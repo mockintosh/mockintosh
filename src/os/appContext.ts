@@ -14,6 +14,7 @@ import type {
   SignInService,
   WindowSpec,
 } from "@mockintosh/sdk";
+import { listFontFamilies, registerFont } from "@mockintosh/ui";
 import type { OSServices, IconScreenRect } from "./context";
 import { createAppSignIn, type SystemSignIn } from "./signIn";
 import { createAppStorage } from "./appStorage";
@@ -187,6 +188,13 @@ export function createAppContext(
     audio: os.audio && instanceAudio(os, os.audio, options.instanceId),
     microphone: os.microphone && instanceMicrophone(os, os.microphone, options.instanceId),
     agentRuntime: os.agentRuntime && instanceAgentRuntime(os, os.agentRuntime, options.instanceId),
+    fontRaster: os.fonts,
+    fonts: {
+      register(name, data, size) {
+        registerFont(name, data, size);
+      },
+      list: () => listFontFamilies(),
+    },
     kernel: kernelClientFor(os, appId, options.instanceId),
     scheduler: {
       now: () => os.scheduler.now(),

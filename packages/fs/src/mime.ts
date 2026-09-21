@@ -20,13 +20,30 @@ const BY_EXTENSION: Readonly<Record<string, string>> = {
   mp4: "video/mp4",
   mp3: "audio/mpeg",
   wav: "audio/wav",
+  ttf: MIME.truetype,
+  otf: "font/otf",
+  fnt: MIME.deckerFont,
 };
 
 /** Browser stills Preview (and, as alternates, Dither / Trace) open. */
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
 
+/** Host outline fonts Foundry opens. */
+export const FONT_TYPES = [
+  MIME.truetype,
+  "font/otf",
+  "font/sfnt",
+  "application/font-sfnt",
+  "application/x-font-ttf",
+  "application/x-font-otf",
+] as const;
+
 export function isImageType(type: string): boolean {
   return (IMAGE_TYPES as readonly string[]).includes(type);
+}
+
+export function isFontType(type: string): boolean {
+  return (FONT_TYPES as readonly string[]).includes(type);
 }
 
 export function extensionOf(name: string): string {
@@ -50,6 +67,7 @@ export function isTextType(type: string): boolean {
     type === MIME.sprite ||
     type === MIME.appShortcut ||
     type === MIME.app ||
+    type === MIME.deckerFont ||
     type.endsWith("+json") ||
     type.endsWith("+xml")
   );

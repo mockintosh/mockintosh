@@ -17,6 +17,7 @@ import type {
   DialogOptions,
   DownloadService,
   FetchFunction,
+  FontRasterService,
   ImageService,
   MicrophoneService,
   VideoService,
@@ -67,6 +68,7 @@ export interface OSServices {
   audio?: AudioService;
   microphone?: MicrophoneService;
   agentRuntime?: AgentRuntime;
+  fonts?: FontRasterService;
   crypto: AppCrypto;
   browser?: BrowserService;
   /** Phone sign-in (`useApp().signIn`), when the platform has a relay. */

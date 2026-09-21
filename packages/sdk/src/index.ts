@@ -16,6 +16,7 @@ import type { AppScheduler, CameraService, ImageService, VideoService } from "./
 import type { AudioService } from "./audio";
 import type { MicrophoneService } from "./microphone";
 import type { AgentRuntime } from "./agentRuntime";
+import type { FontRasterService, FontRegistryService } from "./fontRaster";
 import type { KernelClient, KernelPermission } from "./kernel";
 import type { AppCrypto } from "./crypto";
 import type { BrowserService } from "./browser";
@@ -34,8 +35,10 @@ export {
   inferMimeType,
   isTextType,
   isImageType,
+  isFontType,
   IMAGE_TYPES,
   uniqueChildName,
+  FONT_TYPES,
   type NodeId,
   type NodeRole,
   type FSNode,
@@ -62,6 +65,8 @@ export {
   isImageFrame,
   isDitheredAsset,
   Dithered,
+  DitherTransition,
+  paintDitherDissolve,
   encodePng1bit,
   ASCII_TILE,
   ASCII_MATCH_MODES,
@@ -90,6 +95,7 @@ export type {
   DitheredAsset,
   DitheredProps,
   DitheredSrc,
+  DitherTransitionProps,
   AsciiMatchMode,
   AsciiDitherOptions,
   ResolvedAsciiOptions,
@@ -134,6 +140,22 @@ export type {
   AgentImage,
 } from "./agentRuntime";
 export { readWavChunk, readWavMarkers, setWavChunk, setWavMarkers } from "./wav";
+export type { FontRasterMode, FontRasterOptions, FontRasterService, FontRegistryService } from "./fontRaster";
+export {
+  encodeDeckerFont,
+  decodeDeckerFont,
+  deckerFontFromDraft,
+  draftFromDeckerFont,
+  defaultRasterCharset,
+  deckerOrdinalForCharCode,
+  getGlyphPixel,
+  getGlyphWidth,
+  getGlyphIndexForChar,
+  registerFont,
+  listFonts,
+  listFontFamilies,
+} from "@mockintosh/ui";
+export type { FontStrikeDraft, FontStrikeGlyph, DeckerFont, FontFamilyInfo } from "@mockintosh/ui";
 export type { KernelClient, KernelInvokeOptions, KernelPermission, OperationContract } from "./kernel";
 export type { AppCrypto } from "./crypto";
 export type { BrowserService } from "./browser";
@@ -464,6 +486,10 @@ export interface AppContext {
   microphone?: MicrophoneService;
   /** Language-model agents, when this platform can run them. */
   agentRuntime?: AgentRuntime;
+  /** Rasterize a host TrueType/OpenType file to a 1-bit strike, when this platform can. */
+  fontRaster?: FontRasterService;
+  /** Install a Decker strike for this boot (Font/DA Mover). */
+  fonts: FontRegistryService;
   /** Frame clock and monotonic time. */
   scheduler: AppScheduler;
   /** Kernel traps, when the app declared `permissions`. */
@@ -510,10 +536,11 @@ export type FetchFunction = (url: string, options?: FetchRequest) => Promise<Fet
  * - `browser`   — `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`)
  * - `sign-in`   — `useApp().signIn` is available (sign in from a phone; see `SignInService`)
  * - `agent-runtime` — `useApp().agentRuntime` is available (language-model agents; see `AgentRuntime`)
+ * - `fonts`     — `useApp().fontRaster` is available
  */
 export type Capability =
   | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in"
-  | "agent-runtime";
+  | "agent-runtime" | "fonts";
 
 /**
  * What "About <app>…" — the first Apple-menu item while the app is frontmost —
@@ -718,6 +745,7 @@ export {
   type CursorSpec,
   useTheme,
   useRadius,
+  useViewport,
   themeRadius,
   RADIUS_SCALES,
   DEFAULT_THEME,
@@ -728,6 +756,7 @@ export {
   type UITheme,
   type RadiusScale,
   type RadiusStep,
+  type ViewportSize,
 } from "@mockintosh/ui";
 
 export {
@@ -754,6 +783,10 @@ export {
   ButtonGroup,
   Card,
   Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
   Disclosure,
   Empty,
   Field,

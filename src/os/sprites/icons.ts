@@ -156,6 +156,12 @@ const ICON_VIDEO = defineSprite(
   "qqqqqqqqqqqVVVVVVVVVVpVVVVVVVVVWmqWqWqWqWqaZZZZZZZZZZplllllllllmmqWqWqWqWqaVVVVVVVVVVpVVVVVVVVVWlVVVVVVVVVaVVVVVVVVVVpVVVpVVVVVWlVVWqVVVVVaVVVaqlVVVVpVVVqqpVVVWlVVWqqqVVVaVVVaqqpVVVpVVVqqpVVVWlVVWqpVVVVaVVVapVVVVVpVVVpVVVVVWlVVVVVVVVVaVVVVVVVVVVpVVVVVVVVVWlVVVVVVVVVaapapapapapplllllllllmmWWWWWWWWWaapapapapappVVVVVVVVVWlVVVVVVVVVaqqqqqqqqqqg=="
 );
 
+/** ryos: mac-os-8/applications/atm-4-0-2-installer-resource-6208-applications.png · threshold */
+const ICON_FOUNDRY_ICON = defineSprite(
+  32,
+  32,
+  "VVVVVVVVVVWqqqqqqqqqqlVVVVVVVVVVqqqqqqqqqqpVVVVVVVWVlaqqqqqqqlWqVVVVVVVZVZWqqqqqqqVVqlVVVVVVlVWVqqqqqqpVVapVVVVVWVVVlaqqqqqlVVWqVVVVVZVVVZWqqqqqVVVVqlVVVVlVWVWVqqqqpVVpVapVVVWVVZlVlaqqqlVWqVWqVVVZVVlZVZWqqqVVaqlVqlVVlVVVVVWVqqpVVVVVVapVWVVVVVVVlaqlVWqqqVWqVZVVlVVZVZWqVVaqqqlVqllVWVVVWVWVpVVqqqqpVaqVVZVVVVlVlaqqqqqqqqqqVVVVVVVVVVWqqqqqqqqqqg=="
+);
 export const iconSprites: Record<string, Sprite> = {
   "icon/1bitcamera": ICON_1BITCAMERA,
   "icon/MacFlim": ICON_MACFLIM,
@@ -182,4 +188,5 @@ export const iconSprites: Record<string, Sprite> = {
   "icon/safari": ICON_SAFARI,
   "icon/trash": ICON_TRASH,
   "icon/video": ICON_VIDEO,
+  "foundry/icon": ICON_FOUNDRY_ICON,
 };

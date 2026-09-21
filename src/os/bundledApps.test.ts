@@ -15,6 +15,7 @@ describe("bundled app listings", () => {
       "macpaint",
       "canvas",
       "surface",
+      "foundry",
       "synth",
       "chord",
       "op1",

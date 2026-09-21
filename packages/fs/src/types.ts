@@ -103,6 +103,10 @@ export const MIME = {
   deck: "application/x-decker",
   /** MacPaint document ('PNTG'): 512-byte header, then 720 PackBits rows of 576 pixels. */
   paint: "image/x-macpaint",
+  /** Host TrueType / OpenType bytes dropped onto the desktop. */
+  truetype: "font/ttf",
+  /** Decker `%%FNT1` strike text. */
+  deckerFont: "application/x-mockintosh-font",
 } as const;
 
 export type KnownMime = (typeof MIME)[keyof typeof MIME];

@@ -68,7 +68,7 @@ export default defineConfig({
     // CanvasNode renderer instead of the DOM.
     solid({
       include: [
-        /packages\/ui\/.*\.[tj]sx?$/,
+        /packages\/ui\/(?!src\/primitives\/).*\.[tj]sx?$/,
         /packages\/sdk\/.*\.[tj]sx?$/,
         /apps\/.*\.[tj]sx?$/,
         /src\/os\/.*\.[tj]sx?$/,
@@ -90,6 +90,7 @@ export default defineConfig({
       { find: "@mockintosh/quickdraw", replacement: resolve(__dirname, "packages/quickdraw/src/index.ts") },
       { find: "@mockintosh/ui/renderer", replacement: resolve(__dirname, "packages/ui/src/renderer.ts") },
       { find: "@mockintosh/ui/web", replacement: resolve(__dirname, "packages/ui/src/web/index.ts") },
+      { find: "@mockintosh/ui/primitives", replacement: resolve(__dirname, "packages/ui/src/primitives/index.ts") },
       { find: "@mockintosh/ui/vite", replacement: resolve(__dirname, "packages/ui/src/vite/ditherPlugin.ts") },
       { find: "@mockintosh/ui", replacement: resolve(__dirname, "packages/ui/src/index.ts") },
       { find: "@mockintosh/protocol", replacement: resolve(__dirname, "packages/protocol/src/index.ts") },

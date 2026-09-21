@@ -13,6 +13,8 @@ import { registerApp } from "./apps";
 import { MIME } from "@mockintosh/fs";
 import { getActiveAppId, getActiveWindowId, getWindows, isMenubarHidden, setWindowFullScreen } from "./state";
 import { TITLE_BAR_H, titleBarOuterHeight } from "./windowGeometry";
+import { buildTinyTtf } from "../platform/fontRaster/tinyTtf";
+import Foundry from "@/apps/Foundry";
 
 const WIDTH = 512;
 const HEIGHT = 342;
@@ -92,8 +94,24 @@ describe("bootOS on the headless platform", () => {
     expect(platform.frameCount).toBe(before);
 
     platform.pointer({ type: "move", x: 100, y: 100 });
-    platform.tick();
     expect(platform.frameCount).toBe(before + 1);
+  });
+
+  it("stamps the cursor on move without waiting for the frame loop", () => {
+    const idle = platform.lastFrame()!;
+    platform.pointer({ type: "move", x: 80, y: 200 });
+    const stamped = platform.lastFrame()!;
+    expect(stamped[200 * WIDTH + 80]).toBe(1);
+
+    platform.pointer({ type: "move", x: 400, y: 300 });
+    const moved = platform.lastFrame()!;
+    expect(moved[300 * WIDTH + 400]).toBe(1);
+    // The previous 16×16 is restored from the clean desktop (idle cursor is elsewhere).
+    for (let y = 192; y < 216; y++) {
+      for (let x = 72; x < 96; x++) {
+        expect(moved[y * WIDTH + x], `restored (${x}, ${y})`).toBe(idle[y * WIDTH + x]);
+      }
+    }
   });
 
   it("opens a menu when its title is clicked and closes it on the next click", () => {
@@ -677,6 +695,53 @@ describe("bootOS on the headless platform", () => {
     platform.key({ type: "up", key: "q", modifiers: meta });
     platform.tick();
     expect(getWindows().filter((w) => w.appId === "test-quit")).toHaveLength(0);
+  });
+
+  it("opens Foundry on a TTF and rasterizes a 1-bit strike", async () => {
+    registerApp(Foundry);
+    const desktop = os.services.fs.locate("desktop")!;
+    const file = await os.services.fs.writeFile(desktop.id, "tiny.ttf", buildTinyTtf(), {
+      type: MIME.truetype,
+    });
+    os.services.openApp("foundry", { fileId: file.id, title: file.name });
+    platform.tick();
+    const win = getWindows().find((w) => w.appId === "foundry");
+    expect(win).toBeDefined();
+    await vi.waitFor(() => {
+      platform.tick();
+      const frame = platform.lastFrame()!;
+      const coverage = inkCoverage(frame, win!.x + 10, win!.y + TITLE_BAR_H + 4, 120, 40);
+      expect(coverage).toBeGreaterThan(0.02);
+    });
+    const caller = os.kernel.createSession();
+    const nodes = (await os.kernel.invoke(caller, "inspect", { window: win!.id })) as Array<{
+      name?: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }>;
+    expect(nodes.some((n) => n.name === "glyph-strip")).toBe(true);
+    const cells = nodes.filter((n) => n.name?.startsWith("glyph-") && n.name !== "glyph-strip");
+    expect(cells.map((n) => n.name)).toEqual(expect.arrayContaining(["glyph-32", "glyph-65"]));
+    const right = win!.x + win!.width;
+    for (const cell of cells) {
+      expect(cell.bounds.width).toBeGreaterThan(0);
+      expect(cell.bounds.x + cell.bounds.width).toBeLessThanOrEqual(right);
+    }
+  });
+
+  it("writes a dropped host TrueType font onto the desktop", async () => {
+    const desktop = os.services.fs.locate("desktop")!;
+    expect(os.services.fs.child(desktop.id, "tiny.ttf")).toBeUndefined();
+    platform.drop({
+      x: 80,
+      y: 80,
+      files: [{ name: "tiny.ttf", type: "font/ttf", bytes: new Uint8Array([0, 1, 0, 0]) }],
+    });
+    await vi.waitFor(() => {
+      expect(os.services.fs.child(desktop.id, "tiny.ttf")).toMatchObject({
+        kind: "file",
+        type: "font/ttf",
+      });
+    });
   });
 
   it("writes a dropped host image onto the desktop", async () => {

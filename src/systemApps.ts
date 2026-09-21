@@ -28,6 +28,7 @@ import { sprites as op1Sprites } from "@/apps/op1/icons";
 import { sprites as tp7Sprites } from "@/apps/tp7/icons";
 import { sprites as pchkraftSprites } from "@/apps/pchkraft/icons";
 import { sprites as visualizerSprites } from "@/apps/visualizer/icons";
+import { sprites as foundrySprites } from "@/apps/foundry/icons";
 
 for (const app of [
   Testing,
@@ -119,6 +120,15 @@ registerBundledApp({
   icon: "surface/icon",
   sprites: surfaceSprites,
   load: () => import("@/apps/Surface"),
+});
+
+registerBundledApp({
+  id: "foundry",
+  title: "Foundry",
+  description: "Rasterizes TrueType and OpenType fonts into 1-bit bitmap strikes, which you can then tune pixel by pixel.",
+  icon: "foundry/icon",
+  sprites: foundrySprites,
+  load: () => import("@/apps/Foundry"),
 });
 
 registerBundledApp({

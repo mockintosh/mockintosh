@@ -24,6 +24,7 @@ export function platformCapabilities(platform: Platform): CapabilitySet {
   if (platform.browser) caps.add("browser");
   if (platform.signInRelay) caps.add("sign-in");
   if (platform.agentRuntime) caps.add("agent-runtime");
+  if (platform.fonts) caps.add("fonts");
   return caps;
 }
 
@@ -48,6 +49,7 @@ const DESCRIPTIONS: Record<Capability, string> = {
   browser: "a web browser",
   "sign-in": "a way to sign in from a phone",
   "agent-runtime": "a way to run AI agents",
+  fonts: "TrueType rasterizing",
 };
 
 /** “"Photo Booth" needs a camera, which this Macintosh does not have.” */

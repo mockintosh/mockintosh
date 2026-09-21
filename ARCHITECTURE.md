@@ -86,14 +86,14 @@ The design follows the Macintosh: required members are what every Mac had (scree
 
 Implementations:
 
-- `src/platform/web/` — `<canvas>` + `CanvasPresenter`, DOM events (including host file drops), `requestAnimationFrame`, `OPFSBackend`, `navigator.clipboard`, `WebUSBPrinterTransport`, `fetch`, a Web Audio speaker (`media/audio.ts`), a `getUserMedia` microphone (`media/microphone.ts`), and an agent runtime (`agentRuntime.ts`: fx's WebAssembly core through libfx, loaded on first use, absent without JSPI). The only OS-level code allowed to touch the DOM.
+- `src/platform/web/` — `<canvas>` + `CanvasPresenter`, DOM events (including host file drops), `requestAnimationFrame`, `OPFSBackend`, `navigator.clipboard`, `WebUSBPrinterTransport`, `fetch`, `FontFace` strike rasterizing for Foundry, a Web Audio speaker (`media/audio.ts`), a `getUserMedia` microphone (`media/microphone.ts`), and an agent runtime (`agentRuntime.ts`: fx's WebAssembly core through libfx, loaded on first use, absent without JSPI). The only OS-level code allowed to touch the DOM.
 - `src/platform/headless/` — in-memory display with frame read-back, synthetic input injection, a hand-advanced clock, `InMemoryBackend`, and (with `audioSampleRate`) a speaker that renders on the clock and keeps what it played, and (with `microphoneSampleRate`) a microphone that delivers whatever a test `speak`s into it. `src/os/boot.test.ts` boots the whole shell on it and drives menus, ⌘N, and the capability dialog from Node. It is the starting point for any new host: swap `present()` and the input injectors for real drivers.
 
 Which apps ship is the entry point's decision, not the OS's: `src/systemApps.ts` registers the web build's always-on apps, and lists the optional ones the App Store installs. Bundled apps are written against `@mockintosh/sdk` only — `export default defineApp(…)`, `useApp()` — so they are the same shape as a third-party bundle and could be moved out of the tree. An SDK-clean app may also import `@mockintosh/quickdraw` for offscreen drawing; the OS serves the one shared instance through the import map, because `thePort`, the Font Manager and the cursor are globals (MacPaint is a port of `MacPaint.p` onto it). Three stay OS-owned and reach into `src/os` on purpose: Finder (desktop, folder windows, About This Macintosh, Control Panel), App Store (installation privileges), and Icon Gallery (the OS icon catalog). Finder is registered by boot; other bundled apps are registered by the host. Kernel clients (Source Editor, Terminal, ChatGippity) stay SDK-clean and receive a granted `AppContext.kernel` session from `permissions`.
 
 ### Capabilities
 
-Apps declare what they cannot work without — `requires: ["camera"]` on `defineApp`/`registerApp`, and on App Store manifests. `platformCapabilities(platform)` (`src/os/capabilities.ts`) derives the set this machine has: `network`/`clipboard`/`printer`/`download`/`audio`/`microphone` and the media services from the services present, the rest from `hostCapabilities`. The OS refuses to launch an app with unmet requirements and tells the user why (“*"Photo Booth" needs a camera, which this Macintosh does not have.*”), and skips loading installed bundles it cannot run (their shortcuts explain the same when opened). Apps that work with *or* without a feature check `useApp().capabilities` at the point of use instead — Preview opens sprite files everywhere and gates PNG decoding on `images`; Dither hides Export when `download` is absent; the TP-7 requires only a speaker and says "NO MICROPHONE" when asked to record without one.
+Apps declare what they cannot work without — `requires: ["camera"]` on `defineApp`/`registerApp`, and on App Store manifests. `platformCapabilities(platform)` (`src/os/capabilities.ts`) derives the set this machine has: `network`/`clipboard`/`printer`/`download`/`audio`/`microphone`/`fonts` and the media services from the services present, the rest from `hostCapabilities`. The OS refuses to launch an app with unmet requirements and tells the user why (“*"Photo Booth" needs a camera, which this Macintosh does not have.*”), and skips loading installed bundles it cannot run (their shortcuts explain the same when opened). Apps that work with *or* without a feature check `useApp().capabilities` at the point of use instead — Preview opens sprite files everywhere and gates PNG decoding on `images`; Dither hides Export when `download` is absent; Foundry disables Hinted when `fonts` is missing; the TP-7 requires only a speaker and says "NO MICROPHONE" when asked to record without one.
 
 ## App model
 
@@ -172,7 +172,8 @@ src/platform/
 packages/ui/                1-bit Solid canvas kit — npm `@mockintosh/ui`, site `ui.mockintosh.com`
                             engine: host elements + createUI + layout/draw/input/fonts
                             algorithms: dither, sprites, PNG
-                            widgets/: Solid compositions (Button, TextInput, …)
+                            primitives/: headless create* behavior (press, toggle, slider)
+                            widgets/: skins over host elements (Button, TextInput, …)
                             ./web and ./vite: host adapters
                             Mockintosh apps import widgets via `@mockintosh/sdk`, not this package name
 packages/fs/                Reactive virtual file system + backends
@@ -184,6 +185,7 @@ packages/print/             Print pages → PrinterEncoder (ESC/POS, cat printer
 packages/quickdraw/         GrafPort, CopyBits, BitBlt, packed 1-bit BitMap
 
 sites/ui/                   ui.mockintosh.com — kit catalog; @mockintosh/ui only, not the OS
+                            catalog DevTools (right-click Inspect) is 1-bit chrome in the framebuffer
 
 apps/                       Bundled apps (*.tsx), SDK-only except Finder, App Store, Icon Gallery
   Finder.solid.tsx
@@ -230,10 +232,10 @@ api/                        Vercel functions; api/_web/ is the shared web reader
 Each dirty frame:
 
 1. Solid tree → layout → QuickDraw paint (`ui.frame()`). The tree ends with `ScreenCorners`, an inert layer that anchors the rounded-CRT corner sprites with `right`/`bottom` absolute layout above every window and menu.
-2. `drawCursor` composites QuickDraw's `cursorState.cursor` (mask `srcBic`, data `srcOr`) at the pointer — the only thing drawn outside the tree, standing in for the Mac's VBL cursor task
-3. `platform.display.present(screen)` — on the web, `CanvasPresenter` expands the packed bits to RGBA on the 2D canvas
+2. The host compositor copies that clean frame and stamps QuickDraw's `cursorState.cursor` (mask `srcBic`, data `srcOr`) — the VBL cursor task. Pointer motion restamps the copy; it does not re-paint the tree.
+3. `platform.display.present(composite)` — on the web, `CanvasPresenter` expands the packed bits to RGBA on the 2D canvas
 
-`InitGraf` allocates the framebuffer (`globals.screenBits`) unless the display owns one (`display.framebuffer`, for DMA-backed panels); the shell hands the same `BitMap` to `createUI` and to the display, so nothing else owns pixel memory.
+`InitGraf` allocates the framebuffer (`globals.screenBits`) unless the display owns one (`display.framebuffer`, for DMA-backed panels); the shell paints the tree into that `BitMap`. A presentation copy receives the cursor stamp so the UI buffer stays clean. Zoom XOR paints on `screenBits` and presents that buffer for the duration of the animation.
 
 QuickDraw paints through the original `RgnBlt` / `StretchBits` pipeline (`CopyBits`, `ScrollRect`, and every shape verb). Word-wide `BitBlt` fast paths are omitted unless they are pixel-identical to the general path. `BitBltSlow` is the per-pixel oracle tests compare against; it is not part of the public surface.
 
@@ -338,9 +340,9 @@ apps/finder/attributes.ts      Finder's typed view of node attributes
 
 **Durability.** A body is written to the backend *before* its catalog entry appears; an entry is removed *before* its body is deleted. The catalog is debounced (500 ms) and versioned: `parseCatalog` migrates older documents (the v1 `FileManager` catalog → v2: MIME types, roles, attributes → v3: persisted revisions) and drops unreachable nodes rather than failing.
 
-**Opening.** A double-click asks `resolveOpenAction`: directories open a Finder window; `MIME.appShortcut` / `MIME.app` launch the referenced app; other files launch the first registered app that claims the MIME type as its `"default"` in `fileTypes` (falling back to an `"alternate"` claim), with `FileDocumentProps` (`fileId`, `title`) as props. `os.openersFor(type)` lists every claimant for "Open With". FileViewer opens `text/*`; Preview is the default for 1-bit sprite files and PNG/JPEG/GIF/WebP, and offers Dither and Trace, which claim those types as alternates. Unknown types show a dialog, as does a shortcut or manifest whose app is no longer registered (`reason: "unknown-app"`).
+**Opening.** A double-click asks `resolveOpenAction`: directories open a Finder window; `MIME.appShortcut` / `MIME.app` launch the referenced app; other files launch the first registered app that claims the MIME type as its `"default"` in `fileTypes` (falling back to an `"alternate"` claim), with `FileDocumentProps` (`fileId`, `title`) as props. `os.openersFor(type)` lists every claimant for "Open With". FileViewer opens `text/*`; Preview is the default for 1-bit sprite files and PNG/JPEG/GIF/WebP, and offers Dither and Trace, which claim those types as alternates; Foundry opens TrueType/OpenType and `%%FNT1` strikes. Unknown types show a dialog, as does a shortcut or manifest whose app is no longer registered (`reason: "unknown-app"`).
 
-**Host import.** The web platform reports files the user drags from the real computer onto the screen (`PlatformInput.onDrop`). `bootOS` writes them into the folder under the pointer (desktop, or an open Finder folder) via `src/os/hostImport.ts`. Dropping onto a Dither window also opens the new file there.
+**Host import.** The web platform reports files the user drags from the real computer onto the screen (`PlatformInput.onDrop`). `bootOS` writes them into the folder under the pointer (desktop, or an open Finder folder) via `src/os/hostImport.ts`. Dropping onto a Dither window also opens the new file there; dropping a font onto Foundry does the same.
 
 **Apps.** `useApp().fs` exposes the same `FileSystem` (typed `AppFileSystem` in the SDK); `useApp().storage` is a per-app folder under `System Folder/Preferences`. Installed third-party manifests are `MIME.app` files in `Applications` and are loaded at boot by the `AppInstaller`.
 

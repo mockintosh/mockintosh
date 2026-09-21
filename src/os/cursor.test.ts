@@ -15,7 +15,7 @@ import {
   type GrafPort,
 } from "@mockintosh/quickdraw";
 import { makeRect, newBitMap } from "@mockintosh/quickdraw/bits";
-import { drawCursor } from "./cursor";
+import { drawCursor, liveCursor } from "./cursor";
 import { cursors } from "./cursors";
 
 const WIDTH = 64;
@@ -77,10 +77,12 @@ describe("drawCursor", () => {
 
   it("honors HideCursor / ShowCursor", () => {
     HideCursor();
+    expect(liveCursor()).toBeUndefined();
     drawCursor(port, 20, 20);
     for (let v = 0; v < HEIGHT; v++) for (let h = 0; h < WIDTH; h++) expect(GetPixel(h, v)).toBe(false);
 
     ShowCursor();
+    expect(liveCursor()).toBeDefined();
     drawCursor(port, 20, 20);
     expect(GetPixel(20, 20)).toBe(true);
   });

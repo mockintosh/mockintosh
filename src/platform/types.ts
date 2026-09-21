@@ -24,6 +24,7 @@ import type {
   Capability,
   FetchFunction,
   DownloadService,
+  FontRasterService,
   ImageService,
   MicrophoneService,
   VideoService,
@@ -177,6 +178,8 @@ export interface Platform {
   microphone?: MicrophoneService;
   /** Runs language-model agents for apps. Absent when the host can't load the engine. */
   agentRuntime?: AgentRuntime;
+  /** Rasterize a host TrueType/OpenType file to a 1-bit strike. */
+  fonts?: FontRasterService;
   crypto: AppCrypto;
   browser?: BrowserService;
   /** Phone sign-in for apps (`useApp().signIn`). Absent when no relay server is reachable. */

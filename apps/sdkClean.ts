@@ -8,6 +8,7 @@
 export const SDK_CLEAN = [
   "MacPaint.tsx",
   "Canvas.tsx",
+  "Foundry.tsx",
   "Safari.tsx",
   "Testing.tsx",
   "FileViewer.tsx",
@@ -42,6 +43,7 @@ export const SHELL_APPS = [
 export const BUNDLED_APPS = [
   "MacPaint.tsx",
   "Canvas.tsx",
+  "Foundry.tsx",
   "Safari.tsx",
   "Testing.tsx",
   "FileViewer.tsx",
@@ -75,6 +77,7 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "MacPaint.tsx": ["macpaint"],
   "Canvas.tsx": ["canvas"],
   "Safari.tsx": ["safari"],
+  "Foundry.tsx": ["foundry"],
   "SpotifyPlayer.tsx": ["spotify", "sprites"],
   "Finder.solid.tsx": ["finder"],
   "PhotoBooth.tsx": ["photobooth"],
@@ -94,6 +97,7 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
 export const APP_TITLES: Record<BundledAppEntry, string> = {
   "MacPaint.tsx": "MacPaint",
   "Canvas.tsx": "Canvas",
+  "Foundry.tsx": "Foundry",
   "Safari.tsx": "Safari",
   "Testing.tsx": "Testing",
   "FileViewer.tsx": "File",

@@ -18,6 +18,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 |---|---|---|
 | MacPaint | `MacPaint.tsx` | SDK-clean |
 | Canvas | `Canvas.tsx` | SDK-clean |
+| Foundry | `Foundry.tsx` | SDK-clean |
 | Safari | `Safari.tsx` | SDK-clean |
 | Testing | `Testing.tsx` | SDK-clean |
 | File | `FileViewer.tsx` | SDK-clean |

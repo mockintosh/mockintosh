@@ -15,15 +15,15 @@ import { registerFileOperations } from "./kernel/files";
  * web build); the boot sequence only knows about the Finder and dialogs.
  */
 
-import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd } from "@mockintosh/quickdraw";
+import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd, type Rect } from "@mockintosh/quickdraw";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
-import { createDoubleClickTracker, createUI, type Modifiers } from "@mockintosh/ui";
+import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers } from "@mockintosh/ui";
 import { FileSystem } from "@mockintosh/fs";
 import type { AppContext } from "@mockintosh/sdk";
 import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEvent } from "../platform/types";
-import { importHostFile, isImportableImage, resolveImportTarget } from "./hostImport";
+import { importHostFile, isImportableHostFile, resolveImportTarget } from "./hostImport";
 import { SpriteRegistry, registerBuiltinSprites } from "./sprites";
-import { drawCursor } from "./cursor";
+import { liveCursor } from "./cursor";
 import { cursorForName, cursors } from "./cursors";
 import { animateZoomRect, type AnimRect } from "./zoomAnimation";
 import { buildFolderWindow, windowOuterRect } from "../../apps/Finder.solid";
@@ -117,7 +117,12 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   bootTrace("qd");
   InitGraf(display.framebuffer ?? newBitMap(display.width, display.height));
   let screen = qd.screenBits;
-  const present = () => { if (!stopped) display.present(screen); };
+  let presentBits = newBitMap(display.width, display.height);
+  let cursorRect: Rect | null = null;
+  let framed = false;
+  /** Zoom XOR paints on `screen`; the cursor lives on `presentBits`. */
+  const presentScreen = () => { if (!stopped) display.present(screen); };
+  const presentComposite = () => { if (!stopped) display.present(presentBits); };
 
   InitCursor();
 
@@ -234,6 +239,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     audio: platform.audio,
     microphone: platform.microphone,
     agentRuntime: platform.agentRuntime,
+    fonts: platform.fonts,
     crypto: platform.crypto,
     browser: platform.browser,
     signIn: platform.signInRelay && systemSignIn(platform.signInRelay),
@@ -491,6 +497,10 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     const next = newBitMap(width, height);
     qd.screenBits = next;
     screen = next;
+    // The old composite no longer matches the screen; the next frame rebuilds it.
+    presentBits = newBitMap(width, height);
+    cursorRect = null;
+    framed = false;
     ui.resize(next);
     setResolutionSize((size) => {
       size.width = width;
@@ -501,6 +511,25 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     cursorY = Math.min(cursorY, Math.max(0, height - 1));
     scheduleRepaint();
   });
+
+  function stampCursor(prev: Rect | null): Rect | null {
+    return moveSoftwareCursor(screen, presentBits, prev, liveCursor(), cursorX, cursorY);
+  }
+
+  /** Restamp the cursor on the last clean frame. No tree paint. */
+  function presentCursor(): void {
+    if (stopped || animating || !framed) return;
+    const prev = cursorRect;
+    cursorRect = stampCursor(prev);
+    presentComposite();
+  }
+
+  function compositeFrame(): void {
+    copyBitMapBytes(screen, presentBits);
+    cursorRect = stampCursor(null);
+    framed = true;
+    presentComposite();
+  }
 
   // --- Busy work, under the watch ---
   /** Busy work waiting for a frame with the watch in it; started once that frame is visible. */
@@ -535,8 +564,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   function renderFrame() {
     if (stopped) return;
     ui.frame();
-    drawCursor(ui.port, cursorX, cursorY);
-    present();
+    compositeFrame();
     if (busyStarts.length > 0) {
       // Busy work may freeze the screen, so it waits until the watch is seen.
       const starts = busyStarts.splice(0);
@@ -557,7 +585,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     animating = true;
     void animateZoomRect({
       port: ui.port,
-      present,
+      present: presentScreen,
       from,
       to,
       cancelled: () => stopped,
@@ -614,11 +642,13 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         cursorX = e.x;
         cursorY = e.y;
         cursorState.obscured = false;
-        screenDirty = true;
         ui.dispatchPointer("mousemove", e.x, e.y, { modifiers: e.modifiers });
         trackCursor(e.x, e.y);
+        presentCursor();
         return;
       case "down": {
+        cursorX = e.x;
+        cursorY = e.y;
         ui.dispatchPointer("mousedown", e.x, e.y, { modifiers: e.modifiers });
         if (doubleClick.down(e.x, e.y, scheduler.now())) {
           ui.dispatchPointer("dblclick", e.x, e.y);
@@ -628,11 +658,15 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         return;
       }
       case "up":
+        cursorX = e.x;
+        cursorY = e.y;
         ui.dispatchPointer("mouseup", e.x, e.y, { modifiers: e.modifiers });
         trackCursor(e.x, e.y);
         scheduleRepaint();
         return;
       case "scroll":
+        cursorX = e.x;
+        cursorY = e.y;
         ui.dispatchPointer("scroll", e.x, e.y, { deltaY: e.deltaY ?? 0 });
         scheduleRepaint();
         return;
@@ -699,19 +733,19 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
 
   async function onDrop(e: PlatformDropEvent): Promise<void> {
     if (stopped) return;
-    const images = e.files.filter(isImportableImage);
-    if (images.length === 0) {
+    const accepted = e.files.filter(isImportableHostFile);
+    if (accepted.length === 0) {
       if (e.files.length > 0) {
-        await osServices.showDialog({ message: "Only image files can be imported.", buttons: ["OK"] });
+        await osServices.showDialog({ message: "Only image and font files can be imported.", buttons: ["OK"] });
       }
       return;
     }
     const target = resolveImportTarget(fs, getWindows(), e.x, e.y, MENUBAR_HEIGHT);
     if (!target) return;
     const imported = [];
-    for (let i = 0; i < images.length; i++) {
+    for (let i = 0; i < accepted.length; i++) {
       imported.push(
-        await importHostFile(fs, target.parentId, images[i], {
+        await importHostFile(fs, target.parentId, accepted[i], {
           x: target.position.x + i * 16,
           y: target.position.y + i * 16,
         }),
@@ -750,7 +784,10 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     }
   }
   registerUIOperations(kernel, osServices, { ui, beginGesture: () => { doubleClick.reset(); }, pointer: onPointer, key: onKey, render: renderBarrier,
-    capture: () => ({ width: resolution.width, height: resolution.height, rowBytes: screen.rowBytes, bytes: Array.from(screen.baseAddr) }) });
+    capture: () => {
+      const bits = framed ? presentBits : screen;
+      return { width: resolution.width, height: resolution.height, rowBytes: bits.rowBytes, bytes: Array.from(bits.baseAddr) };
+    } });
 
   registerDesktopSettings(kernel, desktopSettings);
   osServices.projects = await registerProjects(kernel, osServices, platform, renderBarrier);

@@ -35,6 +35,7 @@ import { createWebCrypto } from "./crypto";
 import { createWebSourceProvider } from "./source";
 import { createWebBrowserService } from "./browser";
 import { createWebSignInRelay } from "./signInRelay";
+import { createWebFontRasterService } from "./fontRaster";
 export interface WebPlatformOptions {
   /** Element the screen canvas is appended to. */
   root: HTMLElement;
@@ -146,6 +147,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     audio: createWebAudioService(),
     microphone: createWebMicrophoneService(),
     agentRuntime: createWebAgentRuntime(),
+    fonts: createWebFontRasterService(),
     builder: browserBuilder,
     hostDisplay,
     source: createWebSourceProvider(),
@@ -187,19 +189,8 @@ function createDOMInput(
     emitPointer({ type: "up", ...toScreen(e), button: button(e), modifiers: modifiers(e) });
   });
 
-  // Coalesce mouse moves to one per frame.
-  let pendingMove: MouseEvent | null = null;
   canvas.addEventListener("mousemove", (e) => {
-    if (pendingMove) {
-      pendingMove = e;
-      return;
-    }
-    pendingMove = e;
-    requestAnimationFrame(() => {
-      const ev = pendingMove!;
-      pendingMove = null;
-      emitPointer({ type: "move", ...toScreen(ev), modifiers: modifiers(ev) });
-    });
+    emitPointer({ type: "move", ...toScreen(e), modifiers: modifiers(e) });
   });
 
   // The page around the canvas is not the screen. While the pointer is in

@@ -1,16 +1,19 @@
 /**
  * Host file import — a file the user dragged from the real computer onto the
- * Mockintosh screen becomes an ordinary FS node. Dropping it on Dither or
- * Trace opens that app; anything else lands in the folder under the pointer.
+ * Mockintosh screen becomes an ordinary FS node. Dropping it on Dither,
+ * Trace or Foundry opens that app; anything else lands in the folder under
+ * the pointer.
  */
-import { inferMimeType, isImageType, uniqueChildName, type FileSystem, type FSFile } from "@mockintosh/fs";
+import { inferMimeType, isFontType, isImageType, MIME, uniqueChildName, type FileSystem, type FSFile } from "@mockintosh/fs";
 import type { HostFileDrop } from "../platform/types";
 import type { OSWindow } from "./state";
 import { windowContentRect, windowTotalHeight } from "./windowGeometry";
 
 export const DITHER_APP_ID = "dither";
 export const TRACE_APP_ID = "trace";
+export const FOUNDRY_APP_ID = "foundry";
 export const IMPORTED_IMAGE_ICON = "icon/camera";
+export const IMPORTED_FONT_ICON = "foundry/icon";
 
 export interface ImportTarget {
   parentId: string;
@@ -22,6 +25,15 @@ export interface ImportTarget {
 export function isImportableImage(file: HostFileDrop): boolean {
   if (isImageType(file.type)) return true;
   return isImageType(inferMimeType(file.name));
+}
+
+export function isImportableFont(file: HostFileDrop): boolean {
+  if (isFontType(file.type)) return true;
+  return isFontType(inferMimeType(file.name));
+}
+
+export function isImportableHostFile(file: HostFileDrop): boolean {
+  return isImportableImage(file) || isImportableFont(file);
 }
 
 /**
@@ -45,7 +57,7 @@ export function resolveImportTarget(
       x >= win.x && x < win.x + win.width && y >= win.y && y < win.y + height;
     if (!inside) continue;
 
-    if (win.appId === DITHER_APP_ID || win.appId === TRACE_APP_ID) {
+    if (win.appId === DITHER_APP_ID || win.appId === TRACE_APP_ID || win.appId === FOUNDRY_APP_ID) {
       return {
         parentId: desktop.id,
         position: desktopPosition(x, y, menubarHeight),
@@ -80,12 +92,19 @@ export async function importHostFile(
   file: HostFileDrop,
   position: { x: number; y: number },
 ): Promise<FSFile> {
-  const type = isImageType(file.type) ? file.type : inferMimeType(file.name);
+  const inferred = inferMimeType(file.name);
+  const type = isImageType(file.type)
+    ? file.type
+    : isFontType(file.type)
+      ? file.type === "font/otf"
+        ? "font/otf"
+        : MIME.truetype
+      : inferred;
   const name = uniqueChildName(fs, parentId, file.name.trim() || "untitled");
   return fs.writeFile(parentId, name, file.bytes, {
     type,
     attributes: {
-      icon: IMPORTED_IMAGE_ICON,
+      icon: isImportableFont({ ...file, type }) ? IMPORTED_FONT_ICON : IMPORTED_IMAGE_ICON,
       position: { x: position.x, y: position.y },
     },
   });

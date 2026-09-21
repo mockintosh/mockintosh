@@ -22,6 +22,7 @@ import type {
 } from "../types";
 import { createHeadlessAudio, type HeadlessAudio } from "./audio";
 import { createHeadlessMicrophone, type HeadlessMicrophone } from "./microphone";
+import { createOutlineFontRasterService } from "../fontRaster/service";
 
 export interface HeadlessPlatformOptions {
   width: number;
@@ -117,6 +118,7 @@ export function createHeadlessPlatform(options: HeadlessPlatformOptions): Headle
       randomBytes(n) { return new Uint8Array(n); },
       async sha256(bytes) { return bytes.slice(); },
     },
+    fonts: createOutlineFontRasterService(),
 
     get frameCount() {
       return frameCount;
