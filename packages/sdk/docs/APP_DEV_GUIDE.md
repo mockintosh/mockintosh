@@ -25,6 +25,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Dither | `Dither.tsx` | SDK-clean |
 | Trace | `Trace.tsx` | SDK-clean |
 | Surface | `Surface.tsx` | SDK-clean |
+| Showreel | `Showreel.tsx` | SDK-clean |
 | Video Player | `VideoPlayer.tsx` | SDK-clean |
 | Photo Booth | `PhotoBooth.tsx` | SDK-clean |
 | Source Editor | `SourceEditor.tsx` | SDK-clean |

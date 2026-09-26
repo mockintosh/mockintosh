@@ -21,6 +21,7 @@ import IconGallery from "@/apps/IconGallery";
 import MacPaint from "@/apps/MacPaint";
 import Canvas from "@/apps/Canvas";
 import Surface from "@/apps/Surface";
+import Showreel from "@/apps/Showreel";
 
 for (const app of [
   Testing,
@@ -41,6 +42,7 @@ for (const app of [
   MacPaint,
   Canvas,
   Surface,
+  Showreel,
 ]) {
   registerApp(app);
 }
