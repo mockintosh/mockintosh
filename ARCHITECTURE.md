@@ -134,7 +134,7 @@ Windows belong to apps via `OSWindow.appId`; the **active app** is derived, neve
 
 Menus are owned by apps, not windows. `SolidApp.menus` (or `setAppMenus(appId, …)` for menus that change at runtime) registers an app's menubar; `useWindow().setMenus` sets a *per-window override* for menus that depend on window state (Finder's "Clean Up" is enabled only inside a folder). `getMenubarMenus()` resolves override → app menus → `[]`, so switching windows always shows the right menus with no imperative sync.
 
-### Third-party apps (SDK v2)
+### Third-party apps (SDK v3)
 
 ```ts
 export default defineApp({
