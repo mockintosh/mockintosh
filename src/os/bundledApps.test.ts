@@ -18,6 +18,7 @@ describe("bundled app listings", () => {
       "synth",
       "chord",
       "op1",
+      "tp7",
     ]);
     const apps = await Promise.all(
       listings.map(async (listing) => validateModule(listing.id, await listing.load()).default),

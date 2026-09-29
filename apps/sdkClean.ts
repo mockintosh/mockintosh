@@ -19,6 +19,7 @@ export const SDK_CLEAN = [
   "Synth.tsx",
   "Chord.tsx",
   "OP1.tsx",
+  "TP7.tsx",
   "VideoPlayer.tsx",
   "PhotoBooth.tsx",
   "SourceEditor.tsx",
@@ -50,6 +51,7 @@ export const BUNDLED_APPS = [
   "Synth.tsx",
   "Chord.tsx",
   "OP1.tsx",
+  "TP7.tsx",
   "VideoPlayer.tsx",
   "PhotoBooth.tsx",
   "SpotifyPlayer.tsx",
@@ -79,6 +81,7 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "Synth.tsx": ["synth"],
   "Chord.tsx": ["chord", "synth"],
   "OP1.tsx": ["op1", "synth"],
+  "TP7.tsx": ["tp7", "synth"],
   "Fx.tsx": ["fx"],
 };
 
@@ -96,6 +99,7 @@ export const APP_TITLES: Record<BundledAppEntry, string> = {
   "Synth.tsx": "Synthesizer",
   "Chord.tsx": "Pocket Chord",
   "OP1.tsx": "OP-1",
+  "TP7.tsx": "TP-7",
   "VideoPlayer.tsx": "Video Player",
   "PhotoBooth.tsx": "Photo Booth",
   "SpotifyPlayer.tsx": "Spotify",

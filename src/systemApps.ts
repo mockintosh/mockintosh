@@ -25,6 +25,7 @@ import { sprites as surfaceSprites } from "@/apps/surface/icons";
 import { sprites as synthSprites } from "@/apps/synth/icons";
 import { sprites as chordSprites } from "@/apps/chord/icons";
 import { sprites as op1Sprites } from "@/apps/op1/icons";
+import { sprites as tp7Sprites } from "@/apps/tp7/icons";
 
 for (const app of [
   Testing,
@@ -151,5 +152,15 @@ registerBundledApp({
   load: () => import("@/apps/OP1"),
 });
 
+registerBundledApp({
+  id: "tp7",
+  title: "TP-7",
+  description:
+    "A field recorder in the manner of the Teenage Engineering TP-7. Record memos from the microphone, then hold the reel to stop the tape, spin it to scrub, or turn the ring around it to wind. Memos are WAV files in the TP-7 folder on your disk; marks are kept inside them.",
+  icon: "tp7/icon",
+  sprites: tp7Sprites,
+  requires: ["audio"],
+  load: () => import("@/apps/TP7"),
+});
 
 

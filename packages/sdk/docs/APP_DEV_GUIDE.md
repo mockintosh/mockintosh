@@ -29,6 +29,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Synthesizer | `Synth.tsx` | SDK-clean |
 | Pocket Chord | `Chord.tsx` | SDK-clean |
 | OP-1 | `OP1.tsx` | SDK-clean |
+| TP-7 | `TP7.tsx` | SDK-clean |
 | Video Player | `VideoPlayer.tsx` | SDK-clean |
 | Photo Booth | `PhotoBooth.tsx` | SDK-clean |
 | Source Editor | `SourceEditor.tsx` | SDK-clean |
@@ -392,6 +393,7 @@ input.close();
 - Markers go with the file: `setWavMarkers(bytes, frames)` replaces a WAV's cue points without touching its audio, and `readWavMarkers(bytes)` reads them back.
 - So can your own data: `setWavChunk(bytes, "abcd", body)` puts a chunk of your own in the file (or removes it when `body` is `null`), and `readWavChunk(bytes, "abcd")` reads it back. Other players skip chunks they don't know. The OP-1 keeps each tape's tempo and mix in its WAV this way.
 
+The bundled TP-7 (`apps/TP7.tsx`, transport in `apps/tp7/`) is the worked example. It records memos as WAV files the Finder can see, keeps marks as cue points, and scrubs with a varispeed transport.
 
 ## Agents
 
