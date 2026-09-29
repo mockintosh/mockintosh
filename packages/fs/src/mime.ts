@@ -11,6 +11,8 @@ const BY_EXTENSION: Readonly<Record<string, string>> = {
   canvas: MIME.canvas,
   png: "image/png",
   pbm: "image/x-portable-bitmap",
+  pntg: MIME.paint,
+  mac: MIME.paint,
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   gif: "image/gif",

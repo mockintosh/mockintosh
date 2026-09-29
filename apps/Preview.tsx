@@ -7,6 +7,8 @@ import {
   IMAGE_TYPES,
   MIME,
   readSpriteFile,
+  readPaintFile,
+  paintToSprite,
   showPrintDialog,
   toBits,
   type AppContext,
@@ -44,6 +46,12 @@ async function loadPicture(app: AppContext, fileId: string): Promise<ShownPictur
     const sprite = await readSpriteFile(app.fs, fileId);
     if (!sprite) throw new Error(`Couldn't read "${file.name}".`);
     return { width: sprite.width, height: sprite.height, pixels: sprite.data };
+  }
+  if (file.type === MIME.paint) {
+    const doc = await readPaintFile(app.fs, fileId);
+    if (!doc) throw new Error(`Couldn't read "${file.name}".`);
+    const page = paintToSprite(doc);
+    return { width: page.width, height: page.height, pixels: page.data };
   }
   if (!app.images) throw new Error(`This Macintosh cannot decode "${file.name}".`);
   const bytes = await app.fs.readBytes(fileId);
@@ -176,7 +184,7 @@ export default defineApp<PreviewProps>({
   minSize: WINDOW_MIN,
   scrollable: true,
   resizable: true,
-  fileTypes: [MIME.sprite, ...IMAGE_TYPES],
+  fileTypes: [MIME.sprite, ...IMAGE_TYPES, { type: MIME.paint, rank: "alternate" }],
   Component: Preview,
   onOpen(app, props) {
     const id = typeof props.fileId === "string" ? props.fileId : undefined;

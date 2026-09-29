@@ -101,6 +101,8 @@ export const MIME = {
   /** JSON app manifest for an installed third-party app. */
   app: "application/x-mockintosh-app",
   deck: "application/x-decker",
+  /** MacPaint document ('PNTG'): 512-byte header, then 720 PackBits rows of 576 pixels. */
+  paint: "image/x-macpaint",
 } as const;
 
 export type KnownMime = (typeof MIME)[keyof typeof MIME];

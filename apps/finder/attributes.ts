@@ -29,6 +29,7 @@ const ICON_BY_MIME: Readonly<Record<string, string>> = {
   "image/gif": "icon/camera",
   "image/webp": "icon/camera",
   [MIME.canvas]: "canvas/icon",
+  [MIME.paint]: "macpaint/document",
   [MIME.app]: "icon/appstore-smr-32x32",
   [MIME.appShortcut]: "icon/computer",
 };

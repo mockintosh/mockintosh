@@ -503,13 +503,15 @@ export const sprites: Record<string, Sprite> = {
 
 Prefix names with your app id (`"myapp/icon"`). OS sprites use `"icon/"` and `"chrome/"`.
 
-Sprites are also a file type — `image/x-mockintosh-sprite`, `MIME.sprite` — which is how an app keeps a picture in the user's file system (PhotoBooth, Dither, MacPaint and Surface save this way; Preview opens them by default). `readSpriteFile(fs, fileId)` decodes one; `readImageFile(fs, images, fileId)` expands a sprite or decodes a still — never pass sprite bytes to `images.decode`. `writeSpriteFile(fs, parentId, name, sprite, { attributes })` writes one, optionally with a Finder `icon` attribute:
+Sprites are also a file type — `image/x-mockintosh-sprite`, `MIME.sprite` — which is how an app keeps a picture in the user's file system (PhotoBooth, Dither and Surface save this way; Preview opens them by default). `readSpriteFile(fs, fileId)` decodes one; `readImageFile(fs, images, fileId)` expands a sprite or decodes a still — never pass sprite bytes to `images.decode`. `writeSpriteFile(fs, parentId, name, sprite, { attributes })` writes one, optionally with a Finder `icon` attribute:
 
 ```tsx
 const { fs } = useApp();
 const desktop = fs.locate("desktop");
 if (desktop) await writeSpriteFile(fs, desktop.id, "Photo", sprite, { attributes: { icon: "myapp/photo-icon" } });
 ```
+
+MacPaint documents are their own type — `image/x-macpaint`, `MIME.paint`, the 1984 'PNTG' format: a 576×720 page packed with PackBits, plus the document's 38 fill patterns. `readPaintFile(fs, fileId)` gives a `PaintDocument` (`bits`, 1 = black, high bit leftmost, and `patterns` or `null`); `writePaintFile(fs, parentId, name, doc)` writes one. `readImageFile` expands them too, so Preview opens MacPaint pictures.
 
 ## Printing
 

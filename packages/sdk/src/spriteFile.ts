@@ -9,6 +9,7 @@ import { MIME, type FSFile, type NodeAttributes } from "@mockintosh/fs";
 import { defineSprite, encodeSprite, type ImageFrame, type Sprite } from "@mockintosh/ui";
 import type { AppFileSystem } from "./index";
 import type { ImageService } from "./media";
+import { paintToImageFrame, readPaintFile } from "./paintFile";
 
 /** JSON body of a sprite file. */
 export interface SpriteFileContent {
@@ -53,8 +54,8 @@ export interface ReadImageFileOptions {
 }
 
 /**
- * Load a still as RGBA. Sprite files are expanded locally — never handed to
- * `images.decode`, which would feed JSON to `createImageBitmap` and hang.
+ * Load a still as RGBA. Sprite and MacPaint files are expanded locally — never
+ * handed to `images.decode`, which would feed them to `createImageBitmap` and hang.
  */
 export async function readImageFile(
   fs: AppFileSystem,
@@ -68,6 +69,11 @@ export async function readImageFile(
     const sprite = await readSpriteFile(fs, fileId);
     if (!sprite) throw new Error(`Couldn't read "${file.name}".`);
     return spriteToImageFrame(sprite);
+  }
+  if (file.type === MIME.paint) {
+    const doc = await readPaintFile(fs, fileId);
+    if (!doc) throw new Error(`Couldn't read "${file.name}".`);
+    return paintToImageFrame(doc);
   }
   if (!images) throw new Error("This Macintosh cannot decode images.");
   const bytes = await fs.readBytes(fileId);

@@ -150,6 +150,23 @@ export {
   type WriteSpriteFileOptions,
   type ReadImageFileOptions,
 } from "./spriteFile";
+export {
+  PAINT_WIDTH,
+  PAINT_HEIGHT,
+  PAINT_ROW_BYTES,
+  PAINT_PATTERN_COUNT,
+  blankPaintDocument,
+  decodePaint,
+  encodePaint,
+  packBits,
+  unpackBits,
+  paintToSprite,
+  paintToImageFrame,
+  readPaintFile,
+  writePaintFile,
+  type PaintDocument,
+  type WritePaintFileOptions,
+} from "./paintFile";
 
 /** Classic Alert() icon: System ICON 0 / 1 / 2 (stop / note / caution). */
 export type DialogVariant = "stop" | "note" | "caution";
