@@ -3,8 +3,8 @@
  * frame is a pure function of `t`, so the player can scrub, loop and pause
  * without keeping any animation state.
  */
-import { easeInCubic, easeInExpo, easeInOutQuart, easeOutExpo, lerp, seg } from "./ease";
-import { MICRO_HEIGHT, drawMicro, microWidth } from "./microtype";
+import { easeInCubic, easeInExpo, easeInOutQuart, easeOutExpo, lerp, seg } from "../ease";
+import { MICRO_HEIGHT, drawMicro, microWidth } from "../microtype";
 import {
   INK,
   PAPER,
@@ -21,32 +21,15 @@ import {
   type Frame,
   type PixelRect,
   type Stage,
-} from "./painter";
-import {
-  credits,
-  depth,
-  flow,
-  knotCloseUp,
-  microScale,
-  powerOn,
-  shape,
-  title,
-  titleCloseUp,
-  tunnel,
-  type Shot,
-} from "./scenes";
+} from "../painter";
+import { credits, depth, flow, knotCloseUp, microScale, powerOn, shape, title, titleCloseUp, tunnel, type Shot } from "./scenes";
+import { oneBitScore } from "./score";
+import type { ReelChapter, ReelDefinition, ReelPlayer } from "../reels";
 
 export const REEL_DURATION = 15;
 export const REEL_FPS = 30;
 
-export interface Chapter {
-  number: number;
-  title: string;
-  start: number;
-  end: number;
-}
-
-export const CHAPTERS: readonly Chapter[] = [
+export const CHAPTERS: readonly ReelChapter[] = [
   { number: 1, title: "Type", start: 0, end: 2 },
   { number: 2, title: "Shape", start: 2, end: 4.5 },
   { number: 3, title: "Depth", start: 4.5, end: 7 },
@@ -55,18 +38,6 @@ export const CHAPTERS: readonly Chapter[] = [
   { number: 6, title: "Edit", start: 12, end: 13.5 },
   { number: 7, title: "Credits", start: 13.5, end: REEL_DURATION },
 ];
-
-export function chapterAt(t: number): Chapter {
-  return CHAPTERS.find((c) => t < c.end) ?? CHAPTERS[CHAPTERS.length - 1]!;
-}
-
-/** `SS:FF` at the reel's frame rate. */
-export function timecode(t: number): string {
-  const frames = Math.floor(t * REEL_FPS + 1e-6);
-  const s = Math.floor(frames / REEL_FPS);
-  const f = frames % REEL_FPS;
-  return `${String(s).padStart(2, "0")}:${String(f).padStart(2, "0")}`;
-}
 
 /** Single inverted frames that punctuate the cuts. */
 const FLASH_FRAMES = [6.94, 10.5, 11.5, 12.0, 13.5];
@@ -93,7 +64,7 @@ const CUT = 0.25;
  * Renders reel frames into caller-owned frames. Holds the scratch buffers
  * the transitions need, sized to the last frame it was given.
  */
-export class ReelRenderer {
+export class ReelRenderer implements ReelPlayer {
   private layer: Frame = createFrame(0, 0);
   private scratch: Frame = createFrame(0, 0);
 
@@ -262,3 +233,14 @@ function chapterTag(p: Painter, rect: PixelRect, t: number): void {
   });
   p.clip = clip;
 }
+
+/** Reel one: geometric, hard-cut, 30 fps — type, shape, depth, particles, rhythm, edit. */
+export const ONE_BIT_REEL: ReelDefinition = {
+  id: "one-bit",
+  title: "One Bit",
+  duration: REEL_DURATION,
+  fps: REEL_FPS,
+  chapters: CHAPTERS,
+  createPlayer: () => new ReelRenderer(),
+  createSoundtrack: oneBitScore,
+};

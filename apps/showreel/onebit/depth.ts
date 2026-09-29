@@ -4,7 +4,7 @@
  * one bit. The same projection hands the particle scene its starting points,
  * so the knot can shatter into the next shot.
  */
-import { bayer, type Painter, type Vec } from "./painter";
+import { bayer, type Painter, type Vec } from "../painter";
 
 export interface Vec3 {
   x: number;
@@ -200,12 +200,7 @@ export function drawKnot(painter: Painter, pose: KnotPose): void {
     for (let x = x0; x < x1; x++) {
       const i = y * W + x;
       if (depthBuffer[i] !== Infinity) continue;
-      if (
-        depthBuffer[i - 1] !== Infinity ||
-        depthBuffer[i + 1] !== Infinity ||
-        depthBuffer[i - W] !== Infinity ||
-        depthBuffer[i + W] !== Infinity
-      ) {
+      if (depthBuffer[i - 1] !== Infinity || depthBuffer[i + 1] !== Infinity || depthBuffer[i - W] !== Infinity || depthBuffer[i + W] !== Infinity) {
         px[i] = 1;
       }
     }

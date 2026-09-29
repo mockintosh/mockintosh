@@ -85,8 +85,7 @@ const BAYER8 = (() => {
     for (let x = 0; x < 8; x++) {
       // Bit-reversed interleave of x and x^y: the recursive Bayer matrix.
       const v = x ^ y;
-      const b =
-        ((v & 1) << 5) | ((x & 1) << 4) | ((v & 2) << 2) | ((x & 2) << 1) | ((v & 4) >> 1) | ((x & 4) >> 2);
+      const b = ((v & 1) << 5) | ((x & 1) << 4) | ((v & 2) << 2) | ((x & 2) << 1) | ((v & 4) >> 1) | ((x & 4) >> 2);
       m[y * 8 + x] = (b + 0.5) / 64;
     }
   }
@@ -289,7 +288,10 @@ export class Painter {
       let lo = Infinity;
       let hi = -Infinity;
       // The caps.
-      for (const [px, py] of [[ax, ay], [bx, by]] as const) {
+      for (const [px, py] of [
+        [ax, ay],
+        [bx, by],
+      ] as const) {
         const d = cy - py;
         if (Math.abs(d) < R) {
           const half = Math.sqrt(R * R - d * d);
@@ -350,7 +352,8 @@ export class Painter {
     const y1 = Math.floor(by);
     const dx = Math.abs(x1 - x0);
     const dy = -Math.abs(y1 - y0);
-    if (Math.max(dx, -dy) > 4 * (this.frame.width + this.frame.height)) return;
+    // Negated so a NaN endpoint bails out rather than walking forever.
+    if (!(Math.max(dx, -dy) <= 4 * (this.frame.width + this.frame.height))) return;
     const sx = x0 < x1 ? 1 : -1;
     const sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
@@ -403,8 +406,7 @@ export function squeeze(frame: Frame, scratch: Frame, rect: PixelRect, sx: numbe
     const rowInside = srcY >= rect.y0 && srcY < rect.y1;
     for (let x = rect.x0; x < rect.x1; x++) {
       const srcX = sx > 0 ? Math.floor(cx + (x + 0.5 - cx) / sx) : -1;
-      frame.pixels[row + x] =
-        rowInside && srcX >= rect.x0 && srcX < rect.x1 ? scratch.pixels[srcRow + srcX]! : background;
+      frame.pixels[row + x] = rowInside && srcX >= rect.x0 && srcX < rect.x1 ? scratch.pixels[srcRow + srcX]! : background;
     }
   }
 }

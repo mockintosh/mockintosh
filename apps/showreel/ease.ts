@@ -55,9 +55,7 @@ export function easeOutBack(k: number, overshoot = 1.70158): number {
 
 export function easeInOutBack(k: number, overshoot = 1.70158): number {
   const c2 = overshoot * 1.525;
-  return k < 0.5
-    ? (Math.pow(2 * k, 2) * ((c2 + 1) * 2 * k - c2)) / 2
-    : (Math.pow(2 * k - 2, 2) * ((c2 + 1) * (k * 2 - 2) + c2) + 2) / 2;
+  return k < 0.5 ? (Math.pow(2 * k, 2) * ((c2 + 1) * 2 * k - c2)) / 2 : (Math.pow(2 * k - 2, 2) * ((c2 + 1) * (k * 2 - 2) + c2) + 2) / 2;
 }
 
 /** Deterministic pseudo-random in `[0, 1)` for an integer (and optional salt). */

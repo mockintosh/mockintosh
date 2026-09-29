@@ -4,35 +4,10 @@
  * the reel's business (`reel.ts`), so any shot can be re-used in the edit.
  */
 import { drawKnot, projectKnotCurve, type KnotPose } from "./depth";
-import {
-  clamp01,
-  easeInCubic,
-  easeInExpo,
-  easeInOutBack,
-  easeInOutCubic,
-  easeOutBack,
-  easeOutCubic,
-  easeOutExpo,
-  hash,
-  lerp,
-  seg,
-} from "./ease";
-import { drawMicro, microWidth } from "./microtype";
-import {
-  INK,
-  PAPER,
-  STAGE_H,
-  STAGE_W,
-  XOR,
-  bayer,
-  tone,
-  toneOver,
-  toneUnder,
-  zoomStage,
-  type Painter,
-  type Vec,
-} from "./painter";
-import { drawStrokes, layoutText, mapGlyph, sampleStrokes } from "./type";
+import { clamp01, easeInCubic, easeInExpo, easeInOutBack, easeInOutCubic, easeOutBack, easeOutCubic, easeOutExpo, hash, lerp, seg } from "../ease";
+import { drawMicro, microWidth } from "../microtype";
+import { INK, PAPER, STAGE_H, STAGE_W, XOR, bayer, tone, toneOver, toneUnder, zoomStage, type Painter, type Vec } from "../painter";
+import { drawStrokes, layoutText, mapGlyph, sampleStrokes } from "../type";
 
 export type Shot = (p: Painter, t: number) => void;
 
@@ -469,7 +444,14 @@ export const credits: Shot = (p, t) => {
   p.with({ paint: INK }, () => {
     for (let s = steps; s >= 1; s--) {
       const o = (s / steps) * depthUnits;
-      NAME.forEach((glyph, i) => drawStrokes(p, mapGlyph(glyph, (q) => ({ x: q.x + o, y: q.y + o })), 7, writes[i]));
+      NAME.forEach((glyph, i) =>
+        drawStrokes(
+          p,
+          mapGlyph(glyph, (q) => ({ x: q.x + o, y: q.y + o })),
+          7,
+          writes[i],
+        ),
+      );
     }
     NAME.forEach((glyph, i) => drawStrokes(p, glyph.strokes, 7, writes[i]));
   });

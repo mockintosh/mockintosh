@@ -109,11 +109,7 @@ export interface TextStyle {
  * Lay `text` out with its cap line at `top` and its box centred on `cx`
  * (or starting at `x` when `align` is "left").
  */
-export function layoutText(
-  text: string,
-  style: TextStyle,
-  at: { cx?: number; x?: number; top: number },
-): PlacedGlyph[] {
+export function layoutText(text: string, style: TextStyle, at: { cx?: number; x?: number; top: number }): PlacedGlyph[] {
   const u = style.size / 10;
   const tracking = style.tracking ?? 3.2;
   const chars = [...text.toUpperCase()].filter((ch) => GLYPHS[ch]);
