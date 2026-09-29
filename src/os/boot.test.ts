@@ -339,6 +339,22 @@ describe("bootOS on the headless platform", () => {
     }
   });
 
+  it("opens another window when launched with a url the open windows do not have", () => {
+    registerApp({
+      id: "test-browser",
+      title: "Browser",
+      icon: "icon/computer",
+      defaultSize: { width: 100, height: 60 },
+      Component: () => whiteBox(),
+    });
+    os.services.openApp("test-browser");
+    os.services.openApp("test-browser", { url: "https://example.com/" });
+    os.services.openApp("test-browser", { url: "https://example.com/" });
+    const wins = getWindows().filter((w) => w.appId === "test-browser");
+    expect(wins).toHaveLength(2);
+    expect(wins.map((w) => w.props.url)).toEqual([undefined, "https://example.com/"]);
+  });
+
   it("opens windows of the kind an app asks for: a `plain` box has a frame but no title bar", () => {
     registerApp({
       id: "test-kinds",

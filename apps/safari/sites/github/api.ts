@@ -61,7 +61,32 @@ export interface FileBody {
   note: string;
 }
 
+export interface ProfileInfo {
+  login: string;
+  name: string;
+  kind: "User" | "Organization";
+  bio: string;
+  company: string;
+  location: string;
+  blog: string;
+  twitter: string;
+  followers: number;
+  following: number;
+  publicRepos: number;
+}
+
+export interface ProfileRepo {
+  owner: string;
+  name: string;
+  description: string;
+  language: string;
+  stars: number;
+  fork: boolean;
+}
+
 export type GithubPage =
+  | { view: "search"; query: string; repos: ProfileRepo[] }
+  | { view: "profile"; profile: ProfileInfo; tab: "repos" | "stars" | "people"; repos: ProfileRepo[]; orgs: string[]; people: string[] }
   | { view: "tree"; repo: RepoInfo; ref: string; path: string; entries: DirEntry[]; commit: CommitInfo | null; readme: string | null }
   | { view: "blob"; repo: RepoInfo; ref: string; file: FileBody }
   | { view: "issues"; repo: RepoInfo; issues: IssueInfo[] }
@@ -74,6 +99,11 @@ const API = "https://api.github.com";
 const MAX_TEXT = 48_000;
 
 export async function loadPage(fetch: FetchFunction, token: string, location: Exclude<GithubLocation, { kind: "home" }>): Promise<GithubPage> {
+  if (location.kind === "search") {
+    const data = asRecord(await gh(fetch, token, `/search/repositories?q=${encodeURIComponent(location.query)}&per_page=30`));
+    return { view: "search", query: location.query, repos: Array.isArray(data.items) ? data.items.map(profileRepo) : [] };
+  }
+  if (location.kind === "profile") return loadProfile(fetch, token, location.login, location.tab);
   const repo = await getRepo(fetch, token, location.owner, location.repo);
   if (location.kind === "tree") return loadTree(fetch, token, repo, location.ref, location.path);
   if (location.kind === "blob") return loadBlob(fetch, token, repo, location.ref, location.path);
@@ -116,6 +146,76 @@ export function fileText(content: string, encoding: string, size: number): { tex
   const text = utf8Decode(bytes);
   if (text.length <= MAX_TEXT) return { text, note: "" };
   return { text: text.slice(0, MAX_TEXT), note: "Showing the first part of this file." };
+}
+
+async function loadProfile(
+  fetch: FetchFunction,
+  token: string,
+  login: string,
+  tab: "repos" | "stars" | "people",
+): Promise<GithubPage> {
+  const profile = await getProfile(fetch, token, login);
+  const orgs = profile.kind === "User" ? await listLogins(fetch, token, `/users/${encodeURIComponent(login)}/orgs`) : [];
+  if (profile.kind === "Organization" && tab === "people") {
+    const people = await listLogins(fetch, token, `/orgs/${encodeURIComponent(login)}/public_members`);
+    return { view: "profile", profile, tab, repos: [], orgs, people };
+  }
+  if (profile.kind === "User" && tab === "stars") {
+    const repos = await listProfileRepos(fetch, token, `/users/${encodeURIComponent(login)}/starred?per_page=30`);
+    return { view: "profile", profile, tab, repos, orgs, people: [] };
+  }
+  const reposUrl = profile.kind === "Organization"
+    ? `/orgs/${encodeURIComponent(login)}/repos?sort=updated&per_page=30`
+    : `/users/${encodeURIComponent(login)}/repos?sort=updated&per_page=30&type=owner`;
+  const repos = await listProfileRepos(fetch, token, reposUrl);
+  return { view: "profile", profile, tab: "repos", repos, orgs, people: [] };
+}
+
+async function getProfile(fetch: FetchFunction, token: string, login: string): Promise<ProfileInfo> {
+  const record = asRecord(await gh(fetch, token, `/users/${encodeURIComponent(login)}`));
+  return {
+    login: stringField(record, "login") || login,
+    name: stringField(record, "name"),
+    kind: record.type === "Organization" ? "Organization" : "User",
+    bio: stringField(record, "bio"),
+    company: stringField(record, "company"),
+    location: stringField(record, "location"),
+    blog: stringField(record, "blog"),
+    twitter: stringField(record, "twitter_username"),
+    followers: numberField(record, "followers"),
+    following: numberField(record, "following"),
+    publicRepos: numberField(record, "public_repos"),
+  };
+}
+
+async function listProfileRepos(fetch: FetchFunction, token: string, path: string): Promise<ProfileRepo[]> {
+  const data = await gh(fetch, token, path);
+  if (!Array.isArray(data)) return [];
+  return data.map(profileRepo);
+}
+
+function profileRepo(item: unknown): ProfileRepo {
+  const record = asRecord(item);
+  const owner = asRecord(record.owner);
+  return {
+    owner: stringField(owner, "login"),
+    name: stringField(record, "name"),
+    description: stringField(record, "description"),
+    language: stringField(record, "language"),
+    stars: numberField(record, "stargazers_count"),
+    fork: record.fork === true,
+  };
+}
+
+async function listLogins(fetch: FetchFunction, token: string, path: string): Promise<string[]> {
+  try {
+    const data = await gh(fetch, token, path);
+    if (!Array.isArray(data)) return [];
+    return data.map((item) => stringField(asRecord(item), "login")).filter(Boolean);
+  } catch (error) {
+    if (error instanceof GithubError && error.status === 404) return [];
+    throw error;
+  }
 }
 
 async function loadTree(fetch: FetchFunction, token: string, repo: RepoInfo, ref: string, path: string): Promise<GithubPage> {

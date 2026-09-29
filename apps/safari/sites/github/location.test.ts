@@ -4,6 +4,8 @@ import { formatGithubLocation, parseGithubLocation } from "./location";
 describe("parseGithubLocation", () => {
   it("treats an empty address as the start page", () => {
     expect(parseGithubLocation("  ")).toEqual({ kind: "home" });
+    expect(parseGithubLocation("https://github.com/")).toEqual({ kind: "home" });
+    expect(parseGithubLocation("https://www.github.com")).toEqual({ kind: "home" });
   });
 
   it("reads owner/repo and a full GitHub URL as the code tab", () => {
@@ -36,12 +38,18 @@ describe("parseGithubLocation", () => {
     });
   });
 
-  it("drops the query string and rejects a bare owner", () => {
+  it("drops a repository query string and rejects a broken issue URL", () => {
     expect(parseGithubLocation("octocat/Hello-World?tab=readme")).toEqual({
       kind: "tree", owner: "octocat", repo: "Hello-World", ref: "", path: "",
     });
-    expect(parseGithubLocation("octocat")).toBeNull();
     expect(parseGithubLocation("octocat/Hello-World/issues/nope")).toBeNull();
+  });
+
+  it("reads a user or organization, including the stars and people tabs", () => {
+    expect(parseGithubLocation("octocat")).toEqual({ kind: "profile", login: "octocat", tab: "repos" });
+    expect(parseGithubLocation("https://github.com/github")).toEqual({ kind: "profile", login: "github", tab: "repos" });
+    expect(parseGithubLocation("github.com/octocat?tab=stars")).toEqual({ kind: "profile", login: "octocat", tab: "stars" });
+    expect(parseGithubLocation("github.com/orgs/github/people")).toEqual({ kind: "profile", login: "github", tab: "people" });
   });
 });
 
@@ -55,6 +63,9 @@ describe("formatGithubLocation", () => {
       "github.com/octocat/Hello-World/issues/7",
       "github.com/octocat/Hello-World/pulls",
       "github.com/octocat/Hello-World/pull/3",
+      "github.com/octocat",
+      "github.com/octocat?tab=stars",
+      "github.com/github?tab=people",
     ];
     for (const sample of samples) {
       expect(formatGithubLocation(parseGithubLocation(sample)!)).toBe(sample);

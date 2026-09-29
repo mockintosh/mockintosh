@@ -249,6 +249,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         const b = props ?? {};
         if (a.fileId || b.fileId) return a.fileId === b.fileId;
         if (a.directoryId || b.directoryId) return a.directoryId === b.directoryId;
+        if (typeof b.url === "string") return a.url === b.url;
         return app.singleInstance !== false;
       });
       if (existing) {

@@ -1,22 +1,36 @@
 import { parseHTML } from "linkedom";
 import { Defuddle } from "defuddle/node";
+import type { LayoutNode } from "@mockintosh/markdown";
+import { RemoteError, decodeText, fetchRemote } from "./_web/fetch";
+import { simplifyHtml } from "./_web/simplify";
+import { applySiteRule, siteRuleFor } from "./_web/sites";
 
-const FETCH_TIMEOUT_MS = 10_000;
+const MAX_PAGE_BYTES = 5_000_000;
+const PAGE_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5";
+
+/** POST body. Safari's `apps/safari/remote.ts` sends exactly this. */
+export interface BrowseRequest {
+  url: string;
+  /** Read only the article, the way Reader does. */
+  reader?: boolean;
+  /** A form submission. `body` is `application/x-www-form-urlencoded`. */
+  method?: "get" | "post";
+  body?: string;
+}
 
 export interface BrowseResponse {
-  title: string;
-  markdown: string;
+  /** Where the page actually is, after redirects. */
   url: string;
-  domain: string;
+  title: string;
+  nodes: LayoutNode[];
 }
 
 export interface BrowseErrorResponse {
   error: string;
 }
 
-function normalizeUrl(raw: string): string {
-  if (/^https?:\/\//i.test(raw)) return raw;
-  return `https://${raw}`;
+function json(body: BrowseResponse | BrowseErrorResponse, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
 /**
@@ -28,7 +42,7 @@ export function documentFromHtml(html: string, url: string): Document {
   const { document } = parseHTML(html);
   const view = document.defaultView as (Window & { getComputedStyle?: unknown }) | null;
   if (view && typeof view.getComputedStyle !== "function") {
-    view.getComputedStyle = (() => ({ display: "" })) as typeof getComputedStyle;
+    view.getComputedStyle = (() => ({ display: "" })) as unknown as typeof getComputedStyle;
   }
   const doc = document as Document & { styleSheets?: StyleSheetList; URL: string };
   if (!doc.styleSheets) doc.styleSheets = [] as unknown as StyleSheetList;
@@ -36,108 +50,67 @@ export function documentFromHtml(html: string, url: string): Document {
   return document;
 }
 
+/** The page at `url` as a document, from its HTML. */
+export async function readPage(html: string, url: string, reader: boolean): Promise<BrowseResponse> {
+  const document = documentFromHtml(html, url);
+  if (reader) {
+    const article = await Defuddle(document, url, { markdown: false, useAsync: false, removeImages: false });
+    const content = documentFromHtml(`<html><body>${String(article.content ?? "")}</body></html>`, url);
+    const page = simplifyHtml(content, { baseUrl: url });
+    return { url, title: article.title || page.title, nodes: page.nodes };
+  }
+  const rule = siteRuleFor(new URL(url));
+  const root = rule ? applySiteRule(document, rule) : null;
+  const page = simplifyHtml(document, { baseUrl: url, root });
+  const title = rule?.title ? rule.title(page.title) : page.title;
+  return { url, title, nodes: page.nodes };
+}
+
+function parseRequest(body: unknown): BrowseRequest | null {
+  if (!body || typeof body !== "object") return null;
+  const record = body as Record<string, unknown>;
+  if (typeof record.url !== "string" || !record.url.trim()) return null;
+  return {
+    url: record.url,
+    reader: record.reader === true,
+    method: record.method === "post" ? "post" : "get",
+    body: typeof record.body === "string" ? record.body : undefined,
+  };
+}
+
 export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  let url: string;
+  let request: BrowseRequest | null;
   try {
-    const body = await req.json();
-    url = body?.url;
-    if (!url || typeof url !== "string") {
-      return new Response(JSON.stringify({ error: "Missing url" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    request = parseRequest(await req.json());
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    request = null;
   }
+  if (!request) return json({ error: "Missing url" }, 400);
 
-  const normalizedUrl = normalizeUrl(url.trim());
-
-  let htmlText: string;
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const resp = await fetch(normalizedUrl, {
-        signal: controller.signal,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Accept-Encoding": "gzip, deflate, br",
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-          "Sec-Fetch-Dest": "document",
-          "Sec-Fetch-Mode": "navigate",
-          "Sec-Fetch-Site": "none",
-          "Upgrade-Insecure-Requests": "1",
-        },
-      });
-      if (!resp.ok) {
-        const hint =
-          resp.status === 403 || resp.status === 401
-            ? " (this site blocks automated access)"
-            : resp.status === 404
-            ? " (page not found)"
-            : resp.status === 429
-            ? " (rate limited — try again later)"
-            : "";
-        return new Response(
-          JSON.stringify({
-            error: `${resp.status} ${resp.statusText}${hint}`,
-          }),
-          { status: 502, headers: { "Content-Type": "application/json" } }
-        );
-      }
-      htmlText = await resp.text();
-    } finally {
-      clearTimeout(timeoutId);
+    const remote = await fetchRemote(request.url, {
+      method: request.method === "post" ? "POST" : "GET",
+      body: request.body,
+      accept: PAGE_ACCEPT,
+      maxBytes: MAX_PAGE_BYTES,
+    });
+    const type = remote.contentType.split(";")[0]!.trim().toLowerCase();
+    if (type.startsWith("image/")) {
+      return json({ url: remote.url, title: remote.url, nodes: [{ type: "image", src: remote.url, alt: "", align: "center" }] });
     }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.log(err);
-    return new Response(
-      JSON.stringify({ error: `Could not fetch page: ${msg}` }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  try {
-    const document = documentFromHtml(htmlText, normalizedUrl);
-    const result = await Defuddle(document, normalizedUrl, {
-      markdown: true,
-      useAsync: false,
-      removeImages: false,
-    });
-
-    const payload: BrowseResponse = {
-      title: result.title || "",
-      markdown: (result.content as string) || "",
-      url: normalizedUrl,
-      domain: result.domain || "",
-    };
-
-    return new Response(JSON.stringify(payload), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: `Parse error: ${msg}` }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    const text = decodeText(remote.bytes, remote.contentType);
+    if (type === "text/plain" || type === "application/json" || type === "text/css" || type.endsWith("javascript")) {
+      return json({ url: remote.url, title: new URL(remote.url).pathname.split("/").pop() || remote.url, nodes: [{ type: "code", text }] });
+    }
+    if (type && type !== "text/html" && type !== "application/xhtml+xml" && !type.endsWith("+xml") && type !== "application/xml") {
+      return json({ error: `Safari can't show this kind of file (${type}).` }, 415);
+    }
+    return json(await readPage(text, remote.url, request.reader === true));
+  } catch (error) {
+    if (error instanceof RemoteError) return json({ error: error.message }, error.status >= 400 && error.status < 600 ? 502 : 500);
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: `Could not read the page: ${message}` }, 500);
   }
 }

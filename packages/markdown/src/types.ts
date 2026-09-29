@@ -1,9 +1,10 @@
 // ---------------------------------------------------------------------------
 // Core types for the @mockintosh/markdown package.
 //
-// LayoutNode[] is the render-target model: the bridge between the markdown
-// parser and the BitCanvas renderer. It describes *what to draw* without
-// knowing anything about pixels or fonts.
+// LayoutNode[] is the render-target model: the bridge between a source
+// (markdown here, HTML on the server, a site's API in Safari) and the 1-bit
+// renderer. It describes *what to draw* without knowing anything about
+// pixels or fonts.
 // ---------------------------------------------------------------------------
 
 export type Align = "left" | "center" | "right";
@@ -25,12 +26,35 @@ export interface LinkRect {
   href: string;
 }
 
-// Block-level nodes passed to the canvas renderer.
+/** One row of a table. Cells are inline content only; block content is flattened before it gets here. */
+export interface TableRow {
+  header: boolean;
+  cells: InlineSegment[][];
+}
+
+/** A form control. Only what a 1-bit page can show and submit. */
+export type FormControl =
+  | { kind: "text"; name: string; value: string; placeholder: string }
+  | { kind: "hidden"; name: string; value: string }
+  | { kind: "submit"; name: string; value: string; label: string };
+
+/** A form: submitting it sends its controls' `name=value` pairs to `action`. */
+export interface WebForm {
+  /** Absolute URL, or empty for "the page this form is on". */
+  action: string;
+  method: "get" | "post";
+  controls: FormControl[];
+}
+
+// Block-level nodes passed to the renderer.
 export type LayoutNode =
-  | { type: "heading"; level: 1 | 2; text: string; align: Align }
+  | { type: "heading"; level: 1 | 2 | 3; text: string; align: Align; href?: string }
   | { type: "paragraph"; segments: InlineSegment[]; align: Align }
-  | { type: "listItem"; segments: InlineSegment[]; indent: number }
+  | { type: "listItem"; segments: InlineSegment[]; indent: number; marker?: string }
+  | { type: "code"; text: string }
+  | { type: "table"; rows: TableRow[] }
+  | { type: "form"; form: WebForm }
   | { type: "hr" }
-  | { type: "image"; src: string; alt: string; align: Align }
+  | { type: "image"; src: string; alt: string; align: Align; href?: string }
   | { type: "spacer"; height: number }
   | { type: "br" };

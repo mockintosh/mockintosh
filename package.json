@@ -57,7 +57,6 @@
     "lodash": "^4.17.21",
     "mdast-util-from-markdown": "^2.0.3",
     "solid-js": "2.0.0-rc.8",
-    "textweb": "^0.2.5",
     "three": "^0.183.2"
   },
   "devDependencies": {

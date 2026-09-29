@@ -120,7 +120,7 @@ interface SolidApp<P = Record<string, never>> {
 
 ### Opening an app
 
-`openApp(appId, props, fromRect)` (`boot.ts`) is what the Finder calls for an icon or a document. It checks `requires`, brings an already-open matching window to the front (same `fileId` / `directoryId`, or any window when `singleInstance`), and otherwise runs the app's **`onOpen`** with an `AppContext` — the Macintosh `main` receiving its `'oapp'`/`'odoc'` event. The default `onOpen` opens the main window; an app that supplies its own decides for itself: open in full screen, show a dialog first, open nothing. Whether an app opens a window is the app's business, not the OS's.
+`openApp(appId, props, fromRect)` (`boot.ts`) is what the Finder calls for an icon or a document. It checks `requires`, brings an already-open matching window to the front (same `fileId` / `directoryId`, same `url` when the launch has one, or any window when `singleInstance`), and otherwise runs the app's **`onOpen`** with an `AppContext` — the Macintosh `main` receiving its `'oapp'`/`'odoc'` event. The default `onOpen` opens the main window; an app that supplies its own decides for itself: open in full screen, show a dialog first, open nothing. Whether an app opens a window is the app's business, not the OS's.
 
 Windows are opened through **`AppContext.openWindow(spec)`** (`OSServices.openWindow` underneath, `buildAppWindow` in `appWindow.ts` — this shell's `NewWindow`). A `WindowSpec` names the kind, title, size, position, `scrollable`/`resizable`, and optionally a `Component` other than the app's main one; every field defaults to the `defineApp` declaration, so `openWindow()` is the main window. The first window opened from an icon gets the zoom-rect animation. `OSWindow.Component` holds a window's own component when it has one; `WindowContent` mounts it, else the app's.
 
@@ -175,7 +175,7 @@ packages/fs/                Reactive virtual file system + backends
 packages/sdk/               defineApp, useApp, menubar types, UI + fs + protocol re-exports
 packages/protocol/          Wire schemas: kernel resources, jobs, chat, build contract
 packages/agent/             ChatGippity loop (`runAgent`) over KernelClient + fetch
-packages/markdown/          mdast → LayoutNode
+packages/markdown/          The document model (LayoutNode) and mdast → LayoutNode; the SDK's DocumentView draws it
 packages/print/             Print pages → PrinterEncoder (ESC/POS, cat printer) → PrinterTransport
 packages/quickdraw/         GrafPort, CopyBits, BitBlt, packed 1-bit BitMap
 
@@ -184,6 +184,8 @@ sites/ui/                   ui.mockintosh.com — kit catalog; @mockintosh/ui on
 apps/                       Bundled apps (*.tsx), SDK-only except Finder, App Store, Icon Gallery
   Finder.solid.tsx
   finder/                   Finder windows: folder views, AboutBox, Control Panel
+  Safari.tsx
+  safari/                   Tabs, history, router, toolbar and tab bar (chrome.tsx); sites/ holds the site adapters (GitHub, Hacker News, mockintosh.com)
   sdkClean.ts               SDK_CLEAN / SHELL_APPS manifest for the compile gate
   …
 
@@ -214,6 +216,8 @@ src/
     components/             Desktop, Window, Menubar, Dialog, Splash
 
 templates/app/              vite-plugin-solid universal starter
+
+api/                        Vercel functions; api/_web/ is the shared web reader (fetch + SSRF guard, HTML simplifier, site rules)
 ```
 
 ## Rendering pipeline
@@ -350,6 +354,24 @@ The shell keeps a list of printers with one default (`src/os/printers/manager.ts
 
 **Configured printers** are saved in Preferences › Printers (`printerList.ts`): name, driver id, optional dots override, and a `PrinterDeviceRef` to find the same device again (USB vendor/product/serial, Bluetooth id). The platform supplies `PrinterLinks` (`kinds` + `open(request)`): on the web, one `WebUSBPrinterTransport` bound to its device, or one `WebBluetoothPrinterTransport` that offers every driver's GATT service in the picker and writes through the first the device has. A board with a printer wired in sets `Platform.printer` instead, which appears as a fixed entry.
 
+## Safari
+
+Safari shows the web the way a 1996 browser did: text, links, pictures and forms, with no style sheets or scripts. Every page, whatever its source, becomes the same document model (`LayoutNode[]` from `@mockintosh/markdown`), and the SDK's `DocumentView` draws it.
+
+```
+address bar / link / form  →  PageRequest  →  router ─┬─ start page (about:start)
+                                                     ├─ site adapter (GET, client-side API calls)
+                                                     └─ /api/browse (server reads the HTML)  →  WebPage { url, title, nodes }
+```
+
+- **Window.** The toolbar (Back/Forward, the address field, Copy Link, New Window) and the tab bar sit in a `WindowHeader`, so the window's scroll bar moves only the page, which reports its height with `setContentSize`. Each tab has its own history (`apps/safari/tabs.ts`). Loaded pages are kept per history entry, along with where they were scrolled to, so switching tabs and going Back don't load again; Reload makes a new entry.
+- **Site adapters** (`apps/safari/sites/`) draw sites that have an open API. An adapter with a `bookmark` gets a button in the tab bar. GitHub uses api.github.com, with an optional token under Bookmarks › GitHub Token…; Hacker News uses the Algolia API. Both APIs allow cross-origin requests, so the adapters call them through `useApp().fetch` and never touch the server. There is no separate GitHub app; github.com is only a Safari site.
+- **mockintosh.com** is a picture page: the adapter draws the micro desktop with its alert from Safari's own pixels (`sites/mockintosh.ts`) at 2× on a black page, with no network and no bookmark.
+- **`/api/browse`** fetches the page (`api/_web/fetch.ts`) and reduces it to the document model (`api/_web/simplify.ts`). The fetch checks every redirect hop against private and local addresses, caps the size and times out. The simplifier keeps headings, paragraphs, lists, links, images, `pre` blocks, data tables and GET/POST forms, and drops layout tables, scripts, styles and hidden elements. Per-site rules (`api/_web/sites.ts`) pick the content root and strip chrome, for example on Wikipedia. View › Reader sends the page through Defuddle first.
+- **Pictures** come through `/api/web-image` (image types only, at most 8 MB), are decoded by `useApp().images`, and are dithered to the column width.
+
+Safari keeps links and history as plain strings. It parses them with the SDK's pure `parseUrl` / `formatUrl`, because apps compile without the host's `URL`.
+
 ## App Store
 
 Browses `registry.json`. Only `sdk` major ≥ 2 entries are shown. Install imports the ESM bundle, registers the Solid app, and persists the manifest.
@@ -365,4 +387,4 @@ Browses `registry.json`. Only `sdk` major ≥ 2 entries are shown. Install impor
 
 ## Deployment
 
-Vercel: Vite static site + Edge Functions (`api/chat`, `api/checkout`, `api/verify-purchase`, browse/spotify proxies).
+Vercel: Vite static site + Edge Functions (`api/chat`, `api/checkout`, `api/verify-purchase`, Safari's `api/browse` and `api/web-image`, and the `api/oauth` phone sign-in relay behind `useApp().signIn`). The relay keeps pairings in a Redis REST store (`KV_REST_API_URL` / `KV_REST_API_TOKEN`); `scripts/dev-api.ts` keeps them in memory.

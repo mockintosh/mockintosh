@@ -32,7 +32,6 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Terminal | `Terminal.tsx` | SDK-clean |
 | ChatGippity | `ChatGippity.tsx` | SDK-clean |
 | Spotify | `SpotifyPlayer.tsx` | SDK-clean |
-| GitHub | `GitHub.tsx` | SDK-clean |
 | Finder | `Finder.solid.tsx` | Shell |
 | App Store | `AppStore.tsx` | Shell |
 | Icon Gallery | `IconGallery.tsx` | Shell |
@@ -456,6 +455,10 @@ async function saveNote(fs: AppFileSystem, text: string) {
 Files have one MIME `type` (`MIME.text`, `MIME.markdown`, `MIME.sprite`, …; `inferMimeType(name)` guesses from an extension). Mutations throw `FSError` (`isFSError(err, "exists")`) on name clashes and invalid moves — show the message in a dialog rather than swallowing it.
 
 `<Markdown text={src} />` (and `parseMarkdown`) render markdown through the 1-bit layout tree. Import them from `@mockintosh/sdk`, not `@mockintosh/markdown`.
+
+`parseMarkdown` returns the document model, `LayoutNode[]`: headings, paragraphs of inline segments (text, bold, italic, code, link), list items, code blocks, tables, forms, images and rules. Anything that can produce that model can be drawn with `<DocumentView nodes={…} />`, which is what `<Markdown>` does. Its optional props are `onLink(href)`, `onSubmit(form, fields)` for form nodes, and `loadImage(src)` for images that aren't sprite ids. Safari draws web pages this way.
+
+Apps compile without the host's `URL`. To parse and resolve addresses, use `parseUrl(href, base?)`, which returns a plain `WebUrl` or `null`, together with `formatUrl(url)`, `queryParam(query, name)` and `encodeQuery(params)`.
 
 ### Opening documents
 

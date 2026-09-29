@@ -789,6 +789,11 @@ export {
 export { showPrintDialog, PrintScaleSelect, PrintPreview, printDotsToMillimetres, printScaleLabel } from "./printDialog";
 export type { PrintDialogRequest, PrintDialogChoice, PrintScale, PrintScaleSelectProps, PrintPreviewProps } from "./printDialog";
 export { Markdown, parseMarkdown } from "./markdown";
+export type { MarkdownProps, LayoutNode, InlineSegment, TableRow, FormControl, WebForm } from "./markdown";
+export { DocumentView } from "./document";
+export { encodeQuery, formatUrl, parseUrl, queryParam, queryParams } from "./url";
+export type { QueryParam, WebUrl } from "./url";
+export type { DocumentViewProps, FormField } from "./document";
 
 export interface AppManifest {
   id: string;

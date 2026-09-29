@@ -14,8 +14,7 @@ import VideoPlayer from "@/apps/VideoPlayer";
 import PhotoBooth from "@/apps/PhotoBooth";
 import AppStore from "@/apps/AppStore";
 import ChatGippity from "@/apps/ChatGippity";
-import Safari, { SafariStream, SafariTextweb } from "@/apps/Safari";
-import GitHub from "@/apps/GitHub";
+import Safari from "@/apps/Safari";
 import SpotifyPlayer from "@/apps/SpotifyPlayer";
 import IconGallery from "@/apps/IconGallery";
 import MacPaint from "@/apps/MacPaint";
@@ -34,9 +33,6 @@ for (const app of [
   AppStore,
   ChatGippity,
   Safari,
-  GitHub,
-  SafariStream,
-  SafariTextweb,
   SpotifyPlayer,
   IconGallery,
   MacPaint,

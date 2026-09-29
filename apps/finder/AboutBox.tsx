@@ -3,20 +3,28 @@
  * window; there is no standalone About program.
  */
 import type { JSX } from "@mockintosh/ui";
-import { For } from "solid-js";
+import { For, createSignal } from "solid-js";
 import pkg from "../../package.json";
 import { useApp } from "@mockintosh/sdk";
-import type { OSServices } from "../../src/os/context";
-import { FINDER_APP_ID } from "../../src/os/state";
+import { useOS, type IconScreenRect, type OSServices } from "../../src/os/context";
+import { FINDER_APP_ID, getWindows } from "../../src/os/state";
 import { openSystemWindow } from "../../src/os/systemWindows";
 import { contributors } from "./contributors.generated";
 
 export const ABOUT_BOX_TITLE = "About This Computer";
+export const SOURCE_REPO_URL = "https://github.com/mockintosh/mockintosh";
 
 export function AboutBox(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
+  const os = useOS();
   const computer = app.getSprite("icon/computer");
   const user = app.getSprite("user2");
+  const [linkRect, setLinkRect] = createSignal<IconScreenRect | undefined>(undefined);
+
+  function openRepo(): void {
+    const running = getWindows().some((w) => w.appId === "safari");
+    os.openApp("safari", { url: SOURCE_REPO_URL }, running ? undefined : linkRect());
+  }
 
   return (
     <box width="100%" height="100%" padding={8} flexDirection="column" gap={4} background={0}>
@@ -31,6 +39,16 @@ export function AboutBox(_props: Record<string, unknown>): JSX.Element {
         <box flexDirection="column" gap={2}>
           <text font="body" nowrap>Mockintosh OS</text>
           <text font="body" nowrap>{`v${pkg.version}`}</text>
+          <box
+            cursor="pointer"
+            semantic={{ name: "about-github", role: "link" }}
+            onLayout={({ x, y, width, height }) => setLinkRect({ x, y, width, height })}
+            onClick={openRepo}
+          >
+            <text font="body" nowrap underline>
+              github.com/mockintosh/mockintosh
+            </text>
+          </box>
         </box>
       </box>
       <text font="body" nowrap>Contributors</text>

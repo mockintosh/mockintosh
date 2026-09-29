@@ -1,5 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
-import type { LayoutNode, InlineSegment } from "./types.js";
+import type { LayoutNode, InlineSegment, TableRow } from "./types.js";
 
 // We derive MDAST types from the return type of fromMarkdown rather than
 // importing @types/mdast directly, to avoid version-mismatch issues between
@@ -100,7 +100,7 @@ function convertBlock(node: MdastNode, indent: number, out: LayoutNode[]): void 
         depth: number;
         children: PhrasingNode[];
       };
-      const level: 1 | 2 = h.depth <= 1 ? 1 : 2;
+      const level: 1 | 2 | 3 = h.depth <= 1 ? 1 : h.depth === 2 ? 2 : 3;
       const text = extractPlainText(h.children);
       if (text) out.push({ type: "heading", level, text, align: "left" });
       break;
@@ -129,11 +129,7 @@ function convertBlock(node: MdastNode, indent: number, out: LayoutNode[]): void 
     }
 
     case "list": {
-      const list = node as {
-        type: "list";
-        children: Array<{ type: "listItem"; children: MdastNode[] }>;
-      };
-      convertList(list.children, indent, out);
+      convertList(node as MdastList, indent, out);
       break;
     }
 
@@ -147,14 +143,21 @@ function convertBlock(node: MdastNode, indent: number, out: LayoutNode[]): void 
       break;
     }
 
-    case "code":
-      // Fenced/indented code blocks — skipped until monospace rendering is added
+    case "code": {
+      const code = node as { type: "code"; value: string };
+      if (code.value) out.push({ type: "code", text: code.value });
       break;
+    }
 
-    case "table":
-      // Tables not yet supported — emit a separator so structure is visible
-      out.push({ type: "hr" });
+    case "table": {
+      const table = node as { type: "table"; children: Array<{ children: Array<{ children: PhrasingNode[] }> }> };
+      const rows: TableRow[] = table.children.map((row, index) => ({
+        header: index === 0,
+        cells: row.children.map((cell) => convertInline(cell.children)),
+      }));
+      if (rows.length > 0) out.push({ type: "table", rows });
       break;
+    }
 
     case "html":
     case "yaml":
@@ -167,42 +170,38 @@ function convertBlock(node: MdastNode, indent: number, out: LayoutNode[]): void 
   }
 }
 
-function convertList(
-  items: Array<{ type: "listItem"; children: MdastNode[] }>,
-  indent: number,
-  out: LayoutNode[]
-): void {
-  for (const item of items) {
+interface MdastList {
+  type: "list";
+  ordered?: boolean | null;
+  start?: number | null;
+  children: Array<{ type: "listItem"; children: MdastNode[] }>;
+}
+
+function convertList(list: MdastList, indent: number, out: LayoutNode[]): void {
+  list.children.forEach((item, index) => {
     const segments: InlineSegment[] = [];
-    const nestedLists: Array<{
-      type: "list";
-      children: Array<{ type: "listItem"; children: MdastNode[] }>;
-    }> = [];
+    const nestedLists: MdastList[] = [];
 
     for (const child of item.children) {
       if (child.type === "paragraph") {
         const p = child as { type: "paragraph"; children: PhrasingNode[] };
         segments.push(...convertInline(p.children));
       } else if (child.type === "list") {
-        nestedLists.push(
-          child as {
-            type: "list";
-            children: Array<{ type: "listItem"; children: MdastNode[] }>;
-          }
-        );
+        nestedLists.push(child as MdastList);
       } else {
         convertBlock(child, indent, out);
       }
     }
 
     if (segments.length > 0) {
-      out.push({ type: "listItem", segments, indent });
+      const marker = list.ordered ? `${(list.start ?? 1) + index}.` : undefined;
+      out.push(marker ? { type: "listItem", segments, indent, marker } : { type: "listItem", segments, indent });
     }
 
     for (const nested of nestedLists) {
-      convertList(nested.children, indent + 1, out);
+      convertList(nested, indent + 1, out);
     }
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------

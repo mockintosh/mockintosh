@@ -1,9 +1,6 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { WebSocketServer } from "ws";
-import { handleStreamSession } from "../api/stream.js";
-import { handleTextwebSession } from "../api/textweb-session.js";
 
 const PORT = 3001;
 
@@ -80,6 +77,7 @@ const { default: oauthCallbackHandler } = await import(
 );
 const { default: oauthPollHandler } = await import("../api/oauth/poll.js");
 const { default: browseHandler } = await import("../api/browse.js");
+const { default: webImageHandler } = await import("../api/web-image.js");
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/chat": chatHandler,
@@ -89,6 +87,7 @@ const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/oauth/callback": oauthCallbackHandler,
   "/api/oauth/poll": oauthPollHandler,
   "/api/browse": browseHandler,
+  "/api/web-image": webImageHandler,
 };
 
 const server = createServer(async (req, res) => {
@@ -123,37 +122,6 @@ const server = createServer(async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// WebSocket server — handles /api/stream and /api/textweb upgrade requests
-// ---------------------------------------------------------------------------
-
-const wss = new WebSocketServer({ noServer: true });
-
-server.on("upgrade", (req: IncomingMessage, socket, head) => {
-  const path = new URL(
-    req.url ?? "/",
-    `http://localhost:${PORT}`
-  ).pathname;
-
-  if (path === "/api/stream") {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      console.log("[stream] WebSocket connected");
-      handleStreamSession(ws).catch((err) => {
-        console.error("[stream] session error:", err);
-      });
-    });
-  } else if (path === "/api/textweb") {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      console.log("[textweb] WebSocket connected");
-      handleTextwebSession(ws).catch((err) => {
-        console.error("[textweb] session error:", err);
-      });
-    });
-  } else {
-    socket.destroy();
-  }
-});
-
 server.listen(PORT, () => {
   const keySet =
     !!process.env.LLM_API_KEY &&
@@ -165,8 +133,6 @@ server.listen(PORT, () => {
       keySet ? "configured" : "NOT SET — ChatGippity will return errors"
     }`
   );
-  console.log(`  Safari Stream:  ws://localhost:${PORT}/api/stream`);
-  console.log(`  Safari Textweb: ws://localhost:${PORT}/api/textweb`);
   if (!keySet) {
     console.log("\n  Set your LLM key in .env.local:");
     console.log("    LLM_API_KEY=sk-...");

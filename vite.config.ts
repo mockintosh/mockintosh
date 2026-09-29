@@ -164,8 +164,6 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:3001",
         changeOrigin: true,
-        // ws: true enables WebSocket proxy for /api/stream
-        ws: true,
       },
     },
   },

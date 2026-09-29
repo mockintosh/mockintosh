@@ -22,7 +22,6 @@ export const SDK_CLEAN = [
   "Terminal.tsx",
   "ChatGippity.tsx",
   "SpotifyPlayer.tsx",
-  "GitHub.tsx",
 ] as const;
 
 /** App entry files that are OS shell and are not expected to be SDK-clean. */
@@ -50,7 +49,6 @@ export const BUNDLED_APPS = [
   "SourceEditor.tsx",
   "Terminal.tsx",
   "ChatGippity.tsx",
-  "GitHub.tsx",
   "Finder.solid.tsx",
   "AppStore.tsx",
   "IconGallery.tsx",
@@ -62,6 +60,7 @@ export type BundledAppEntry = (typeof BUNDLED_APPS)[number];
 export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]>> = {
   "MacPaint.tsx": ["macpaint"],
   "Canvas.tsx": ["canvas"],
+  "Safari.tsx": ["safari"],
   "SpotifyPlayer.tsx": ["spotify", "sprites"],
   "Finder.solid.tsx": ["finder"],
   "PhotoBooth.tsx": ["photobooth"],
@@ -69,7 +68,6 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "Trace.tsx": ["trace"],
   "Surface.tsx": ["surface"],
   "Showreel.tsx": ["showreel"],
-  "GitHub.tsx": ["github"],
 };
 
 export const APP_TITLES: Record<BundledAppEntry, string> = {
@@ -86,7 +84,6 @@ export const APP_TITLES: Record<BundledAppEntry, string> = {
   "VideoPlayer.tsx": "Video Player",
   "PhotoBooth.tsx": "Photo Booth",
   "SpotifyPlayer.tsx": "Spotify",
-  "GitHub.tsx": "GitHub",
   "SourceEditor.tsx": "Source Editor",
   "Terminal.tsx": "Terminal",
   "ChatGippity.tsx": "ChatGippity",
