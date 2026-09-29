@@ -102,6 +102,40 @@ export interface PlatformScheduler {
   now(): number;
 }
 
+/** One poll of a phone sign-in. */
+export type SignInPollResult =
+  | { status: "pending" }
+  | { status: "complete"; params: Record<string, string> }
+  | { status: "expired" };
+
+/** A phone sign-in in progress: what the QR code shows, and how to collect the answer. */
+export interface SignInPairing {
+  /** The URL the QR code encodes, opened on the phone. */
+  link: string;
+  /** How long the pairing stays open, in milliseconds. */
+  expiresInMs: number;
+  /** How often to call `poll`, in milliseconds. */
+  pollIntervalMs: number;
+  poll(): Promise<SignInPollResult>;
+}
+
+export interface SignInStartRequest {
+  /** The provider's authorize URL. The relay sets `redirect_uri` to `redirectUri`, and `state`. */
+  url: string;
+  /** Shown on the phone before it goes on to the provider. */
+  appTitle: string;
+}
+
+/**
+ * Carries an OAuth authorization response from the user's phone to this
+ * machine — a server both can reach (`api/oauth` on the web host).
+ */
+export interface SignInRelay {
+  /** The redirect URI apps register with their provider. */
+  readonly redirectUri: string;
+  start(request: SignInStartRequest): Promise<SignInPairing>;
+}
+
 /** Capabilities a platform declares outright; the rest follow from which services it provides. */
 export type HostCapability = "browser";
 
@@ -142,6 +176,8 @@ export interface Platform {
   microphone?: MicrophoneService;
   crypto: AppCrypto;
   browser?: BrowserService;
+  /** Phone sign-in for apps (`useApp().signIn`). Absent when no relay server is reachable. */
+  signInRelay?: SignInRelay;
   /**
    * Load a JavaScript module by URL, for installing third-party apps. Absent
    * when the host cannot load modules at runtime, where the App Store then

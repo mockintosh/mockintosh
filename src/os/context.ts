@@ -68,6 +68,8 @@ export interface OSServices {
   crypto: AppCrypto;
   browser?: BrowserService;
   /** Installs third-party apps, when the platform can load code at runtime. */
+  /** Phone sign-in (`useApp().signIn`), when the platform has a relay. */
+  signIn?: import("./signIn").SystemSignIn;
   installer?: AppInstaller;
   /**
    * Open an app the way the user does: check its `requires`, bring a matching

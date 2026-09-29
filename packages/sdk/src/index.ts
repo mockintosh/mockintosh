@@ -18,6 +18,7 @@ import type { MicrophoneService } from "./microphone";
 import type { KernelClient, KernelPermission } from "./kernel";
 import type { AppCrypto } from "./crypto";
 import type { BrowserService } from "./browser";
+import type { SignInDeclaration, SignInService } from "./signIn";
 
 export type { MenubarDefinition, MenubarItemDef, MenubarActionItem, MenubarRadioGroupDef, MenubarSubmenuDef, MenubarSeparator } from "./menus";
 
@@ -122,6 +123,7 @@ export { readWavChunk, readWavMarkers, setWavChunk, setWavMarkers } from "./wav"
 export type { KernelClient, KernelInvokeOptions, KernelPermission, OperationContract } from "./kernel";
 export type { AppCrypto } from "./crypto";
 export type { BrowserService } from "./browser";
+export type { SignInService, SignInDeclaration } from "./signIn";
 export { encodeQR } from "./qr";
 export type { Resource, Job, Diagnostic, ChatMessage, CompleteResult, OpenAITool, ContentPart, ChatContent } from "@mockintosh/protocol";
 export { parse, resource, jobSchema } from "@mockintosh/protocol";
@@ -412,6 +414,8 @@ export interface AppContext {
   };
   crypto: AppCrypto;
   browser?: BrowserService;
+  /** Sign in to an OAuth provider from the user's phone, when this Macintosh can. */
+  signIn?: SignInService;
   /**
    * What this Macintosh can do. Apps that work with or without a feature
    * check here instead of declaring it in `requires`.
@@ -475,9 +479,10 @@ export type FetchFunction = (url: string, options?: FetchRequest) => Promise<Fet
  * - `audio`     — `useApp().audio` is available (a speaker)
  * - `microphone` — `useApp().microphone` is available
  * - `browser`   — `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`)
+ * - `sign-in`   — `useApp().signIn` is available (sign in from a phone; see `SignInService`)
  */
 export type Capability =
-  | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser";
+  | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in";
 
 /**
  * What "About <app>…" — the first Apple-menu item while the app is frontmost —
@@ -520,6 +525,12 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
    * instance and exposes it as `useApp().kernel`. `kernel:*` is every trap.
    */
   permissions?: KernelPermission[];
+  /**
+   * Where the app signs in with `useApp().signIn`. The OS refuses authorize
+   * URLs on any other host. Declare `"sign-in"` in `requires` alongside it
+   * when the app cannot work signed out.
+   */
+  signIn?: SignInDeclaration;
   /** Content size of the main window. */
   defaultSize: { width: number; height: number };
   /** Kind of the main window (default `document`). */

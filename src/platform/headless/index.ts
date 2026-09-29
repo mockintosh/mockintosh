@@ -17,6 +17,7 @@ import type {
   PlatformKeyEvent,
   PlatformPointerEvent,
   PlatformScheduler,
+  SignInRelay,
 } from "../types";
 import { createHeadlessAudio, type HeadlessAudio } from "./audio";
 import { createHeadlessMicrophone, type HeadlessMicrophone } from "./microphone";
@@ -28,6 +29,8 @@ export interface HeadlessPlatformOptions {
   audioSampleRate?: number;
   /** Give the machine a microphone at this sample rate; `tick` then delivers what it hears. */
   microphoneSampleRate?: number;
+  /** A sign-in relay to hand apps; tests supply a scripted one. */
+  signInRelay?: SignInRelay;
 }
 
 export interface HeadlessPlatform extends Platform {
@@ -103,6 +106,7 @@ export function createHeadlessPlatform(options: HeadlessPlatformOptions): Headle
     storage: new InMemoryBackend(),
     ...(audio ? { audio } : {}),
     ...(microphone ? { microphone } : {}),
+    ...(options.signInRelay ? { signInRelay: options.signInRelay } : {}),
     env: { origin: "", config: {} },
     hostCapabilities: [] as HostCapability[],
     crypto: {

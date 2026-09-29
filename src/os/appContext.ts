@@ -10,9 +10,11 @@ import type {
   AudioService,
   KernelClient,
   MicrophoneService,
+  SignInService,
   WindowSpec,
 } from "@mockintosh/sdk";
 import type { OSServices, IconScreenRect } from "./context";
+import { createAppSignIn, type SystemSignIn } from "./signIn";
 import { createAppStorage } from "./appStorage";
 import { getApp } from "./apps";
 import { openersForFileType } from "./openers";
@@ -113,6 +115,17 @@ function instanceMicrophone(os: OSServices, microphone: MicrophoneService, insta
   };
 }
 
+/** Sign-in as one app sees it: limited to its declared hosts, its sheet closing when the launch ends. */
+function appSignIn(os: OSServices, signIn: SystemSignIn, appId: string, instanceId?: string): SignInService {
+  const app = getApp(appId);
+  return createAppSignIn({
+    redirectUri: signIn.redirectUri,
+    appTitle: app?.title ?? appId,
+    hosts: app?.signIn?.hosts ?? [],
+    showSheet: (request) => signIn.show(request, instanceId),
+  });
+}
+
 export function createAppContext(
   os: OSServices,
   appId: string,
@@ -142,6 +155,7 @@ export function createAppContext(
     env: { origin: os.env.origin, config: os.env.config ?? {} },
     crypto: os.crypto,
     browser: os.browser,
+    signIn: os.signIn && appSignIn(os, os.signIn, appId, options.instanceId),
     capabilities: os.capabilities,
     fetch: os.fetch,
     print: os.printers,

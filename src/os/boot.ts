@@ -52,6 +52,8 @@ import { createAppContext } from "./appContext";
 import { buildAppWindow } from "./appWindow";
 import { DialogApp } from "./components/Dialog.solid";
 import { createAppInstaller } from "./installedApps";
+import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
+import type { SystemSignIn } from "./signIn";
 import {
   describeMissingCapabilities,
   missingCapabilities,
@@ -227,6 +229,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     microphone: platform.microphone,
     crypto: platform.crypto,
     browser: platform.browser,
+    signIn: platform.signInRelay && systemSignIn(platform.signInRelay),
     installer,
     openApp(appId, props = {}, fromRect?) {
       const app = getApp(appId);
@@ -381,6 +384,45 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     singleInstance: false,
     Component: DialogApp as any,
   });
+
+  registerApp({
+    id: "__signin__",
+    title: "Sign In",
+    icon: "icon/computer",
+    defaultSize: { width: 360, height: 172 },
+    windowKind: "dialog",
+    scrollable: false,
+    resizable: false,
+    singleInstance: false,
+    Component: SignInSheet as any,
+  });
+
+  function systemSignIn(relay: NonNullable<Platform["signInRelay"]>): SystemSignIn {
+    const browser = platform.browser;
+    return {
+      redirectUri: relay.redirectUri,
+      show(request, instanceId) {
+        return new Promise((resolve, reject) => {
+          let disown = () => {};
+          const props = {
+            request,
+            relay,
+            openExternal: browser && ((url) => void browser.openExternal(url)),
+            resolve(params) {
+              disown();
+              resolve(params);
+            },
+            reject(error: Error) {
+              disown();
+              reject(error);
+            },
+          } satisfies SignInSheetProps;
+          const windowId = osServices.openWindow("__signin__", { title: "Sign In", props });
+          if (instanceId) disown = instances.own(instanceId, () => osServices.closeWindow(windowId));
+        });
+      },
+    };
+  }
 
   async function openFSNodeImpl(nodeId: string, fromRect?: AnimRect): Promise<void> {
     const action = await resolveOpenAction(fs, nodeId);

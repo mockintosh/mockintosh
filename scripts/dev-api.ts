@@ -73,19 +73,21 @@ const { default: chatHandler } = await import("../api/chat.js");
 const { default: generateImageHandler } = await import(
   "../api/generate-image.js"
 );
-const { default: spotifyDeviceRequestHandler } = await import(
-  "../api/spotify/device-request.js"
+const { default: oauthStartHandler } = await import("../api/oauth/start.js");
+const { default: oauthPairHandler } = await import("../api/oauth/pair.js");
+const { default: oauthCallbackHandler } = await import(
+  "../api/oauth/callback.js"
 );
-const { default: spotifyDevicePollHandler } = await import(
-  "../api/spotify/device-poll.js"
-);
+const { default: oauthPollHandler } = await import("../api/oauth/poll.js");
 const { default: browseHandler } = await import("../api/browse.js");
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/chat": chatHandler,
   "/api/generate-image": generateImageHandler,
-  "/api/spotify/device-request": spotifyDeviceRequestHandler,
-  "/api/spotify/device-poll": spotifyDevicePollHandler,
+  "/api/oauth/start": oauthStartHandler,
+  "/api/oauth/pair": oauthPairHandler,
+  "/api/oauth/callback": oauthCallbackHandler,
+  "/api/oauth/poll": oauthPollHandler,
   "/api/browse": browseHandler,
 };
 

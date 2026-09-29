@@ -240,6 +240,7 @@ export default defineApp({
 - `env.origin` / `env.config` — host origin and configuration (`SPOTIFY_CLIENT_ID`, …)
 - `crypto.randomBytes` / `crypto.sha256`
 - `browser` — `openExternal`, `authorize`, `loadScript`, when this Macintosh runs in a browser
+- `signIn` — sign in to an OAuth provider from the user's phone (see [Signing in](#signing-in))
 
 `useApp()` reads a per-window context, so call it during component setup (not in a callback created elsewhere).
 
@@ -259,6 +260,7 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `audio`     | `useApp().audio` is available (a speaker; see [Sound](#sound))        |
 | `microphone` | `useApp().microphone` is available (see [Sound input](#sound-input)) |
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
+| `sign-in`   | `useApp().signIn` is available (see [Signing in](#signing-in))        |
 
 Two ways to use them:
 
@@ -278,6 +280,43 @@ Two ways to use them:
   ```
 
 `fetch` has the portable signature `(url, { method?, headers?, body? }) => Promise<{ ok, status, headers, text(), json(), arrayBuffer() }>` — the browser's `fetch` satisfies it, and so will a device's HTTP client. Stay within that subset.
+
+## Signing in
+
+`useApp().signIn` signs the user in to an OAuth provider the way a TV does. The OS shows a QR code, the user signs in on their phone, and your app receives the provider's authorization code. Nothing is typed on the Macintosh and no browser window opens. It is present when the Macintosh can reach its sign-in relay (capability `sign-in`).
+
+The provider must support the **authorization code flow with PKCE**. The relay only carries the code from the phone to the Macintosh: it never holds a client secret or a token.
+
+1. Register `useApp().signIn.redirectUri` as a redirect URI in the provider's dashboard.
+2. Declare the provider's sign-in host. The OS refuses authorize URLs on any other host:
+
+   ```tsx
+   export default defineApp({
+     id: "player",
+     requires: ["network", "sign-in"],
+     signIn: { hosts: ["accounts.example.com"] },
+     /* … */
+   });
+   ```
+
+3. Build the authorize URL with your client ID and a PKCE challenge, and keep the verifier. The OS sets `redirect_uri` and `state` for you. Then exchange the code yourself:
+
+   ```tsx
+   const { signIn, fetch } = useApp();
+   const params = await signIn!.authorize(
+     `https://accounts.example.com/authorize?response_type=code&client_id=${id}&scope=${scope}` +
+       `&code_challenge_method=S256&code_challenge=${challenge}`
+   );
+   if (!params) return; // the user cancelled
+   const tokens = await fetch!("https://accounts.example.com/api/token", {
+     method: "POST",
+     headers: { "Content-Type": "application/x-www-form-urlencoded" },
+     body: `grant_type=authorization_code&code=${params.code}&client_id=${id}` +
+       `&redirect_uri=${encodeURIComponent(signIn!.redirectUri)}&code_verifier=${verifier}`,
+   });
+   ```
+
+`authorize` resolves `null` when the user cancels, closes the sheet, or declines on the phone. It rejects when the provider reports another error or the host is not declared. `apps/spotify/api.ts` (`signInWithPhone`) is a complete example.
 
 ## Sound
 

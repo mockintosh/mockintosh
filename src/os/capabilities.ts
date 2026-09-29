@@ -22,6 +22,7 @@ export function platformCapabilities(platform: Platform): CapabilitySet {
   if (platform.audio) caps.add("audio");
   if (platform.microphone) caps.add("microphone");
   if (platform.browser) caps.add("browser");
+  if (platform.signInRelay) caps.add("sign-in");
   return caps;
 }
 
@@ -44,6 +45,7 @@ const DESCRIPTIONS: Record<Capability, string> = {
   audio: "a speaker",
   microphone: "a microphone",
   browser: "a web browser",
+  "sign-in": "a way to sign in from a phone",
 };
 
 /** “"Photo Booth" needs a camera, which this Macintosh does not have.” */

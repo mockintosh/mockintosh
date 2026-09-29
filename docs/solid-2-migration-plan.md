@@ -121,6 +121,8 @@ All three sites pass the same `{ generate: "universal", moduleName: "@mockintosh
 
 ### Follow-up — Spotify sign-in without `window.opener`
 
+Done, generalised: the relay is provider-agnostic (`api/oauth/*`), apps reach it through `useApp().signIn` (capability `sign-in`, hosts declared in `defineApp({ signIn })`), and the OS owns the QR sheet (`src/os/components/SignInSheet.solid.tsx`). `BrowserService.authorize` and `callback.html` are unchanged but no bundled app uses them. The original plan:
+
 COOP `same-origin` makes `authorize()` in `src/platform/web/browser.ts` hang: the popup returns to `public/callback.html` with `window.opener === null`, so the `postMessage` never arrives. Replace the popup with a TV-style sign-in: the OS shows a QR code (`encodeQR` already ships in the SDK) and a short code; the user signs in on their phone; the OS polls until the token arrives. Spotify does not offer the OAuth device-authorization grant to third-party apps, so the relay is ours: `api/spotify` mints a session id, the phone completes the standard Authorization Code + PKCE flow against `/callback` on our origin, the function stores the code keyed by session, and `authorize()` polls `/api/spotify/session/:id` with backoff. The desktop path can still work with a plain same-origin popup handing off via `BroadcastChannel` (no `opener` needed), which is the cheaper intermediate if the QR flow slips. `BrowserService.authorize` keeps its signature; the web platform swaps the implementation. Not on the migration branch.
 
 ### Follow-ups, not on the branch

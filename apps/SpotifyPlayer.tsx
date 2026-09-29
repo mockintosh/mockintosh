@@ -1,25 +1,20 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Button, type Ink } from "@mockintosh/ui";
+import { Button } from "@mockintosh/ui";
 import { useApp, defineApp } from "@mockintosh/sdk";
 import {
-  SCOPES,
-  type DeviceFlowState,
+  SPOTIFY_ACCOUNTS_HOST,
   type PlayerState,
   type SpotifyPlaylist,
   type SpotifySession,
   type SpotifyTokens,
-  buildQRMatrix,
   ditherImageFromUrl,
-  exchangeCodeForTokens,
   fetchPlaylists,
-  generateCodeChallenge,
-  generateCodeVerifier,
   isSpotifyTokens,
   loadSpotifySDK,
+  signInWithPhone,
   spotifyPost,
   spotifyPut,
-  spotifyRedirectUri,
 } from "./spotify/api";
 import { spotifySprites } from "./sprites/spotify";
 
@@ -27,25 +22,6 @@ const SIDEBAR_W = 90;
 
 /** Key in the app's storage folder (System Folder/Preferences/spotify/). */
 const TOKENS_KEY = "tokens.json";
-
-/** `/api/spotify/device-request` — starts the device-code login flow. */
-interface DeviceRequestResponse {
-  error?: string;
-  poll_id: string;
-  verification_uri: string;
-  verification_uri_complete?: string;
-  user_code: string;
-  interval?: number;
-  expires_in?: number;
-}
-
-/** `/api/spotify/device-poll` — the flow's current state. */
-interface DevicePollResponse {
-  status: "pending" | "ready" | "expired" | "denied";
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-}
 
 function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
@@ -57,7 +33,7 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
   });
   const { storage } = app;
   const CLIENT_ID = app.env.config.SPOTIFY_CLIENT_ID ?? "";
-  const REDIRECT_URI = spotifyRedirectUri(app.env.origin);
+  const signIn = app.signIn!; // present: the app requires "sign-in"
   const [tokens, setTokens] = createSignal<SpotifyTokens | null>(null, { ownedWrite: true });
   const [playlists, setPlaylists] = createSignal<SpotifyPlaylist[]>([]);
   const [selected, setSelected] = createSignal(-1);
@@ -66,7 +42,7 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
   const [artSize, setArtSize] = createSignal(64);
   const [volume, setVolume] = createSignal(50);
   const [error, setError] = createSignal("");
-  const [deviceFlow, setDeviceFlow] = createSignal<DeviceFlowState | null>(null);
+  const [signingIn, setSigningIn] = createSignal(false);
   const [sidebarScroll, setSidebarScroll] = createSignal(0);
 
   // The API layer reads `session.tokens` and reports refreshes/revocations
@@ -75,7 +51,7 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
     tokens: null,
     fetch: app.fetch!, // present: the app requires "network"
     clientId: CLIENT_ID,
-    redirectUri: REDIRECT_URI,
+    redirectUri: signIn.redirectUri,
     crypto: app.crypto,
     images: app.images,
     onChange(next) {
@@ -102,10 +78,8 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
     },
   );
 
-  let codeVerifier = "";
   let deviceId: string | null = null;
   let sdkPlayer: { connect: () => Promise<void>; disconnect: () => void; setVolume: (v: number) => void; addListener: Function } | null = null;
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
 
   createEffect(
     () => tokens(),
@@ -178,116 +152,21 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
     },
   );
 
-  // OAuth return is handled in startBrowser via `browser.authorize`.
-
-  createEffect(
-    () => deviceFlow(),
-    (flow) => {
-    if (!flow || flow.status !== "qr") return;
-    const intervalMs = (flow.interval || 5) * 1000;
-    pollTimer = setInterval(async () => {
-      const current = deviceFlow();
-      if (!current || current.status !== "qr") return;
-      if (Date.now() > current.expiresAt) {
-        setDeviceFlow({ ...current, status: "expired" });
-        return;
-      }
-      try {
-        const resp = await session.fetch(`/api/spotify/device-poll?poll_id=${encodeURIComponent(current.pollId)}`);
-        const data = (await resp.json()) as DevicePollResponse;
-        if (data.status === "ready") {
-          session.onChange({
-            access_token: data.access_token,
-            refresh_token: data.refresh_token,
-            expires_at: Date.now() + data.expires_in * 1000,
-          });
-          setDeviceFlow(null);
-        } else if (data.status === "expired" || data.status === "denied") {
-          setDeviceFlow({ ...current, status: data.status });
-        }
-      } catch {
-        /* keep polling */
-      }
-    }, intervalMs);
-    return () => {
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = null;
-    };
-    },
-  );
-
   onCleanup(() => {
-    if (pollTimer) clearInterval(pollTimer);
     sdkPlayer?.disconnect();
   });
 
-  function startQr(): void {
-    if (!CLIENT_ID) {
-      setError("No client ID configured");
-      return;
+  async function startSignIn(): Promise<void> {
+    setError("");
+    setSigningIn(true);
+    try {
+      const next = await signInWithPhone(session, signIn);
+      if (next) session.onChange(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign-in failed");
+    } finally {
+      setSigningIn(false);
     }
-    setDeviceFlow({
-      status: "loading",
-      pollId: "",
-      verificationUri: "",
-      userCode: "",
-      interval: 5,
-      expiresAt: 0,
-      qrMatrix: null,
-    });
-    void session.fetch("/api/spotify/device-request", { method: "POST" })
-      .then((r) => r.json() as Promise<DeviceRequestResponse>)
-      .then((data) => {
-        if (data.error) {
-          setError(String(data.error));
-          setDeviceFlow(null);
-          return;
-        }
-        const uri = data.verification_uri_complete ?? data.verification_uri;
-        setDeviceFlow({
-          status: "qr",
-          pollId: data.poll_id,
-          verificationUri: uri,
-          userCode: data.user_code,
-          interval: data.interval ?? 5,
-          expiresAt: Date.now() + (data.expires_in ?? 300) * 1000,
-          qrMatrix: buildQRMatrix(uri),
-        });
-      })
-      .catch((e) => {
-        setError(e instanceof Error ? e.message : "Failed to start login");
-        setDeviceFlow(null);
-      });
-  }
-
-  function startBrowser(): void {
-    if (!CLIENT_ID) {
-      setError("No client ID configured");
-      return;
-    }
-    const verifier = generateCodeVerifier(app.crypto);
-    codeVerifier = verifier;
-    void generateCodeChallenge(verifier, app.crypto).then(async (challenge) => {
-      const params = [
-        ["response_type", "code"],
-        ["client_id", CLIENT_ID],
-        ["scope", SCOPES],
-        ["redirect_uri", REDIRECT_URI],
-        ["code_challenge_method", "S256"],
-        ["code_challenge", challenge],
-      ].map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
-      try {
-        const result = await app.browser!.authorize(`https://accounts.spotify.com/authorize?${params}`, {
-          redirectOrigin: app.env.origin,
-        });
-        if (!result.code || !codeVerifier) return;
-        const next = await exchangeCodeForTokens(result.code, codeVerifier, session);
-        session.onChange(next);
-        setError("");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Auth failed");
-      }
-    });
   }
 
   const logo = app.getSprite("icon/spotify");
@@ -302,52 +181,16 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
       </Show>
       <Show when={CLIENT_ID && !tokens()}>
         <box width="100%" height="100%" background={1} flexDirection="column" alignItems="center" justifyContent="center" gap={8} padding={8}>
-          <Show when={deviceFlow()?.status === "loading"}>
-            <text font="body" color={0}>Connecting to Spotify...</text>
-          </Show>
-          <Show when={deviceFlow()?.status === "qr" && deviceFlow()?.qrMatrix}>
-            <text font="body" color={0}>Scan with your phone</text>
-            <raster
-              width={120}
-              height={120}
-              onPaint={({ rect, setPixel }) => {
-                const matrix = deviceFlow()?.qrMatrix;
-                if (!matrix) return;
-                const module = Math.max(1, Math.floor(Math.min(rect.width, rect.height) / matrix.length));
-                for (let r = 0; r < matrix.length; r++) {
-                  for (let c = 0; c < matrix[r].length; c++) {
-                    const ink: Ink = matrix[r][c] ? 1 : 0;
-                    for (let py = 0; py < module; py++) {
-                      for (let px = 0; px < module; px++) {
-                        setPixel(c * module + px, r * module + py, ink);
-                      }
-                    }
-                  }
-                }
-              }}
+          {logo && (
+            <image
+              width={logo.width}
+              height={logo.height}
+              src={{ width: logo.width, height: logo.height, data: logo.data, mask: logo.mask }}
+              mode="inverted"
             />
-            <text font="menu" color={0}>{deviceFlow()?.userCode ?? ""}</text>
-            <Button label="Cancel" onClick={() => setDeviceFlow(null)} />
-          </Show>
-          <Show when={deviceFlow()?.status === "expired" || deviceFlow()?.status === "denied"}>
-            <text font="body" color={0}>
-              {deviceFlow()?.status === "expired" ? "QR code expired." : "Access denied."}
-            </text>
-            <Button label="Try Again" onClick={() => setDeviceFlow(null)} />
-          </Show>
-          <Show when={!deviceFlow()}>
-            {logo && (
-              <image
-                width={logo.width}
-                height={logo.height}
-                src={{ width: logo.width, height: logo.height, data: logo.data, mask: logo.mask }}
-                mode="inverted"
-              />
-            )}
-            <text font="body" color={0}>To continue, login to Spotify:</text>
-            <Button label="Log in with QR" onClick={startQr} />
-            <Button label="Log in via browser" onClick={startBrowser} />
-          </Show>
+          )}
+          <text font="body" color={0}>Sign in to Spotify with your phone.</text>
+          <Button label="Sign In…" disabled={signingIn()} onClick={() => void startSignIn()} />
           <Show when={error()}>
             <text font="body" color={0}>{error()}</text>
           </Show>
@@ -453,7 +296,8 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
 
 export default defineApp({
   id: "spotify",
-  requires: ["network", "browser"],
+  requires: ["network", "browser", "sign-in"],
+  signIn: { hosts: [SPOTIFY_ACCOUNTS_HOST] },
   title: "Spotify Player",
   icon: "icon/spotify",
   sprites: spotifySprites,

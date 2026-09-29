@@ -33,7 +33,7 @@ import { createWebMicrophoneService } from "./media/microphone";
 import { createWebCrypto } from "./crypto";
 import { createWebSourceProvider } from "./source";
 import { createWebBrowserService } from "./browser";
-
+import { createWebSignInRelay } from "./signInRelay";
 export interface WebPlatformOptions {
   /** Element the screen canvas is appended to. */
   root: HTMLElement;
@@ -118,6 +118,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     : undefined;
 
   const hostCapabilities: HostCapability[] = [];
+  const fetch = globalThis.fetch.bind(globalThis);
 
   return {
     display,
@@ -133,10 +134,11 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     hostCapabilities,
     crypto: createWebCrypto(),
     browser: createWebBrowserService(),
+    signInRelay: createWebSignInRelay(fetch, location.origin),
     clipboard,
     printerLinks: createWebPrinterLinks(),
     download: createWebDownloadService(),
-    fetch: globalThis.fetch.bind(globalThis),
+    fetch,
     images: createWebImageService(),
     video: createWebVideoService(),
     camera: createWebCameraService(),

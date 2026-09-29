@@ -1,8 +1,7 @@
-import { encodeQR, toBits, type AppCrypto, type BrowserService, type FetchFunction, type FetchRequest, type FetchResponse, type ImageService } from "@mockintosh/sdk";
+import { toBits, type AppCrypto, type BrowserService, type FetchFunction, type FetchRequest, type FetchResponse, type ImageService, type SignInService } from "@mockintosh/sdk";
 
-export function spotifyRedirectUri(origin: string): string {
-  return `${origin.replace("//localhost", "//[::1]").replace("//127.0.0.1", "//[::1]")}/callback.html`;
-}
+/** Where Spotify's sign-in page lives; the app's `signIn.hosts`. */
+export const SPOTIFY_ACCOUNTS_HOST = "accounts.spotify.com";
 
 function formBody(fields: Record<string, string>): string {
   return Object.entries(fields)
@@ -75,24 +74,33 @@ export interface PlayerState {
   duration_ms: number;
 }
 
-export type DeviceFlowStatus = "loading" | "qr" | "expired" | "denied" | "error";
-
-export interface DeviceFlowState {
-  status: DeviceFlowStatus;
-  pollId: string;
-  verificationUri: string;
-  userCode: string;
-  interval: number;
-  expiresAt: number;
-  qrMatrix: boolean[][] | null;
-}
-
-export function generateCodeVerifier(crypto: AppCrypto): string {
+function generateCodeVerifier(crypto: AppCrypto): string {
   return base64url(crypto.randomBytes(64));
 }
 
-export async function generateCodeChallenge(verifier: string, crypto: AppCrypto): Promise<string> {
+async function generateCodeChallenge(verifier: string, crypto: AppCrypto): Promise<string> {
   return base64url(await crypto.sha256(new TextEncoder().encode(verifier)));
+}
+
+/**
+ * Sign in from the user's phone (authorization code + PKCE through the OS
+ * sign-in sheet). `session.redirectUri` must be `signIn.redirectUri`.
+ * Resolves `null` when the user cancels.
+ */
+export async function signInWithPhone(session: SpotifySession, signIn: SignInService): Promise<SpotifyTokens | null> {
+  const verifier = generateCodeVerifier(session.crypto);
+  const challenge = await generateCodeChallenge(verifier, session.crypto);
+  const query = formBody({
+    response_type: "code",
+    client_id: session.clientId,
+    scope: SCOPES,
+    code_challenge_method: "S256",
+    code_challenge: challenge,
+  });
+  const params = await signIn.authorize(`https://${SPOTIFY_ACCOUNTS_HOST}/authorize?${query}`);
+  if (!params) return null;
+  if (!params.code) throw new Error("Spotify did not send a sign-in code");
+  return exchangeCodeForTokens(params.code, verifier, session);
 }
 
 export function isSpotifyTokens(v: unknown): v is SpotifyTokens {
@@ -105,7 +113,7 @@ export function isSpotifyTokens(v: unknown): v is SpotifyTokens {
   );
 }
 
-export async function exchangeCodeForTokens(
+async function exchangeCodeForTokens(
   code: string,
   codeVerifier: string,
   session: SpotifySession
@@ -225,21 +233,6 @@ export async function fetchPlaylists(session: SpotifySession): Promise<SpotifyPl
 export async function loadSpotifySDK(browser: BrowserService): Promise<{ Player: new (opts: unknown) => unknown } | undefined> {
   const Spotify = await browser.loadScript("https://sdk.scdn.co/spotify-player.js", "Spotify");
   return Spotify as { Player: new (opts: unknown) => unknown } | undefined;
-}
-
-export function buildQRMatrix(url: string): boolean[][] | null {
-  try {
-    const sprite = encodeQR(url);
-    const matrix: boolean[][] = [];
-    for (let y = 0; y < sprite.height; y++) {
-      const row: boolean[] = [];
-      for (let x = 0; x < sprite.width; x++) row.push(sprite.data[y * sprite.width + x] !== 0);
-      matrix.push(row);
-    }
-    return matrix;
-  } catch {
-    return null;
-  }
 }
 
 export async function ditherImageFromUrl(
