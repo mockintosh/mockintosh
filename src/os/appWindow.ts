@@ -46,14 +46,14 @@ export function buildAppWindow<P extends Record<string, unknown>>(
   };
 
   let bounds: WindowBounds;
-  if (windowDefinition(kind).coversScreen) {
+  const def = windowDefinition(kind);
+  if (def.coversScreen || def.backdrop) {
     bounds = fullScreenBounds(env.screen);
   } else {
     const size = spec.size ?? app.defaultSize;
     const width = Math.min(size.width, standardBounds.width);
     const height = Math.min(size.height, standardBounds.height);
     const n = env.openWindowCount % 6;
-    const def = windowDefinition(kind);
     const wanted = spec.position ?? (def.modal
       ? {
           // Alert() places the dBoxProc window in the upper centre.
@@ -91,6 +91,9 @@ export function buildAppWindow<P extends Record<string, unknown>>(
     contentWidth: bounds.width,
     scrollable,
     resizable,
+    movable: spec.movable,
+    onGoAway: spec.onGoAway,
+    modal: spec.modal,
     minWidth: minSize?.width,
     minHeight: minSize?.height,
     standardBounds,

@@ -36,6 +36,12 @@ export interface PlatformDisplay {
   readonly framebuffer?: BitMap;
   /** Show the current contents of `screen` (QuickDraw's `screenBits`). */
   present(screen: BitMap): void;
+  /**
+   * Call `callback` once everything presented so far can be seen: the
+   * browser has painted it, the panel has refreshed. Absent when a frame is
+   * visible as soon as `present` returns.
+   */
+  whenVisible?(callback: () => void): void;
 }
 
 export type PointerButton = 0 | 1 | 2;

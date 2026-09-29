@@ -24,12 +24,13 @@ import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEven
 import { importHostFile, isImportableImage, resolveImportTarget } from "./hostImport";
 import { SpriteRegistry, registerBuiltinSprites } from "./sprites";
 import { drawCursor } from "./cursor";
-import { cursorForName } from "./cursors";
+import { cursorForName, cursors } from "./cursors";
 import { animateZoomRect, type AnimRect } from "./zoomAnimation";
 import { buildFolderWindow, windowOuterRect } from "../../apps/Finder.solid";
 import { bootstrapFileSystem } from "./fsBootstrap";
 import { resolveOpenAction } from "./openers";
 import { claimMenubarEdge, stepMenubarReveal } from "./menubarReveal";
+import { createScreenshots, type Screenshots } from "./screenshot";
 import { makeOSRoot } from "./OSRoot.solid";
 import {
   setSplashVisible,
@@ -39,6 +40,7 @@ import {
   getWindows,
   getActiveWindowId,
   setWindowOutline,
+  setScreenshotMarquee,
   bringToFront,
   getMenubarMenus,
   isMenubarHidden,
@@ -189,6 +191,19 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         })
       : undefined;
 
+  // Assigned once `osServices` exists, before the frame loop or any input.
+  let screenshotCapture!: Screenshots;
+
+  function readScreen() {
+    ui.frame();
+    return {
+      width: resolution.width,
+      height: resolution.height,
+      rowBytes: screen.rowBytes,
+      bytes: screen.baseAddr.slice(),
+    };
+  }
+
   // --- OS services (passed to Solid components via context) ---
   const osServices: OSServices = {
     kernel,
@@ -261,6 +276,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       }
       return win.id;
     },
+    busy: (work) => runBusy(work),
     showDialog(options) {
       return new Promise<string | null>((resolve) => {
         osServices.openWindow("__dialog__", {
@@ -322,6 +338,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       setWindowOutline(null);
     },
     scheduleRepaint,
+    screenshots: {
+      captureEntireScreen: () => screenshotCapture.captureEntireScreen(),
+      beginPortionCapture() {
+        screenshotCapture.beginPortionCapture();
+        trackCursor();
+      },
+      settled: () => screenshotCapture.settled(),
+    },
     async eraseDisk() {
       await fs.erase();
       if (platform.reload) {
@@ -332,6 +356,17 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       closeAllWindows();
     },
   };
+
+  screenshotCapture = createScreenshots({
+    fs,
+    bounds: () => ({ width: resolution.width, height: resolution.height }),
+    readScreen,
+    setOutline: setScreenshotMarquee,
+    scheduleRepaint,
+    onError(message) {
+      void osServices.showDialog({ message, buttons: ["OK"] });
+    },
+  });
 
   registerApp({
     id: "__dialog__",
@@ -415,12 +450,48 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     scheduleRepaint();
   });
 
+  // --- Busy work, under the watch ---
+  /** Busy work waiting for a frame with the watch in it; started once that frame is visible. */
+  const busyStarts: Array<() => void> = [];
+  /** Busy work started and not yet settled. The watch stays up while there is any. */
+  let busyCount = 0;
+
+  /** Choose the cursor for the pointer at (x, y): crosshair while framing a shot, else the watch while busy. */
+  function trackCursor(x = cursorX, y = cursorY): void {
+    if (screenshotCapture.selecting()) {
+      SetCursor(cursors.cross);
+      return;
+    }
+    SetCursor(busyCount > 0 ? cursors.watch : cursorForName(ui.cursorAt(x, y)));
+  }
+
+  function runBusy<T>(work: () => T | Promise<T>): Promise<T> {
+    busyCount++;
+    trackCursor();
+    scheduleRepaint();
+    const done = new Promise<void>((start) => busyStarts.push(start)).then(work);
+    const settle = () => {
+      busyCount--;
+      trackCursor();
+      scheduleRepaint();
+    };
+    done.then(settle, settle);
+    return done;
+  }
+
   // --- Frame loop ---
   function renderFrame() {
     if (stopped) return;
     ui.frame();
     drawCursor(ui.port, cursorX, cursorY);
     present();
+    if (busyStarts.length > 0) {
+      // Busy work may freeze the screen, so it waits until the watch is seen.
+      const starts = busyStarts.splice(0);
+      const startAll = () => { if (!stopped) for (const start of starts) start(); };
+      if (display.whenVisible) display.whenVisible(startAll);
+      else startAll();
+    }
   }
 
   /**
@@ -462,6 +533,17 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
 
   function onPointer(e: PlatformPointerEvent): void {
     if (stopped) throw new ServiceError("disconnect", "Boot has ended");
+    if (screenshotCapture.selecting()) {
+      if (e.type !== "scroll") {
+        cursorX = Math.max(0, Math.min(resolution.width - 1, Math.floor(e.x)));
+        cursorY = Math.max(0, Math.min(resolution.height - 1, Math.floor(e.y)));
+        cursorState.obscured = false;
+      }
+      screenshotCapture.pointer(e);
+      trackCursor(cursorX, cursorY);
+      scheduleRepaint();
+      return;
+    }
     if (claimMenubarEdge(e, scheduler.now())) {
       // y < 0 is the page above the canvas. Don't park the cursor there;
       // only a full-screen pass needs a repaint so the bar can slide.
@@ -481,21 +563,21 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         cursorY = e.y;
         cursorState.obscured = false;
         screenDirty = true;
-        SetCursor(cursorForName(ui.cursorAt(e.x, e.y)));
         ui.dispatchPointer("mousemove", e.x, e.y, { modifiers: e.modifiers });
+        trackCursor(e.x, e.y);
         return;
       case "down": {
         ui.dispatchPointer("mousedown", e.x, e.y, { modifiers: e.modifiers });
         if (doubleClick.down(e.x, e.y, scheduler.now())) {
           ui.dispatchPointer("dblclick", e.x, e.y);
         }
-        SetCursor(cursorForName(ui.cursorAt(e.x, e.y)));
+        trackCursor(e.x, e.y);
         scheduleRepaint();
         return;
       }
       case "up":
-        SetCursor(cursorForName(ui.cursorAt(e.x, e.y)));
         ui.dispatchPointer("mouseup", e.x, e.y, { modifiers: e.modifiers });
+        trackCursor(e.x, e.y);
         scheduleRepaint();
         return;
       case "scroll":
@@ -535,14 +617,21 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
 
   function onKey(e: PlatformKeyEvent): void {
     if (stopped) throw new ServiceError("disconnect", "Boot has ended");
+    if (screenshotCapture.key(e)) {
+      trackCursor();
+      scheduleRepaint();
+      return;
+    }
     const mods: Modifiers = e.modifiers;
     if (e.type === "up") {
       ui.dispatchKeyboard("keyup", e.key, mods);
       return;
     }
     const command = mods.meta || mods.ctrl;
+    // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
     if (command && e.key.toLowerCase() === "v") {
-      pasteFromClipboard();
+      if (!(mods.meta && runMenuShortcut(e.key))) pasteFromClipboard();
+      scheduleRepaint();
       return;
     }
     if (mods.meta && e.key.length === 1 && runMenuShortcut(e.key)) {

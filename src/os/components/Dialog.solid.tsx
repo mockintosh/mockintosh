@@ -24,7 +24,8 @@ export function DialogApp(props: DialogProps): JSX.Element {
   const defaultLabel = () => buttons()[buttons().length - 1];
 
   function finish(label: string): void {
-    props.resolve(props.showInput ? value() : label);
+    if (props.showInput) props.resolve(label === "Cancel" ? null : value());
+    else props.resolve(label);
     win.close();
   }
 

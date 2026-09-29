@@ -21,11 +21,16 @@ export function isModalKind(kind: OSWindowKind): boolean {
   return windowDefinition(kind).modal;
 }
 
+/** Whether `win` blocks every other window: its own `modal`, else its kind's. */
+export function isModalWindow(win: Pick<OSWindow, "kind" | "modal">): boolean {
+  return win.modal ?? isModalKind(win.kind);
+}
+
 export function hasModalFront(windows: OSWindow[]): boolean {
-  return windows.some((w) => isModalKind(w.kind));
+  return windows.some(isModalWindow);
 }
 
 /** True if `win` must ignore input because a modal window is open above it. */
 export function isBlockedByModal(win: OSWindow, windows: OSWindow[]): boolean {
-  return !isModalKind(win.kind) && hasModalFront(windows);
+  return !isModalWindow(win) && hasModalFront(windows);
 }

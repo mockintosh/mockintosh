@@ -22,6 +22,7 @@ import type {
 import type { HostDisplay, PlatformEnv, PlatformScheduler } from "../platform/types";
 import type { CapabilitySet } from "./capabilities";
 import type { SystemPrinters } from "./printers/manager";
+import type { ScreenshotCommands } from "./screenshot";
 
 export interface IconScreenRect {
   x: number;
@@ -84,6 +85,8 @@ export interface OSServices {
   openFSNode: (nodeId: string, fromRect?: IconScreenRect) => void;
   closeWindow: (id: string) => void;
   showDialog: (options: DialogOptions) => Promise<string | null>;
+  /** Run `work` under the watch cursor, once the watch is on screen (`AppContext.os.busy`). */
+  busy: <T>(work: () => T | Promise<T>) => Promise<T>;
   /**
    * Play the classic zoom-open animation from `fromRect` (e.g. an icon's
    * screen rect) to `toRect` (the window rect), then call `onDone` to
@@ -100,6 +103,8 @@ export interface OSServices {
   /** Remove the drag/resize outline and call the stored commit callback. */
   hideWindowOutline: () => void;
   scheduleRepaint: () => void;
+  /** Full-screen and selection captures, saved as PNGs on the desktop. */
+  screenshots: ScreenshotCommands;
   /**
    * Format the startup disk and come back on a first-boot volume (desktop
    * shortcuts restored). Reloads the machine when the platform can.

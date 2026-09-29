@@ -4,7 +4,7 @@
  * that app's windows in front of the others, keeping each app's own order.
  */
 
-import { isModalKind } from "./layering";
+import { isModalWindow } from "./layering";
 import { windowDefinition, type OSWindowKind } from "./windowKinds";
 
 /** System windows (alerts) are not applications you switch to. */
@@ -36,10 +36,13 @@ export function orderWindowsForApp<T extends { appId: string }>(windows: readonl
 
 /** The window that should be key after a switch: the app's front document, else its front window. */
 export function keyWindowId(
-  windows: readonly { id: string; appId: string; kind: OSWindowKind }[],
+  windows: readonly { id: string; appId: string; kind: OSWindowKind; modal?: boolean }[],
   appId: string,
 ): string | null {
-  const mine = windows.filter((win) => win.appId === appId && !isModalKind(win.kind));
-  const documents = mine.filter((win) => !windowDefinition(win.kind).toolPalette);
+  const mine = windows.filter((win) => win.appId === appId && !isModalWindow(win));
+  const documents = mine.filter((win) => {
+    const def = windowDefinition(win.kind);
+    return !def.toolPalette && !def.backdrop;
+  });
   return (documents.at(-1) ?? mine.at(-1))?.id ?? null;
 }

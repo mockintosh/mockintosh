@@ -30,10 +30,11 @@ export class AppInstances {
     const record = this.records.get(id);
     if (record) record.kernelCaller = caller;
   }
-  own(id: string, cleanup: () => void) {
+  /** Run `cleanup` when the instance ends; the returned function withdraws it (the resource ended first). */
+  own(id: string, cleanup: () => void): () => void {
     const record = this.records.get(id);
-    if (!record || record.lifetime.closed) { cleanup(); return; }
-    record.lifetime.own(cleanup);
+    if (!record || record.lifetime.closed) { cleanup(); return () => {}; }
+    return record.lifetime.own(cleanup);
   }
   addWindow(id: string, window: string) {
     const record = this.records.get(id);

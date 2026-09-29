@@ -109,6 +109,11 @@ export function windowTotalHeight(
   );
 }
 
+/** Zooming changes the size, so like the grow box it needs a resizable window of a kind that has one. */
+export function hasZoomBox(win: Pick<OSWindow, "kind" | "resizable">): boolean {
+  return win.resizable && windowDefinition(win.kind).zoomBox;
+}
+
 /** Whether the window shows a grow box: it must be resizable and of a kind that has one. */
 export function hasGrowBox(win: OSWindow): boolean {
   return win.resizable && windowDefinition(win.kind).growBox;

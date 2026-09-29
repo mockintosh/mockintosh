@@ -225,7 +225,8 @@ export default defineApp({
 - `fs` — the shared file system (see [Files](#files))
 - `window` — the window this component is in (see [Windows](#windows))
 - `openWindow(spec?)` — open another window of your app (see [Windows](#windows))
-- `os.openApp / closeWindow / showDialog`
+- `os.openApp / closeWindow / showDialog` — `showDialog` resolves with the label of the button pressed or, with `showInput`, the text typed; pressing "Cancel" in an input dialog resolves `null`
+- `os.busy(work)` — run something that freezes the Macintosh for a moment under the watch cursor: the watch reaches the screen first, then `work` runs, and the cursor comes back when it (or its promise) settles
 - `setMenus(menus)` — this window's menubar (see [Menus](#menus))
 - `quit()` — end this launch: close every one of its windows and return to the Finder (see [Menus](#menus))
 - `fetch` — network access, when this Macintosh has it (see [Capabilities](#capabilities))
@@ -452,13 +453,13 @@ export default defineApp({
 });
 ```
 
-Item types (`MenubarItemDef`): an action `{ label, shortcut?, disabled?, onClick? }`, a `{ type: "separator" }`, a `{ type: "radiogroup", value, onValueChange, items }`, or a hierarchical menu `{ type: "submenu", label, disabled?, items }` that opens beside its item on hover. Items inside a submenu keep their ⌘-shortcuts. Reach for a submenu when a menu grows past about 15 items, since a pull-down taller than the screen gets cut off. The Apple menu is the OS's; you can't add to it.
+Item types (`MenubarItemDef`): an action `{ label, shortcut?, disabled?, checked?, onClick? }` (`checked` draws a check mark beside it), a `{ type: "separator" }`, a `{ type: "radiogroup", value, onValueChange, items }`, or a hierarchical menu `{ type: "submenu", label, disabled?, items }` that opens beside its item on hover. Items inside a submenu keep their ⌘-shortcuts. Reach for a submenu when a menu grows past about 15 items, since a pull-down taller than the screen gets cut off. The Apple menu is the OS's; you can't add to it.
 
 ## Windows
 
 By default, opening your app opens one window — its *main window* — with `Component` inside, sized by `defaultSize`, of kind `windowKind` (a `document` unless you say otherwise), with `scrollable`, `resizable` and `minSize` as declared on `defineApp`.
 
-`useApp().window` is the window your component is mounted in. `width()` and `height()` are the content size (reactive accessors — read them in JSX or effects), `isActive()` is whether it is frontmost, `scrollY()` the content scroll offset, `kind()` its current kind; `setTitle(title)` renames it, `setFullScreen(on)` takes it full screen and back, and `close()` closes it. A component that fills its window is:
+`useApp().window` is the window your component is mounted in. `width()` and `height()` are the content size (reactive accessors — read them in JSX or effects), `isActive()` is whether it is frontmost, `scrollY()` the content scroll offset and `scrollTo(y)` moves it (a `scrollable` window keeps it within the height you gave `setContentSize`), `kind()` its current kind; `setTitle(title)` renames it, `setFullScreen(on)` takes it full screen and back, and `close()` closes it. A component that fills its window is:
 
 ```tsx
 const { window: win } = useApp();
@@ -477,6 +478,7 @@ Like the Macintosh's `NewWindow`, you choose what kind of window you get:
 | `plain`      | a bare 1px frame, no title bar, cannot be moved                            |
 | `alert`      | `plain` and system-modal: nothing else takes input until it closes         |
 | `fullscreen` | no chrome at all — the whole screen, menubar included (see below)          |
+| `desk`       | your app's own desktop: no chrome, the whole screen below the menubar, always behind your other windows. Content coordinates are screen coordinates. Clicking it does not take the key window; hidden while another app is front. MacPaint's gray desk with its palettes is one. |
 
 ### Deciding what opening does: `onOpen`
 
@@ -501,7 +503,7 @@ export default defineApp({
 
 `onOpen` receives an `AppContext`: everything `useApp()` has except `window` and `setMenus`, since there is no window yet. It runs outside any component — open windows and dialogs there; keep signals and effects inside components.
 
-`openWindow(spec)` takes a `WindowSpec` whose every field is optional and defaults to your `defineApp`: `kind`, `title`, `size` (content pixels), `position`, `scrollable`, `resizable`, `minSize`, `Component` (a different component for this window — a preferences dialog, a palette) and `props`. It returns the window id, which `os.closeWindow` accepts. `openWindow()` with no argument is the main window.
+`openWindow(spec)` takes a `WindowSpec` whose every field is optional and defaults to your `defineApp`: `kind`, `title`, `size` (content pixels), `position`, `scrollable`, `resizable`, `minSize`, `Component` (a different component for this window — a preferences dialog, a palette) and `props`. `movable: false` pins a window where it opened. `onGoAway` makes the close box ask instead of close — run your Close command and call `window.close()` once the user agrees. `modal: false` keeps an `alert`-framed window from blocking the rest of the screen, for dialogs that decide themselves what clicks elsewhere do. It returns the window id, which `os.closeWindow` accepts. `openWindow()` with no argument is the main window.
 
 ### Full screen
 

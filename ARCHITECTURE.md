@@ -68,7 +68,7 @@ Everything above the dashed line compiles **without DOM types**; `npm run check:
 
 ```ts
 interface Platform {
-  display:   { width, height, framebuffer?, present(screen: BitMap) }
+  display:   { width, height, framebuffer?, present(screen: BitMap), whenVisible?(cb) }  // whenVisible: the presented frame can be seen
   input:     { onPointer(handler), onKey(handler), onDrop?(handler) }  // raw events, screen coordinates; onDrop is host files
   scheduler: { requestFrame(cb), now() }                  // requestFrame returns a cancel
   storage:   FSBackend                                    // the disk
@@ -289,6 +289,7 @@ A window's `kind` selects a **window definition** (`src/os/windowKinds.ts`) — 
 | `"plain"`         | `plainDBox`       | 1px frame and shadow; no title bar, not movable     | 1                            |
 | `"alert"`         | `dBoxProc`        | 1px / 2px white / 2px square frame and shadow; system-modal | 5 front              |
 | `"fullscreen"`    | —                 | none; bounds are the screen, menubar hidden         | 3 above documents            |
+| `"desk"`          | —                 | none; the screen under the menubar, local = global coordinates; a press does not take the key window | behind the app's other windows; hidden when another app is front |
 
 `buildAppWindow` clamps size/position to the desktop (gray region minus 3 px). Zoom box toggles `standardBounds` vs `userBounds`. Opening from a Finder icon plays the zoom-rect animation.
 

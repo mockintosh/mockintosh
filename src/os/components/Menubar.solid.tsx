@@ -55,11 +55,19 @@ function menuTitleWidth(label: string): number {
   return measureText(label, MENU_FONT) + LABEL_PAD * 2;
 }
 
+/** Whether a panel reserves the check column: any radio group or checkable item aligns every label after it. */
+function hasCheckColumn(items: MenubarItemDef[]): boolean {
+  return items.some(
+    (item) => item.type === "radiogroup" || ((item.type ?? "action") === "action" && (item as MenubarActionItem).checked !== undefined),
+  );
+}
+
 function menuDropdownWidth(items: MenubarItemDef[]): number {
   let max = 80;
+  const checkCol = hasCheckColumn(items) ? CHECK_COL_W : 0;
   for (const item of items) {
     if ("label" in item && item.label) {
-      const w = measureText(item.label, MENU_FONT);
+      const w = measureText(item.label, MENU_FONT) + checkCol;
       const shortcut = "shortcut" in item ? (item as MenubarActionItem).shortcut : undefined;
       const sw = shortcut ? measureText(`${COMMAND_KEY}${shortcut}`, MENU_FONT) + 16
         : item.type === "submenu" ? SUBMENU_ARROW.width + 16 : 0;
@@ -390,6 +398,7 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
 
   let itemIndex = 0;
   const itemNodes: JSX.Element[] = [];
+  const labelLeft = 8 + (hasCheckColumn(props.items) ? CHECK_COL_W : 0);
 
   let yOffset = MENU_PADDING;
   for (let i = 0; i < props.items.length; i++) {
@@ -419,7 +428,7 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
           onMouseLeave={() => props.setHighlighted(null)}
           onClick={() => { if (!sub.disabled) openSubmenu(idxSelf, sub, yTop); }}
         >
-          <box position="absolute" left={8} top={0} width={w - 16} height={ITEM_H} justifyContent="center">
+          <box position="absolute" left={labelLeft} top={0} width={w - 8 - labelLeft} height={ITEM_H} justifyContent="center">
             <text font={MENU_FONT} nowrap color={ink()} stipple={sub.disabled} verticalAlign="middle">
               {sub.label}
             </text>
@@ -505,7 +514,15 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
           onMouseLeave={() => props.setHighlighted(null)}
           onClick={() => { if (!ai.disabled) props.onRun(ai); }}
         >
-          <box position="absolute" left={8} top={0} width={w - 16} height={ITEM_H} justifyContent="center">
+          <Show when={ai.checked}>
+            <box position="absolute" left={8} top={0} width={CHECK_COL_W} height={ITEM_H} justifyContent="center">
+              <text font={MENU_FONT} nowrap color={isHighlighted() && !ai.disabled ? 0 : 1}
+                stipple={ai.disabled} verticalAlign="middle">
+                {CHECK_MARK}
+              </text>
+            </box>
+          </Show>
+          <box position="absolute" left={labelLeft} top={0} width={w - 8 - labelLeft} height={ITEM_H} justifyContent="center">
             <text font={MENU_FONT} nowrap color={isHighlighted() && !ai.disabled ? 0 : 1}
               stipple={ai.disabled} verticalAlign="middle">
               {ai.label}

@@ -10,7 +10,7 @@ const menuOption = object({ label: string, value: string, disabled: boolean }, [
 const menuLeaves = [
   object({ type: { enum: ["separator"] } }),
   object({ type: { enum: ["radiogroup"] }, value: string, items: array(menuOption) }),
-  object({ type: { enum: ["action"] }, label: string, shortcut: string, disabled: boolean }, ["label"]),
+  object({ type: { enum: ["action"] }, label: string, shortcut: string, disabled: boolean, checked: boolean }, ["label"]),
 ] as const;
 const submenu = <const S extends Schema>(items: S) =>
   object({ type: { enum: ["submenu"] }, label: string, disabled: boolean, items: array(items) }, ["type", "label", "items"]);

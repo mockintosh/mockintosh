@@ -8,7 +8,7 @@ import type { HostDisplay, HostResolution, HostScale } from "../types";
 
 export const HOST_RESOLUTIONS: readonly HostResolution[] = [
   { id: "classic", label: "512 x 342", width: 512, height: 342 },
-  { id: "640x480", label: "640 x 480", width: 640, height: 480 },
+  { id: "600x400", label: "600 x 400", width: 600, height: 400 },
   { id: "viewport", label: "Fit window" },
 ];
 

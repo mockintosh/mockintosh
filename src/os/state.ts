@@ -26,8 +26,9 @@ function runHostWrite(write: () => void): void {
 }
 import type { JSX } from "@mockintosh/ui";
 import { keyWindowId, orderWindowsForApp } from "./appSwitcher";
-import { isModalKind, sortWindowsForPaint, windowLayer } from "./layering";
+import { isModalWindow, sortWindowsForPaint, windowLayer } from "./layering";
 import { tuckMenubar } from "./menubarReveal";
+import { disposeAllWindowContent, disposeWindowContent } from "./windowContent";
 import { windowDefinition, type OSWindowKind } from "./windowKinds";
 import type { MenubarDefinition } from "@mockintosh/sdk";
 
@@ -74,6 +75,12 @@ export interface OSWindow {
   contentWidth: number;
   scrollable: boolean;
   resizable: boolean;
+  /** `false` pins the window: its title bar does not drag. */
+  movable?: boolean;
+  /** Replaces closing on a close-box click; the app closes the window itself. */
+  onGoAway?: () => void;
+  /** Overrides the kind's modality (`windowDefinition(kind).modal`). */
+  modal?: boolean;
   /** Minimum content width when resizing (default 100). */
   minWidth?: number;
   /** Minimum content height when resizing (default 60). */
@@ -193,10 +200,10 @@ function menubarWindow(): OSWindow | undefined {
   // No key window means the Finder desktop is front, even if other apps
   // still have windows open behind it.
   if (!active) return undefined;
-  if (!isModalKind(active.kind)) return active;
+  if (!isModalWindow(active)) return active;
   const stack = sortWindowsForPaint(windowStore().list as OSWindow[]);
   for (let i = stack.length - 1; i >= 0; i--) {
-    if (!isModalKind(stack[i].kind)) return stack[i];
+    if (!isModalWindow(stack[i])) return stack[i];
   }
   return undefined;
 }
@@ -245,42 +252,59 @@ export const [getWindowOutline, setWindowOutline] = lazySignal<{
   height: number;
 } | null>(null);
 
+/** Rubber-band rectangle while dragging a screenshot selection, in screen pixels. */
+export const [getScreenshotMarquee, setScreenshotMarquee] = lazySignal<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} | null>(null);
+
 // ---------------------------------------------------------------------------
 // Window helpers
 // ---------------------------------------------------------------------------
 
 export function openOSWindow(win: OSWindow): void {
   if (windowDefinition(win.kind).coversScreen) tuckMenubar();
+  const def = windowDefinition(win.kind);
   _setWindowStore((s) => {
     // Remove any duplicate with the same id before adding
     const idx = s.list.findIndex((w) => w.id === win.id);
     if (idx >= 0) s.list.splice(idx, 1);
-    s.list.push(win);
+    const firstOwn = def.backdrop ? s.list.findIndex((w) => w.appId === win.appId) : -1;
+    if (firstOwn >= 0) s.list.splice(firstOwn, 0, win);
+    else s.list.push(win);
   });
-  // A palette joins an already-front app without taking the key window, so the
-  // document keeps its stripes while the palette's drag bar stays filled.
+  // A palette or desk joins an already-front app without taking the key window,
+  // so the document keeps its stripes while the palette's drag bar stays filled.
   const active = getActiveWindow();
-  if (!windowDefinition(win.kind).toolPalette || !active || active.appId !== win.appId) {
+  const joinsFrontApp = def.toolPalette || def.backdrop;
+  if (!joinsFrontApp || !active || active.appId !== win.appId) {
     setActiveWindowId(win.id);
   }
   flushIfIdle();
 }
 
 export function closeOSWindow(id: string): void {
+  disposeWindowContent(id);
+  const closing = windowStore().list.find((w) => w.id === id);
   _setWindowStore((s) => {
     const idx = s.list.findIndex((w) => w.id === id);
     if (idx >= 0) s.list.splice(idx, 1);
   });
   setActiveWindowId((prev) => {
     if (prev !== id) return prev;
-    const remaining = windowStore().list.filter((w) => w.id !== id);
-    return remaining.length > 0 ? remaining[remaining.length - 1].id : null;
+    const remaining = windowStore().list.filter((w) => w.id !== id) as OSWindow[];
+    // The app stays front while it has windows left (a desk, a palette).
+    const sameApp = closing ? keyWindowId(remaining, closing.appId) : null;
+    return sameApp ?? (remaining.length > 0 ? remaining[remaining.length - 1].id : null);
   });
   flushIfIdle();
 }
 
 /** Close every window — what shutting the machine down does. */
 export function closeAllWindows(): void {
+  disposeAllWindowContent();
   _setWindowStore((s) => {
     s.list = [];
   });
@@ -299,9 +323,21 @@ export function activateApp(appId: string): void {
 }
 
 export function bringToFront(id: string): void {
+  const desk = windowStore().list.find((w) => w.id === id);
+  if (desk && windowDefinition(desk.kind).backdrop) {
+    activateApp(desk.appId);
+    return;
+  }
   _setWindowStore((s) => {
+    const target = s.list.find((w) => w.id === id);
+    if (!target) return;
+    // An app with a desk owns the screen: its desk must come forward too, or
+    // other apps' windows would sit between the desk and the window.
+    if (s.list.some((w) => w.appId === target.appId && windowDefinition(w.kind).backdrop)) {
+      const next = orderWindowsForApp(s.list, target.appId);
+      s.list.splice(0, s.list.length, ...next);
+    }
     const idx = s.list.findIndex((w) => w.id === id);
-    if (idx < 0) return;
     const win = s.list[idx];
     const layer = windowLayer(win.kind);
     // Insert after the last window of the same or lower layer.

@@ -22,4 +22,15 @@ describe("app instance ownership", () => {
     expect(cleanup).toEqual(["timer", "subscription"]);
     expect(() => instances.addWindow(next, "late")).toThrow("ended");
   });
+
+  it("forgets cleanup for a resource that ended before its instance", () => {
+    const cleanup: string[] = [];
+    const instances = new AppInstances(() => {});
+    const id = instances.create("app");
+    const disown = instances.own(id, () => cleanup.push("frame"));
+    instances.own(id, () => cleanup.push("stream"));
+    disown();
+    instances.stop(id);
+    expect(cleanup).toEqual(["stream"]);
+  });
 });

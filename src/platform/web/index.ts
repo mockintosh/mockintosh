@@ -76,6 +76,12 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
       }
       presenter.present(screen);
     },
+    whenVisible(callback) {
+      // The canvas is painted after the frame callbacks of the rendering
+      // update that follows a present; the frame callback after that one
+      // runs once the paint is done, wherever the present happened.
+      requestAnimationFrame(() => requestAnimationFrame(() => callback()));
+    },
   };
   screenEl.subscribeInvalidate(() => {
     if (!lastScreen) return;

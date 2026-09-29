@@ -78,6 +78,7 @@ export function createAppContext(
       openersFor: (type) => openersForFileType(type),
       closeWindow: (id) => os.closeWindow(id),
       showDialog: (opts) => os.showDialog(opts),
+      busy: (work) => os.busy(work),
     },
     openWindow<P extends Record<string, unknown>>(spec?: WindowSpec<P>): string {
       const fromRect = pendingFromRect;
@@ -98,16 +99,21 @@ export function createAppContext(
     scheduler: {
       now: () => os.scheduler.now(),
       requestFrame(callback) {
-        let cancelled = false;
+        let settled = false;
+        let disown = () => {};
         const stop = os.scheduler.requestFrame((timeMs) => {
-          if (!cancelled) callback(timeMs);
+          if (settled) return;
+          settled = true;
+          disown();
+          callback(timeMs);
         });
         const cancel = () => {
-          if (cancelled) return;
-          cancelled = true;
+          if (settled) return;
+          settled = true;
+          disown();
           stop();
         };
-        if (options.instanceId) os.instances?.own(options.instanceId, cancel);
+        if (options.instanceId && os.instances) disown = os.instances.own(options.instanceId, cancel);
         return cancel;
       },
     },

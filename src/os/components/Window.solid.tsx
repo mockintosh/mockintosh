@@ -1,4 +1,4 @@
-import { Errored, isPending } from "solid-js";
+import { Errored, Loading, isPending } from "solid-js";
 import { For, Show, createSignal, createMemo } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { useOS } from "../context";
@@ -19,6 +19,7 @@ import { getWindows, setWindowFullScreen } from "../state";
 import { windowDefinition } from "../windowKinds";
 import { AppServicesContext, WindowSlotsContext, type AppServices } from "@mockintosh/sdk";
 import { createAppContext } from "../appContext";
+import { mountWindowContent } from "../windowContent";
 import { measureText, type PointerCaptureEvent } from "@mockintosh/ui";
 
 import {
@@ -40,6 +41,7 @@ import {
   windowTotalHeight,
   windowContentWidth,
   titleBarOuterHeight,
+  hasZoomBox,
 } from "../windowGeometry";
 
 /** Offsets of the six title-bar stripe lines within the 11px close-box band. */
@@ -74,7 +76,7 @@ export function Window(props: WindowProps): JSX.Element {
   /** A palette is on whenever its app is front, even while a document is the key window. */
   const appFront = () => getActiveAppId() === props.win.appId;
   const chromeOn = () => (def().toolPalette ? appFront() : isActive());
-  const shown = () => !def().toolPalette || appFront();
+  const shown = () => !(def().toolPalette || def().backdrop) || appFront();
 
   // Outer geometry
   const frame = createMemo(() => windowFrame(props.win));
@@ -166,9 +168,22 @@ export function Window(props: WindowProps): JSX.Element {
     // A utility window is used from the document. The press drags the bar or
     // changes a control; it does not take the key window, so both stay active.
     if (def().toolPalette) return;
+    // The desk is used from the document too; a press only brings its app forward.
+    if (def().backdrop) {
+      if (!appFront()) {
+        bringToFront(props.win.id);
+        ev.preventDefault();
+      }
+      return;
+    }
     if (isActive()) return;
     bringToFront(props.win.id);
     if (!hasTitleBar(props.win) || ev.localY >= TITLE_BAR_H) ev.preventDefault();
+  }
+
+  function goAway(): void {
+    if (props.win.onGoAway) props.win.onGoAway();
+    else os.closeWindow(props.win.id);
   }
 
   function handleThumbDrag(gx: number, gy: number) {
@@ -261,6 +276,7 @@ export function Window(props: WindowProps): JSX.Element {
               dragOffsetY = ly;
             }}
             onDrag={(_lx, _ly, gx, gy) => {
+              if (props.win.movable === false) return;
               const { width } = props.win;
               const newX = Math.max(3, Math.min(gx - dragOffsetX, os.resolution.width - width - 3));
               const newY = Math.max(os.menubarHeight + 3, Math.min(gy - dragOffsetY, os.resolution.height - 3));
@@ -332,7 +348,7 @@ export function Window(props: WindowProps): JSX.Element {
                   onMouseUp={(lx, ly) => {
                     const inBox = lx >= 0 && lx < CLOSE_SIZE && ly >= 0 && ly < CLOSE_SIZE;
                     setClosePressed(false);
-                    if (inBox) os.closeWindow(props.win.id);
+                    if (inBox) goAway();
                   }}
                 />
               }
@@ -350,7 +366,7 @@ export function Window(props: WindowProps): JSX.Element {
                   onMouseUp={(lx, ly) => {
                     const inBox = lx >= 0 && lx < CLOSE_SIZE && ly >= 0 && ly < CLOSE_SIZE;
                     setClosePressed(false);
-                    if (inBox) os.closeWindow(props.win.id);
+                    if (inBox) goAway();
                   }}
                 />
               )}
@@ -358,7 +374,7 @@ export function Window(props: WindowProps): JSX.Element {
             </Show>
 
             {/* Zoom box */}
-            <Show when={def().zoomBox}>
+            <Show when={hasZoomBox(props.win)}>
             <box
               position="absolute"
               left={zoomX() - 1}
@@ -725,6 +741,15 @@ function DefaultInfoBar(props: { win: OSWindow }): JSX.Element {
   );
 }
 
+/** The app's subtree, in a root the OS disposes before the window (see `windowContent.ts`). */
+function WindowContentRoot(props: {
+  windowId: string;
+  onCleanupError(error: unknown): void;
+  children: JSX.Element;
+}): JSX.Element {
+  return mountWindowContent(props.windowId, () => props.children, props.onCleanupError);
+}
+
 function WindowContent(props: {
   win: OSWindow;
   slots: import("@mockintosh/sdk").WindowSlots;
@@ -742,6 +767,7 @@ function WindowContent(props: {
     height: () => props.win.height,
     isActive: () => getActiveWindowId() === windowId,
     scrollY: () => props.win.scrollY,
+    scrollTo: (y) => updateOSWindow(windowId, { scrollY: Math.max(0, Math.round(y)) }),
     kind: () => props.win.kind,
     setTitle: (title) => updateOSWindow(windowId, { title }),
     setContentSize: (width, height) =>
@@ -762,6 +788,7 @@ function WindowContent(props: {
       height: api.height,
       isActive: api.isActive,
       scrollY: api.scrollY,
+      scrollTo: api.scrollTo,
       // The shell's kinds are the SDK's plus `finder-folder`, a document window.
       kind: () => (props.win.kind === "finder-folder" ? "document" : props.win.kind),
       setTitle: api.setTitle,
@@ -777,15 +804,25 @@ function WindowContent(props: {
       <AppServicesContext value={services}>
       <WindowSlotsContext value={props.slots}>
       <box width="100%" height="100%" inert={modalFront()}>
-        <Errored fallback={error => {
-          const err = error();
-          if (props.win.instanceId) os.instances?.fail(props.win.instanceId, err);
-          return <text wrap>{`Application failed: ${String(err)}`}</text>;
-        }}>
-        <Show when={component()} keyed>
-          {(Comp) => <Comp {...props.win.props} />}
-        </Show>
-        </Errored>
+        <WindowContentRoot
+          windowId={windowId}
+          onCleanupError={(error) => {
+            console.error(`${props.win.appId}: a cleanup threw while its window closed`, error);
+            if (props.win.instanceId) os.instances?.note(props.win.instanceId, error, "cleanup");
+          }}
+        >
+          <Errored fallback={error => {
+            const err = error();
+            if (props.win.instanceId) os.instances?.fail(props.win.instanceId, err);
+            return <text wrap>{`Application failed: ${String(err)}`}</text>;
+          }}>
+          <Loading fallback={<box width="100%" height="100%" background={0} />}>
+          <Show when={component()} keyed>
+            {(Comp) => <Comp {...props.win.props} />}
+          </Show>
+          </Loading>
+          </Errored>
+        </WindowContentRoot>
       </box>
       </WindowSlotsContext>
       </AppServicesContext>

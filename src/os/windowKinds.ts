@@ -53,6 +53,12 @@ export interface WindowDefinition {
    * window — the first click changes a control. Hidden when another app is frontmost.
    */
   toolPalette: boolean;
+  /**
+   * The app's desk: the whole screen under the menubar, always behind the
+   * app's other windows. A press does not take the key window. Hidden when
+   * another app is frontmost.
+   */
+  backdrop?: boolean;
 }
 
 const DOCUMENT: WindowDefinition = {
@@ -103,6 +109,7 @@ const WINDOW_DEFINITIONS: Record<OSWindowKind, WindowDefinition> = {
   plain: PLAIN,
   // dBoxProc: 1px outer, 2px white, 2px inner band; square; system-modal.
   alert: { ...PLAIN, frameGap: 2, innerFrame: 2, modal: true, layer: 5 },
+  desk: { ...PLAIN, frame: 0, shadow: false, backdrop: true },
   fullscreen: {
     titleBar: false,
     closeBox: false,

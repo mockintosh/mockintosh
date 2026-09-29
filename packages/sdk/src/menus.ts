@@ -22,6 +22,8 @@ export interface MenubarActionItem {
   label: string;
   shortcut?: string;
   disabled?: boolean;
+  /** Draw a check mark beside the item (`CheckItem`). */
+  checked?: boolean;
   onClick?: () => void;
 }
 

@@ -7,6 +7,7 @@ import {
   getSplashVisible,
   setSplashVisible,
   getWindowOutline,
+  getScreenshotMarquee,
 } from "./state";
 import { Splash } from "./components/Splash.solid";
 import { Desktop } from "./components/Desktop.solid";
@@ -50,6 +51,21 @@ export function OSRoot(props: OSRootProps): JSX.Element {
           </Show>
           {/* Tucked above a full-screen window until the top edge brings it down. */}
           <Menubar height={props.menubarHeight} top={menubarTop()} menus={getMenubarMenus()} />
+          <Show when={getScreenshotMarquee()}>
+            {(r) => (
+              <box
+                position="absolute"
+                left={r().x}
+                top={r().y}
+                width={r().width}
+                height={r().height}
+                borderColor={1}
+                borderWidth={1}
+                borderStyle="dotted"
+                penMode="xor"
+              />
+            )}
+          </Show>
         </Show>
         <ScreenCorners />
       </box>

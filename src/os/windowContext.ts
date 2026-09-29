@@ -14,6 +14,7 @@ export interface WindowAPI {
   height: Accessor<number>;
   isActive: Accessor<boolean>;
   scrollY: Accessor<number>;
+  scrollTo: (y: number) => void;
   kind: Accessor<OSWindowKind>;
   setTitle: (title: string) => void;
   setContentSize: (width: number, height: number) => void;

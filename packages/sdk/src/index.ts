@@ -17,14 +17,7 @@ import type { KernelClient, KernelPermission } from "./kernel";
 import type { AppCrypto } from "./crypto";
 import type { BrowserService } from "./browser";
 
-export type {
-  MenubarDefinition,
-  MenubarItemDef,
-  MenubarActionItem,
-  MenubarRadioGroupDef,
-  MenubarSubmenuDef,
-  MenubarSeparator,
-} from "./menus";
+export type { MenubarDefinition, MenubarItemDef, MenubarActionItem, MenubarRadioGroupDef, MenubarSubmenuDef, MenubarSeparator } from "./menus";
 
 // File-system vocabulary, re-exported so apps never import @mockintosh/fs
 // directly (the OS owns the one FileSystem instance; apps reach it via
@@ -294,8 +287,14 @@ export interface PrintService {
  * - `fullscreen` — no chrome at all; covers the whole screen, menubar
  *                  included. Touching the top edge slides the menubar down
  *                  over the picture; ⌘ shortcuts work without revealing it.
+ * - `desk`       — the app's own desktop: no chrome, the whole screen under
+ *                  the menubar, always behind the app's other windows. Its
+ *                  content coordinates are screen coordinates. A click in it
+ *                  does not take the key window, and it is hidden while
+ *                  another app is frontmost. MacPaint's gray desk with its
+ *                  palettes is one.
  */
-export type WindowKind = "document" | "dialog" | "utility" | "plain" | "alert" | "fullscreen";
+export type WindowKind = "document" | "dialog" | "utility" | "plain" | "alert" | "fullscreen" | "desk";
 
 /**
  * What an app asks for when it opens a window. Everything is optional: the
@@ -312,6 +311,19 @@ export interface WindowSpec<P extends Record<string, unknown> = Record<string, u
   position?: { x: number; y: number };
   scrollable?: boolean;
   resizable?: boolean;
+  /** `false` pins the window where it opened: its title bar does not drag. */
+  movable?: boolean;
+  /**
+   * The close box asks instead of closing: `TrackGoAway` → your Close command.
+   * Close the window yourself (`window.close()`) once the user agrees.
+   */
+  onGoAway?: () => void;
+  /**
+   * `false` keeps an `alert`-framed window from blocking the rest of the
+   * screen — `ModalDialog` with a filter proc rather than `Alert`: the app
+   * decides what clicks elsewhere do while it is up.
+   */
+  modal?: boolean;
   minSize?: { width: number; height: number };
   /** The content to mount; the app's `Component` when omitted. */
   Component?: (props: P) => JSX.Element;
@@ -349,7 +361,19 @@ export interface AppContext {
      */
     openersFor(type: string): FileOpener[];
     closeWindow(windowId: string): void;
+    /**
+     * Resolves with the label of the button pressed or, with `showInput`,
+     * the text typed — `null` when that dialog's "Cancel" is pressed.
+     */
     showDialog(options: DialogOptions): Promise<string | null>;
+    /**
+     * Do something that keeps the Macintosh busy, under the watch cursor:
+     * the watch reaches the screen first, then `work` runs — it may block
+     * everything until it returns — and the cursor comes back when it (or
+     * the promise it returns) settles. Nothing else draws meanwhile, so keep
+     * it to a second or two.
+     */
+    busy<T>(work: () => T | Promise<T>): Promise<T>;
   };
   /**
    * Open one of this app's windows. Returns the new window's id, which
@@ -571,6 +595,8 @@ export interface AppWindow {
   isActive: Accessor<boolean>;
   /** Current vertical scroll offset of the content, when `scrollable`. */
   scrollY: Accessor<number>;
+  /** Scroll the content to `y`. The window keeps it within the content height it was given. */
+  scrollTo(y: number): void;
   /** The window's current kind; `fullscreen` while `setFullScreen(true)` is in effect. */
   kind: Accessor<WindowKind>;
   /** Height of the scrollable document; drives the window scrollbar thumb. */
@@ -695,7 +721,6 @@ export {
 } from "@mockintosh/ui";
 
 export { Markdown, parseMarkdown } from "./markdown";
-export type { MarkdownProps, LayoutNode, InlineSegment } from "./markdown";
 
 export interface AppManifest {
   id: string;
