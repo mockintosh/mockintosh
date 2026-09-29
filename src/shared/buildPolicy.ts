@@ -2,7 +2,7 @@ import ts from "typescript";
 import {buildRequest, projectPath, type BuildRequest} from "./buildContract";
 import {parse} from "./schema";
 
-export const sharedBuildImports = new Set(["solid-js", "@mockintosh/sdk", "@mockintosh/ui", "@mockintosh/ui/renderer", "@mockintosh/agent"]);
+export const sharedBuildImports = new Set(["solid-js", "@mockintosh/sdk", "@mockintosh/ui", "@mockintosh/ui/renderer", "@mockintosh/quickdraw", "@mockintosh/agent"]);
 /** Browser globals that share the OS JavaScript realm. Apps must use the SDK. */
 export const bannedHostGlobals = new Set([
   "alert", "confirm", "prompt",
@@ -14,12 +14,14 @@ export const compilerOptions: ts.CompilerOptions = {
   jsx: ts.JsxEmit.Preserve, jsxImportSource: "@mockintosh/ui", strict: true, noEmit: true, skipLibCheck: true,
   allowJs: true, checkJs: true, types: [], lib: ["lib.es2022.d.ts"],
 };
-/** `foo.alert` / `{ alert }` bindings are not the host global. */
+/** `foo.alert` / `{ alert }` bindings / `alert() {}` members are not the host global. */
 function isHostGlobalUse(node: ts.Identifier): boolean {
   const parent = node.parent;
   if (!parent) return true;
   if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
   if (ts.isPropertyAssignment(parent) && parent.name === node) return false;
+  if ((ts.isMethodDeclaration(parent) || ts.isMethodSignature(parent)) && parent.name === node) return false;
+  if ((ts.isPropertyDeclaration(parent) || ts.isPropertySignature(parent)) && parent.name === node) return false;
   if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) return false;
   if (ts.isBindingElement(parent) && (parent.name === node || parent.propertyName === node)) return false;
   if ((ts.isVariableDeclaration(parent) || ts.isParameter(parent)) && parent.name === node) return false;

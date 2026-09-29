@@ -437,7 +437,7 @@ export function DrText(
         srcBits,
         heightFlag,
         topHt,
-        textRect.top
+        textRect.top - portBounds.top
       );
     });
     return;

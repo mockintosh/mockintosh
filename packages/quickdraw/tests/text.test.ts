@@ -14,6 +14,7 @@ import {
   NewRgn,
   RectRgn,
   SetClip,
+  SetOrigin,
   StdText,
   StdTxMeas,
   StringWidth,
@@ -207,6 +208,18 @@ describe("DrText", () => {
     expect(getBit(port.portBits, 4, 3)).toBe(0);
     expect(getBit(port.portBits, 4, 12)).toBe(0);
     expect(port.pnLoc.h).toBe(8);
+  });
+
+  it("places glyphs in local coordinates when the port origin is not (0,0)", () => {
+    installSynthetic(barStrike(), { 65: 4 });
+    const plain = openPort(32, 24);
+    MoveTo(4, 12);
+    DrawString("A");
+    const shifted = openPort(32, 24);
+    SetOrigin(10, 20);
+    MoveTo(14, 32);
+    DrawString("A");
+    expect(pixelsFromBitMap(shifted.portBits)).toEqual(pixelsFromBitMap(plain.portBits));
   });
 
   it("does not blit the space character", () => {

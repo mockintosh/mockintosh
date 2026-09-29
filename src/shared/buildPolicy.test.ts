@@ -15,5 +15,9 @@ describe("shared compiler policy", () => {
     expect(() => validateSources(request('alert("saved")'))).toThrow(/Host API 'alert'/);
     expect(() => validateSources(request("document.body"))).toThrow(/Host API 'document'/);
     expect(() => validateSources(request("const x = { alert: 1 }; x.alert"))).not.toThrow();
+    expect(() => validateSources(request("const s = { prompt(text: string) { return text; } }; s.prompt('hi')"))).not.toThrow();
+    expect(() => validateSources(request("interface S { prompt(text: string): void; confirm: boolean }"))).not.toThrow();
+    expect(() => validateSources(request("class S { prompt() {} }"))).not.toThrow();
+    expect(() => validateSources(request("const s = { run() { return prompt('x'); } }"))).toThrow(/Host API 'prompt'/);
   });
 });

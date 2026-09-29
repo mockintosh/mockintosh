@@ -4,7 +4,7 @@
 
 Mockintosh is a Macintosh-style simulator running in the browser. The entire UI is rendered on a single `<canvas>` element at **512×342 pixels** into a **1-bit** framebuffer (packed 8 pixels per byte, as on the original Macintosh): black, white, and dither patterns. There is no HTML/CSS inside the simulated screen.
 
-**SDK v3 is Solid 2-only.** Third-party apps are ES modules that `defineApp({ Component })` and optionally export `sprites`. They are loaded at runtime via dynamic `import()`. The OS shares one Solid runtime; externalize `solid-js`, `@mockintosh/ui`, and `@mockintosh/sdk` in your Vite build and consume them through the OS import map.
+**SDK v3 is Solid 2-only.** Third-party apps are ES modules that `defineApp({ Component })` and optionally export `sprites`. They are loaded at runtime via dynamic `import()`. The OS shares one Solid runtime; externalize `solid-js`, `@mockintosh/ui`, `@mockintosh/sdk`, and (if you draw with it) `@mockintosh/quickdraw` in your Vite build and consume them through the OS import map.
 
 v1 `App.render` / `WindowContext` apps are not loaded. SDK 2 bundles cannot share a realm with Solid 2; the App Store hides catalog entries with `sdk` major &lt; 3, and the installer refuses them with a rebuild prompt.
 
@@ -114,6 +114,10 @@ Use `<raster onPaint>` when the pixels come from somewhere Solid cannot see (dit
 `onPaint` runs at paint time, outside any reactive scope, so reading a signal inside it does not schedule a repaint. When the pixels come from somewhere else (a camera, a decoder, a timer), bump `revision` from a signal: `<raster revision={frame()} onPaint={…} />` redraws whenever `frame` changes.
 
 Never index the framebuffer yourself: its memory layout (packed 1 bpp) is an implementation detail of the platform.
+
+### QuickDraw offscreen
+
+An app that wants the Toolbox's own drawing — regions, pen modes, patterns, pictures, styled text — can import `@mockintosh/quickdraw` and draw into its own `BitMap`s through a `GrafPort` it opens, then `CopyBits` the result onto `surface.port` in `onPaint`. MacPaint is written this way. There is one QuickDraw in the system: `thePort`, the Font Manager and the cursor are shared with the OS, so save the current port with `GetPort` and restore it before you return, and never leave a drawing call half-done across an `await`. Font numbers come from `fontFamilyId(name)` in `@mockintosh/ui`.
 
 ### Layout
 
@@ -574,7 +578,7 @@ export default defineConfig({
     rolldownOptions: {
       // The OS serves these through an import map so one runtime is shared.
       // Includes subpaths — JSX compiles to `@mockintosh/ui/renderer`.
-      external: (id) => /^(@mockintosh\/(sdk|ui)|solid-js)(\/|$)/.test(id),
+      external: (id) => /^(@mockintosh\/(sdk|ui|quickdraw)|solid-js)(\/|$)/.test(id),
     },
   },
 });

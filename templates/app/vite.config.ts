@@ -19,7 +19,7 @@ export default defineConfig({
     rolldownOptions: {
       // The OS serves these through an import map so one runtime is shared.
       // Includes subpaths — JSX compiles to `@mockintosh/ui/renderer`.
-      external: (id) => /^(@mockintosh\/(sdk|ui)|solid-js)(\/|$)/.test(id),
+      external: (id) => /^(@mockintosh\/(sdk|ui|quickdraw)|solid-js)(\/|$)/.test(id),
     },
   },
 });

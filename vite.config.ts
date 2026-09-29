@@ -27,8 +27,9 @@ function sharedRuntimeImportMap(): Plugin {
         const ui = chunkFile("ui-runtime");
         const renderer = chunkFile("ui-renderer-runtime");
         const sdk = chunkFile("sdk-runtime");
+        const quickdraw = chunkFile("quickdraw-runtime");
         const solidJs = chunkFile("solid-runtime");
-        if (!ui || !renderer || !sdk) return html;
+        if (!ui || !renderer || !sdk || !quickdraw) return html;
         const map = {
           imports: {
             "solid-js": solidJs ?? "/node_modules/solid-js/dist/solid.js",
@@ -36,6 +37,8 @@ function sharedRuntimeImportMap(): Plugin {
             // Third-party JSX compiles to calls into the universal renderer.
             "@mockintosh/ui/renderer": renderer,
             "@mockintosh/sdk": sdk,
+            // One QuickDraw: thePort, the Font Manager and the cursor are globals.
+            "@mockintosh/quickdraw": quickdraw,
             "@mockintosh/agent": chunkFile("agent-runtime") ?? "/packages/agent/src/index.ts",
           },
         };
@@ -148,6 +151,7 @@ export default defineConfig({
         "ui-runtime": resolve(__dirname, "packages/ui/src/index.ts"),
         "ui-renderer-runtime": resolve(__dirname, "packages/ui/src/renderer.ts"),
         "sdk-runtime": resolve(__dirname, "packages/sdk/src/index.ts"),
+        "quickdraw-runtime": resolve(__dirname, "packages/quickdraw/src/index.ts"),
         "agent-runtime": resolve(__dirname, "packages/agent/src/index.ts"),
         "solid-runtime": resolve(__dirname, "node_modules/solid-js/dist/solid.js"),
       },
