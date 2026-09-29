@@ -31,6 +31,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | OP-1 | `OP1.tsx` | SDK-clean |
 | TP-7 | `TP7.tsx` | SDK-clean |
 | pchkraft | `Pchkraft.tsx` | SDK-clean |
+| Visualizer | `Visualizer.tsx` | SDK-clean |
 | Video Player | `VideoPlayer.tsx` | SDK-clean |
 | Photo Booth | `PhotoBooth.tsx` | SDK-clean |
 | Source Editor | `SourceEditor.tsx` | SDK-clean |
@@ -369,6 +370,7 @@ app.scheduler.requestFrame(function frame() {
 });
 ```
 
+A monitor makes no sound and doesn't keep the speaker awake. It closes when your app quits. `monitor` is optional on `AudioService`, so check for it and explain when it's missing. The bundled Visualizer (`apps/Visualizer.tsx`, analysis in `apps/visualizer/listen.ts`) is the worked example.
 
 The SDK also exports `midiToFrequency(note)`, `noteName(note)` (`60` → `"C4"`) and `encodeWav(channels, sampleRate)`, which turns rendered `Float32Array`s into a 16-bit WAV you can offer through `useApp().download`. `decodeWav(bytes)` reads one back — integer PCM of 8 to 32 bits or 32-bit float — as `{ sampleRate, channels }`, or `null` if it isn't a WAVE file. The bundled Synthesizer (`apps/Synth.tsx`, engine in `apps/synth/`) is the worked example: a polyphonic engine, a sequencer that ticks on the stream clock, and visuals synced through `playbackPosition()`. The OP-1 (`apps/OP1.tsx`, engine in `apps/op1/`) samples: it records its own output or the speaker (piecing a continuous take together from the monitor) and keeps each take as a WAV in its storage.
 

@@ -27,6 +27,7 @@ import { sprites as chordSprites } from "@/apps/chord/icons";
 import { sprites as op1Sprites } from "@/apps/op1/icons";
 import { sprites as tp7Sprites } from "@/apps/tp7/icons";
 import { sprites as pchkraftSprites } from "@/apps/pchkraft/icons";
+import { sprites as visualizerSprites } from "@/apps/visualizer/icons";
 
 for (const app of [
   Testing,
@@ -175,3 +176,13 @@ registerBundledApp({
   load: () => import("@/apps/Pchkraft"),
 });
 
+registerBundledApp({
+  id: "visualizer",
+  title: "Visualizer",
+  description:
+    "Listens to everything this Macintosh plays and draws it in one bit: scopes and meters, generative systems, the shots of Showreel's first reel, and Surface plots. Arrow keys change the picture.",
+  icon: "visualizer/icon",
+  sprites: visualizerSprites,
+  requires: ["audio"],
+  load: () => import("@/apps/Visualizer"),
+});
