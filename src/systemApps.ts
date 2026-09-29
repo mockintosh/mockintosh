@@ -24,6 +24,7 @@ import { sprites as canvasSprites } from "@/apps/canvas/icons";
 import { sprites as surfaceSprites } from "@/apps/surface/icons";
 import { sprites as synthSprites } from "@/apps/synth/icons";
 import { sprites as chordSprites } from "@/apps/chord/icons";
+import { sprites as op1Sprites } from "@/apps/op1/icons";
 
 for (const app of [
   Testing,
@@ -139,6 +140,16 @@ registerBundledApp({
   load: () => import("@/apps/Chord"),
 });
 
+registerBundledApp({
+  id: "op1",
+  title: "OP-1",
+  description:
+    "A portable synthesizer workstation in the manner of the Teenage Engineering OP-1: seven synth engines including a sampler, a drum kit, a pattern sequencer for each, a four-track tape and a mixer, all on four encoders. Play the keys A to ' ; Space runs the tape, Q shows the pattern. It starts with the Sunday Tape on; File › Open Tape has the other demos and the tapes you've saved.",
+  icon: "op1/icon",
+  sprites: op1Sprites,
+  requires: ["audio"],
+  load: () => import("@/apps/OP1"),
+});
 
 
 
