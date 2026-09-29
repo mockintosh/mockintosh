@@ -299,11 +299,7 @@ export interface PrintService {
    * wide and `height` tall. Like `printPicture`, resolves without printing if
    * the user cancels.
    */
-  printPage(
-    height: number,
-    draw: (port: GrafPort, size: { width: number; height: number }) => void,
-    options?: PrintPageOptions,
-  ): Promise<void>;
+  printPage(height: number, draw: (port: GrafPort, size: { width: number; height: number }) => void, options?: PrintPageOptions): Promise<void>;
 }
 
 /**
@@ -773,6 +769,8 @@ export {
   Tooltip,
 } from "@mockintosh/ui";
 
+export { showPrintDialog, PrintScaleSelect, PrintPreview, printDotsToMillimetres, printScaleLabel } from "./printDialog";
+export type { PrintDialogRequest, PrintDialogChoice, PrintScale, PrintScaleSelectProps, PrintPreviewProps } from "./printDialog";
 export { Markdown, parseMarkdown } from "./markdown";
 
 export interface AppManifest {

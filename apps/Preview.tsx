@@ -7,11 +7,13 @@ import {
   IMAGE_TYPES,
   MIME,
   readSpriteFile,
+  showPrintDialog,
   toBits,
   type AppContext,
   type FileDocumentProps,
   type MenubarItemDef,
   type PrintableImage,
+  type PrintDialogChoice,
 } from "@mockintosh/sdk";
 
 /**
@@ -77,13 +79,17 @@ function Preview(props: PreviewProps): JSX.Element {
 
   // Kept outside the reactive graph so menu clicks read what is on screen now.
   let shown: ShownPicture | null = null;
+  let lastPrint: PrintDialogChoice | undefined;
 
   async function printPicture(): Promise<void> {
     const picture = shown;
     if (!app.print || !picture) return;
     const image: PrintableImage = { width: picture.width, height: picture.height, data: picture.pixels };
+    const choice = await showPrintDialog(app, { image, documentName: title(), options: lastPrint });
+    if (!choice) return;
+    lastPrint = choice;
     try {
-      await app.print.printPicture(image);
+      await app.print.printPicture(image, choice);
     } catch (err) {
       await app.os.showDialog({
         message: `Couldn't print: ${err instanceof Error ? err.message : String(err)}`,

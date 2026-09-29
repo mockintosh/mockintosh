@@ -17,19 +17,14 @@ import {
   type CameraSource,
   type ImageFrame,
   type MenubarItemDef,
+  type PrintScale,
 } from "@mockintosh/sdk";
 import { AdjustSlider } from "./photobooth/AdjustSlider";
 import { AsciiControls } from "./photobooth/AsciiControls";
 import { AsciiCompare, COMPARE_WINDOW } from "./photobooth/AsciiCompare";
 import { pictureOverflows, placedOrigin, type Point } from "./photobooth/pan";
 import { photoSize, photoSizeLabel, type PhotoSizeId } from "./photobooth/photoSize";
-import {
-  PrintSettings,
-  printPictureOptions,
-  type PrintOrientationChoice,
-  type PrintScaleChoice,
-  type PrintSettingsProps,
-} from "./photobooth/PrintSettings";
+import { PrintSettings, type PrintOrientationChoice, type PrintSettingsProps } from "./photobooth/PrintSettings";
 import {
   applyAdjustInPlace,
   BRIGHTNESS_DEFAULT,
@@ -106,7 +101,7 @@ function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
   const [cameraAspect, setCameraAspect] = createSignal(4 / 3);
   const [pan, setPan] = createSignal<Point>({ x: 0, y: 0 });
   const [dragging, setDragging] = createSignal(false);
-  const [printScale, setPrintScale] = createSignal<PrintScaleChoice>("auto");
+  const [printScale, setPrintScale] = createSignal<PrintScale>("auto");
   const [printOrientation, setPrintOrientation] = createSignal<PrintOrientationChoice>("auto");
 
   const isFullScreen = () => win.kind() === "fullscreen";
@@ -256,7 +251,7 @@ function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
     try {
       await print.printPicture(
         { width: photo.width, height: photo.height, data: photo.pixels },
-        printPictureOptions(printScale(), printOrientation()),
+        { scale: printScale(), orientation: printOrientation() },
       );
     } catch (err) {
       await app.os.showDialog({
