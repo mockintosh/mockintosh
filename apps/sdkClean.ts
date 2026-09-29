@@ -16,6 +16,7 @@ export const SDK_CLEAN = [
   "Trace.tsx",
   "Surface.tsx",
   "Showreel.tsx",
+  "Synth.tsx",
   "VideoPlayer.tsx",
   "PhotoBooth.tsx",
   "SourceEditor.tsx",
@@ -44,6 +45,7 @@ export const BUNDLED_APPS = [
   "Trace.tsx",
   "Surface.tsx",
   "Showreel.tsx",
+  "Synth.tsx",
   "VideoPlayer.tsx",
   "PhotoBooth.tsx",
   "SpotifyPlayer.tsx",
@@ -70,6 +72,7 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "Trace.tsx": ["trace"],
   "Surface.tsx": ["surface"],
   "Showreel.tsx": ["showreel"],
+  "Synth.tsx": ["synth"],
   "Fx.tsx": ["fx"],
 };
 
@@ -84,6 +87,7 @@ export const APP_TITLES: Record<BundledAppEntry, string> = {
   "Trace.tsx": "Trace",
   "Surface.tsx": "Surface",
   "Showreel.tsx": "Showreel",
+  "Synth.tsx": "Synthesizer",
   "VideoPlayer.tsx": "Video Player",
   "PhotoBooth.tsx": "Photo Booth",
   "SpotifyPlayer.tsx": "Spotify",

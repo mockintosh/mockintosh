@@ -22,6 +22,7 @@ import { spotifySprites } from "@/apps/sprites/spotify";
 import { sprites as macpaintSprites } from "@/apps/macpaint/icons";
 import { sprites as canvasSprites } from "@/apps/canvas/icons";
 import { sprites as surfaceSprites } from "@/apps/surface/icons";
+import { sprites as synthSprites } from "@/apps/synth/icons";
 
 for (const app of [
   Testing,
@@ -115,6 +116,16 @@ registerBundledApp({
   load: () => import("@/apps/Surface"),
 });
 
+registerBundledApp({
+  id: "synth",
+  title: "Synthesizer",
+  description:
+    "A polyphonic analog-style synthesizer with a 16-step sequencer, arpeggiator and effects. Play it with the mouse or the keys A to K.",
+  icon: "synth/icon",
+  sprites: synthSprites,
+  requires: ["audio"],
+  load: () => import("@/apps/Synth"),
+});
 
 
 

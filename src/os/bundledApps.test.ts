@@ -15,6 +15,7 @@ describe("bundled app listings", () => {
       "macpaint",
       "canvas",
       "surface",
+      "synth",
     ]);
     const apps = await Promise.all(
       listings.map(async (listing) => validateModule(listing.id, await listing.load()).default),
