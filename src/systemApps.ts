@@ -23,6 +23,7 @@ import { sprites as macpaintSprites } from "@/apps/macpaint/icons";
 import { sprites as canvasSprites } from "@/apps/canvas/icons";
 import { sprites as surfaceSprites } from "@/apps/surface/icons";
 import { sprites as synthSprites } from "@/apps/synth/icons";
+import { sprites as chordSprites } from "@/apps/chord/icons";
 
 for (const app of [
   Testing,
@@ -127,6 +128,16 @@ registerBundledApp({
   load: () => import("@/apps/Synth"),
 });
 
+registerBundledApp({
+  id: "chord",
+  title: "Pocket Chord",
+  description:
+    "A pocket chord instrument. Seven buttons play the chords of a key; the joystick adds sevenths, suspensions and more. Strum, arpeggiate or pulse over a built-in rhythm box.",
+  icon: "chord/icon",
+  sprites: chordSprites,
+  requires: ["audio"],
+  load: () => import("@/apps/Chord"),
+});
 
 
 

@@ -27,6 +27,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Surface | `Surface.tsx` | SDK-clean |
 | Showreel | `Showreel.tsx` | SDK-clean |
 | Synthesizer | `Synth.tsx` | SDK-clean |
+| Pocket Chord | `Chord.tsx` | SDK-clean |
 | Video Player | `VideoPlayer.tsx` | SDK-clean |
 | Photo Booth | `PhotoBooth.tsx` | SDK-clean |
 | Source Editor | `SourceEditor.tsx` | SDK-clean |
