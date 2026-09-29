@@ -16,6 +16,16 @@ describe("capabilities", () => {
 
     const withDownload = { ...bare, download: { save: async () => {} } };
     expect([...platformCapabilities(withDownload)]).toEqual(["download"]);
+
+    const withSpeaker = createHeadlessPlatform({ width: 8, height: 8, audioSampleRate: 48000 });
+    expect([...platformCapabilities(withSpeaker)]).toEqual(["audio"]);
+
+    const withMicrophone = createHeadlessPlatform({ width: 8, height: 8, microphoneSampleRate: 48000 });
+    expect([...platformCapabilities(withMicrophone)]).toEqual(["microphone"]);
+    expect(describeMissingCapabilities("TP-7", ["microphone"])).toBe(
+      '"TP-7" needs a microphone, which this Macintosh does not have.'
+    );
+
   });
 
   it("lists what is missing, in declaration order", () => {

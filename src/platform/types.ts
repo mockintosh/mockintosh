@@ -17,12 +17,14 @@ import type { PrinterLinks, PrinterProfile, PrinterTransport } from "@mockintosh
 import type { UIClipboard, Modifiers } from "@mockintosh/ui";
 import type {
   AppCrypto,
+  AudioService,
   BrowserService,
   CameraService,
   Capability,
   FetchFunction,
   DownloadService,
   ImageService,
+  MicrophoneService,
   VideoService,
 } from "@mockintosh/sdk";
 
@@ -134,6 +136,10 @@ export interface Platform {
   images?: ImageService;
   video?: VideoService;
   camera?: CameraService;
+  /** A speaker: PCM output streams the apps render into. */
+  audio?: AudioService;
+  /** A microphone: PCM input the apps are handed as it arrives. */
+  microphone?: MicrophoneService;
   crypto: AppCrypto;
   browser?: BrowserService;
   /**

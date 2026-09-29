@@ -112,4 +112,15 @@ describe("createAppStorage", () => {
     expect(await a.list()).toEqual(["settings.json"]);
     await a.remove("missing"); // no-op
   });
+
+  it("keeps bytes as they were written, typed by the key's extension", async () => {
+    const fs = await bootedFS();
+    const storage = createAppStorage(fs, "alpha");
+    expect(await storage.readBytes("take.wav")).toBeNull();
+    const bytes = new Uint8Array([0, 1, 254, 255, 128]);
+    await storage.writeBytes("take.wav", bytes);
+    expect(await storage.readBytes("take.wav")).toEqual(bytes);
+    const folder = fs.child(fs.locate("preferences")!.id, "alpha")!;
+    expect(fs.child(folder.id, "take.wav")).toMatchObject({ kind: "file", type: "audio/wav" });
+  });
 });

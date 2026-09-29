@@ -10,12 +10,14 @@ import type { AnimRect } from "./zoomAnimation";
 import type { AppInstaller } from "./installedApps";
 import type {
   AppCrypto,
+  AudioService,
   BrowserService,
   CameraService,
   DialogOptions,
   DownloadService,
   FetchFunction,
   ImageService,
+  MicrophoneService,
   VideoService,
   WindowSpec,
 } from "@mockintosh/sdk";
@@ -61,6 +63,8 @@ export interface OSServices {
   images?: ImageService;
   video?: VideoService;
   camera?: CameraService;
+  audio?: AudioService;
+  microphone?: MicrophoneService;
   crypto: AppCrypto;
   browser?: BrowserService;
   /** Installs third-party apps, when the platform can load code at runtime. */

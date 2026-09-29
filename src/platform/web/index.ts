@@ -28,6 +28,8 @@ import { createWebDownloadService } from "./download";
 import { createWebImageService } from "./media/images";
 import { createWebVideoService } from "./media/video";
 import { createWebCameraService } from "./media/camera";
+import { createWebAudioService } from "./media/audio";
+import { createWebMicrophoneService } from "./media/microphone";
 import { createWebCrypto } from "./crypto";
 import { createWebSourceProvider } from "./source";
 import { createWebBrowserService } from "./browser";
@@ -138,6 +140,8 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     images: createWebImageService(),
     video: createWebVideoService(),
     camera: createWebCameraService(),
+    audio: createWebAudioService(),
+    microphone: createWebMicrophoneService(),
     builder: browserBuilder,
     hostDisplay,
     source: createWebSourceProvider(),

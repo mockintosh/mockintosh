@@ -19,6 +19,8 @@ export function platformCapabilities(platform: Platform): CapabilitySet {
   if (platform.images) caps.add("images");
   if (platform.video) caps.add("video");
   if (platform.camera) caps.add("camera");
+  if (platform.audio) caps.add("audio");
+  if (platform.microphone) caps.add("microphone");
   if (platform.browser) caps.add("browser");
   return caps;
 }
@@ -39,6 +41,8 @@ const DESCRIPTIONS: Record<Capability, string> = {
   camera: "a camera",
   video: "video playback",
   images: "image decoding",
+  audio: "a speaker",
+  microphone: "a microphone",
   browser: "a web browser",
 };
 

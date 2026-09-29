@@ -13,6 +13,8 @@ import type { GrafPort } from "@mockintosh/quickdraw";
 import type { Sprite } from "@mockintosh/ui";
 import type { MenubarDefinition } from "./menus";
 import type { AppScheduler, CameraService, ImageService, VideoService } from "./media";
+import type { AudioService } from "./audio";
+import type { MicrophoneService } from "./microphone";
 import type { KernelClient, KernelPermission } from "./kernel";
 import type { AppCrypto } from "./crypto";
 import type { BrowserService } from "./browser";
@@ -98,6 +100,19 @@ export type {
   CameraService,
   AppScheduler,
 } from "./media";
+export type {
+  AudioService,
+  AudioMonitor,
+  AudioStream,
+  AudioStreamOptions,
+  AudioStreamState,
+  AudioRenderBlock,
+  AudioLatency,
+  DecodedWav,
+} from "./audio";
+export { midiToFrequency, noteName, encodeWav, decodeWav } from "./audio";
+export type { MicrophoneService, MicrophoneInput, MicrophoneOptions, AudioCaptureBlock } from "./microphone";
+export { readWavChunk, readWavMarkers, setWavChunk, setWavMarkers } from "./wav";
 export type { KernelClient, KernelInvokeOptions, KernelPermission, OperationContract } from "./kernel";
 export type { AppCrypto } from "./crypto";
 export type { BrowserService } from "./browser";
@@ -134,6 +149,10 @@ export interface DialogOptions {
 export interface AppStorage {
   read(key: string): Promise<string | null>;
   write(key: string, value: string): Promise<void>;
+  /** A key's raw bytes, for data that isn't text (sounds, pictures). */
+  readBytes(key: string): Promise<Uint8Array | null>;
+  /** Store bytes under `key`; the file's type comes from the key's extension (`take.wav` is `audio/wav`). */
+  writeBytes(key: string, bytes: Uint8Array): Promise<void>;
   remove(key: string): Promise<void>;
   list(): Promise<string[]>;
 }
@@ -402,6 +421,10 @@ export interface AppContext {
   video?: VideoService;
   /** Live camera frames, when this platform can. */
   camera?: CameraService;
+  /** Sound output streams, when this platform has a speaker. */
+  audio?: AudioService;
+  /** Sound input, when this platform has a microphone. */
+  microphone?: MicrophoneService;
   /** Frame clock and monotonic time. */
   scheduler: AppScheduler;
   /** Kernel traps, when the app declared `permissions`. */
@@ -443,17 +466,12 @@ export type FetchFunction = (url: string, options?: FetchRequest) => Promise<Fet
  * - `camera`    — `useApp().camera` is available
  * - `video`     — `useApp().video` is available
  * - `images`    — `useApp().images` is available
+ * - `audio`     — `useApp().audio` is available (a speaker)
+ * - `microphone` — `useApp().microphone` is available
  * - `browser`   — `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`)
  */
 export type Capability =
-  | "network"
-  | "clipboard"
-  | "printer"
-  | "download"
-  | "camera"
-  | "video"
-  | "images"
-  | "browser";
+  | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser";
 
 /**
  * What "About <app>…" — the first Apple-menu item while the app is frontmost —

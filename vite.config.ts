@@ -128,6 +128,7 @@ export default defineConfig({
       "packages/agent/src/**/*.test.ts",
       "packages/fs/tests/**/*.test.ts",
       "packages/print/tests/**/*.test.ts",
+      "packages/sdk/tests/**/*.test.ts",
       "src/os/**/*.test.ts",
       "src/platform/**/*.test.ts",
       "src/runtime/**/*.test.ts",

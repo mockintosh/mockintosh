@@ -18,12 +18,19 @@ export function appStorageFolder(fs: FileSystem, appId: string): FSDirectory {
 }
 
 export function createAppStorage(fs: FileSystem, appId: string): AppStorage {
+  const existingFolder = () => {
+    const prefs = fs.locate("preferences");
+    return prefs ? fs.child(prefs.id, appId) : undefined;
+  };
+  const existingFile = (key: string) => {
+    const folder = existingFolder();
+    const file = folder ? fs.child(folder.id, key) : undefined;
+    return file?.kind === "file" ? file : undefined;
+  };
   return {
     async read(key) {
-      const prefs = fs.locate("preferences");
-      const folder = prefs ? fs.child(prefs.id, appId) : undefined;
-      const file = folder ? fs.child(folder.id, key) : undefined;
-      return file?.kind === "file" ? fs.readText(file.id) : null;
+      const file = existingFile(key);
+      return file ? fs.readText(file.id) : null;
     },
     async write(key, value) {
       const folder = appStorageFolder(fs, appId);
@@ -32,15 +39,20 @@ export function createAppStorage(fs: FileSystem, appId: string): AppStorage {
         type: inferred === MIME.binary ? MIME.text : inferred,
       });
     },
+    async readBytes(key) {
+      const file = existingFile(key);
+      return file ? fs.readBytes(file.id) : null;
+    },
+    async writeBytes(key, bytes) {
+      const folder = appStorageFolder(fs, appId);
+      await fs.writeFile(folder.id, key, bytes, { type: inferMimeType(key) });
+    },
     async remove(key) {
-      const prefs = fs.locate("preferences");
-      const folder = prefs ? fs.child(prefs.id, appId) : undefined;
-      const file = folder ? fs.child(folder.id, key) : undefined;
+      const file = existingFile(key);
       if (file) await fs.remove(file.id);
     },
     async list() {
-      const prefs = fs.locate("preferences");
-      const folder = prefs ? fs.child(prefs.id, appId) : undefined;
+      const folder = existingFolder();
       return folder ? fs.children(folder.id).filter((n) => n.kind === "file").map((n) => n.name) : [];
     },
   };

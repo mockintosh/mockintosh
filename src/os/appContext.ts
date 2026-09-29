@@ -4,7 +4,14 @@
  * extends one with the window a component is mounted in (`AppServices`).
  */
 
-import type { AppContext, KernelClient, WindowSpec } from "@mockintosh/sdk";
+import type {
+  AppContext,
+  AudioMonitor,
+  AudioService,
+  KernelClient,
+  MicrophoneService,
+  WindowSpec,
+} from "@mockintosh/sdk";
 import type { OSServices, IconScreenRect } from "./context";
 import { createAppStorage } from "./appStorage";
 import { getApp } from "./apps";
@@ -59,6 +66,53 @@ function kernelClientFor(os: OSServices, appId: string, instanceId?: string): Ke
   };
 }
 
+/** The speaker as one launch sees it: its streams and monitors close when the launch ends. */
+function instanceAudio(os: OSServices, audio: AudioService, instanceId?: string): AudioService {
+  const monitor = audio.monitor?.bind(audio);
+  return {
+    async open(streamOptions) {
+      const stream = await audio.open(streamOptions);
+      if (!instanceId || !os.instances) return stream;
+      const disown = os.instances.own(instanceId, () => stream.close());
+      stream.onStateChange((state) => {
+        if (state === "closed") disown();
+      });
+      return stream;
+    },
+    ...(monitor && {
+      async monitor(): Promise<AudioMonitor> {
+        const tap = await monitor();
+        if (!instanceId || !os.instances) return tap;
+        const disown = os.instances.own(instanceId, () => tap.close());
+        return {
+          sampleRate: tap.sampleRate,
+          capacity: tap.capacity,
+          read: (left, right) => tap.read(left, right),
+          close() {
+            disown();
+            tap.close();
+          },
+        };
+      },
+    }),
+  };
+}
+
+/** The microphone as one launch sees it: its inputs close when the launch ends, so no app keeps listening after it quits. */
+function instanceMicrophone(os: OSServices, microphone: MicrophoneService, instanceId?: string): MicrophoneService {
+  return {
+    async open(inputOptions) {
+      const input = await microphone.open(inputOptions);
+      if (!instanceId || !os.instances) return input;
+      const disown = os.instances.own(instanceId, () => input.close());
+      input.onStateChange((state) => {
+        if (state === "closed") disown();
+      });
+      return input;
+    },
+  };
+}
+
 export function createAppContext(
   os: OSServices,
   appId: string,
@@ -95,6 +149,8 @@ export function createAppContext(
     images: os.images,
     video: os.video,
     camera: os.camera,
+    audio: os.audio && instanceAudio(os, os.audio, options.instanceId),
+    microphone: os.microphone && instanceMicrophone(os, os.microphone, options.instanceId),
     kernel: kernelClientFor(os, appId, options.instanceId),
     scheduler: {
       now: () => os.scheduler.now(),

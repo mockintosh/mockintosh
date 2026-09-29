@@ -18,13 +18,21 @@ import type {
   PlatformPointerEvent,
   PlatformScheduler,
 } from "../types";
+import { createHeadlessAudio, type HeadlessAudio } from "./audio";
+import { createHeadlessMicrophone, type HeadlessMicrophone } from "./microphone";
 
 export interface HeadlessPlatformOptions {
   width: number;
   height: number;
+  /** Give the machine a speaker at this sample rate; `tick` then renders audio too. */
+  audioSampleRate?: number;
+  /** Give the machine a microphone at this sample rate; `tick` then delivers what it hears. */
+  microphoneSampleRate?: number;
 }
 
 export interface HeadlessPlatform extends Platform {
+  audio?: HeadlessAudio;
+  microphone?: HeadlessMicrophone;
   /** Number of frames presented so far. */
   readonly frameCount: number;
   /** Framebuffer as presented most recently, one byte per pixel (1 = black); `null` before the first frame. */
@@ -37,12 +45,16 @@ export interface HeadlessPlatform extends Platform {
   drop(event: PlatformDropEvent): void;
   /** Press and release at (x, y). */
   click(x: number, y: number): void;
-  /** Advance the clock by `ms` and run every pending frame callback once. */
+  /** Advance the clock by `ms`, render that much audio, and run every pending frame callback once. */
   tick(ms?: number): void;
 }
 
 export function createHeadlessPlatform(options: HeadlessPlatformOptions): HeadlessPlatform {
-  const { width, height } = options;
+  const { width, height, audioSampleRate, microphoneSampleRate } = options;
+  const audio = audioSampleRate ? createHeadlessAudio(audioSampleRate) : undefined;
+  let audioFrames = 0;
+  const microphone = microphoneSampleRate ? createHeadlessMicrophone(microphoneSampleRate) : undefined;
+  let microphoneFrames = 0;
 
   let presented: BitMap | null = null;
   let frameCount = 0;
@@ -89,6 +101,8 @@ export function createHeadlessPlatform(options: HeadlessPlatformOptions): Headle
     },
     scheduler,
     storage: new InMemoryBackend(),
+    ...(audio ? { audio } : {}),
+    ...(microphone ? { microphone } : {}),
     env: { origin: "", config: {} },
     hostCapabilities: [] as HostCapability[],
     crypto: {
@@ -117,6 +131,16 @@ export function createHeadlessPlatform(options: HeadlessPlatformOptions): Headle
     },
     tick(ms = 16) {
       clock += ms;
+      if (audio && audioSampleRate) {
+        const due = Math.floor((clock * audioSampleRate) / 1000) - audioFrames;
+        audioFrames += due;
+        audio.advance(due);
+      }
+      if (microphone && microphoneSampleRate) {
+        const due = Math.floor((clock * microphoneSampleRate) / 1000) - microphoneFrames;
+        microphoneFrames += due;
+        microphone.advance(due);
+      }
       const due = frameCallbacks;
       frameCallbacks = [];
       for (const cb of due) cb(clock);

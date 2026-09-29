@@ -223,6 +223,8 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     images: platform.images,
     video: platform.video,
     camera: platform.camera,
+    audio: platform.audio,
+    microphone: platform.microphone,
     crypto: platform.crypto,
     browser: platform.browser,
     installer,

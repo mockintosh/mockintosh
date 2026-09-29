@@ -221,7 +221,7 @@ export default defineApp({
 ```
 
 - `getSprite(name)` — OS sprites plus your exported `sprites`
-- `storage.read/write/remove/list` — per-app key-value storage (see [Storage](#storage))
+- `storage.read/write/readBytes/writeBytes/remove/list` — per-app key-value storage (see [Storage](#storage))
 - `fs` — the shared file system (see [Files](#files))
 - `window` — the window this component is in (see [Windows](#windows))
 - `openWindow(spec?)` — open another window of your app (see [Windows](#windows))
@@ -233,6 +233,8 @@ export default defineApp({
 - `print` — the system printer, when the platform has one (see [Printing](#printing))
 - `download` — offer a file to the host user (`save({ name, type, bytes })`), when the platform can
 - `images` / `video` / `camera` — decode rasters, play video, or open a camera (see [Capabilities](#capabilities))
+- `audio` — sound output streams, when this Macintosh has a speaker (see [Sound](#sound))
+- `microphone` — sound input, when this Macintosh has a microphone (see [Sound input](#sound-input))
 - `scheduler` — `requestFrame` / `now` (no `requestAnimationFrame` / `performance`)
 - `capabilities` — the set of things this Macintosh can do (see [Capabilities](#capabilities))
 - `env.origin` / `env.config` — host origin and configuration (`SPOTIFY_CLIENT_ID`, …)
@@ -254,6 +256,8 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `camera`    | `useApp().camera` is available                                        |
 | `video`     | `useApp().video` is available                                         |
 | `images`    | `useApp().images` is available                                        |
+| `audio`     | `useApp().audio` is available (a speaker; see [Sound](#sound))        |
+| `microphone` | `useApp().microphone` is available (see [Sound input](#sound-input)) |
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
 
 Two ways to use them:
@@ -275,15 +279,87 @@ Two ways to use them:
 
 `fetch` has the portable signature `(url, { method?, headers?, body? }) => Promise<{ ok, status, headers, text(), json(), arrayBuffer() }>` — the browser's `fetch` satisfies it, and so will a device's HTTP client. Stay within that subset.
 
+## Sound
+
+`useApp().audio` is the speaker, present when the platform has one (capability `audio`). You don't hand it files. You open a **stream** and fill blocks of samples when the speaker asks for them. The contract is plain PCM, so the same code runs on Web Audio today and on a device's DAC tomorrow:
+
+```tsx
+import { midiToFrequency, useApp } from "@mockintosh/sdk";
+
+const app = useApp();
+let phase = 0;
+const stream = await app.audio!.open({
+  channels: 1,
+  latency: "interactive",            // or "playback": deeper buffer, fewer dropouts
+  render(block) {                    // { sampleRate, frames, channels, position }
+    const out = block.channels[0]!;
+    const step = midiToFrequency(69) / block.sampleRate;
+    for (let i = 0; i < block.frames; i++) {
+      out[i] = 0.2 * Math.sin(2 * Math.PI * phase);
+      phase = (phase + step) % 1;
+    }
+  },
+});
+```
+
+- **`render` must be fast and must not throw.** It runs ahead of the speaker (on the web, on the main thread, topping up an audio worklet's queue). A render that throws closes the stream. Keep the DSP in plain TypeScript with no allocation per block.
+- **`block.position` is the stream's sample clock**: the frame index of `channels[i][0]`. Schedule musical events against it, not against wall time. That way a sequencer stays sample-accurate however the host chunks the blocks.
+- **`stream.playbackPosition()`** is the frame the listener is hearing *now*, which lags `position` by `stream.latency` seconds. Light keys, move playheads and draw scopes from it, so the picture matches the sound rather than running ahead of it.
+- **`stream.state()`** is `"suspended"` until the user first clicks or presses a key (browsers refuse to make sound before a gesture), then `"running"`, then `"closed"`. Watch it with `onStateChange` and tell the user to click when it's suspended.
+- Streams opened in a window close when the app quits. Call `close()` yourself in `onCleanup` for anything shorter-lived.
+
+### Listening to the speaker
+
+`app.audio.monitor()`, where the speaker supports it, taps the output: every app's streams, mixed, as the listener hears them. It is a meter, not a recorder. Each `read` fills your arrays with the latest frames, so call it on the display's clock:
+
+```tsx
+const monitor = await app.audio!.monitor!();
+const left = new Float32Array(2048);
+const right = new Float32Array(2048);
+app.scheduler.requestFrame(function frame() {
+  monitor.read(left, right);          // oldest first, ending now; zeros when silent
+  // …draw a meter or a spectrum…
+  app.scheduler.requestFrame(frame);
+});
+```
+
+
+The SDK also exports `midiToFrequency(note)`, `noteName(note)` (`60` → `"C4"`) and `encodeWav(channels, sampleRate)`, which turns rendered `Float32Array`s into a 16-bit WAV you can offer through `useApp().download`. `decodeWav(bytes)` reads one back — integer PCM of 8 to 32 bits or 32-bit float — as `{ sampleRate, channels }`, or `null` if it isn't a WAVE file. The bundled Synthesizer (`apps/Synth.tsx`, engine in `apps/synth/`) is the worked example: a polyphonic engine, a sequencer that ticks on the stream clock, and visuals synced through `playbackPosition()`. The OP-1 (`apps/OP1.tsx`, engine in `apps/op1/`) samples: it records its own output or the speaker (piecing a continuous take together from the monitor) and keeps each take as a WAV in its storage.
+
+### Sound input
+
+`useApp().microphone` is sound input, present when the platform has a microphone (capability `microphone`). It's the mirror of output. You open an **input**, and the platform hands you blocks of PCM as they arrive:
+
+```tsx
+const app = useApp();
+const input = await app.microphone!.open({
+  channels: 1,                       // the default; 2 duplicates a mono microphone
+  capture(block) {                   // { sampleRate, frames, channels, position }
+    take.append(block.channels[0]!); // copy it: the arrays are reused after capture returns
+  },
+});
+// …later
+input.close();
+```
+
+- **Open it from a click.** On the web, `open` asks the user for permission the first time, and rejects (`NotAllowedError`) if they refuse or there is no input device. Say so on screen rather than failing silently.
+- **Open it only while you need it.** Browsers show a recording indicator for as long as an input is open, so close it when recording stops. The OS closes inputs when your app quits.
+- **`block.position` is the input's frame clock**, gapless from when it opened. `capture` has the same rules as `render`: quick, no allocation, no throwing.
+- Markers go with the file: `setWavMarkers(bytes, frames)` replaces a WAV's cue points without touching its audio, and `readWavMarkers(bytes)` reads them back.
+- So can your own data: `setWavChunk(bytes, "abcd", body)` puts a chunk of your own in the file (or removes it when `body` is `null`), and `readWavChunk(bytes, "abcd")` reads it back. Other players skip chunks they don't know. The OP-1 keeps each tape's tempo and mix in its WAV this way.
+
+
 ## Storage
 
-`useApp().storage` is a string key/value store private to your app. Each key is a file in `System Folder/Preferences/<your app id>/`, so users can inspect and delete your data from the Finder.
+`useApp().storage` is a key/value store private to your app. Each key is a file in `System Folder/Preferences/<your app id>/`, so users can inspect and delete your data from the Finder. Values are text; `readBytes` / `writeBytes` keep binary data such as recordings, typed by the key's extension.
 
 ```tsx
 const app = useApp();
 const saved = await app.storage.read("settings.json");
 await app.storage.write("settings.json", JSON.stringify({ volume: 7 }));
 await app.storage.remove("settings.json");
+await app.storage.writeBytes("take.wav", encodeWav([left], 48000));
+const take = decodeWav((await app.storage.readBytes("take.wav"))!);
 ```
 
 ## Files

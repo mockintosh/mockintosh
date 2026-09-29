@@ -75,7 +75,7 @@ interface Platform {
   env:       { origin, config }                           // host origin + VITE_* / device config
   hostCapabilities: HostCapability[]                      // leftover flags; `browser` is derived from the service
   clipboard?, printerLinks?, printer?, download?, fetch?  // peripherals; absent = feature hidden
-  images?, video?, camera?                                // media; capabilities follow presence
+  images?, video?, camera?, audio?, microphone?           // media; capabilities follow presence
   crypto                                                  // randomBytes + sha256
   browser?                                                // openExternal, authorize, loadScript
 }
@@ -85,14 +85,14 @@ The design follows the Macintosh: required members are what every Mac had (scree
 
 Implementations:
 
-- `src/platform/web/` — `<canvas>` + `CanvasPresenter`, DOM events (including host file drops), `requestAnimationFrame`, `OPFSBackend`, `navigator.clipboard`, `WebUSBPrinterTransport`, `fetch`. The only OS-level code allowed to touch the DOM.
-- `src/platform/headless/` — in-memory display with frame read-back, synthetic input injection, a hand-advanced clock, `InMemoryBackend`. `src/os/boot.test.ts` boots the whole shell on it and drives menus, ⌘N, and the capability dialog from Node. It is the starting point for any new host: swap `present()` and the input injectors for real drivers.
+- `src/platform/web/` — `<canvas>` + `CanvasPresenter`, DOM events (including host file drops), `requestAnimationFrame`, `OPFSBackend`, `navigator.clipboard`, `WebUSBPrinterTransport`, `fetch`, a Web Audio speaker (`media/audio.ts`), a `getUserMedia` microphone (`media/microphone.ts`), and an agent runtime (`agentRuntime.ts`: fx's WebAssembly core through libfx, loaded on first use, absent without JSPI). The only OS-level code allowed to touch the DOM.
+- `src/platform/headless/` — in-memory display with frame read-back, synthetic input injection, a hand-advanced clock, `InMemoryBackend`, and (with `audioSampleRate`) a speaker that renders on the clock and keeps what it played, and (with `microphoneSampleRate`) a microphone that delivers whatever a test `speak`s into it. `src/os/boot.test.ts` boots the whole shell on it and drives menus, ⌘N, and the capability dialog from Node. It is the starting point for any new host: swap `present()` and the input injectors for real drivers.
 
 Which apps ship is the entry point's decision, not the OS's: `src/systemApps.ts` registers the web build's bundled apps. Bundled apps are written against `@mockintosh/sdk` only — `export default defineApp(…)`, `useApp()` — so they are the same shape as a third-party bundle and could be moved out of the tree. Three stay OS-owned and reach into `src/os` on purpose: Finder (desktop, folder windows, About This Macintosh, Control Panel), App Store (installation privileges), and Icon Gallery (the OS icon catalog). Finder is registered by boot; other bundled apps are registered by the host. Kernel clients (Source Editor, Terminal, ChatGippity) stay SDK-clean and receive a granted `AppContext.kernel` session from `permissions`.
 
 ### Capabilities
 
-Apps declare what they cannot work without — `requires: ["camera"]` on `defineApp`/`registerApp`, and on App Store manifests. `platformCapabilities(platform)` (`src/os/capabilities.ts`) derives the set this machine has: `network`/`clipboard`/`printer`/`download` from the services present, the rest from `hostCapabilities`. The OS refuses to launch an app with unmet requirements and tells the user why (“*"Photo Booth" needs a camera, which this Macintosh does not have.*”), and skips loading installed bundles it cannot run (their shortcuts explain the same when opened). Apps that work with *or* without a feature check `useApp().capabilities` at the point of use instead — Preview opens sprite files everywhere and gates PNG decoding on `images`; Dither hides Export when `download` is absent.
+Apps declare what they cannot work without — `requires: ["camera"]` on `defineApp`/`registerApp`, and on App Store manifests. `platformCapabilities(platform)` (`src/os/capabilities.ts`) derives the set this machine has: `network`/`clipboard`/`printer`/`download`/`audio`/`microphone` and the media services from the services present, the rest from `hostCapabilities`. The OS refuses to launch an app with unmet requirements and tells the user why (“*"Photo Booth" needs a camera, which this Macintosh does not have.*”), and skips loading installed bundles it cannot run (their shortcuts explain the same when opened). Apps that work with *or* without a feature check `useApp().capabilities` at the point of use instead — Preview opens sprite files everywhere and gates PNG decoding on `images`; Dither hides Export when `download` is absent; the TP-7 requires only a speaker and says "NO MICROPHONE" when asked to record without one.
 
 ## App model
 
