@@ -52,6 +52,7 @@
     "@solidjs/web": "2.0.0-rc.8",
     "dayjs": "^1.11.11",
     "defuddle": "^0.14.0",
+    "libfx": "0.0.11",
     "linkedom": "^0.18.12",
     "lodash": "^4.17.21",
     "mdast-util-from-markdown": "^2.0.3",

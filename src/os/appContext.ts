@@ -5,6 +5,7 @@
  */
 
 import type {
+  AgentRuntime,
   AppContext,
   AudioMonitor,
   AudioService,
@@ -115,6 +116,26 @@ function instanceMicrophone(os: OSServices, microphone: MicrophoneService, insta
   };
 }
 
+/** Agents as one launch sees them: its sessions close when the launch ends, cancelling any turn in flight. */
+function instanceAgentRuntime(os: OSServices, runtime: AgentRuntime, instanceId?: string): AgentRuntime {
+  return {
+    engine: runtime.engine,
+    async createSession(sessionOptions) {
+      const session = await runtime.createSession(sessionOptions);
+      if (!instanceId || !os.instances) return session;
+      const disown = os.instances.own(instanceId, () => void session.close());
+      return {
+        prompt: (text, promptOptions) => session.prompt(text, promptOptions),
+        checkpoint: () => session.checkpoint(),
+        close() {
+          disown();
+          return session.close();
+        },
+      };
+    },
+  };
+}
+
 /** Sign-in as one app sees it: limited to its declared hosts, its sheet closing when the launch ends. */
 function appSignIn(os: OSServices, signIn: SystemSignIn, appId: string, instanceId?: string): SignInService {
   const app = getApp(appId);
@@ -165,6 +186,7 @@ export function createAppContext(
     camera: os.camera,
     audio: os.audio && instanceAudio(os, os.audio, options.instanceId),
     microphone: os.microphone && instanceMicrophone(os, os.microphone, options.instanceId),
+    agentRuntime: os.agentRuntime && instanceAgentRuntime(os, os.agentRuntime, options.instanceId),
     kernel: kernelClientFor(os, appId, options.instanceId),
     scheduler: {
       now: () => os.scheduler.now(),

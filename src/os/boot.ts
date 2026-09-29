@@ -227,6 +227,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     camera: platform.camera,
     audio: platform.audio,
     microphone: platform.microphone,
+    agentRuntime: platform.agentRuntime,
     crypto: platform.crypto,
     browser: platform.browser,
     signIn: platform.signInRelay && systemSignIn(platform.signInRelay),

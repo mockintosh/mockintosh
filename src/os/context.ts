@@ -9,6 +9,7 @@ import type { FileSystem } from "@mockintosh/fs";
 import type { AnimRect } from "./zoomAnimation";
 import type { AppInstaller } from "./installedApps";
 import type {
+  AgentRuntime,
   AppCrypto,
   AudioService,
   BrowserService,
@@ -65,6 +66,7 @@ export interface OSServices {
   camera?: CameraService;
   audio?: AudioService;
   microphone?: MicrophoneService;
+  agentRuntime?: AgentRuntime;
   crypto: AppCrypto;
   browser?: BrowserService;
   /** Installs third-party apps, when the platform can load code at runtime. */

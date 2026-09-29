@@ -235,6 +235,7 @@ export default defineApp({
 - `images` / `video` / `camera` — decode rasters, play video, or open a camera (see [Capabilities](#capabilities))
 - `audio` — sound output streams, when this Macintosh has a speaker (see [Sound](#sound))
 - `microphone` — sound input, when this Macintosh has a microphone (see [Sound input](#sound-input))
+- `agentRuntime` — language-model agents with your app's tools, when this Macintosh can run them (see [Agents](#agents))
 - `scheduler` — `requestFrame` / `now` (no `requestAnimationFrame` / `performance`)
 - `capabilities` — the set of things this Macintosh can do (see [Capabilities](#capabilities))
 - `env.origin` / `env.config` — host origin and configuration (`SPOTIFY_CLIENT_ID`, …)
@@ -261,6 +262,7 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `microphone` | `useApp().microphone` is available (see [Sound input](#sound-input)) |
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
 | `sign-in`   | `useApp().signIn` is available (see [Signing in](#signing-in))        |
+| `agent-runtime` | `useApp().agentRuntime` is available (see [Agents](#agents))      |
 
 Two ways to use them:
 
@@ -386,6 +388,35 @@ input.close();
 - **`block.position` is the input's frame clock**, gapless from when it opened. `capture` has the same rules as `render`: quick, no allocation, no throwing.
 - Markers go with the file: `setWavMarkers(bytes, frames)` replaces a WAV's cue points without touching its audio, and `readWavMarkers(bytes)` reads them back.
 - So can your own data: `setWavChunk(bytes, "abcd", body)` puts a chunk of your own in the file (or removes it when `body` is `null`), and `readWavChunk(bytes, "abcd")` reads it back. Other players skip chunks they don't know. The OP-1 keeps each tape's tempo and mix in its WAV this way.
+
+
+## Agents
+
+`useApp().agentRuntime` runs language-model agents, present when the platform can (capability `agent-runtime`; in the browser that's fx's WebAssembly engine, which needs Chrome or Safari 27+). Your app supplies everything the agent knows and can do: the user's provider key, the instructions and the tools. A session is one conversation:
+
+```tsx
+const session = await app.agentRuntime!.createSession({
+  apiKey,                          // the user's Vercel AI Gateway key, kept in app.storage
+  instructions: "You are …",       // the whole system context; nothing is added
+  tools: [{
+    name: "lookup",
+    description: "Look up a word.",
+    inputSchema: { type: "object", properties: { word: { type: "string" } }, required: ["word"] },
+    execute: async (input, { signal }) => define(String(input.word), signal),
+  }],
+  checkpoint,                      // optional: bytes from an earlier session.checkpoint()
+});
+const turn = session.prompt("What does 'mockintosh' mean?");
+for await (const event of turn) {  // text, reasoning, tool-start, tool-end
+  if (event.type === "text") reply += event.delta;
+}
+const { stopReason } = await turn.result; // "end", "cancelled", "limit" or "refused"
+```
+
+- **Read the events, then await `result`.** A turn nobody reads stalls. `turn.cancel()` stops it and aborts the running tool's `signal`.
+- **Tools are yours to guard.** The runtime approves nothing; validate input and check permissions inside `execute`. Return a string, or `{ text, images }` to show the model a picture.
+- **Keep the conversation with `checkpoint()`**, called while idle, and pass the bytes back to `createSession` next launch. Keys, instructions and tools are not in the checkpoint.
+- The OS closes your sessions when your app quits.
 
 
 ## Storage

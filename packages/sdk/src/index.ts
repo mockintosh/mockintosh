@@ -15,6 +15,7 @@ import type { MenubarDefinition } from "./menus";
 import type { AppScheduler, CameraService, ImageService, VideoService } from "./media";
 import type { AudioService } from "./audio";
 import type { MicrophoneService } from "./microphone";
+import type { AgentRuntime } from "./agentRuntime";
 import type { KernelClient, KernelPermission } from "./kernel";
 import type { AppCrypto } from "./crypto";
 import type { BrowserService } from "./browser";
@@ -119,6 +120,19 @@ export type {
 } from "./audio";
 export { midiToFrequency, noteName, encodeWav, decodeWav } from "./audio";
 export type { MicrophoneService, MicrophoneInput, MicrophoneOptions, AudioCaptureBlock } from "./microphone";
+export type {
+  AgentRuntime,
+  AgentSession,
+  AgentSessionOptions,
+  AgentTurn,
+  AgentTurnResult,
+  AgentStopReason,
+  AgentEvent,
+  AgentTool,
+  AgentToolContext,
+  AgentToolResult,
+  AgentImage,
+} from "./agentRuntime";
 export { readWavChunk, readWavMarkers, setWavChunk, setWavMarkers } from "./wav";
 export type { KernelClient, KernelInvokeOptions, KernelPermission, OperationContract } from "./kernel";
 export type { AppCrypto } from "./crypto";
@@ -435,6 +449,8 @@ export interface AppContext {
   audio?: AudioService;
   /** Sound input, when this platform has a microphone. */
   microphone?: MicrophoneService;
+  /** Language-model agents, when this platform can run them. */
+  agentRuntime?: AgentRuntime;
   /** Frame clock and monotonic time. */
   scheduler: AppScheduler;
   /** Kernel traps, when the app declared `permissions`. */
@@ -480,9 +496,11 @@ export type FetchFunction = (url: string, options?: FetchRequest) => Promise<Fet
  * - `microphone` — `useApp().microphone` is available
  * - `browser`   — `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`)
  * - `sign-in`   — `useApp().signIn` is available (sign in from a phone; see `SignInService`)
+ * - `agent-runtime` — `useApp().agentRuntime` is available (language-model agents; see `AgentRuntime`)
  */
 export type Capability =
-  | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in";
+  | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in"
+  | "agent-runtime";
 
 /**
  * What "About <app>…" — the first Apple-menu item while the app is frontmost —

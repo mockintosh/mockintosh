@@ -26,6 +26,12 @@ describe("capabilities", () => {
       '"TP-7" needs a microphone, which this Macintosh does not have.'
     );
 
+    const agentRuntime = { engine: "scripted", createSession: async () => ({}) as never };
+    const withAgents = createHeadlessPlatform({ width: 8, height: 8, agentRuntime });
+    expect([...platformCapabilities(withAgents)]).toEqual(["agent-runtime"]);
+    expect(describeMissingCapabilities("fx", ["agent-runtime"])).toBe(
+      '"fx" needs a way to run AI agents, which this Macintosh does not have.'
+    );
   });
 
   it("lists what is missing, in declaration order", () => {

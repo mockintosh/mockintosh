@@ -30,6 +30,7 @@ import { createWebVideoService } from "./media/video";
 import { createWebCameraService } from "./media/camera";
 import { createWebAudioService } from "./media/audio";
 import { createWebMicrophoneService } from "./media/microphone";
+import { createWebAgentRuntime } from "./agentRuntime";
 import { createWebCrypto } from "./crypto";
 import { createWebSourceProvider } from "./source";
 import { createWebBrowserService } from "./browser";
@@ -144,6 +145,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     camera: createWebCameraService(),
     audio: createWebAudioService(),
     microphone: createWebMicrophoneService(),
+    agentRuntime: createWebAgentRuntime(),
     builder: browserBuilder,
     hostDisplay,
     source: createWebSourceProvider(),

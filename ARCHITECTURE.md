@@ -76,6 +76,7 @@ interface Platform {
   hostCapabilities: HostCapability[]                      // leftover flags; `browser` is derived from the service
   clipboard?, printerLinks?, printer?, download?, fetch?  // peripherals; absent = feature hidden
   images?, video?, camera?, audio?, microphone?           // media; capabilities follow presence
+  agentRuntime?                                           // language-model agents with app-supplied tools
   crypto                                                  // randomBytes + sha256
   browser?                                                // openExternal, authorize, loadScript
 }

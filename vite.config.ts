@@ -53,7 +53,7 @@ function sharedRuntimeImportMap(): Plugin {
 
 export default defineConfig({
   optimizeDeps: {
-    exclude: ["@rollup/browser", "@solidjs/compiler-wasm32-wasi"],
+    exclude: ["@rollup/browser", "@solidjs/compiler-wasm32-wasi", "libfx"],
     include: ["solid-js", "solid-js/refresh", "@solidjs/universal", "typescript"],
   },
   // The Oxc WASM loader uses top-level await and nested workers; IIFE

@@ -16,6 +16,7 @@ import type { FSBackend } from "@mockintosh/fs";
 import type { PrinterLinks, PrinterProfile, PrinterTransport } from "@mockintosh/print";
 import type { UIClipboard, Modifiers } from "@mockintosh/ui";
 import type {
+  AgentRuntime,
   AppCrypto,
   AudioService,
   BrowserService,
@@ -174,6 +175,8 @@ export interface Platform {
   audio?: AudioService;
   /** A microphone: PCM input the apps are handed as it arrives. */
   microphone?: MicrophoneService;
+  /** Runs language-model agents for apps. Absent when the host can't load the engine. */
+  agentRuntime?: AgentRuntime;
   crypto: AppCrypto;
   browser?: BrowserService;
   /** Phone sign-in for apps (`useApp().signIn`). Absent when no relay server is reachable. */
