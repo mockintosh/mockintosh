@@ -26,6 +26,7 @@ import { sprites as synthSprites } from "@/apps/synth/icons";
 import { sprites as chordSprites } from "@/apps/chord/icons";
 import { sprites as op1Sprites } from "@/apps/op1/icons";
 import { sprites as tp7Sprites } from "@/apps/tp7/icons";
+import { sprites as pchkraftSprites } from "@/apps/pchkraft/icons";
 
 for (const app of [
   Testing,
@@ -163,4 +164,14 @@ registerBundledApp({
   load: () => import("@/apps/TP7"),
 });
 
+registerBundledApp({
+  id: "pchkraft",
+  title: "pchkraft",
+  description:
+    "A pocket groovebox and looper in the manner of the Vorimo pchkraft. Hum a melody or play the four keys; each beat of a hum becomes the chord that fits it, and the loop starts at once. Keys A S D F play, M listens, R records, Space runs the tape.",
+  icon: "pchkraft/icon",
+  sprites: pchkraftSprites,
+  requires: ["audio"],
+  load: () => import("@/apps/Pchkraft"),
+});
 
