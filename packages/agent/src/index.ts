@@ -8,3 +8,4 @@ export {
   isHttpTool, isReadOnlyTool, type AgentHttp, type AgentInvoke, type AgentExecState, type ToolExecution,
 } from "./execute";
 export { encodePackedPng, encodePackedPngDataUrl } from "./png";
+export { AGENT_BRIEF } from "@mockintosh/protocol";

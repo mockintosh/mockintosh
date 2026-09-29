@@ -31,6 +31,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Source Editor | `SourceEditor.tsx` | SDK-clean |
 | Terminal | `Terminal.tsx` | SDK-clean |
 | ChatGippity | `ChatGippity.tsx` | SDK-clean |
+| fx | `Fx.tsx` | SDK-clean |
 | Spotify | `SpotifyPlayer.tsx` | SDK-clean |
 | Finder | `Finder.solid.tsx` | Shell |
 | App Store | `AppStore.tsx` | Shell |
@@ -417,6 +418,7 @@ const { stopReason } = await turn.result; // "end", "cancelled", "limit" or "ref
 - **Keep the conversation with `checkpoint()`**, called while idle, and pass the bytes back to `createSession` next launch. Keys, instructions and tools are not in the checkpoint.
 - The OS closes your sessions when your app quits.
 
+The bundled fx app (`apps/Fx.tsx`, conversation in `apps/fx/`) is the worked example: kernel traps as tools, a streamed transcript, and the conversation saved between launches.
 
 ## Storage
 

@@ -67,6 +67,16 @@ registerBundledApp({
   load: () => import("@/apps/ChatGippity"),
 });
 
+registerBundledApp({
+  id: "fx",
+  title: "fx",
+  description:
+    "The fx coding agent from Vercel Labs, running on this Macintosh. It reads and edits files, builds apps, and clicks around to check its work. Bring your own Vercel AI Gateway key.",
+  icon: "icon/chat",
+  requires: ["network", "agent-runtime"],
+  permissions: ["kernel:*"],
+  load: () => import("@/apps/Fx"),
+});
 
 registerBundledApp({
   id: "spotify",

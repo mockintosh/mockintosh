@@ -10,6 +10,7 @@ describe("bundled app listings", () => {
       "dither",
       "trace",
       "chatgippity",
+      "fx",
       "spotify",
       "macpaint",
       "canvas",
