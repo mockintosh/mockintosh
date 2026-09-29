@@ -1,17 +1,19 @@
 /**
- * Installed third-party apps live in the file system: each is a `MIME.app`
- * file in the Applications folder whose body is the `AppManifest`. Opening
- * one from the Finder launches the app; trashing it uninstalls.
+ * Installed apps live in the file system: each is a `MIME.app` file in the
+ * Applications folder whose body is the `AppManifest`. Opening one from the
+ * Finder launches the app; trashing it uninstalls. Installing also leaves a
+ * shortcut on the desktop.
  *
- * Loading the code behind a manifest needs `Platform.loadModule`; the
- * `AppInstaller` wraps it and is only offered (`OSServices.installer`) on
- * platforms that have it.
+ * A manifest's `entry` is either a bundle URL, loaded through
+ * `Platform.loadModule`, or `bundled:<id>`, loaded from the host's bundled-app
+ * registry. A platform without `loadModule` can still install bundled apps.
  */
 import { MIME, type FileSystem, type FSFile } from "@mockintosh/fs";
 import type { AppManifest, Capability } from "@mockintosh/sdk";
 import type { Sprite } from "@mockintosh/ui";
 import type { ModuleLoader } from "../platform/types";
 import { getApp, registerApp, registerUnavailableApp, type SolidApp } from "./apps";
+import { bundledApps, bundledIdFromEntry, bundledManifest, getBundledApp, type BundledAppListing } from "./bundledApps";
 import { missingCapabilities, type CapabilitySet } from "./capabilities";
 import type { SpriteRegistry } from "./sprites/registry";
 
@@ -35,7 +37,8 @@ export interface AppInstallerOptions {
   fs: FileSystem;
   sprites: SpriteRegistry;
   capabilities: CapabilitySet;
-  loadModule: ModuleLoader;
+  /** Absent on hosts that cannot fetch a bundle URL. Bundled apps still install. */
+  loadModule?: ModuleLoader;
 }
 
 function sdkMajor(sdk: string | undefined): number {
@@ -58,7 +61,7 @@ export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
       if (existing) return existing;
     }
 
-    const module = validateModule(manifest.id, await loadModule(manifest.entry));
+    const module = validateModule(manifest.id, await loadEntry(manifest, loadModule));
     if (module.sprites) sprites.registerAll(module.sprites);
     registerApp(module.default);
     loaded.add(manifest.id);
@@ -69,6 +72,7 @@ export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
     async install(manifest) {
       await load(manifest);
       await writeManifest(fs, manifest);
+      await ensureDesktopShortcut(fs, manifest);
     },
 
     async loadInstalled() {
@@ -90,6 +94,48 @@ export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
       });
     },
   };
+}
+
+async function loadEntry(manifest: AppManifest, loadModule: ModuleLoader | undefined): Promise<unknown> {
+  const bundledId = bundledIdFromEntry(manifest.entry);
+  if (bundledId !== undefined) {
+    const listing = getBundledApp(bundledId);
+    if (!listing) throw new Error(`No bundled app "${bundledId}".`);
+    return listing.load();
+  }
+  if (!loadModule) throw new Error("This Macintosh cannot load app bundles.");
+  return loadModule(manifest.entry);
+}
+
+/**
+ * One-time. A desktop that already had shortcuts to bundled apps keeps them
+ * working: each such shortcut with no manifest becomes an install. The marker
+ * on the Applications folder means a later uninstall stays uninstalled.
+ * `listings` defaults to everything the host registered.
+ */
+export async function migrateBundledDesktopShortcuts(
+  fs: FileSystem,
+  installer: AppInstaller,
+  listings: readonly BundledAppListing[] = bundledApps(),
+): Promise<void> {
+  const apps = fs.locate("applications");
+  if (!apps || fs.attributes(apps.id).bundledAppsMigrated === true) return;
+
+  const installed = new Set(installedAppIds(fs));
+  const shortcutIds = await desktopShortcutAppIds(fs);
+  let failed = false;
+  for (const listing of listings) {
+    if (!shortcutIds.has(listing.id) || installed.has(listing.id)) continue;
+    try {
+      await installer.install(bundledManifest(listing));
+    } catch (err) {
+      failed = true;
+      console.error(`Failed to install bundled app "${listing.id}":`, err);
+    }
+  }
+  if (failed) return;
+  fs.setAttributes(apps.id, { bundledAppsMigrated: true });
+  await fs.flush();
 }
 
 export function validateModule(appId: string, module: unknown): AppModule {
@@ -148,5 +194,29 @@ async function writeManifest(fs: FileSystem, manifest: AppManifest): Promise<FSF
   return fs.writeJSON(apps.id, manifest.title, manifest, {
     type: MIME.app,
     attributes: { icon: manifest.icon, appId: manifest.id },
+  });
+}
+
+async function desktopShortcutAppIds(fs: FileSystem): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const desktop = fs.locate("desktop");
+  if (!desktop) return ids;
+  for (const node of fs.children(desktop.id)) {
+    if (node.kind !== "file" || node.type !== MIME.appShortcut) continue;
+    const shortcut = await fs.readJSON<{ appId?: string }>(node.id);
+    if (shortcut?.appId) ids.add(shortcut.appId);
+  }
+  return ids;
+}
+
+/** A Finder icon for an install, unless the desktop already has one for this app. */
+async function ensureDesktopShortcut(fs: FileSystem, manifest: AppManifest): Promise<void> {
+  const desktop = fs.locate("desktop");
+  if (!desktop) return;
+  if ((await desktopShortcutAppIds(fs)).has(manifest.id)) return;
+  if (fs.child(desktop.id, manifest.title)) return;
+  await fs.writeJSON(desktop.id, manifest.title, { appId: manifest.id }, {
+    type: MIME.appShortcut,
+    attributes: { icon: manifest.icon },
   });
 }

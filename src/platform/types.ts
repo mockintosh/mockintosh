@@ -182,9 +182,9 @@ export interface Platform {
   /** Phone sign-in for apps (`useApp().signIn`). Absent when no relay server is reachable. */
   signInRelay?: SignInRelay;
   /**
-   * Load a JavaScript module by URL, for installing third-party apps. Absent
-   * when the host cannot load modules at runtime, where the App Store then
-   * cannot install anything.
+   * Load a JavaScript module by URL, for installing a remote app bundle.
+   * Absent when the host cannot load modules at runtime. Bundled apps, whose
+   * entry is `bundled:<id>`, still install without it.
    */
   loadModule?: ModuleLoader;
   /** Load persisted bundled ESM through this host's shared runtime. */

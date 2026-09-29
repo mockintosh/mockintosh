@@ -132,7 +132,8 @@ describe("bootOS on the headless platform", () => {
 
     expect(getWindows()).toEqual([]);
     const names = os.services.fs.children(os.services.fs.locate("desktop")!.id).map((n) => n.name);
-    expect(names).toContain("Canvas");
+    expect(names).toContain("App Store");
+    expect(names).not.toContain("Canvas");
     expect(names).not.toContain("scratch");
   });
 

@@ -2,8 +2,9 @@
  * SpriteRegistry — every named 1-bit image the OS can draw, by key.
  *
  * Built-in sprites (icons, window chrome, UI widgets) are registered at boot;
- * bundled apps contribute theirs through `SolidApp.sprites` and installed
- * apps through their module's `sprites` export. Components look sprites up
+ * always-on apps contribute theirs through `SolidApp.sprites`, optional
+ * bundled apps through their listing, and installed apps through their
+ * module's `sprites` export. Components look sprites up
  * by name (`<image src>`, `useApp().getSprite`), so nothing else holds pixel
  * data.
  */

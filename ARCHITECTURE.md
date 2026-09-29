@@ -89,7 +89,7 @@ Implementations:
 - `src/platform/web/` — `<canvas>` + `CanvasPresenter`, DOM events (including host file drops), `requestAnimationFrame`, `OPFSBackend`, `navigator.clipboard`, `WebUSBPrinterTransport`, `fetch`, a Web Audio speaker (`media/audio.ts`), a `getUserMedia` microphone (`media/microphone.ts`), and an agent runtime (`agentRuntime.ts`: fx's WebAssembly core through libfx, loaded on first use, absent without JSPI). The only OS-level code allowed to touch the DOM.
 - `src/platform/headless/` — in-memory display with frame read-back, synthetic input injection, a hand-advanced clock, `InMemoryBackend`, and (with `audioSampleRate`) a speaker that renders on the clock and keeps what it played, and (with `microphoneSampleRate`) a microphone that delivers whatever a test `speak`s into it. `src/os/boot.test.ts` boots the whole shell on it and drives menus, ⌘N, and the capability dialog from Node. It is the starting point for any new host: swap `present()` and the input injectors for real drivers.
 
-Which apps ship is the entry point's decision, not the OS's: `src/systemApps.ts` registers the web build's bundled apps. Bundled apps are written against `@mockintosh/sdk` only — `export default defineApp(…)`, `useApp()` — so they are the same shape as a third-party bundle and could be moved out of the tree. Three stay OS-owned and reach into `src/os` on purpose: Finder (desktop, folder windows, About This Macintosh, Control Panel), App Store (installation privileges), and Icon Gallery (the OS icon catalog). Finder is registered by boot; other bundled apps are registered by the host. Kernel clients (Source Editor, Terminal, ChatGippity) stay SDK-clean and receive a granted `AppContext.kernel` session from `permissions`.
+Which apps ship is the entry point's decision, not the OS's: `src/systemApps.ts` registers the web build's always-on apps, and lists the optional ones the App Store installs. Bundled apps are written against `@mockintosh/sdk` only — `export default defineApp(…)`, `useApp()` — so they are the same shape as a third-party bundle and could be moved out of the tree. An SDK-clean app may also import `@mockintosh/quickdraw` for offscreen drawing; the OS serves the one shared instance through the import map, because `thePort`, the Font Manager and the cursor are globals (MacPaint is a port of `MacPaint.p` onto it). Three stay OS-owned and reach into `src/os` on purpose: Finder (desktop, folder windows, About This Macintosh, Control Panel), App Store (installation privileges), and Icon Gallery (the OS icon catalog). Finder is registered by boot; other bundled apps are registered by the host. Kernel clients (Source Editor, Terminal, ChatGippity) stay SDK-clean and receive a granted `AppContext.kernel` session from `permissions`.
 
 ### Capabilities
 
@@ -146,7 +146,11 @@ export default defineApp({
 });
 ```
 
-Bundles externalize `solid-js`, `solid-js/store`, `@mockintosh/ui`, and `@mockintosh/sdk`. The OS serves those via an import map so one Solid runtime is shared. The `AppInstaller` (`src/os/installedApps.ts`) fetches the bundle through `Platform.loadModule`, validates `Component`, registers the module's `sprites`, and calls `registerApp`; a platform without `loadModule` has no installer and the App Store says so. The App Store filters catalog entries to `sdk` major ≥ 2.
+Bundles externalize `solid-js`, `solid-js/store`, `@mockintosh/ui`, and `@mockintosh/sdk`. The OS serves those via an import map so one Solid runtime is shared. The `AppInstaller` (`src/os/installedApps.ts`) fetches a remote bundle through `Platform.loadModule`, validates `Component`, registers the module's `sprites`, and calls `registerApp`. A host without `loadModule` can still install bundled apps (below); a remote bundle then fails with a clear error. The App Store filters registry entries to `sdk` major ≥ 3.
+
+### Bundled optional apps
+
+The toy apps (Synthesizer, MacPaint, and the rest of the App Store's "Mockintosh Apps" section) stay in this repo, but a new desktop does not get a shortcut for them. `systemApps.ts` registers each with `registerBundledApp` (`src/os/bundledApps.ts`): title, description, and icon sprites up front, the module behind `import()`. Installing writes the same `.app` manifest as a remote app, with `entry: "bundled:<id>"`, and a desktop shortcut. The installer resolves that prefix from the registry instead of `Platform.loadModule`. Trashing the `.app` uninstalls. Boot migrates an existing disk once: a desktop shortcut to a bundled app and no manifest means install it, then a `bundledAppsMigrated` attribute on the Applications folder keeps a later uninstall from coming back.
 
 `useApp()` provides `getSprite`, `storage` (per-app folder), `fs` (the shared file system), `window` (this window's reactive size, `isActive`, `scrollY`, `kind`, `setTitle`, `setFullScreen`, `close`), `openWindow` (another window of this app), `os.openApp/closeWindow/showDialog`, `setMenus` (this window's menubar), `capabilities`, optional `fetch` and `print`, and `env`. Sprite files (`image/x-mockintosh-sprite`) are read and written with `readSpriteFile` / `writeSpriteFile` from the SDK. Apps that declare `fileTypes` are launched with `FileDocumentProps` when such a file is opened. The OS supplies one `AppServices` per window through the SDK's `AppServicesContext`, so each window's components see their own.
 
@@ -191,7 +195,7 @@ apps/                       Bundled apps (*.tsx), SDK-only except Finder, App St
 
 src/
   solidMain.ts              Browser entry: createWebPlatform → bootOS
-  systemApps.ts             Registers the web build's bundled apps (each module's defineApp exports)
+  systemApps.ts             Registers the web build's always-on apps, and the optional apps' listings
   os/                       Shell (DOM-free)
     boot.ts                 bootOS(platform): boot order, frame loop, input → UI, OSServices
     capabilities.ts         Platform capability set; `requires` checks and their wording
@@ -211,7 +215,8 @@ src/
     cursors.ts              The OS cursors as QuickDraw `Cursor`s (arrow, iBeam, watch, grab)
     zoomAnimation.ts        XOR zoom-rect animation (presents via a callback)
     appStorage.ts           Per-app storage folder
-    installedApps.ts        AppInstaller: .app manifests in Applications, bundles via Platform.loadModule
+    bundledApps.ts          Optional apps: listings, bundled: manifests, one-time desktop migration
+    installedApps.ts        AppInstaller: .app manifests; bundled: entries or Platform.loadModule
     printers/               Printers: the list + default (manager), one device per printer, driver catalog, saved list
     components/             Desktop, Window, Menubar, Dialog, Splash
 

@@ -13,21 +13,17 @@ interface DesktopShortcut {
   icon: string;
 }
 
+/**
+ * Icons on a new desktop. Optional apps (MacPaint, the instruments, …) are
+ * not here: a new user installs those from the App Store.
+ */
 const DESKTOP_SHORTCUTS: readonly DesktopShortcut[] = [
-  { name: "Photo Booth",    appId: "photobooth",  icon: "icon/photobooth-smr-32" },
-  { name: "Dither",         appId: "dither",      icon: "dither/icon" },
-  { name: "Trace",          appId: "trace",       icon: "trace/icon" },
-  { name: "1984.mp4",       appId: "video",       icon: "icon/MacFlim" },
-  { name: "Safari",         appId: "safari",      icon: "icon/safari" },
-  { name: "GitHub",         appId: "github",      icon: "icon/safari" },
-  { name: "App Store",      appId: "appstore",    icon: "icon/appstore-smr-32x32" },
-  { name: "ChatGippity",    appId: "chatgippity", icon: "icon/computer" },
-  { name: "Spotify Player", appId: "spotify",     icon: "icon/spotify" },
-  { name: "Icon Gallery",   appId: "icon_gallery", icon: "icon-gallery/icon" },
-  { name: "MacPaint",       appId: "macpaint",    icon: "macpaint/icon" },
-  { name: "Canvas",         appId: "canvas",      icon: "canvas/icon" },
-  { name: "Surface",        appId: "surface",     icon: "surface/icon" },
-  { name: "Showreel",       appId: "showreel",    icon: "showreel/icon" },
+  { name: "Photo Booth",  appId: "photobooth",   icon: "icon/photobooth-smr-32" },
+  { name: "1984.mp4",     appId: "video",        icon: "icon/MacFlim" },
+  { name: "Safari",       appId: "safari",       icon: "icon/safari" },
+  { name: "App Store",    appId: "appstore",     icon: "icon/appstore-smr-32x32" },
+  { name: "Icon Gallery", appId: "icon_gallery", icon: "icon-gallery/icon" },
+  { name: "Showreel",     appId: "showreel",     icon: "showreel/icon" },
 ];
 
 /** Create the startup volume and its standard folders on a fresh disk; repair them otherwise. */
@@ -50,10 +46,6 @@ export async function bootstrapFileSystem(fs: FileSystem): Promise<void> {
       await writeDesktopShortcut(fs, desktop.id, s);
     }
   } else {
-    await ensureDesktopShortcut(fs, desktop, "dither");
-    await ensureDesktopShortcut(fs, desktop, "trace");
-    await ensureDesktopShortcut(fs, desktop, "github");
-    await ensureDesktopShortcut(fs, desktop, "surface");
     await ensureDesktopShortcut(fs, desktop, "showreel");
   }
   await fs.flush();
@@ -67,13 +59,7 @@ async function ensureDesktopShortcut(
   const spec = DESKTOP_SHORTCUTS.find((shortcut) => shortcut.appId === appId);
   if (!spec) return;
   const existing = fs.child(desktop.id, spec.name);
-  if (!existing) {
-    await writeDesktopShortcut(fs, desktop.id, spec);
-    return;
-  }
-  if (appId === "dither" && fs.attributes(existing.id).icon === "icon/camera") {
-    fs.setAttributes(existing.id, { icon: spec.icon });
-  }
+  if (!existing) await writeDesktopShortcut(fs, desktop.id, spec);
 }
 
 async function writeDesktopShortcut(

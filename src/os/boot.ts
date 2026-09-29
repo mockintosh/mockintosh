@@ -48,12 +48,13 @@ import {
 } from "./state";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
+import { bundledApps } from "./bundledApps";
 import { createAppContext } from "./appContext";
 import { buildAppWindow } from "./appWindow";
 import { DialogApp } from "./components/Dialog.solid";
-import { createAppInstaller } from "./installedApps";
 import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
 import type { SystemSignIn } from "./signIn";
+import { createAppInstaller, migrateBundledDesktopShortcuts } from "./installedApps";
 import {
   describeMissingCapabilities,
   missingCapabilities,
@@ -124,6 +125,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   const sprites = new SpriteRegistry();
   registerBuiltinSprites(sprites);
   for (const app of getAllApps()) if (app.sprites) sprites.registerAll(app.sprites);
+  for (const listing of bundledApps()) if (listing.sprites) sprites.registerAll(listing.sprites);
 
   // --- Frame scheduling ---
   let screenDirty = true;
@@ -176,12 +178,16 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   registerFileOperations(kernel, fs, platform.source);
   const desktopSettings = await createDesktopSettings(fs);
 
-  // --- Installed third-party apps (manifests live in /Applications) ---
+  // --- Installed apps (manifests live in /Applications) ---
   const capabilities = platformCapabilities(platform);
-  const installer = platform.loadModule
-    ? createAppInstaller({ fs, sprites, capabilities, loadModule: platform.loadModule })
-    : undefined;
-  await installer?.loadInstalled();
+  const installer = createAppInstaller({
+    fs,
+    sprites,
+    capabilities,
+    loadModule: platform.loadModule,
+  });
+  await migrateBundledDesktopShortcuts(fs, installer);
+  await installer.loadInstalled();
 
   // --- Printers ---
   const printers =

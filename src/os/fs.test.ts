@@ -27,7 +27,7 @@ describe("bootstrapFileSystem", () => {
     expect(shortcuts.every((n) => n.kind === "file" && n.type === MIME.appShortcut)).toBe(true);
   });
 
-  it("erase() then bootstrap yields a first-boot desktop including Canvas", async () => {
+  it("erase() then bootstrap yields the first-boot desktop, without the App Store apps", async () => {
     const fs = await bootedFS();
     const desktop = fs.locate("desktop")!;
     await fs.writeJSON(desktop.id, "scratch", { n: 1 }, { type: MIME.json });
@@ -38,10 +38,10 @@ describe("bootstrapFileSystem", () => {
     await bootstrapFileSystem(fs);
 
     const names = fs.children(fs.locate("desktop")!.id).map((n) => n.name);
-    expect(names).toContain("Canvas");
-    expect(names).toContain("MacPaint");
-    expect(names).toContain("Dither");
-    expect(names).toContain("Trace");
+    const firstBoot = ["Photo Booth", "1984.mp4", "Safari", "App Store", "Icon Gallery", "Showreel"];
+    expect(names).toEqual([...firstBoot].sort((a, b) => a.localeCompare(b)));
+    expect(names).not.toContain("Canvas");
+    expect(names).not.toContain("MacPaint");
     expect(names).not.toContain("scratch");
     expect(fs.locate("volume")?.name).toBe(STARTUP_VOLUME_NAME);
   });
@@ -57,7 +57,7 @@ describe("bootstrapFileSystem", () => {
     expect(fs.locate("preferences")).toBeDefined();
   });
 
-  it("adds a Dither shortcut to an existing desktop that lacks one", async () => {
+  it("adds a Showreel shortcut to an existing desktop that lacks one", async () => {
     const fs = await FileSystem.open({ backend: new InMemoryBackend(), persistDelayMs: 0 });
     const hd = fs.mkdir(ROOT_ID, STARTUP_VOLUME_NAME, { role: "volume" });
     fs.mkdir(hd.id, "Desktop Folder", { role: "desktop" });
@@ -66,24 +66,11 @@ describe("bootstrapFileSystem", () => {
     const system = fs.mkdir(hd.id, "System Folder", { role: "system" });
     fs.mkdir(system.id, "Preferences", { role: "preferences" });
     await bootstrapFileSystem(fs);
-    const dither = fs.child(fs.locate("desktop")!.id, "Dither");
-    expect(dither).toMatchObject({
-      kind: "file",
-      type: MIME.appShortcut,
-    });
-    expect(fs.attributes(dither!.id).icon).toBe("dither/icon");
-    const trace = fs.child(fs.locate("desktop")!.id, "Trace");
-    expect(trace).toMatchObject({ kind: "file", type: MIME.appShortcut });
-    expect(fs.attributes(trace!.id).icon).toBe("trace/icon");
-  });
-
-  it("updates a camera-icon Dither shortcut to Scanned Art", async () => {
-    const fs = await bootedFS();
-    const desktop = fs.locate("desktop")!;
-    const dither = fs.child(desktop.id, "Dither")!;
-    fs.setAttributes(dither.id, { icon: "icon/camera" });
-    await bootstrapFileSystem(fs);
-    expect(fs.attributes(dither.id).icon).toBe("dither/icon");
+    const showreel = fs.child(fs.locate("desktop")!.id, "Showreel");
+    expect(showreel).toMatchObject({ kind: "file", type: MIME.appShortcut });
+    expect(fs.attributes(showreel!.id).icon).toBe("showreel/icon");
+    expect(fs.child(fs.locate("desktop")!.id, "Dither")).toBeUndefined();
+    expect(fs.child(fs.locate("desktop")!.id, "Canvas")).toBeUndefined();
   });
 });
 
