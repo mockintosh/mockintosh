@@ -1,6 +1,8 @@
 /**
  * Canvas document — a retained list of shapes and text boxes.
  * The file is JSON (`MIME.canvas`); pixels are only produced at paint time.
+ * Documents and elements are never mutated: an edit builds a new element
+ * and a new list, so views keyed on identity see every change.
  */
 
 export const DOCUMENT_VERSION = 1 as const;
@@ -66,8 +68,13 @@ export function emptyDocument(): CanvasDocument {
   return { version: DOCUMENT_VERSION, width: DEFAULT_PAGE.width, height: DEFAULT_PAGE.height, elements: [] };
 }
 
-export function cloneDocument(doc: CanvasDocument): CanvasDocument {
-  return { version: DOCUMENT_VERSION, width: doc.width, height: doc.height, elements: doc.elements.map((el) => ({ ...el })) };
+/** `elements` with the element `id` swapped for `update(element)`. */
+export function replaceElement(
+  elements: readonly CanvasElement[],
+  id: string,
+  update: (el: CanvasElement) => CanvasElement,
+): CanvasElement[] {
+  return elements.map((el) => (el.id === id ? update(el) : el));
 }
 
 export function allocateId(elements: readonly CanvasElement[]): string {
@@ -174,13 +181,13 @@ export function lineEndpoints(el: ShapeElement): { x0: number; y0: number; x1: n
   return { x0, y0, x1, y1 };
 }
 
-export function assignLine(el: ShapeElement, x0: number, y0: number, x1: number, y1: number): void {
-  const frame = normalizeFrame(x0, y0, x1, y1);
-  el.x = frame.x;
-  el.y = frame.y;
-  el.width = frame.width;
-  el.height = frame.height;
-  el.reverse = x0 > x1 !== y0 > y1;
+/** A line's frame and diagonal, stored as `x`/`y`/`width`/`height` plus `reverse`. */
+export interface LineFrame extends Frame {
+  reverse: boolean;
+}
+
+export function lineFrame(x0: number, y0: number, x1: number, y1: number): LineFrame {
+  return { ...normalizeFrame(x0, y0, x1, y1), reverse: x0 > x1 !== y0 > y1 };
 }
 
 function distanceToSegment(px: number, py: number, x0: number, y0: number, x1: number, y1: number): number {
@@ -288,6 +295,21 @@ export function minSize(el: CanvasElement): { width: number; height: number } {
   if (el.type === "text") return { width: MIN_TEXT_W, height: MIN_SHAPE };
   if (el.type === "line") return { width: 1, height: 1 };
   return { width: MIN_SHAPE, height: MIN_SHAPE };
+}
+
+/** `el` as it looks with `handle` dragged by (`dx`, `dy`) from where it started. */
+export function resizeElement(el: CanvasElement, handle: Handle, dx: number, dy: number): CanvasElement {
+  if (handle === "start" || handle === "end") {
+    if (el.type !== "line") return el;
+    const ends = lineEndpoints(el);
+    const frame = handle === "start"
+      ? lineFrame(ends.x0 + dx, ends.y0 + dy, ends.x1, ends.y1)
+      : lineFrame(ends.x0, ends.y0, ends.x1 + dx, ends.y1 + dy);
+    return { ...el, ...frame };
+  }
+  const origin = handlePosition(el, handle);
+  const mins = minSize(el);
+  return { ...el, ...applyResize(el, handle, origin.x + dx, origin.y + dy, mins.width, mins.height) };
 }
 
 export function bringToFront(elements: readonly CanvasElement[], id: string): CanvasElement[] {

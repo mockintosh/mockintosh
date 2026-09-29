@@ -2,15 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   allocateId,
   applyResize,
-  assignLine,
   bringToFront,
-  cloneDocument,
   containsPoint,
   duplicateElement,
   hitTest,
   lineEndpoints,
+  lineFrame,
   normalizeFrame,
   parseDocument,
+  replaceElement,
+  resizeElement,
   sendToBack,
   type CanvasDocument,
   type ShapeElement,
@@ -64,10 +65,12 @@ describe("parseDocument", () => {
     expect(() => parseDocument({ version: 2, elements: [] })).toThrow(/version/);
   });
 
-  it("clones without sharing element objects", () => {
-    const doc: CanvasDocument = { version: 1, width: 80, height: 60, elements: [rect("a", 0, 0, 8, 8)] };
-    const copy = cloneDocument(doc);
-    (copy.elements[0] as ShapeElement).x = 99;
+  it("replaces one element without touching the original list or element", () => {
+    const doc: CanvasDocument = { version: 1, width: 80, height: 60, elements: [rect("a", 0, 0, 8, 8), rect("b", 0, 0, 8, 8)] };
+    const next = replaceElement(doc.elements, "a", (el) => ({ ...el, x: 99 }));
+    expect(next).not.toBe(doc.elements);
+    expect(next[0]).toMatchObject({ id: "a", x: 99 });
+    expect(next[1]).toBe(doc.elements[1]);
     expect(doc.elements[0]?.x).toBe(0);
   });
 });
@@ -130,19 +133,22 @@ describe("geometry", () => {
   });
 
   it("records the NE–SW diagonal on a reversed line", () => {
-    const el: ShapeElement = {
-      id: "l",
-      type: "line",
-      x: 0,
-      y: 0,
-      width: 1,
-      height: 1,
-      fill: "none",
-      stroke: true,
-    };
-    assignLine(el, 20, 0, 0, 10);
+    const el: ShapeElement = { id: "l", type: "line", ...lineFrame(20, 0, 0, 10), fill: "none", stroke: true };
     expect(el).toMatchObject({ x: 0, y: 0, width: 20, height: 10, reverse: true });
     expect(lineEndpoints(el)).toEqual({ x0: 19, y0: 0, x1: 0, y1: 9 });
+  });
+
+  it("resizes into a new element and leaves the original alone", () => {
+    const orig = rect("r", 10, 10, 20, 20);
+    const next = resizeElement(orig, "se", 5, 7);
+    expect(next).toMatchObject({ id: "r", x: 10, y: 10, width: 25, height: 27 });
+    expect(orig).toMatchObject({ width: 20, height: 20 });
+  });
+
+  it("drags a line endpoint and keeps the other end fixed", () => {
+    const line: ShapeElement = { id: "l", type: "line", ...lineFrame(0, 0, 20, 10), fill: "none", stroke: true };
+    expect(resizeElement(line, "end", -30, 0)).toMatchObject({ x: -11, y: 0, reverse: true });
+    expect(resizeElement(rect("r", 0, 0, 8, 8), "start", 4, 4)).toMatchObject({ x: 0, y: 0 });
   });
 
   it("raises, lowers, and duplicates without sharing identity", () => {

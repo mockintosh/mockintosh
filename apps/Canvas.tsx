@@ -1,36 +1,35 @@
-import { For, Show, createEffect, createSignal, onSettled } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { fontLineHeight } from "@mockintosh/ui";
+import { fontLineHeight, layoutText, requireFont } from "@mockintosh/ui";
 import {
   defineApp,
+  EditableText,
   measureText,
   MIME,
-  TextInput,
   useApp,
   type MenubarItemDef,
-  type Sprite,
 } from "@mockintosh/sdk";
 import {
   ALL_RESIZE_HANDLES,
   allocateId,
-  applyResize,
-  assignLine,
   bringToFront,
-  cloneDocument,
   cornerRadius,
   duplicateElement,
   emptyDocument,
   HANDLE_SIZE,
   handlePosition,
   lineEndpoints,
-  minSize,
+  lineFrame,
   normalizeFrame,
   parseDocument,
+  replaceElement,
+  resizeElement,
   sendToBack,
   type CanvasDocument,
   type CanvasElement,
   type CanvasFont,
   type FillStyle,
+  type Frame,
   type Handle,
   type ResizeHandle,
   type ShapeElement,
@@ -38,7 +37,7 @@ import {
 } from "./canvas/document";
 import { boxFill, lineHitMask, ovalHitMask, paintLine, paintOval } from "./canvas/draw";
 import { rasterizeCanvas } from "./canvas/raster";
-import { APP_ICON, TOOL_ICONS } from "./canvas/icons";
+import { sprites, TOOL_ICONS } from "./canvas/icons";
 import { matchingPageSize, pageSize, pageSizeLabel, type PageSizeId } from "./canvas/page";
 import {
   FILL_LABEL,
@@ -53,33 +52,47 @@ const FOOT_H = 17;
 const UNDO_LIMIT = 32;
 const DEFAULT_NAME = "Untitled";
 const DEFAULT_SHAPE = { width: 48, height: 32 };
+const PASTEBOARD = "gray25";
+const PAGE_MARGIN = 12;
+const PAGE_SHADOW = 1;
+const PAGE_BORDER = 1;
 const FILLS: FillStyle[] = ["none", "white", "black", "gray25", "gray50", "gray75"];
 
-interface FrameDraft {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+/** Id of the shape shown while a drawing tool is being dragged; never part of the document. */
+const DRAFT_ID = "draft";
 
-function ToolButton(props: { id: ToolId; selected: boolean; onSelect: () => void }): JSX.Element {
+/** A locked tool stays chosen after it draws; an unlocked one hands back to Selection. */
+type ToolButtonState = "off" | "on" | "locked";
+
+/** Row under every tool icon where a locked tool shows a dotted bar. */
+const LOCK_ROW = CELL - 2;
+
+function ToolButton(props: {
+  id: ToolId;
+  state: ToolButtonState;
+  onSelect: () => void;
+  onLock: () => void;
+}): JSX.Element {
   const icon = TOOL_ICONS[props.id];
   return (
     <box
       width={CELL}
       height={CELL}
-      semantic={{ name: `tool-${props.id}`, role: "button", value: props.selected ? "on" : "off" }}
-      onClick={props.onSelect}
+      semantic={{ name: `tool-${props.id}`, role: "button", value: props.state }}
+      onMouseDown={props.onSelect}
+      onDoubleClick={props.onLock}
     >
       <raster
         width={CELL}
         height={CELL}
-        revision={props.selected ? 1 : 0}
+        revision={props.state === "off" ? 0 : props.state === "on" ? 1 : 2}
         onPaint={(surface) => {
+          const inverted = props.state !== "off";
           for (let y = 0; y < CELL; y++) {
             for (let x = 0; x < CELL; x++) {
-              const ink = icon.data[y * CELL + x] ? 1 : 0;
-              surface.setPixel(x, y, props.selected ? (ink ? 0 : 1) : ink);
+              let ink: 0 | 1 = icon.data[y * CELL + x] ? 1 : 0;
+              if (props.state === "locked" && y === LOCK_ROW && x >= 2 && x < CELL - 2 && x % 2 === 0) ink = 1;
+              surface.setPixel(x, y, inverted ? (ink ? 0 : 1) : ink);
             }
           }
         }}
@@ -94,8 +107,8 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   const { print } = app;
 
   const [doc, setDoc] = createSignal<CanvasDocument>(emptyDocument(), { ownedWrite: true });
-  const [rev, setRev] = createSignal(0);
   const [tool, setTool] = createSignal<ToolId>("select");
+  const [toolLocked, setToolLocked] = createSignal(false);
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [editingId, setEditingId] = createSignal<string | null>(null);
   const [dirty, setDirty] = createSignal(false);
@@ -110,22 +123,30 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   const [fileName, setFileName] = createSignal<string | undefined>(
     typeof props.title === "string" ? props.title : undefined,
   );
-  const [draft, setDraft] = createSignal<FrameDraft | null>(null);
+  const [draft, setDraft] = createSignal<CanvasElement | null>(null);
 
   const undoStack: CanvasDocument[] = [];
   const redoStack: CanvasDocument[] = [];
 
-  let move: { origX: number; origY: number; gx: number; gy: number } | null = null;
+  let move: { orig: CanvasElement; gx: number; gy: number } | null = null;
   let resize: { handle: Handle; orig: CanvasElement; gx: number; gy: number } | null = null;
   let creating: { tool: Exclude<ToolId, "select">; x0: number; y0: number } | null = null;
 
-  const bump = () => setRev((n) => n + 1);
   const elements = () => doc().elements;
   const selected = () => elements().find((el) => el.id === selectedId()) ?? null;
   const artW = () => doc().width;
   const artH = () => doc().height;
   const viewW = () => Math.max(8, win.width() - TOOLS_W);
   const viewH = () => Math.max(8, win.height() - FOOT_H);
+  /** The page, its frame, and its shadow. */
+  const pageW = () => artW() + PAGE_BORDER * 2 + PAGE_SHADOW;
+  const pageH = () => artH() + PAGE_BORDER * 2 + PAGE_SHADOW;
+  /**
+   * Gray area the page sits on: centered on an axis where it fits, a margin's
+   * width from the start where it doesn't, so its top-left corner stays in reach.
+   */
+  const pasteW = () => Math.max(viewW(), pageW() + PAGE_MARGIN * 2);
+  const pasteH = () => Math.max(viewH(), pageH() + PAGE_MARGIN * 2);
 
   function kept(elements: CanvasElement[]): CanvasDocument {
     const cur = doc();
@@ -139,11 +160,10 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
 
   function replaceDoc(next: CanvasDocument): void {
     setDoc(next);
-    bump();
   }
 
   function pushUndo(): void {
-    undoStack.push(cloneDocument(doc()));
+    undoStack.push(doc());
     if (undoStack.length > UNDO_LIMIT) undoStack.shift();
     redoStack.length = 0;
     setCanUndo(true);
@@ -153,7 +173,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   function undo(): void {
     const prev = undoStack.pop();
     if (!prev) return;
-    redoStack.push(cloneDocument(doc()));
+    redoStack.push(doc());
     replaceDoc(prev);
     setCanUndo(undoStack.length > 0);
     setCanRedo(true);
@@ -164,7 +184,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   function redo(): void {
     const next = redoStack.pop();
     if (!next) return;
-    undoStack.push(cloneDocument(doc()));
+    undoStack.push(doc());
     replaceDoc(next);
     setCanUndo(true);
     setCanRedo(redoStack.length > 0);
@@ -186,12 +206,20 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     if (el?.type === "text") setFont(el.font);
   }
 
-  function patchSelected(update: (el: CanvasElement) => void): void {
-    const el = selected();
-    if (!el) return;
-    update(el);
-    replaceDoc(kept(elements().slice()));
+  function updateElement(id: string, update: (el: CanvasElement) => CanvasElement): void {
+    replaceDoc(kept(replaceElement(elements(), id, update)));
     markDirty();
+  }
+
+  function chooseTool(id: ToolId, lock: boolean): void {
+    setTool(id);
+    setToolLocked(lock && id !== "select");
+    setEditingId(null);
+  }
+
+  /** Drawing tools are one-shot unless locked, as in MacDraw, Figma, and Sketch. */
+  function toolUsed(): void {
+    if (!toolLocked()) setTool("select");
   }
 
   function commitElements(next: CanvasElement[], selectId: string | null): void {
@@ -217,13 +245,19 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     };
   }
 
-  function newShape(type: Exclude<ToolId, "select">, frame: { x: number; y: number; width: number; height: number }): CanvasElement {
-    const id = allocateId(elements());
+  function newShape(
+    type: Exclude<ToolId, "select">,
+    frame: Frame & { reverse?: boolean },
+    id: string = allocateId(elements()),
+  ): CanvasElement {
     if (type === "text") {
       return {
         id,
         type: "text",
-        ...frame,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
         text: "Text",
         font: font(),
         align: "left",
@@ -246,17 +280,29 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     setDraft(null);
     const dragged = Math.abs(x1 - x0) > 2 || Math.abs(y1 - y0) > 2;
     if (t === "line" && !dragged) return;
-    pushUndo();
+    let el: CanvasElement;
     if (!dragged) {
       const size = t === "text" ? defaultTextSize() : DEFAULT_SHAPE;
-      addElement(newShape(t, { x: Math.round(x0), y: Math.round(y0), ...size }), t === "text");
-      return;
+      el = newShape(t, { x: Math.round(x0), y: Math.round(y0), ...size });
+    } else {
+      el = draggedShape(t, x0, y0, x1, y1);
+      if (t !== "text" && t !== "line" && (el.width < 4 || el.height < 4)) return;
     }
-    const frame = normalizeFrame(x0, y0, x1, y1);
-    if (t !== "text" && t !== "line" && (frame.width < 4 || frame.height < 4)) return;
-    const el = newShape(t, frame);
-    if (t === "line") assignLine(el as ShapeElement, x0, y0, x1, y1);
+    pushUndo();
     addElement(el, t === "text");
+    toolUsed();
+  }
+
+  /** The shape a drag from (`x0`, `y0`) to (`x1`, `y1`) makes with tool `t`. */
+  function draggedShape(
+    t: Exclude<ToolId, "select">,
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    id?: string,
+  ): CanvasElement {
+    return newShape(t, t === "line" ? lineFrame(x0, y0, x1, y1) : normalizeFrame(x0, y0, x1, y1), id);
   }
 
   function artboardDown(lx: number, ly: number): void {
@@ -265,13 +311,14 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
       selectElement(null);
       return;
     }
+    selectElement(null);
     creating = { tool: t, x0: lx, y0: ly };
-    setDraft({ x: Math.round(lx), y: Math.round(ly), width: 1, height: 1 });
+    setDraft(null);
   }
 
   function artboardDrag(lx: number, ly: number): void {
     if (!creating) return;
-    setDraft(normalizeFrame(creating.x0, creating.y0, lx, ly));
+    setDraft(draggedShape(creating.tool, creating.x0, creating.y0, lx, ly, DRAFT_ID));
   }
 
   function artboardUp(lx: number, ly: number): void {
@@ -282,49 +329,29 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   function startMove(el: CanvasElement, gx: number, gy: number): void {
     if (tool() !== "select" || editingId()) return;
     pushUndo();
-    move = { origX: el.x, origY: el.y, gx, gy };
+    move = { orig: el, gx, gy };
     resize = null;
   }
 
   function onMove(gx: number, gy: number): void {
-    if (!move) return;
-    const el = selected();
-    if (!el) return;
-    el.x = move.origX + Math.round(gx - move.gx);
-    el.y = move.origY + Math.round(gy - move.gy);
-    replaceDoc(kept(elements().slice()));
-    markDirty();
+    const m = move;
+    if (!m) return;
+    const x = m.orig.x + Math.round(gx - m.gx);
+    const y = m.orig.y + Math.round(gy - m.gy);
+    updateElement(m.orig.id, (el) => ({ ...el, x, y }));
   }
 
   function startResize(el: CanvasElement, handle: Handle, gx: number, gy: number): void {
     pushUndo();
-    resize = { handle, orig: { ...el }, gx, gy };
+    resize = { handle, orig: el, gx, gy };
     move = null;
   }
 
   function onResize(gx: number, gy: number): void {
-    if (!resize) return;
-    const el = selected();
-    if (!el) return;
-    const dx = Math.round(gx - resize.gx);
-    const dy = Math.round(gy - resize.gy);
-    if (el.type === "line" && (resize.handle === "start" || resize.handle === "end")) {
-      const orig = resize.orig as ShapeElement;
-      const ends = lineEndpoints(orig);
-      if (resize.handle === "start") assignLine(el as ShapeElement, ends.x0 + dx, ends.y0 + dy, ends.x1, ends.y1);
-      else assignLine(el as ShapeElement, ends.x0, ends.y0, ends.x1 + dx, ends.y1 + dy);
-    } else if (resize.handle !== "start" && resize.handle !== "end") {
-      const handle = resize.handle;
-      const origin = handlePosition(resize.orig, handle);
-      const mins = minSize(el);
-      const next = applyResize(resize.orig, handle, origin.x + dx, origin.y + dy, mins.width, mins.height);
-      el.x = next.x;
-      el.y = next.y;
-      el.width = next.width;
-      el.height = next.height;
-    }
-    replaceDoc(kept(elements().slice()));
-    markDirty();
+    const r = resize;
+    if (!r) return;
+    const next = resizeElement(r.orig, r.handle, Math.round(gx - r.gx), Math.round(gy - r.gy));
+    updateElement(r.orig.id, () => next);
   }
 
   function endGesture(): void {
@@ -352,10 +379,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     const el = selected();
     if (!el || el.type === "text") return;
     pushUndo();
-    el.fill = next;
-    if (next === "none") el.stroke = true;
-    replaceDoc(kept(elements().slice()));
-    markDirty();
+    updateElement(el.id, () => ({ ...el, fill: next, stroke: el.stroke || next === "none" }));
   }
 
   function applyStroke(on: boolean): void {
@@ -363,9 +387,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     const el = selected();
     if (!el || el.type === "text" || el.type === "line") return;
     pushUndo();
-    el.stroke = on || el.fill === "none";
-    replaceDoc(kept(elements().slice()));
-    markDirty();
+    updateElement(el.id, () => ({ ...el, stroke: on || el.fill === "none" }));
   }
 
   function applyFont(next: CanvasFont): void {
@@ -373,19 +395,14 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     const el = selected();
     if (!el || el.type !== "text") return;
     pushUndo();
-    el.font = next;
-    el.height = Math.max(el.height, fontLineHeight(next) + 4);
-    replaceDoc(kept(elements().slice()));
-    markDirty();
+    updateElement(el.id, () => ({ ...el, font: next, height: Math.max(el.height, fontLineHeight(next) + 4) }));
   }
 
   function applyAlign(next: TextElement["align"]): void {
     const el = selected();
     if (!el || el.type !== "text") return;
     pushUndo();
-    el.align = next;
-    replaceDoc(kept(elements().slice()));
-    markDirty();
+    updateElement(el.id, () => ({ ...el, align: next }));
   }
 
   function beginEdit(el: TextElement): void {
@@ -396,14 +413,25 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     setFont(el.font);
   }
 
-  function onTextChange(value: string): void {
-    const el = selected();
-    if (!el || el.type !== "text") return;
-    el.text = value;
-    const w = measureText(value || " ", el.font) + 8;
-    el.width = Math.max(el.width, Math.min(w, artW()));
-    replaceDoc(kept(elements().slice()));
-    markDirty();
+  /** Leaving a text box with nothing in it removes it, as in Figma and Sketch. */
+  function endEdit(id: string): void {
+    if (editingId() !== id) return;
+    setEditingId(null);
+    const el = elements().find((e) => e.id === id);
+    if (el?.type === "text" && el.text.trim() === "") {
+      commitElements(elements().filter((e) => e.id !== id), null);
+    }
+  }
+
+  /** Typing grows the box to fit — wider up to the page edge, then taller — and never shrinks it. */
+  function onTextChange(id: string, value: string): void {
+    updateElement(id, (el) => {
+      if (el.type !== "text") return el;
+      const font = requireFont(el.font);
+      const width = Math.max(el.width, Math.min(layoutText(font, value).width, artW() - el.x));
+      const height = Math.max(el.height, layoutText(font, value, width).height);
+      return { ...el, text: value, width, height };
+    });
   }
 
   function handleKey(key: string, modifiers: { shift: boolean }): void {
@@ -413,21 +441,23 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
       return;
     }
     if (key === "Escape") {
-      selectElement(null);
+      if (tool() !== "select") chooseTool("select", false);
+      else selectElement(null);
       return;
     }
     const el = selected();
     if (!el) return;
     const step = modifiers.shift ? 8 : 1;
-    if (key === "ArrowLeft" || key === "ArrowRight" || key === "ArrowUp" || key === "ArrowDown") {
-      pushUndo();
-      if (key === "ArrowLeft") el.x -= step;
-      if (key === "ArrowRight") el.x += step;
-      if (key === "ArrowUp") el.y -= step;
-      if (key === "ArrowDown") el.y += step;
-      replaceDoc(kept(elements().slice()));
-      markDirty();
-    }
+    const nudge: Record<string, { dx: number; dy: number }> = {
+      ArrowLeft: { dx: -step, dy: 0 },
+      ArrowRight: { dx: step, dy: 0 },
+      ArrowUp: { dx: 0, dy: -step },
+      ArrowDown: { dx: 0, dy: step },
+    };
+    const by = nudge[key];
+    if (!by) return;
+    pushUndo();
+    updateElement(el.id, () => ({ ...el, x: el.x + by.dx, y: el.y + by.dy }));
   }
 
   function desktopCanvases() {
@@ -725,30 +755,45 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     },
   );
 
-  function ElementView(props: { el: CanvasElement }): JSX.Element {
-    const el = () => {
-      rev();
-      return props.el;
-    };
+  /** One object on the page. A `preview` is the shape a drawing tool is dragging out: it ignores the pointer. */
+  function ElementView(props: { el: CanvasElement; preview?: boolean }): JSX.Element {
+    const el = () => props.el;
+    const semanticName = () => (props.preview ? DRAFT_ID : `el-${el().id}`);
+    // Rasters paint outside any reactive scope; a new element object means new pixels.
+    let paints = 0;
+    const revision = createMemo(() => {
+      el();
+      return ++paints;
+    });
     const selectable = () => tool() === "select" && editingId() !== props.el.id;
     const isText = () => el().type === "text";
     const shape = () => el() as ShapeElement;
     const textEl = () => el() as TextElement;
 
-    const pointer = () =>
-      tool() === "select"
-        ? {
-            onMouseDown: () => selectElement(el()),
-            onDoubleClick: () => {
-              if (el().type === "text") beginEdit(el() as TextElement);
-            },
-            onDragStart: (_lx: number, _ly: number, gx: number, gy: number) => {
-              if (selectable()) startMove(el(), gx, gy);
-            },
-            onDrag: (_lx: number, _ly: number, gx: number, gy: number) => onMove(gx, gy),
-            onDragEnd: () => endGesture(),
-          }
-        : {};
+    const pointer = () => {
+      if (props.preview) return {};
+      const t = tool();
+      if (t === "text" && isText()) {
+        return {
+          onClick: () => {
+            beginEdit(textEl());
+            toolUsed();
+          },
+        };
+      }
+      if (t !== "select") return {};
+      return {
+        onMouseDown: () => selectElement(el()),
+        onDoubleClick: () => {
+          if (isText()) beginEdit(textEl());
+        },
+        onDragStart: (_lx: number, _ly: number, gx: number, gy: number) => {
+          if (selectable()) startMove(el(), gx, gy);
+        },
+        onDrag: (_lx: number, _ly: number, gx: number, gy: number) => onMove(gx, gy),
+        onDragEnd: () => endGesture(),
+      };
+    };
 
     return (
       <Show
@@ -764,13 +809,14 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
                 width={el().width}
                 height={el().height}
                 hitMask={shape().type === "line" ? lineHitMask(shape()) : ovalHitMask(el().width, el().height)}
-                semantic={{ name: `el-${el().id}`, role: "img", value: el().type }}
+                semantic={{ name: semanticName(), role: "img", value: el().type }}
+                inert={props.preview}
                 {...pointer()}
               >
                 <raster
                   width={el().width}
                   height={el().height}
-                  revision={rev()}
+                  revision={revision()}
                   onPaint={(surface) => {
                     if (shape().type === "line") paintLine(surface, shape());
                     else paintOval(surface, shape());
@@ -789,7 +835,8 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
               borderWidth={shape().stroke ? 1 : 0}
               borderColor={shape().stroke ? 1 : undefined}
               borderRadius={shape().type === "roundrect" ? cornerRadius(el()) : undefined}
-              semantic={{ name: `el-${el().id}`, role: "img", value: el().type }}
+              semantic={{ name: semanticName(), role: "img", value: el().type }}
+              inert={props.preview}
               {...pointer()}
             />
           </Show>
@@ -813,20 +860,18 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
               </text>
             }
           >
-            <TextInput
+            <EditableText
               name={`text-${el().id}`}
               value={textEl().text}
               font={textEl().font}
+              align={textEl().align}
               width={el().width}
               height={el().height}
-              padding={1}
-              borderless
               autoFocus
               selectAllOnFocus
-              onChange={onTextChange}
-              onSubmit={() => setEditingId(null)}
-              onCancel={() => setEditingId(null)}
-              onBlur={() => setEditingId(null)}
+              onChange={(value) => onTextChange(el().id, value)}
+              onCancel={() => endEdit(el().id)}
+              onBlur={() => endEdit(el().id)}
             />
           </Show>
         </box>
@@ -834,13 +879,13 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     );
   }
 
+  /**
+   * Selection frame and handles. Drawn after the page and its frame, outside the
+   * page's clip, so they stay on top and reachable even for an object on or past the edge.
+   */
   function SelectionChrome(): JSX.Element {
-    const el = () => {
-      rev();
-      return selected();
-    };
     return (
-      <Show when={editingId() === null ? el() : null}>
+      <Show when={editingId() === null ? selected() : null}>
         {(sel) => {
           const node = () => sel();
           const handles = () => {
@@ -860,8 +905,8 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
           return (
             <box
               position="absolute"
-              left={0}
-              top={0}
+              left={PAGE_BORDER}
+              top={PAGE_BORDER}
               width={artW()}
               height={artH()}
             >
@@ -905,7 +950,6 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   }
 
   const status = () => {
-    rev();
     const el = selected();
     if (!el) return `${elements().length} object${elements().length === 1 ? "" : "s"}`;
     if (el.type === "text") return `${FONT_LABEL[el.font]} text`;
@@ -927,7 +971,12 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
             <box flexDirection="row" gap={1}>
               <For each={row}>
                 {(id) => (
-                  <ToolButton id={id} selected={tool() === id} onSelect={() => { setTool(id); setEditingId(null); }} />
+                  <ToolButton
+                    id={id}
+                    state={tool() !== id ? "off" : toolLocked() ? "locked" : "on"}
+                    onSelect={() => chooseTool(id, false)}
+                    onLock={() => chooseTool(id, true)}
+                  />
                 )}
               </For>
             </box>
@@ -938,38 +987,73 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
       <box flexGrow={1} height={win.height()} flexDirection="column">
         <box width={viewW()} height={viewH()} overflow="scroll" background={0}>
         <box
+          width={pasteW()}
+          height={pasteH()}
+          justifyContent="center"
+          alignItems="center"
+          background={PASTEBOARD}
+          tabIndex={0}
+          autoFocus
+          semantic={{ name: "pasteboard", role: "group" }}
+          onMouseDown={() => {
+            if (tool() === "select") selectElement(null);
+          }}
+          onKeyDown={(key, mods) => handleKey(key, mods)}
+        >
+        <box width={pageW()} height={pageH()} position="relative">
+        <box
+          position="absolute"
+          left={PAGE_SHADOW}
+          top={PAGE_SHADOW}
+          width={artW() + PAGE_BORDER * 2}
+          height={artH() + PAGE_BORDER * 2}
+          background={1}
+        />
+        <box
+          position="absolute"
+          left={0}
+          top={0}
+          width={artW() + PAGE_BORDER * 2}
+          height={artH() + PAGE_BORDER * 2}
+          borderWidth={PAGE_BORDER}
+          borderColor={1}
+          background={0}
+        >
+        <box
           width={artW()}
           height={artH()}
           position="relative"
           overflow="hidden"
           background={0}
-          tabIndex={0}
-          autoFocus
           semantic={{ name: "artboard", role: "canvas" }}
           onMouseDown={artboardDown}
           onDrag={artboardDrag}
           onMouseUp={artboardUp}
-          onKeyDown={(key, mods) => handleKey(key, mods)}
         >
-          <For each={elements()}>
-            {(el) => <ElementView el={el} />}
+          <For each={elements()} keyed={(el) => el.id}>
+            {(el) => <ElementView el={el()} />}
           </For>
           <Show when={draft()}>
-            {(r) => (
-              <box
-                position="absolute"
-                left={r().x}
-                top={r().y}
-                width={r().width}
-                height={r().height}
-                borderWidth={1}
-                borderColor={1}
-                borderStyle="dotted"
-                inert
-              />
+            {(d) => (
+              <Show when={d().type === "text"} fallback={<ElementView el={d()} preview />}>
+                <box
+                  position="absolute"
+                  left={d().x}
+                  top={d().y}
+                  width={d().width}
+                  height={d().height}
+                  borderWidth={1}
+                  borderColor={1}
+                  borderStyle="dotted"
+                  inert
+                />
+              </Show>
             )}
           </Show>
-          <SelectionChrome />
+        </box>
+        </box>
+        <SelectionChrome />
+        </box>
         </box>
         </box>
         <box height={1} background={1} />
@@ -1000,10 +1084,6 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     </box>
   );
 }
-
-export const sprites: Record<string, Sprite> = {
-  "canvas/icon": APP_ICON,
-};
 
 export default defineApp({
   id: "canvas",

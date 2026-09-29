@@ -3,11 +3,12 @@
  * Selection chrome is not part of the picture.
  */
 import {
-  fontLineHeight,
   getGlyphIndexForChar,
   getGlyphPixel,
   getGlyphWidth,
-  measureText,
+  layoutText,
+  lineLeft,
+  lineTop,
   requireFont,
   type RasterSurface,
 } from "@mockintosh/ui";
@@ -106,17 +107,16 @@ function paintBox(data: Uint8Array, pageW: number, pageH: number, el: ShapeEleme
   }
 }
 
+/** Same line breaks and positions as the `<text wrap align>` the app shows on screen. */
 function paintText(data: Uint8Array, pageW: number, pageH: number, el: TextElement): void {
   const font = requireFont(el.font);
-  const lineH = Math.max(font.glyphHeight, fontLineHeight(el.font));
-  let y = el.y;
-  for (const line of wrapLines(el.text, el.font, el.width)) {
+  const block = layoutText(font, el.text, el.width);
+  for (let row = 0; row < block.lines.length; row++) {
+    const line = block.lines[row]!;
+    const y = el.y + lineTop(block, row);
     if (y >= el.y + el.height || y >= pageH) break;
-    const lineW = measureText(line, el.font);
-    let x = el.x;
-    if (el.align === "center") x += Math.floor((el.width - lineW) / 2);
-    if (el.align === "right") x += el.width - lineW;
-    for (const ch of line) {
+    let x = el.x + lineLeft(line, el.align, el.width);
+    for (const ch of line.text) {
       const glyph = getGlyphIndexForChar(font, ch);
       const gw = getGlyphWidth(font, glyph);
       for (let gy = 0; gy < font.glyphHeight; gy++) {
@@ -130,24 +130,5 @@ function paintText(data: Uint8Array, pageW: number, pageH: number, el: TextEleme
       }
       x += gw + font.spacing;
     }
-    y += lineH;
   }
-}
-
-function wrapLines(text: string, font: string, maxWidth: number): string[] {
-  const lines: string[] = [];
-  for (const para of text.split("\n")) {
-    let line = "";
-    for (const word of para.split(" ")) {
-      const next = line ? `${line} ${word}` : word;
-      if (line && measureText(next, font) > maxWidth) {
-        lines.push(line);
-        line = word;
-      } else {
-        line = next;
-      }
-    }
-    lines.push(line);
-  }
-  return lines;
 }

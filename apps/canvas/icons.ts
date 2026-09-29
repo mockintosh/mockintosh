@@ -159,3 +159,7 @@ export const TOOL_ICONS: Record<ToolId, Sprite> = {
   oval: OVAL,
   line: LINE,
 };
+
+export const sprites: Record<string, Sprite> = {
+  "canvas/icon": APP_ICON,
+};
