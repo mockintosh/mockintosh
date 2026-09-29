@@ -7,6 +7,8 @@ import { createContext, useContext } from "solid-js";
 import type { MeasureFunc } from "./layout";
 import { initBuiltinFonts } from "./fonts/registry";
 import { layoutNodeText } from "./fonts/textLayout";
+import { layoutNodeRuns } from "./fonts/runLayout";
+import { nodeRuns, runFaceOf } from "./textRuns";
 import { alignmentHeight } from "./fonts/metrics";
 import { fontFromProps, type FontStyle } from "./fonts/style";
 import { collectNodeText, textWraps, type CanvasNode, type TextVerticalAlign } from "./nodes";
@@ -32,8 +34,16 @@ export function createMeasureFunc(): MeasureFunc {
     }
     if (node.type === "text") {
       const font = fontFromProps(node.props);
-      const text = collectNodeText(node);
       const valign = (node.props["verticalAlign"] as TextVerticalAlign | undefined) ?? "top";
+      const runs = nodeRuns(node);
+      if (runs) {
+        const block = layoutNodeRuns(node, runFaceOf(node), runs, textWraps(node.props) ? availableWidth : undefined);
+        return {
+          width: block.width,
+          height: alignmentHeight(font, block.lines.length, block.height, valign),
+        };
+      }
+      const text = collectNodeText(node);
       if (!text) {
         return { width: 0, height: alignmentHeight(font, 1, font.glyphHeight, valign) };
       }

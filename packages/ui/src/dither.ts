@@ -1,7 +1,7 @@
 /**
  * RGBA → 1-byte-per-pixel (`0` = white, `1` = black) — the `<bitmap>` /
  * `blitPixels` contract. Atkinson, Bayer, Thermal, and ASCII are the Photo
- * Booth converters; threshold is the simple luminance cut Picture and Video Player used.
+ * Booth converters; threshold is the simple luminance cut.
  */
 
 import { asciiToBits, createAsciiDitherer, type AsciiDitherOptions } from "./asciiDither.ts";

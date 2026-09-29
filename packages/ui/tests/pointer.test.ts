@@ -82,6 +82,21 @@ describe("pointer capture", () => {
     expect(events).toEqual(["down", "start", "drag", "end", "up"]);
   });
 
+  it("starts a drag at the press point so the first move is not lost", () => {
+    const { root, b } = tree();
+    const calls: number[][] = [];
+    b._eventHandlers.onMouseDown = () => {};
+    b._eventHandlers.onDragStart = (lx, ly, gx, gy) => calls.push([lx, ly, gx, gy]);
+    b._eventHandlers.onDrag = (lx, ly, gx, gy) => calls.push([lx, ly, gx, gy]);
+    const ptr = createPointerDispatcher(root, createFocusManager(root));
+    ptr.dispatch("mousedown", 30, 30);
+    ptr.dispatch("mousemove", 45, 40);
+    expect(calls).toEqual([
+      [5, 5, 30, 30],
+      [20, 15, 45, 40],
+    ]);
+  });
+
   it("fires enter and leave on ancestors when the hit moves", () => {
     const root = createNode("_root");
     root.style = { width: 100, height: 100 };
@@ -569,5 +584,21 @@ describe("createDoubleClickTracker", () => {
     expect(clicks.down(10, 10, 0)).toBe(false);
     expect(clicks.down(20, 10, 100)).toBe(false);
     expect(clicks.down(20, 10, 700)).toBe(false);
+  });
+});
+
+describe("onMouseMove", () => {
+  it("tracks an unpressed pointer and yields to onDrag during a press", () => {
+    const { root, a } = tree();
+    const events: string[] = [];
+    a._eventHandlers.onMouseMove = (x, y) => events.push(`move ${x},${y}`);
+    a._eventHandlers.onDrag = (x, y) => events.push(`drag ${x},${y}`);
+    const ptr = createPointerDispatcher(root, createFocusManager(root));
+    ptr.dispatch("mousemove", 5, 6);
+    ptr.dispatch("mousedown", 5, 6);
+    ptr.dispatch("mousemove", 7, 8);
+    ptr.dispatch("mouseup", 7, 8);
+    ptr.dispatch("mousemove", 9, 9);
+    expect(events).toEqual(["move 5,6", "drag 7,8", "move 9,9"]);
   });
 });

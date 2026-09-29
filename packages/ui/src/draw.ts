@@ -83,10 +83,13 @@ import {
 } from "./nodes";
 import type { FocusManager } from "./focus";
 import type { Sprite } from "./sprite";
-import { layoutNodeText, lineBoxHeight } from "./fonts/textLayout";
+import { layoutNodeText, lineBoxHeight, lineLeft } from "./fonts/textLayout";
 import { textAdvance } from "./fonts/font";
 import { faceMetrics, middleCellTop } from "./fonts/metrics";
 import { fontFromProps, fontNameFromProps, fontStyleFromProps, textFace } from "./fonts/style";
+import { drawUnderline } from "./fonts/underline";
+import { layoutNodeRuns, runFont, runLineLeft, runStyle } from "./fonts/runLayout";
+import { nodeRuns, runFaceOf } from "./textRuns";
 import { encodeUiText, fontFamilyId } from "./fonts/strike";
 import { drawStyledLine } from "./fonts/bridge";
 import { textSelectionOf } from "./selectable";
@@ -538,8 +541,9 @@ function drawText(
     TextMode(srcBic);
   }
 
-  const text = collectNodeText(node);
-  if (!text) return;
+  const runs = nodeRuns(node);
+  const text = runs ? "" : collectNodeText(node);
+  if (!runs && !text) return;
 
   const s = node.style;
   const padLeft = s.paddingLeft ?? s.padding ?? 0;
@@ -550,6 +554,30 @@ function drawText(
   const innerY = y + padTop;
   const innerW = Math.max(0, width - padLeft - padRight);
   const innerH = Math.max(0, height - padTop - padBottom);
+
+  if (runs) {
+    const face = runFaceOf(node);
+    const block = layoutNodeRuns(node, face, runs, wrap ? innerW : undefined);
+    let lineY = innerY;
+    if (verticalAlign === "middle") lineY = innerY + Math.floor((innerH - block.height) / 2);
+    else if (verticalAlign === "bottom") lineY = innerY + innerH - block.height;
+    for (const line of block.lines) {
+      const lineX = innerX + runLineLeft(line, align, innerW);
+      for (const fragment of line.fragments) {
+        const run = runs[fragment.run]!;
+        const runFace = runFont(face, run);
+        const runStyleValue = runStyle(face.style, run);
+        TextFace(textFace(runStyleValue));
+        const bytes = encodeUiText(runFace, fragment.text);
+        MoveTo(lineX + fragment.x, lineY + runFace.glyphHeight);
+        DrawText(bytes, 0, bytes.length);
+        if (runStyleValue.underline) drawUnderline(runFace, fragment.text, lineX + fragment.x, lineY, color);
+      }
+      lineY += block.lineHeight;
+    }
+    if (stipple) stippleRect(x, y, width, height);
+    return;
+  }
 
   // Same line breaking as the measure pass, so drawn geometry matches layout.
   const block = layoutNodeText(node, font, text, wrap ? innerW : undefined);
@@ -568,9 +596,7 @@ function drawText(
 
   for (let i = 0; i < block.lines.length; i++) {
     const line = block.lines[i]!;
-    let lineX = innerX;
-    if (align === "center") lineX = innerX + Math.floor((innerW - line.width) / 2);
-    else if (align === "right") lineX = innerX + innerW - line.width;
+    const lineX = innerX + lineLeft(line, align, innerW);
     if (line.text) {
       if (style.outline || style.shadow) {
         drawStyledLine(line.text, lineX, lineY, fontName, style, color, font.size);
@@ -578,6 +604,7 @@ function drawText(
         const bytes = encodeUiText(font, line.text);
         MoveTo(lineX, lineY + strikeAscent);
         DrawText(bytes, 0, bytes.length);
+        if (style.underline) drawUnderline(font, line.text, lineX, lineY, color);
       }
     }
     if (selection && line.text) {
@@ -598,6 +625,7 @@ function drawText(
           const selected = encodeUiText(font, slice);
           MoveTo(left, lineY + strikeAscent);
           DrawText(selected, 0, selected.length);
+          if (style.underline) drawUnderline(font, slice, left, lineY, 0);
         }
         if (color) {
           ForeColor(blackColor);
@@ -608,13 +636,15 @@ function drawText(
     lineY += block.lineHeight;
   }
 
-  if (stipple) {
-    const r = makeRect(y, x, y + height, x + width);
-    PenPat(globals.gray);
-    PenMode(patBic);
-    PaintRect(r);
-    PenNormal();
-  }
+  if (stipple) stippleRect(x, y, width, height);
+}
+
+/** Classic grayed text: knock every other pixel out of the node's rect. */
+function stippleRect(x: number, y: number, width: number, height: number): void {
+  PenPat(globals.gray);
+  PenMode(patBic);
+  PaintRect(makeRect(y, x, y + height, x + width));
+  PenNormal();
 }
 
 

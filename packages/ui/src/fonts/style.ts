@@ -21,6 +21,8 @@ export interface FontStyle {
   outline?: boolean;
   /** Same as outline, plus a 1px south-east drop of the ring. */
   shadow?: boolean;
+  /** Drawn by the UI on the face baseline (`underline.ts`); never changes the strike or its advance. */
+  underline?: boolean;
 }
 
 const STYLE_BOLD = 1;
@@ -39,6 +41,7 @@ export function fontStyleFromProps(props: Record<string, unknown> | undefined): 
     italic: Boolean(props?.["italic"]),
     outline: Boolean(props?.["outline"]),
     shadow: Boolean(props?.["shadow"]),
+    underline: Boolean(props?.["underline"]),
   };
 }
 
@@ -56,7 +59,7 @@ export function fontFromProps(props: Record<string, unknown> | undefined): Decke
   return resolveFont(fontNameFromProps(props), fontStyleFromProps(props), fontSizeFromProps(props));
 }
 
-/** QuickDraw `txFace` bits for this style. */
+/** QuickDraw `txFace` bits for this style. Underline is not one: see `underline.ts`. */
 export function textFace(style: FontStyle): Style {
   return (
     (style.bold ? boldFace : 0) |

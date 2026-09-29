@@ -7,7 +7,7 @@ import type { BitMap } from "@mockintosh/quickdraw";
 import { InMemoryBackend } from "@mockintosh/fs";
 import { OPFSBackend, isOPFSAvailable } from "./OPFSBackend";
 import { createWebPrinterLinks } from "./printerLinks";
-import type { UIClipboard } from "@mockintosh/ui";
+import type { Modifiers, UIClipboard } from "@mockintosh/ui";
 import type {
   HostCapability,
   HostFileDrop,
@@ -158,13 +158,19 @@ function createDOMInput(
   const emitKey = (e: PlatformKeyEvent) => keyHandlers.forEach((h) => h(e));
   const emitDrop = (e: PlatformDropEvent) => dropHandlers.forEach((h) => h(e));
   const button = (e: MouseEvent): PointerButton => (e.button === 1 || e.button === 2 ? e.button : 0);
+  const modifiers = (e: MouseEvent | KeyboardEvent): Modifiers => ({
+    shift: e.shiftKey,
+    ctrl: e.ctrlKey,
+    alt: e.altKey,
+    meta: e.metaKey,
+  });
 
   canvas.addEventListener("mousedown", (e) => {
     canvas.focus({ preventScroll: true });
-    emitPointer({ type: "down", ...toScreen(e), button: button(e) });
+    emitPointer({ type: "down", ...toScreen(e), button: button(e), modifiers: modifiers(e) });
   });
   canvas.addEventListener("mouseup", (e) => {
-    emitPointer({ type: "up", ...toScreen(e), button: button(e) });
+    emitPointer({ type: "up", ...toScreen(e), button: button(e), modifiers: modifiers(e) });
   });
 
   // Coalesce mouse moves to one per frame.
@@ -178,7 +184,7 @@ function createDOMInput(
     requestAnimationFrame(() => {
       const ev = pendingMove!;
       pendingMove = null;
-      emitPointer({ type: "move", ...toScreen(ev) });
+      emitPointer({ type: "move", ...toScreen(ev), modifiers: modifiers(ev) });
     });
   });
 
@@ -218,7 +224,7 @@ function createDOMInput(
   const keyEvent = (type: "down" | "up", e: KeyboardEvent): PlatformKeyEvent => ({
     type,
     key: e.key,
-    modifiers: { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey },
+    modifiers: modifiers(e),
   });
   window.addEventListener("keydown", (e) => emitKey(keyEvent("down", e)));
   window.addEventListener("keyup", (e) => emitKey(keyEvent("up", e)));

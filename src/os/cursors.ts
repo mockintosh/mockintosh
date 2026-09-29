@@ -10,9 +10,11 @@
 import { type Cursor } from "@mockintosh/quickdraw";
 import {
   cursorFromFace,
+  cursorFromFaceCached,
+  isCursorFace,
   MAC_CURSOR_FACES,
   resolveMacCursorFace,
-  type CursorName,
+  type CursorSpec,
 } from "@mockintosh/ui";
 
 export const cursors = {
@@ -41,11 +43,12 @@ const named: Record<string, Cursor> = {
 };
 
 /**
- * QuickDraw cursor for a widget name.
+ * QuickDraw cursor for a widget's `cursor` — a name or the app's own face.
  * `pointer` is the arrow here (classic buttons); the catalog maps it to the hand.
  */
-export function cursorForName(name: CursorName): Cursor {
-  return named[name] ?? cursors.arrow;
+export function cursorForName(spec: CursorSpec): Cursor {
+  if (isCursorFace(spec)) return cursorFromFaceCached(spec);
+  return named[spec] ?? cursors.arrow;
 }
 
 export { resolveMacCursorFace };

@@ -16,6 +16,15 @@ import type { LayoutStyle, LayoutRect } from "./nodes";
 
 export type { LayoutStyle, LayoutRect };
 
+/**
+ * Children that take part in flex flow. Absolute children are placed on their
+ * own; empty text nodes are Solid's slot anchors and take no space or gap.
+ */
+function inFlow(c: CanvasNode): boolean {
+  if (c.type === "_text_content" && !c.textContent) return false;
+  return (c.style.position ?? "relative") === "relative";
+}
+
 /** Flexbox default: children fill the cross axis unless sized or aligned explicitly. */
 const DEFAULT_ALIGN_ITEMS: NonNullable<LayoutStyle["alignItems"]> = "stretch";
 
@@ -139,9 +148,7 @@ function measureNode(
       : Math.max(0, (sizedH ?? availableHeight) - 2 * bw);
 
     // Recurse to size children first
-    const relativeChildren = node.children.filter(
-      (c) => (c.style.position ?? "relative") === "relative"
-    );
+    const relativeChildren = node.children.filter(inFlow);
     const absoluteChildren = node.children.filter(
       (c) => c.style.position === "absolute"
     );
@@ -252,9 +259,7 @@ function deriveContainerSize(
   const isRow = dir === "row";
   const isMainAxis = (dim === "width" && isRow) || (dim === "height" && !isRow);
 
-  const relativeChildren = node.children.filter(
-    (c) => (c.style.position ?? "relative") === "relative"
-  );
+  const relativeChildren = node.children.filter(inFlow);
 
   if (relativeChildren.length === 0) {
     return dim === "width" ? pad.left + pad.right : pad.top + pad.bottom;
@@ -449,9 +454,7 @@ function positionNode(
   const innerH = Math.max(0, node.layout.height - inset.top - inset.bottom);
 
   // Separate relative and absolute children
-  const relativeChildren = node.children.filter(
-    (c) => (c.style.position ?? "relative") === "relative"
-  );
+  const relativeChildren = node.children.filter(inFlow);
   const absoluteChildren = node.children.filter(
     (c) => c.style.position === "absolute"
   );

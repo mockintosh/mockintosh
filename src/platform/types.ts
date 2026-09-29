@@ -48,6 +48,8 @@ export interface PlatformPointerEvent {
   button?: PointerButton;
   deltaX?: number;
   deltaY?: number;
+  /** Modifier keys held with this event. Hosts without a keyboard omit it. */
+  modifiers?: Modifiers;
 }
 
 export interface PlatformKeyEvent {

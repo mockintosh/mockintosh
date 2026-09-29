@@ -85,6 +85,7 @@ export {
 } from "@mockintosh/ui";
 export type {
   Sprite,
+  TextRun,
   ImageFrame,
   DitherMode,
   DitherOptions,
@@ -619,6 +620,10 @@ export {
   fontLineHeight,
   drawString,
   drawPixels,
+  heldModifiers,
+  type Modifiers,
+  type CursorFace,
+  type CursorSpec,
   useTheme,
   useRadius,
   themeRadius,
@@ -683,6 +688,7 @@ export {
   Table,
   Tabs,
   TextInput,
+  EditableText,
   Toggle,
   ToggleGroup,
   Tooltip,

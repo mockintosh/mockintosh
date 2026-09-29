@@ -481,11 +481,11 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         cursorY = e.y;
         cursorState.obscured = false;
         screenDirty = true;
-        ui.dispatchPointer("mousemove", e.x, e.y);
         SetCursor(cursorForName(ui.cursorAt(e.x, e.y)));
+        ui.dispatchPointer("mousemove", e.x, e.y, { modifiers: e.modifiers });
         return;
       case "down": {
-        ui.dispatchPointer("mousedown", e.x, e.y);
+        ui.dispatchPointer("mousedown", e.x, e.y, { modifiers: e.modifiers });
         if (doubleClick.down(e.x, e.y, scheduler.now())) {
           ui.dispatchPointer("dblclick", e.x, e.y);
         }
@@ -494,8 +494,8 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         return;
       }
       case "up":
-        ui.dispatchPointer("mouseup", e.x, e.y);
         SetCursor(cursorForName(ui.cursorAt(e.x, e.y)));
+        ui.dispatchPointer("mouseup", e.x, e.y, { modifiers: e.modifiers });
         scheduleRepaint();
         return;
       case "scroll":

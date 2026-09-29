@@ -15,15 +15,17 @@ import { render, _setRepaintHook } from "./renderer";
 import { createNode, markDirty } from "./nodes";
 import { computeLayout } from "./layout";
 import { notifyLayoutChanges } from "./layoutObserver";
+import { settleScrollOffsets } from "./scroll";
 import { createMeasureFunc, MeasureContext } from "./measure";
 import { createDrawContext, drawTree, resizeDrawContext } from "./draw";
-import { createFocusManager, applyAutoFocus } from "./focus";
+import { createFocusManager, applyPendingAutoFocus, registerFocusRoot } from "./focus";
 import { FocusContext } from "./focusContext";
 import { installFontBridge } from "./fonts/bridge";
 import { registerFont as registerFontInRegistry } from "./fonts/registry";
 import { measureText } from "./fonts/bridge";
 import { createPointerDispatcher, type PointerDispatcher, type PointerExtras, type PointerType } from "./pointer";
-import { cursorAt as resolveCursorAt, type CursorName } from "./cursor";
+import { noteModifiers } from "./modifiers";
+import { cursorAt as resolveCursorAt, type CursorSpec } from "./cursor";
 import type { CanvasNode, Modifiers } from "./nodes";
 import type { FocusManager } from "./focus";
 import { type BitMap, type GrafPort } from "@mockintosh/quickdraw";
@@ -94,7 +96,7 @@ export interface UIInstance {
    * Cursor name for the box under `(x, y)` — walk ancestors for `cursor`.
    * Hosts map the name to CSS or a 1-bit face; widgets only declare intent.
    */
-  cursorAt(x: number, y: number): CursorName;
+  cursorAt(x: number, y: number): CursorSpec;
 
   /**
    * Point the tree at a new framebuffer. Relayouts on the next `frame()`.
@@ -162,6 +164,7 @@ export function createUI(config: UIConfig): UIInstance {
   root.layout = { x: 0, y: 0, width, height };
 
   const focusManager = createFocusManager(root);
+  registerFocusRoot(root);
   drawCtx.focusManager = focusManager;
 
   const measureFunc = createMeasureFunc();
@@ -169,11 +172,10 @@ export function createUI(config: UIConfig): UIInstance {
 
   const pointer: PointerDispatcher = createPointerDispatcher(root, focusManager, (error) => services.onError?.(error));
 
-  let autoFocusApplied = false;
-
   function layoutIfDirty(): void {
     if (!root._dirty) return;
     computeLayout(root, width, height, measureFunc);
+    settleScrollOffsets(root);
     notifyLayoutChanges(root);
   }
 
@@ -241,13 +243,10 @@ export function createUI(config: UIConfig): UIInstance {
         root
       );
 
-      if (!autoFocusApplied) {
-        autoFocusApplied = true;
-        Promise.resolve().then(() => {
-          uiFlush();
-          if (!disposed) applyAutoFocus(root, focusManager);
-        });
-      }
+      Promise.resolve().then(() => {
+        uiFlush();
+        if (!disposed) applyPendingAutoFocus(root, focusManager);
+      });
 
       return () => {
         disposed = true;
@@ -258,11 +257,13 @@ export function createUI(config: UIConfig): UIInstance {
 
     frame(): void {
       uiFlush();
+      applyPendingAutoFocus(root, focusManager);
       layoutIfDirty();
       drawTree(root, drawCtx);
     },
 
     dispatchPointer(type, x, y, extras) {
+      if (extras?.modifiers) noteModifiers(extras.modifiers);
       const consumed = pointer.dispatch(type, x, y, extras);
       uiFlush();
       // Selection, hover, and focus paint without mutating the Solid tree.
@@ -282,6 +283,7 @@ export function createUI(config: UIConfig): UIInstance {
       modifiers?: Partial<Modifiers>
     ): void {
       const mods: Modifiers = { ...DEFAULT_MODIFIERS, ...modifiers };
+      if (type !== "keypress") noteModifiers(mods);
       uiFlush();
       try {
         if (type === "keydown" && key === "Escape" && dismissOverlayModal()) {

@@ -161,9 +161,25 @@ Two different things are called "alignment"; keep them apart:
 </text>
 ```
 
+### Styled runs and links
+
+For mixed styles in one paragraph, give `<text>` a `runs` array instead of children. Each run is `{ text, bold?, italic?, underline?, onClick? }`. The runs wrap together as one paragraph and share the node's `font`, `align` and `wrap`. Spaces collapse, as they do in HTML. A run with `onClick` is a link: the node shows the pointing-hand cursor over it and calls the handler when it is clicked. Runs cannot be selected.
+
+```tsx
+<text font="body" wrap runs={[
+  { text: "Read the " },
+  { text: "guide", underline: true, onClick: () => openGuide() },
+  { text: " first.", bold: true },
+]} />
+```
+
 ### Pointer events
 
-A press goes to the topmost node under the cursor that has a mouse handler; there is no bubbling. The node that received `onMouseDown` keeps `onDragStart` / `onDrag` / `onDragEnd` / `onMouseUp` until release, and gets `onClick` if released over itself. Start visual drag feedback (rubber bands, ghosts) in `onDragStart`, not `onMouseDown` — a plain click never reaches `onDragStart`.
+A press goes to the topmost node under the cursor that has a mouse handler; there is no bubbling. The node that received `onMouseDown` keeps `onDragStart` / `onDrag` / `onDragEnd` / `onMouseUp` until release, and gets `onClick` if released over itself. Start visual drag feedback (rubber bands, ghosts) in `onDragStart`, not `onMouseDown` — a plain click never reaches `onDragStart`. `onDragStart` fires on the first move but reports the press point, so measure drag deltas from its coordinates.
+
+`onMouseMove` reports the pointer passing over a node while no button is down; with the button down, the pressed node gets `onDrag` instead. Inside any pointer or key handler, `heldModifiers()` (from `@mockintosh/sdk`) is the set of modifier keys the host saw with that event — `shift`, `option`, `command`, `control` — which is how a shift-drag constrains or an option-drag copies.
+
+`cursor` on a node is either a semantic name (`"text"`, `"crosshair"`, `"watch"`, …) or your own 16×16 `CursorFace` — `{ sprite, hotSpot }`, drawn the way the ROM draws cursors: pixels whose sprite `mask` is clear but whose data is set *invert* the screen under them. Keep one face object per cursor shape rather than building a new one per render.
 
 `onMouseDownCapture` is the exception to "no bubbling": it runs on every *ancestor* of the hit node, outermost first, before the target's `onMouseDown`. Calling `event.preventDefault()` swallows the press and everything that would follow it. Use it when a container must decide before its children react (a disabled overlay, a "click to activate" surface).
 

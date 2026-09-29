@@ -18,7 +18,7 @@ import {
   type CursorFace,
   type CursorFaceTable,
 } from "../cursorFace";
-import type { CursorName, NamedCursor } from "../cursor";
+import type { CursorSpec, NamedCursor } from "../cursor";
 import { defineSprite, fromGrid } from "../sprite";
 
 const I_BEAM = fromGrid(16, 16, [
@@ -118,7 +118,7 @@ export const MAC_CURSOR_FACES: Record<MacCursorName, CursorFace> = {
 };
 
 export function resolveMacCursorFace(
-  name: CursorName,
+  name: CursorSpec,
   overrides?: CursorFaceTable,
 ): CursorFace | undefined {
   const faces = overrides ? { ...MAC_CURSOR_FACES, ...overrides } : MAC_CURSOR_FACES;

@@ -13,9 +13,10 @@ import {
   type CanvasNode,
   type HitMask,
   type LayoutRect,
+  type Modifiers,
   type PointerCaptureEvent,
 } from "./nodes";
-import type { FocusManager } from "./focus";
+import { focusScopeOf, type FocusManager } from "./focus";
 import { scheduleRepaint } from "./renderer";
 import { isScrollOwned, scrollOverflow, scrollPaintOffset } from "./scroll";
 import { createPanVelocity, stepFlick } from "./scrollInertia";
@@ -37,6 +38,8 @@ export interface PointerExtras {
   kind?: PointerKind;
   /** `mouseup` that must not click — `pointercancel`, or a pan that already consumed the press. */
   cancel?: boolean;
+  /** Modifier keys the host saw with this event; read back through `heldModifiers()`. */
+  modifiers?: Modifiers;
 }
 
 /** Movement before a touch press becomes a pan or a widget drag. */
@@ -556,12 +559,16 @@ export function createPointerDispatcher(
         // when the pointer leaves it, menus highlight on press-drag.
         setHovered(hit);
         if (captured) {
-          const { lx, ly } = localOf(captured, x, y);
           if (!dragging) {
             dragging = true;
-            captured._eventHandlers.onDragStart?.(lx, ly, x, y);
+            const press = localOf(captured, pressX, pressY);
+            captured._eventHandlers.onDragStart?.(press.lx, press.ly, pressX, pressY);
           }
+          const { lx, ly } = localOf(captured, x, y);
           captured._eventHandlers.onDrag?.(lx, ly, x, y);
+        } else if (hit?._eventHandlers.onMouseMove) {
+          const { lx, ly } = localOf(hit, x, y);
+          hit._eventHandlers.onMouseMove(lx, ly);
         }
         return false;
       }
@@ -580,7 +587,7 @@ export function createPointerDispatcher(
         // A press inside a focus scope activates that scope (restoring its
         // last-focused node), even if the press is swallowed below — so
         // keyboard focus follows whatever the user clicked into.
-        const scope = findScope(hit);
+        const scope = focusScopeOf(hit);
         if (scope !== focusManager.getActiveScope()) focusManager.setActiveScope(scope);
 
         if (runMouseDownCapture(hit, x, y)) {
@@ -635,13 +642,4 @@ export function createPointerDispatcher(
       }
       return false;
   }
-}
-
-function findScope(node: CanvasNode): CanvasNode | null {
-  let n: CanvasNode | null = node;
-  while (n) {
-    if (n.props["focusScope"] === true) return n;
-    n = n.parent;
-  }
-  return null;
 }

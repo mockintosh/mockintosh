@@ -174,6 +174,41 @@ function wrapParagraph(
   flush();
 }
 
+/** Left edge of `line` in a box `width` wide, as `<text align>` paints it. */
+export function lineLeft(line: TextLine, align: "left" | "center" | "right", width: number): number {
+  if (align === "center") return Math.floor((width - line.width) / 2);
+  if (align === "right") return width - line.width;
+  return 0;
+}
+
+/** Row of the line that holds caret `index`; a wrap point belongs to the line it starts. */
+export function lineOfIndex(block: TextBlock, index: number): number {
+  let row = 0;
+  for (let i = 0; i < block.lines.length; i++) {
+    if (block.lines[i]!.start <= index) row = i;
+    else break;
+  }
+  return row;
+}
+
+/** Where the caret for `index` sits in a block laid out `width` wide and aligned `align`. */
+export function caretPoint(
+  block: TextBlock,
+  font: DeckerFont,
+  index: number,
+  align: "left" | "center" | "right" = "left",
+  width: number = block.width,
+): { x: number; y: number; row: number } {
+  const row = lineOfIndex(block, index);
+  const line = block.lines[row]!;
+  const column = Math.max(0, Math.min(line.text.length, index - line.start));
+  return {
+    x: lineLeft(line, align, width) + textAdvance(font, line.text.slice(0, column)),
+    y: lineTop(block, row),
+    row,
+  };
+}
+
 /** Caret index in `text` for a click at `x` along the line (half-glyph rule). */
 export function charIndexAtX(font: DeckerFont, text: string, x: number): number {
   let accumulated = 0;
@@ -186,7 +221,14 @@ export function charIndexAtX(font: DeckerFont, text: string, x: number): number 
 }
 
 /** Source index in the original string for a point in a laid-out block. */
-export function indexAtPoint(block: TextBlock, font: DeckerFont, x: number, y: number): number {
+export function indexAtPoint(
+  block: TextBlock,
+  font: DeckerFont,
+  x: number,
+  y: number,
+  align: "left" | "center" | "right" = "left",
+  width: number = block.width,
+): number {
   if (!block.lines.length) return 0;
   const last = block.lines.length - 1;
   const lastTop = lineTop(block, last);
@@ -195,5 +237,5 @@ export function indexAtPoint(block: TextBlock, font: DeckerFont, x: number, y: n
       ? last
       : Math.max(0, Math.min(last, Math.floor(y / block.lineHeight)));
   const line = block.lines[row]!;
-  return line.start + charIndexAtX(font, line.text, x);
+  return line.start + charIndexAtX(font, line.text, x - lineLeft(line, align, width));
 }

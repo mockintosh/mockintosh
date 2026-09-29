@@ -4,7 +4,7 @@
  * QuickDraw tracks *which* cursor is current and whether it is hidden
  * (`cursorState`, `SetCursor`, `HideCursor`, `ObscureCursor`); it never draws
  * it. The OS draws it here, on top of the finished frame, with two `CopyBits`
- * exactly as the ROM did: punch the mask out (`srcBic`), then OR the data in.
+ * exactly as the ROM did: punch the mask out (`srcBic`), then XOR the data in.
  */
 import { cursorState, type GrafPort } from "@mockintosh/quickdraw";
 import { blitQuickdrawCursor } from "@mockintosh/ui";

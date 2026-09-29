@@ -4,6 +4,7 @@
 
 import type { GrafPort } from "@mockintosh/quickdraw";
 import type { Sprite } from "./sprite";
+import type { CursorSpec } from "./cursor";
 
 export interface LayoutStyle {
   width?: number | `${number}%`;
@@ -113,17 +114,20 @@ export interface MouseEventHandlers {
    */
   onMouseDownCapture?: (event: PointerCaptureEvent) => void;
   onMouseUp?: (localX: number, localY: number) => void;
+  /** The pointer moved over this node with no press captured. A press delivers `onDrag` instead. */
+  onMouseMove?: (localX: number, localY: number) => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  /** The first move of a press. Reports where the press went down, so `onDrag` deltas from it lose no travel. */
   onDragStart?: (localX: number, localY: number, globalX: number, globalY: number) => void;
   onDrag?: (localX: number, localY: number, globalX: number, globalY: number) => void;
   onDragEnd?: (localX: number, localY: number, globalX: number, globalY: number) => void;
   onScroll?: (deltaY: number) => void;
   /**
-   * Semantic cursor name (`pointer`, `text`, `watch`, …). Hosts map it to
-   * CSS or a 1-bit face — see `cursor.ts`.
+   * Semantic cursor name (`pointer`, `text`, `watch`, …) or the app's own
+   * 16×16 `CursorFace`. Hosts map a name to CSS or a 1-bit face — see `cursor.ts`.
    */
-  cursor?: string;
+  cursor?: CursorSpec;
 }
 
 export interface KeyboardEventHandlers {
@@ -149,6 +153,7 @@ export function hasMouseHandlers(h: EventHandlers): boolean {
     h.onMouseDown ||
     h.onMouseDownCapture ||
     h.onMouseUp ||
+    h.onMouseMove ||
     h.onMouseEnter ||
     h.onMouseLeave ||
     h.onDragStart ||
@@ -341,6 +346,13 @@ export interface BoxProps extends LayoutStyle, EventHandlers, SemanticProps {
    * into empty space after navigation.
    */
   scrollKey?: string | number;
+  /**
+   * Which end of an `overflow="scroll"` pane holds still as content changes.
+   * `"bottom"` keeps a pane that is scrolled to the end at the end while its
+   * children grow (chat threads, logs); scrolling up lets go until the reader
+   * scrolls back down. Default `"top"`.
+   */
+  scrollAnchor?: "top" | "bottom";
   /** Per-pixel hit mask — limits clickable area to non-zero mask pixels. */
   hitMask?: HitMask;
   /**
@@ -351,8 +363,10 @@ export interface BoxProps extends LayoutStyle, EventHandlers, SemanticProps {
   children?: unknown;
 }
 
-/** A node's laid-out size, as reported to `<box onLayout>`. */
+/** A node's laid-out box, as reported to `<box onLayout>`. `x`/`y` are on the screen. */
 export interface LayoutSize {
+  x: number;
+  y: number;
   width: number;
   height: number;
 }
@@ -390,6 +404,8 @@ export interface TextProps extends LayoutStyle, EventHandlers, SemanticProps {
    * `bold` / `italic` / `outline`. Grows the cell 3px in each axis.
    */
   shadow?: boolean;
+  /** QuickDraw underline, 1px below the baseline. Does not change the advance. */
+  underline?: boolean;
   color?: Ink;
   /** Solid background behind the text */
   background?: Ink;
@@ -419,7 +435,24 @@ export interface TextProps extends LayoutStyle, EventHandlers, SemanticProps {
    * Matches Classic Mac System's "grayed text" technique.
    */
   stipple?: boolean;
+  /**
+   * Styled runs that wrap as one paragraph, in place of `children`. Runs
+   * inherit the node's font, size and style and add their own. Runs of
+   * spaces collapse to one and never start a wrapped line. A run with
+   * `onClick` becomes a link: the pointer cursor shows over it and a click
+   * on it calls the handler. Runs are not `selectable`.
+   */
+  runs?: readonly TextRun[];
   children?: string;
+}
+
+/** One styled stretch of a `<text runs>` paragraph. */
+export interface TextRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  onClick?: () => void;
 }
 
 export interface ImageProps extends LayoutStyle, EventHandlers, SemanticProps {
@@ -512,6 +545,8 @@ export interface CanvasNode {
   _dirty: boolean;
   _eventHandlers: EventHandlers;
   _scrollOffset: number;
+  /** `scrollOverflow` as of the last layout pass. */
+  _scrollMax: number;
 }
 
 /** Concatenate `_text_content` leaves. Used by measure, draw, and `<text selectable>`. */
@@ -534,6 +569,7 @@ export function createNode(type: NodeType): CanvasNode {
     _dirty: true,
     _eventHandlers: {},
     _scrollOffset: 0,
+    _scrollMax: 0,
   };
 }
 
@@ -617,7 +653,7 @@ export function shadowRaise(node: CanvasNode): number {
 
 export const EVENT_PROP_NAMES = new Set<string>([
   "onClick", "onDoubleClick", "onMouseDown", "onMouseDownCapture", "onMouseUp",
-  "onMouseEnter", "onMouseLeave", "onDragStart", "onDrag", "onDragEnd",
+  "onMouseMove", "onMouseEnter", "onMouseLeave", "onDragStart", "onDrag", "onDragEnd",
   "onScroll",
   "onKeyDown", "onKeyUp", "onKeyPress",
   "onFocus", "onBlur", "tabIndex", "autoFocus", "cursor",

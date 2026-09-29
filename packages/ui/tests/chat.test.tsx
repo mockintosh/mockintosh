@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { For, createSignal } from "solid-js";
 import { describe, expect, it } from "vitest";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
 import { createUI } from "../src/ui";
@@ -75,7 +75,7 @@ describe("chat kit", () => {
   it("pins a thread to the last message", () => {
     const ui = createUI({ screen: newBitMap(240, 200) });
     ui.render(() => (
-      <MessageScroller height={80} stickKey={3}>
+      <MessageScroller height={80}>
         <Message align="start">one</Message>
         <Message align="end">two</Message>
         <Message align="start">three</Message>
@@ -84,6 +84,55 @@ describe("chat kit", () => {
     ui.frame();
     const last = ui.inspect().find((n) => n.text.includes("three"))!;
     expect(last.bounds.y).toBeLessThan(80);
+  });
+
+  it("follows new messages at the end and holds still once scrolled up", () => {
+    const [lines, setLines] = createSignal(["one", "two", "three"]);
+    const ui = createUI({ screen: newBitMap(240, 200) });
+    ui.render(() => (
+      <MessageScroller height={80}>
+        <For each={lines()}>{(line) => <Message align="start">{line}</Message>}</For>
+      </MessageScroller>
+    ));
+    ui.frame();
+    const log = () => ui.inspect().find((n) => n.role === "log")!;
+    const visible = (text: string) => {
+      const node = ui.inspect().find((n) => n.text === text);
+      return !!node && node.bounds.height > 0;
+    };
+
+    setLines((all) => [...all, "four"]);
+    ui.frame();
+    expect(visible("four")).toBe(true);
+
+    ui.dispatchPointer("scroll", log().bounds.x + 10, log().bounds.y + 10, { deltaY: -400 });
+    ui.frame();
+    expect(visible("one")).toBe(true);
+    setLines((all) => [...all, "five"]);
+    ui.frame();
+    expect(visible("one")).toBe(true);
+    expect(visible("five")).toBe(false);
+
+    ui.dispatchPointer("scroll", log().bounds.x + 10, log().bounds.y + 10, { deltaY: 400 });
+    setLines((all) => [...all, "six"]);
+    ui.frame();
+    expect(visible("six")).toBe(true);
+  });
+
+  it("does not leave an empty thread scrolled past its only line", () => {
+    const [lines, setLines] = createSignal(["one", "two", "three", "four"]);
+    const ui = createUI({ screen: newBitMap(240, 200) });
+    ui.render(() => (
+      <MessageScroller height={80} padding={6}>
+        <For each={lines()}>{(line) => <Message align="start">{line}</Message>}</For>
+      </MessageScroller>
+    ));
+    ui.frame();
+    setLines(["hello"]);
+    ui.frame();
+    const log = ui.inspect().find((n) => n.role === "log")!;
+    const line = ui.inspect().find((n) => n.text === "hello")!;
+    expect(line.bounds.y).toBeGreaterThanOrEqual(log.bounds.y + 6);
   });
 
   it("renders a separator marker and an uploading attachment", () => {

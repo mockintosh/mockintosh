@@ -75,7 +75,7 @@ function AgentCard(): JSX.Element {
   const [prompt, setPrompt] = createSignal("");
   return (
     <Card title="Agent" padding={0}>
-      <MessageScroller height={140} padding={8} stickKey="home-agent">
+      <MessageScroller height={140} padding={8}>
         <Bubble align="end">Make the header rule dotted.</Bubble>
         <Marker>Read layout.tsx</Marker>
         <Marker>Patched SiteHeader</Marker>

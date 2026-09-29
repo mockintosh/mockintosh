@@ -77,6 +77,8 @@ export type { TabsProps, TabItem } from "./Tabs";
 export { TextInput } from "./TextInput";
 export type { TextInputProps } from "./TextInput";
 export { TextEditor } from "./TextEditor";
+export { EditableText } from "./EditableText";
+export type { EditableTextProps } from "./EditableText";
 export type { TextEditorProps } from "./TextEditor";
 export { Toggle, ToggleGroup } from "./Toggle";
 export type { ToggleProps, ToggleGroupProps, ToggleOption } from "./Toggle";

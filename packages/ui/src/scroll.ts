@@ -34,6 +34,22 @@ export function scrollOverflow(node: CanvasNode): number {
   return Math.max(0, contentH - node.layout.height);
 }
 
+/**
+ * After each layout pass: a `scrollAnchor="bottom"` pane that was at the end
+ * stays at the end, and an offset left past shrunken content comes back
+ * inside it. Owned panes are the owner's to clamp.
+ */
+export function settleScrollOffsets(node: CanvasNode): void {
+  if (node.style.overflow === "scroll" && !isScrollOwned(node)) {
+    const max = scrollOverflow(node);
+    const atEnd = node._scrollOffset >= node._scrollMax - 1;
+    if (node.props["scrollAnchor"] === "bottom" && atEnd) node._scrollOffset = Math.round(max);
+    else if (node._scrollOffset > max) node._scrollOffset = Math.floor(max);
+    node._scrollMax = max;
+  }
+  for (const child of node.children) settleScrollOffsets(child);
+}
+
 export interface ScrollTrack {
   x: number;
   y: number;

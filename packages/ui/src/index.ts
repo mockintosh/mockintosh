@@ -37,6 +37,7 @@ export type {
   LayoutSize,
   LayoutChangeFn,
   TextProps,
+  TextRun,
   TextAlign,
   TextVerticalAlign,
   ImageProps,
@@ -68,7 +69,7 @@ export {
 } from "./pointer";
 export type { PointerType, PointerKind, PointerExtras, PointerDispatcher, PointerScheduler } from "./pointer";
 export { cursorAt, cursorOf, cssCursor, isNamedCursor, DEFAULT_CURSOR } from "./cursor";
-export type { CursorName, NamedCursor, CursorCSSTable } from "./cursor";
+export type { CursorName, CursorSpec, NamedCursor, CursorCSSTable } from "./cursor";
 export {
   cursorFromFace,
   cursorFromFaceCached,
@@ -77,7 +78,9 @@ export {
   blitQuickdrawCursorBits,
   blitCursorFace,
   cssCursorFromFace,
+  cssCursorFromFaceCached,
   cssTableFromFaces,
+  isCursorFace,
   resolveCursorFace,
   CURSOR_SIZE,
 } from "./cursorFace";
@@ -107,6 +110,12 @@ export type { DeckerFont } from "./fonts/font";
 export { resolveFont, fontStyleFromProps, fontFromProps, textFace } from "./fonts/style";
 export type { FontStyle } from "./fonts/style";
 export { measureText, fontLineHeight, drawString } from "./fonts/bridge";
+export { layoutText, lineLeft, lineTop, caretPoint, indexAtPoint } from "./fonts/textLayout";
+export type { TextBlock, TextLine } from "./fonts/textLayout";
+export { layoutRuns, runAtPoint } from "./fonts/runLayout";
+export type { RunBlock, RunLine, RunFragment, RunFace } from "./fonts/runLayout";
+export { heldModifiers } from "./modifiers";
+export { fontFamilyId, fontFamilyName } from "./fonts/strike";
 export { drawPixels } from "./portDraw";
 export { faceMetrics, faceMetricsByName, alignmentHeight, cdefBaseline, middleCellTop } from "./fonts/metrics";
 export type { FontFaceMetrics, FontInfo } from "./fonts/metrics";
@@ -223,6 +232,7 @@ export {
   Tabs,
   TextInput,
   TextEditor,
+  EditableText,
   Toggle,
   ToggleGroup,
   Tooltip,
@@ -284,6 +294,7 @@ export type {
   TabItem,
   TextInputProps,
   TextEditorProps,
+  EditableTextProps,
   ToggleProps,
   ToggleGroupProps,
   ToggleOption,

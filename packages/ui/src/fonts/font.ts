@@ -38,16 +38,31 @@ export function ordinalForCharCode(codeUnit: number): number {
   return extraOrdinalForCharCode(codeUnit) ?? 255;
 }
 
+/**
+ * Stand-ins for typographic characters a font may not draw: curly quotes,
+ * dashes, the wider or non-breaking spaces. Used before `?`.
+ */
+const LOOKALIKES: ReadonlyMap<number, string> = new Map([
+  ...[0x2018, 0x2019, 0x201a, 0x201b, 0x2032, 0x02bc].map((code) => [code, "'"] as const),
+  ...[0x201c, 0x201d, 0x201e, 0x201f, 0x2033].map((code) => [code, '"'] as const),
+  ...[0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212].map((code) => [code, "-"] as const),
+  ...[0x00a0, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a, 0x202f, 0x205f].map((code) => [code, " "] as const),
+  [0x2039, "<"],
+  [0x203a, ">"],
+  [0x00b7, "\u2022"],
+  [0x2219, "\u2022"],
+  [0x00d7, "x"],
+]);
+
 export function getGlyphIndexForChar(font: DeckerFont, ch: string): number {
   if (!ch) return -1;
-  const ord = ordinalForCharCode(ch.charCodeAt(0));
-  if (ord === 255) {
-    return font.glyphWidths[FALLBACK_GLYPH_INDEX] > 0 ? FALLBACK_GLYPH_INDEX : -1;
-  }
-  if (!hasGlyph(font, ord)) {
-    return font.glyphWidths[FALLBACK_GLYPH_INDEX] > 0 ? FALLBACK_GLYPH_INDEX : -1;
-  }
-  return ord;
+  const code = ch.charCodeAt(0);
+  const ord = ordinalForCharCode(code);
+  if (ord !== 255 && hasGlyph(font, ord)) return ord;
+  const lookalike = LOOKALIKES.get(code);
+  const lookalikeOrd = lookalike === undefined ? 255 : ordinalForCharCode(lookalike.charCodeAt(0));
+  if (lookalikeOrd !== 255 && hasGlyph(font, lookalikeOrd)) return lookalikeOrd;
+  return font.glyphWidths[FALLBACK_GLYPH_INDEX] > 0 ? FALLBACK_GLYPH_INDEX : -1;
 }
 
 export function getGlyphWidth(font: DeckerFont, glyphIndex: number): number {

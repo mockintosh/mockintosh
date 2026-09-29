@@ -20,6 +20,7 @@ import { resolveFont, textFace, type FontStyle } from "./style";
 import { encodeUiText, fontAscent, fontFamilyId, hostSwapFont } from "./strike";
 import { textAdvance } from "./font";
 import { faceMetricsByName } from "./metrics";
+import { drawUnderline } from "./underline";
 import { OUTLINE_PAD, SHADOW_PAD } from "./outlineSmear";
 
 let bridgeInstalled = false;
@@ -159,6 +160,7 @@ export function drawString(
     const bytes = encodeUiText(font, text);
     MoveTo(x, y + font.glyphHeight);
     DrawText(bytes, 0, bytes.length);
+    if (style.underline) drawUnderline(font, text, x, y, color);
   }
   if (previous) SetPort(previous);
 }

@@ -65,15 +65,15 @@ export function MessageScrollerPage(): JSX.Element {
     <box flexDirection="column" gap={16}>
       <PageTitle
         title="Message Scroller"
-        lede="Stick-to-bottom thread. stickKey pins when a new line arrives, unless you have scrolled up."
+        lede="Stick-to-bottom thread. It follows new lines while you are at the end, and holds still once you scroll up."
       />
       <Preview
-        code={`<MessageScroller height={120} stickKey={n()}>
+        code={`<MessageScroller height={120}>
   ...
 </MessageScroller>`}
       >
         <box flexDirection="column" gap={8}>
-          <MessageScroller height={120} stickKey={n()}>
+          <MessageScroller height={120}>
             <Message align="start">one</Message>
             <Message align="end">two</Message>
             <Message align="start">three</Message>

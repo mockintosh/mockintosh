@@ -9,7 +9,7 @@ import { getFocusManager } from "./focusContext";
 import { useUIServices } from "./services";
 import { fontFromProps } from "./fonts/style";
 import { indexAtPoint, layoutNodeText } from "./fonts/textLayout";
-import { collectNodeText, setNodeProperty, textWraps, type CanvasNode } from "./nodes";
+import { collectNodeText, setNodeProperty, textWraps, type CanvasNode, type TextAlign } from "./nodes";
 import { scrollPaintOffset } from "./scroll";
 
 export interface TextSelection {
@@ -47,10 +47,13 @@ function blockOf(node: CanvasNode) {
 function indexAtLocal(node: CanvasNode, lx: number, ly: number): number {
   const text = collectNodeText(node);
   const padL = node.style.paddingLeft ?? node.style.padding ?? 0;
+  const padR = node.style.paddingRight ?? node.style.padding ?? 0;
   const padT = node.style.paddingTop ?? node.style.padding ?? 0;
+  const align = (node.props["align"] as TextAlign | undefined) ?? "left";
+  const innerW = Math.max(0, node.layout.width - padL - padR);
   return Math.max(0, Math.min(
     text.length,
-    indexAtPoint(blockOf(node), fontFromProps(node.props), lx - padL, ly - padT),
+    indexAtPoint(blockOf(node), fontFromProps(node.props), lx - padL, ly - padT, align, innerW),
   ));
 }
 

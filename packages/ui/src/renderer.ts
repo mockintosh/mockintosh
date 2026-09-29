@@ -17,6 +17,8 @@ import {
   type NodeType,
 } from "./nodes";
 import { applySelectable } from "./selectable";
+import { applyRuns } from "./textRuns";
+import { requestAutoFocus } from "./focus";
 
 const ELEMENT_TYPES = new Set(["box", "text", "image", "raster", "bitmap"]);
 
@@ -26,12 +28,16 @@ function toNodeType(tagName: string): NodeType {
   return "box";
 }
 
+function applyProp(node: CanvasNode, name: string, value: unknown): void {
+  setNodeProperty(node, name, value);
+  if (name === "selectable") applySelectable(node, value);
+  if (name === "runs") applyRuns(node, value);
+  if (name === "autoFocus" && value) requestAutoFocus(node);
+}
+
 function applyProps(node: CanvasNode, props: Record<string, unknown> | undefined): void {
   if (!props) return;
-  for (const [name, value] of Object.entries(props)) {
-    setNodeProperty(node, name, value);
-    if (name === "selectable") applySelectable(node, value);
-  }
+  for (const [name, value] of Object.entries(props)) applyProp(node, name, value);
 }
 
 // Module-level repaint hook — set by createUI so any reactive tree mutation
@@ -83,8 +89,7 @@ const renderer = createRenderer<CanvasNode>({
   },
 
   setProperty(node: CanvasNode, name: string, value: unknown, _prev?: unknown): void {
-    setNodeProperty(node, name, value);
-    if (name === "selectable") applySelectable(node, value);
+    applyProp(node, name, value);
     _repaintHook();
   },
 
@@ -126,13 +131,28 @@ export const {
   createElement,
   createTextNode,
   insertNode,
-  insert,
   spread,
   setProp,
   mergeProps,
   applyRef,
   ref,
 } = renderer;
+
+/**
+ * Compiled JSX passes a `null` marker for a dynamic child with nothing static
+ * after it ("append here"). `@solidjs/universal` 2.0.0-rc.8 keeps no node for
+ * such a slot while it renders an empty list, so the slot's next nodes are
+ * appended after later siblings — a `<For>` that starts empty ends up painted
+ * above the `<Show>` written after it. Pin every appended slot to its own empty
+ * anchor; layout ignores empty text nodes.
+ */
+export function insert(...args: Parameters<typeof renderer.insert>): ReturnType<typeof renderer.insert> {
+  const [parent, accessor, marker, ...rest] = args;
+  if (marker !== null) return renderer.insert(parent, accessor, marker, ...rest);
+  const anchor = createNode("_text_content");
+  insertChild(parent, anchor, null);
+  return renderer.insert(parent, accessor, anchor, ...rest);
+}
 
 function hostTrace(message: string): void {
   const write = (globalThis as { trace?: (s: string) => void }).trace;

@@ -163,3 +163,16 @@ describe("writePixelGlyph / applyExtraGlyphs", () => {
     expect(getGlyphWidth(narrow, ordinalForCharCode(COMMAND_KEY.charCodeAt(0)))).toBe(0);
   });
 });
+
+describe("typographic look-alikes", () => {
+  it("draws curly quotes, dashes and odd spaces as their ASCII look-alikes rather than '?'", () => {
+    for (const name of BUILTIN_FONTS) {
+      const font = requireFont(name);
+      expect(Array.from("it’s “fine” — really", (ch) => getGlyphIndexForChar(font, ch))).toEqual(
+        Array.from(`it's "fine" - really`, (ch) => getGlyphIndexForChar(font, ch)),
+      );
+      expect(measureText("a\u00a0b", name).width).toBe(measureText("a b", name).width);
+      expect(getGlyphIndexForChar(font, "·")).toBe(getGlyphIndexForChar(font, BULLET));
+    }
+  });
+});

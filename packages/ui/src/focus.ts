@@ -157,19 +157,65 @@ export function createFocusManager(root: CanvasNode): FocusManager {
   return manager;
 }
 
+/** The nearest `focusScope` ancestor of `node` (a window), or null. */
+export function focusScopeOf(node: CanvasNode): CanvasNode | null {
+  let n: CanvasNode | null = node;
+  while (n) {
+    if (n.props["focusScope"] === true) return n;
+    n = n.parent;
+  }
+  return null;
+}
+
 // -------------------------------------------------------------------------
-// Auto-focus: called after tree is first rendered
+// Auto-focus: a node given `autoFocus` takes focus once it is mounted, like
+// HTML's attribute — at first render or later, e.g. in a window opened after
+// boot. The renderer queues nodes as the prop is set; each UI instance
+// drains the queue after flushing, before it lays out and draws.
 // -------------------------------------------------------------------------
 
-export function applyAutoFocus(root: CanvasNode, manager: FocusManager): void {
-  function findAutoFocus(node: CanvasNode): CanvasNode | null {
-    if (node._eventHandlers.autoFocus) return node;
-    for (const child of node.children) {
-      const found = findAutoFocus(child);
-      if (found) return found;
-    }
-    return null;
+const pendingAutoFocus = new Set<CanvasNode>();
+/** Roots of live UI instances; a queued node under one of them waits for that instance. */
+const uiRoots = new WeakSet<CanvasNode>();
+
+/** Called by the renderer when `autoFocus` is set on a node. */
+export function requestAutoFocus(node: CanvasNode): void {
+  pendingAutoFocus.add(node);
+}
+
+/** Called by a UI instance for its root, so other instances leave its queued nodes alone. */
+export function registerFocusRoot(root: CanvasNode): void {
+  uiRoots.add(root);
+}
+
+function rootOf(node: CanvasNode): CanvasNode {
+  let n = node;
+  while (n.parent) n = n.parent;
+  return n;
+}
+
+/**
+ * Focus the first queued `autoFocus` node now mounted under `root`, and make
+ * its focus scope the active one. Nodes queued under another UI instance
+ * stay queued; nodes that never got mounted (or were unmounted) are dropped.
+ */
+export function applyPendingAutoFocus(root: CanvasNode, manager: FocusManager): void {
+  if (pendingAutoFocus.size === 0) return;
+  let target: CanvasNode | null = null;
+  for (const node of pendingAutoFocus) {
+    const top = rootOf(node);
+    if (top !== root && uiRoots.has(top)) continue;
+    pendingAutoFocus.delete(node);
+    if (top === root && node._eventHandlers.autoFocus && !target) target = node;
   }
-  const target = findAutoFocus(root);
-  if (target) manager.focus(target);
+  if (!target) return;
+  const scope = focusScopeOf(target);
+  if (scope !== manager.getActiveScope()) manager.setActiveScope(scope);
+  if (!isWithin(manager.focused, target)) manager.focus(target);
+}
+
+/** A container asking for focus is satisfied when a control inside it already has it. */
+function isWithin(node: CanvasNode | null, ancestor: CanvasNode): boolean {
+  for (let n = node; n; n = n.parent) if (n === ancestor) return true;
+  return false;
 }

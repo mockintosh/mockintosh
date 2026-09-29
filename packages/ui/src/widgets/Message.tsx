@@ -1,8 +1,5 @@
-import { Show, createEffect, onSettled } from "solid-js";
+import { Show } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import type { CanvasNode } from "../nodes";
-import { scrollOverflow } from "../pointer";
-import { scheduleRepaint } from "../renderer";
 import { Avatar } from "./Avatar";
 import { Bubble } from "./Bubble";
 
@@ -52,48 +49,19 @@ export interface MessageScrollerProps {
   /** Inner inset. Default 4. */
   padding?: number;
   children?: JSX.Element;
-  /**
-   * When this changes, pin to the bottom if the user is already there
-   * (or has not scrolled away).
-   */
-  stickKey?: string | number;
 }
 
-/** Stick-to-bottom thread on a scroll pane. */
+/** Thread on a scroll pane that follows new messages while the reader is at the end. */
 export function MessageScroller(props: MessageScrollerProps): JSX.Element {
-  let node: CanvasNode | null = null;
-  let pinned = true;
-
-  const pin = () => {
-    if (!node || !pinned) return;
-    const max = scrollOverflow(node);
-    if (node._scrollOffset === max) return;
-    node._scrollOffset = max;
-    scheduleRepaint();
-  };
-
-  createEffect(
-    () => props.stickKey,
-    () => {
-      onSettled(pin);
-    },
-  );
-
   return (
     <box
-      ref={(el) => {
-        node = el;
-      }}
       semantic={{ role: "log" }}
       overflow="scroll"
+      scrollAnchor="bottom"
       height={props.height}
       flexDirection="column"
       gap={8}
       padding={props.padding ?? 4}
-      onScroll={() => {
-        if (!node) return;
-        pinned = node._scrollOffset >= scrollOverflow(node) - 2;
-      }}
     >
       {props.children}
     </box>

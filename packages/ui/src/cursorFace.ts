@@ -9,7 +9,7 @@ import {
   CopyBits,
   SetPort,
   srcBic,
-  srcOr,
+  srcXor,
   type BitMap,
   type Cursor,
   type GrafPort,
@@ -17,10 +17,15 @@ import {
 } from "@mockintosh/quickdraw";
 import { makeRect } from "@mockintosh/quickdraw/bits";
 import { encodeBase64 } from "./base64";
-import { isNamedCursor, type CursorName, type NamedCursor } from "./cursor";
+import type { CursorSpec, NamedCursor } from "./cursor";
 import { encodePngRgba } from "./png";
 import type { Sprite } from "./sprite";
 
+/**
+ * A cursor as the ROM draws it: `(screen AND NOT mask) XOR data`. So a pixel
+ * with `data` set where the sprite's `mask` is clear inverts what is under it
+ * — MacPaint's crosshairs and brush shapes rely on that.
+ */
 export interface CursorFace {
   sprite: Sprite;
   hotSpot: Point;
@@ -31,6 +36,13 @@ export type CursorFaceTable = Partial<Record<NamedCursor, CursorFace>>;
 export const CURSOR_SIZE = 16;
 const CURSOR_RECT = makeRect(0, 0, CURSOR_SIZE, CURSOR_SIZE);
 const faceCursors = new WeakMap<CursorFace, Cursor>();
+const faceCss = new WeakMap<CursorFace, string>();
+
+export function isCursorFace(value: unknown): value is CursorFace {
+  if (typeof value !== "object" || value === null) return false;
+  const face = value as Partial<CursorFace>;
+  return typeof face.sprite === "object" && face.sprite !== null && typeof face.hotSpot === "object";
+}
 
 /** Pack a sprite of at most 16×16 into a QuickDraw `Cursor`. */
 export function cursorFromFace(face: CursorFace): Cursor {
@@ -47,10 +59,8 @@ export function cursorFromFace(face: CursorFace): Cursor {
       const i = v * sprite.width + h;
       const bit = 0x8000 >> h;
       const opaque = sprite.mask ? sprite.mask[i] !== 0 : true;
-      if (opaque) {
-        m |= bit;
-        if (sprite.data[i]) d |= bit;
-      }
+      if (opaque) m |= bit;
+      if (sprite.data[i]) d |= bit;
     }
     data[v] = d;
     mask[v] = m;
@@ -112,12 +122,12 @@ function stampCursorBits(dest: BitMap, cursor: Cursor, x: number, y: number): vo
   const left = x - cursor.hotSpot.h;
   const dst = makeRect(top, left, top + CURSOR_SIZE, left + CURSOR_SIZE);
   CopyBits(mask, dest, CURSOR_RECT, dst, srcBic, null);
-  CopyBits(data, dest, CURSOR_RECT, dst, srcOr, null);
+  CopyBits(data, dest, CURSOR_RECT, dst, srcXor, null);
 }
 
 /**
  * Paint a QuickDraw cursor into `port` with its hot spot at (`x`, `y`).
- * Mask `srcBic`, then data `srcOr` — the ROM VBL order.
+ * Mask `srcBic`, then data `srcXor` — the ROM VBL order.
  */
 export function blitQuickdrawCursor(port: GrafPort, cursor: Cursor, x: number, y: number): void {
   SetPort(port);
@@ -137,7 +147,8 @@ function spriteToRgba(sprite: Sprite): Uint8Array {
   const rgba = new Uint8Array(sprite.width * sprite.height * 4);
   for (let i = 0; i < sprite.width * sprite.height; i++) {
     const opaque = sprite.mask ? sprite.mask[i] !== 0 : true;
-    if (!opaque) continue;
+    // CSS cannot invert; an XOR pixel shows black.
+    if (!opaque && !sprite.data[i]) continue;
     const ink = sprite.data[i] ? 0 : 255;
     const o = i * 4;
     rgba[o] = ink;
@@ -155,6 +166,16 @@ export function cssCursorFromFace(face: CursorFace, fallback = "default"): strin
   return `url("data:image/png;base64,${encodeBase64(png)}") ${hotSpot.h} ${hotSpot.v}, ${fallback}`;
 }
 
+/** {@link cssCursorFromFace} with the default fallback, encoded once per face. */
+export function cssCursorFromFaceCached(face: CursorFace): string {
+  let css = faceCss.get(face);
+  if (css === undefined) {
+    css = cssCursorFromFace(face);
+    faceCss.set(face, css);
+  }
+  return css;
+}
+
 export function cssTableFromFaces(
   faces: CursorFaceTable,
   fallbacks?: Partial<Record<NamedCursor, string>>,
@@ -168,10 +189,13 @@ export function cssTableFromFaces(
 }
 
 export function resolveCursorFace(
-  name: CursorName,
+  spec: CursorSpec,
   faces: CursorFaceTable,
 ): CursorFace | undefined {
-  if (name === "none") return undefined;
-  if (isNamedCursor(name) && faces[name]) return faces[name];
-  return faces.default ?? faces.arrow;
+  if (isCursorFace(spec)) return spec;
+  if (spec === "none") return undefined;
+  const named = Object.prototype.hasOwnProperty.call(faces, spec)
+    ? faces[spec as NamedCursor]
+    : undefined;
+  return named ?? faces.default ?? faces.arrow;
 }

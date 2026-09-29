@@ -1,6 +1,6 @@
 /**
  * `<box onLayout>` delivery. After each layout pass, boxes whose measured
- * size differs from the last one reported get their callback — deferred to
+ * box differs from the last one reported get their callback — deferred to
  * a microtask so a callback that writes signals never runs mid-layout.
  */
 import type { CanvasNode, LayoutChangeFn, LayoutSize } from "./nodes";
@@ -16,13 +16,17 @@ export function notifyLayoutChanges(root: CanvasNode): void {
   });
 }
 
+function sameBox(a: LayoutSize, b: LayoutSize): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
 function collect(node: CanvasNode, pending: Array<{ onLayout: LayoutChangeFn; size: LayoutSize }>): void {
   const onLayout = node.props["onLayout"] as LayoutChangeFn | undefined;
   if (onLayout) {
-    const { width, height } = node.layout;
+    const { x, y, width, height } = node.layout;
+    const size = { x, y, width, height };
     const prev = lastReported.get(node);
-    if (!prev || prev.width !== width || prev.height !== height) {
-      const size = { width, height };
+    if (!prev || !sameBox(prev, size)) {
       lastReported.set(node, size);
       pending.push({ onLayout, size });
     }

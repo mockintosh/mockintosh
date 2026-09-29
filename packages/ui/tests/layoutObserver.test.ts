@@ -29,7 +29,7 @@ describe("notifyLayoutChanges", () => {
     notifyLayoutChanges(root);
     expect(sizes).toEqual([]);
     await microtask();
-    expect(sizes).toEqual([{ width: 100, height: 40 }]);
+    expect(sizes).toEqual([{ x: 0, y: 0, width: 100, height: 40 }]);
 
     markDirty(child);
     computeLayout(root, 200, 100, noMeasure);
@@ -43,8 +43,8 @@ describe("notifyLayoutChanges", () => {
     notifyLayoutChanges(root);
     await microtask();
     expect(sizes).toEqual([
-      { width: 100, height: 40 },
-      { width: 100, height: 300 },
+      { x: 0, y: 0, width: 100, height: 40 },
+      { x: 0, y: 0, width: 100, height: 300 },
     ]);
   });
 });
