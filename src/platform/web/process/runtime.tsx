@@ -12,6 +12,8 @@ import { Errored, For, Loading, createComponent, createRoot, createSignal, flush
 import { InitGraf, type BitMap } from "@mockintosh/quickdraw";
 import { createPrintPage, disposePrintPage, drawOnPage } from "@mockintosh/print";
 import { layoutPrintable } from "../../../os/printers/pictureLayout";
+import { declarationOf } from "../../../os/appDeclaration";
+import type { SolidApp as OSSolidApp } from "../../../os/apps";
 import { newBitMap, rowBytesFor } from "@mockintosh/quickdraw/bits";
 import {
   createUI,
@@ -145,6 +147,8 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
   let frameScheduled = false;
   let nextWindow = 0;
   let nextKeepAlive = 0;
+  /** The app's own About box, while it's open. */
+  let aboutKey: string | null = null;
   let sendStats = false;
   /** Shared memory needs a cross-origin-isolated page; elsewhere (Safari) pictures go by message. */
   const canShare = typeof SharedArrayBuffer !== "undefined" && (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated === true;
@@ -449,6 +453,20 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     post({ t: "cursor", key: w.key, cursor });
   }
 
+  /** Load an app only to tell the OS what it declares. */
+  async function describe(source: AppSource, appId: string): Promise<void> {
+    try {
+      const loaded = await load(source);
+      if (!loaded || typeof loaded.Component !== "function" || loaded.id !== appId) {
+        post({ t: "failed", error: `The module doesn't export the app "${appId}"` });
+        return;
+      }
+      post({ t: "described", declaration: declarationOf(loaded as OSSolidApp) });
+    } catch (error) {
+      post({ t: "failed", error: `Couldn't load ${appId}: ${error instanceof Error ? error.message : String(error)}` });
+    }
+  }
+
   async function start(startMessage: ProcessStart): Promise<void> {
     const loaded = await load(startMessage.source).catch((error: unknown) => {
       post({ t: "failed", error: `Couldn't load ${startMessage.appId}: ${error instanceof Error ? error.message : String(error)}` });
@@ -597,6 +615,13 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
           flush();
           scheduleFrame();
           return;
+        case "about": {
+          const About = app?.about?.Component;
+          if (!About) return;
+          if (aboutKey && (windows.has(aboutKey) || opening.has(aboutKey))) return;
+          aboutKey = context.openWindow({ title: msg.title, kind: "dialog", size: msg.size, Component: About });
+          return;
+        }
         default:
           receive(msg);
       }
@@ -667,6 +692,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
   scope.onmessage = (event) => {
     const msg = event.data;
     if (msg.t === "start") void start(msg.start);
+    else if (msg.t === "describe") void describe(msg.source, msg.appId);
     else receive(msg);
   };
 }

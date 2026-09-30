@@ -23,6 +23,11 @@ export interface BundledAppListing {
   permissions?: string[];
   /** The app module: a `defineApp` default export, same shape as a third-party bundle. */
   load: () => Promise<unknown>;
+  /**
+   * The app's declaration, so installing and launching it in a process never
+   * loads its code on the OS's thread (`apps/declarations.generated.json`).
+   */
+  declaration?: import("./appDeclaration").AppDeclaration;
 }
 
 let listings: Map<string, BundledAppListing> | undefined;

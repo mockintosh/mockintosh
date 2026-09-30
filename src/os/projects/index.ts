@@ -1,5 +1,7 @@
 import { sourceForTemplate, type ProjectTemplate } from "./templates";
 import { setAppSource } from "../process/sources";
+import { describeApp } from "../process/describe";
+import { declaredApp } from "../appDeclaration";
 export { counterSource, blankSource, canvasSource, type ProjectTemplate } from "./templates";
 import {diskPath} from "./paths";
 import {MIME} from "@mockintosh/fs";
@@ -90,9 +92,20 @@ export class ProjectService {
     const code = await disk.stat(path + "/index.js");
     if (record.id !== selection.build || code.revision !== record.codeRevision) throw new ServiceError("conflict", "Build artifact was edited; rebuild from source");
     const source = decoder.decode(await disk.read(code.path));
-    const module = validateModule(selection.app, await this.platform.loadArtifact(source, record.id));
+    const loadArtifact = this.platform.loadArtifact;
+    const loadHere = async () => validateModule(selection.app, await loadArtifact(source, record.id));
+    const appSource = { kind: "code" as const, code: source, identity: record.id };
+    if (this.platform.processes) {
+      // A process reads the build, so its code never runs on the OS's thread unless it has to.
+      const declaration = await describeApp(this.platform.processes, selection.app, appSource);
+      if (declaration.id !== selection.app) throw new ServiceError("conflict", `The build is "${declaration.id}", not "${selection.app}"`);
+      if (missingCapabilities(declaration.requires, this.os.capabilities).length) throw new ServiceError("unsupported-operation", "Build needs unavailable host capabilities");
+      setAppSource(selection.app, appSource);
+      return declaredApp(declaration, loadHere);
+    }
+    const module = await loadHere();
     // A process loads the same build.
-    setAppSource(selection.app, { kind: "code", code: source, identity: record.id });
+    setAppSource(selection.app, appSource);
     if (missingCapabilities(module.default.requires, this.os.capabilities).length) throw new ServiceError("unsupported-operation", "Build needs unavailable host capabilities");
     // Sprites are registered only after module validation; names belong to the app's bundle.
     return {...module.default, sprites: {...module.default.sprites, ...module.sprites}};

@@ -240,6 +240,15 @@ export class AppProcess {
     this.send({ t: "window.detach", key });
   }
 
+  get appId(): string {
+    return this.options.appId;
+  }
+
+  /** Open the app's own About box: its code is here, not on the OS's thread. */
+  openAbout(title: string, size: { width: number; height: number }): void {
+    this.send({ t: "about", title, size });
+  }
+
   /** End the worker now, without waiting for its cleanups: Force Quit, or a stuck app. */
   kill(): void {
     this.stop();

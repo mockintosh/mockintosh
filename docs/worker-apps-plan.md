@@ -95,10 +95,21 @@ The prototype twins stayed until step 7, so each step could be compared with the
 
 Force Quit is in the Apple menu. ⌘⌥Esc and ⌃⌥Esc also open it; a Mac host keeps ⌘⌥Esc for its own Force Quit window.
 
+## The page reads declarations, not code
+
+The OS needs an app's declaration before the app runs: title, icon, sprites, what it requires, the files it opens, its window's defaults. It no longer loads the app's code to get it (`src/os/appDeclaration.ts`):
+
+- **Bundled apps** are registered from `apps/declarations.generated.json`. `apps/declarations.test.ts` checks it against each app's `defineApp`, and `npm run apps:declarations` rewrites it.
+- **Installed bundles and OS builds** are read by a process that loads the code, reports the declaration and is terminated (`src/os/process/describe.ts`). The page never evaluates a third-party bundle.
+- **An app that must run on the OS's thread** has its code loaded when it's opened: `?processes=main`, an app a process can't serve, or a platform without processes.
+- **A custom About box** is drawn by the app's process.
+
+The idle page went from 7.0 MB to 4.6 MB, and from 11.9 MB to 8.7 MB with Showreel open in a process (production build).
+
 ## Next
 
-- **Load only a manifest on the page.** The page still imports each process app's module to read its declaration, so a process app's code is loaded twice.
 - **`os.openersFor` and `signIn`** in processes.
+- **Cache installed bundles' declarations** on disk, so boot doesn't start a process per installed bundle to read them.
 - **Bundles split into chunks** that import shared modules themselves.
 - **App-to-app drag and Apple Events**, then the Finder can move too.
 

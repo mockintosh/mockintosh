@@ -109,6 +109,10 @@ export interface WindowState {
 
 export type HostToProcess =
   | { t: "start"; start: ProcessStart }
+  /** Load `source`, answer `described` with its declaration, and do nothing else: the OS reads an app it won't run on its own thread. */
+  | { t: "describe"; source: AppSource; appId: string }
+  /** Open the app's own About box (`about.Component`) as one of its windows. */
+  | { t: "about"; title: string; size: { width: number; height: number } }
   /** The OS window for `key` is on screen: mount its content. */
   | { t: "window.attach"; key: string; state: WindowState }
   /** The OS window for `key` closed: dispose its content. */
@@ -137,6 +141,7 @@ export type HostToProcess =
   | { t: "reply"; id: number; ok: false; error: string };
 
 export type ProcessToHost =
+  | { t: "described"; declaration: import("../appDeclaration").AppDeclaration }
   /** `onOpen` returned; the launch ends now unless a window is open or the app holds `keepAlive`. */
   | { t: "started" }
   /** The app failed to load or threw in `onOpen`. */

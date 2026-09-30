@@ -1,5 +1,4 @@
 import {createRoot, createStore, flush} from "solid-js";
-import SourceEditor from "../../apps/SourceEditor";
 import { registerProjects } from "./projects";
 import { AppInstances } from "./instances";
 import { registerFileOperations } from "./kernel/files";
@@ -56,6 +55,10 @@ import { AppProcess } from "./process/host";
 import { processBlocker } from "./process/eligible";
 import { appSource } from "./process/sources";
 import { processWindowComponent } from "./components/ProcessWindow.solid";
+import { describeApp } from "./process/describe";
+import { declaredApp, type AppDeclaration } from "./appDeclaration";
+import { openAppAboutBox, ABOUT_SIZE } from "./components/AppAboutBox.solid";
+import bundledDeclarations from "../../apps/declarations.generated.json";
 import { buildAppWindow } from "./appWindow";
 import { DialogApp } from "./components/Dialog.solid";
 import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
@@ -74,7 +77,6 @@ import { registerShell } from "./shell";
 import { registerUIOperations } from "./kernel/uiService";
 import { Cancellation } from "./kernel/cancellation";
 import { ServiceError } from "./kernel";
-import Terminal from "../../apps/Terminal";
 import { Kernel } from "./kernel";
 
 const MENUBAR_HEIGHT = 20;
@@ -202,6 +204,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     sprites,
     capabilities,
     loadModule: platform.loadModule,
+    describe: platform.processes && ((appId, source) => describeApp(platform.processes!, appId, source)),
   });
   await migrateBundledDesktopShortcuts(fs, installer);
   await installer.loadInstalled();
@@ -279,6 +282,16 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       });
       if (existing) {
         bringToFront(existing.id);
+        return;
+      }
+      if (app.load && (!platform.processes || processBlocker(app, platform.processes) !== null)) {
+        // Registered from its declaration, and it must run here: load its code first.
+        void app.load().then(({ default: loaded }) => {
+          if (getApp(appId) === app) registerApp({ ...loaded, sprites: app.sprites ?? loaded.sprites });
+          osServices.openApp(appId, props, fromRect);
+        }, (error: unknown) => {
+          void osServices.showDialog({ message: `"${app.title}" couldn't be loaded: ${error instanceof Error ? error.message : String(error)}` });
+        });
         return;
       }
       // The app's `main`: it decides which windows to open, if any.
@@ -394,6 +407,24 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       setWindowOutline(null);
     },
     scheduleRepaint,
+    openAbout(appId) {
+      const app = getApp(appId);
+      if (!app) return;
+      if (!app.customAbout || app.about?.Component) {
+        openAppAboutBox(osServices, app);
+        return;
+      }
+      // The app draws its About box in its own code: in its process, or here once the code is loaded.
+      const proc = [...processes.values()].find((p) => p.appId === appId);
+      if (proc) {
+        proc.openAbout(`About ${app.title}`, app.about?.size ?? ABOUT_SIZE);
+        return;
+      }
+      void app.load?.().then(({ default: loaded }) => {
+        registerApp({ ...loaded, sprites: app.sprites ?? loaded.sprites });
+        openAppAboutBox(osServices, getApp(appId)!);
+      });
+    },
     forceQuit() {
       const active = getWindows().find((w) => w.id === getActiveWindowId());
       const instanceId = active?.instanceId;
@@ -531,8 +562,16 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     }
   }
 
-  registerApp(Terminal);
-  registerApp(SourceEditor);
+  // The kernel's own clients. With processes they run in one, so the page registers only what they declare.
+  const kernelClients = {
+    terminal: () => import("../../apps/Terminal"),
+    source_editor: () => import("../../apps/SourceEditor"),
+  };
+  for (const [id, load] of Object.entries(kernelClients)) {
+    const declaration = (bundledDeclarations as Record<string, AppDeclaration>)[id];
+    if (platform.processes && declaration) registerApp(declaredApp(declaration, load));
+    else registerApp((await load()).default);
+  }
 
   // --- Mount Solid tree ---
   bootTrace("root");

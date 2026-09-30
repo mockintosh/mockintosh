@@ -10,6 +10,8 @@
  */
 import { MIME, type FileSystem, type FSFile } from "@mockintosh/fs";
 import { setAppSource } from "./process/sources";
+import type { AppSource } from "./process/protocol";
+import { declaredApp, type AppDeclaration } from "./appDeclaration";
 import type { AppManifest, Capability } from "@mockintosh/sdk";
 import type { Sprite } from "@mockintosh/ui";
 import type { ModuleLoader } from "../platform/types";
@@ -40,6 +42,12 @@ export interface AppInstallerOptions {
   capabilities: CapabilitySet;
   /** Absent on hosts that cannot fetch a bundle URL. Bundled apps still install. */
   loadModule?: ModuleLoader;
+  /**
+   * Read an installed bundle's declaration in a process, so the OS's thread
+   * never evaluates it. Absent: the bundle is loaded here, as on a host
+   * without processes.
+   */
+  describe?: (appId: string, source: AppSource) => Promise<AppDeclaration>;
 }
 
 function sdkMajor(sdk: string | undefined): number {
@@ -48,7 +56,17 @@ function sdkMajor(sdk: string | undefined): number {
 }
 
 export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
-  const { fs, sprites, capabilities, loadModule } = options;
+  const { fs, sprites, capabilities, loadModule, describe } = options;
+
+  /** Register an app from its declaration; its code loads only if it ever runs on the OS's thread. */
+  function registerDeclared(manifest: AppManifest, declaration: AppDeclaration, source: AppSource): SolidApp<any> {
+    const app = declaredApp(declaration, async () => validateModule(manifest.id, await loadEntry(manifest, loadModule)));
+    setAppSource(manifest.id, source);
+    if (app.sprites) sprites.registerAll(app.sprites);
+    registerApp(app);
+    loaded.add(manifest.id);
+    return app;
+  }
   const loaded = new Set<string>();
 
   async function load(manifest: AppManifest): Promise<SolidApp<any>> {
@@ -62,8 +80,17 @@ export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
       if (existing) return existing;
     }
 
-    const module = validateModule(manifest.id, await loadEntry(manifest, loadModule));
     const bundledId = bundledIdFromEntry(manifest.entry);
+    const declaration = bundledId !== undefined ? getBundledApp(bundledId)?.declaration : undefined;
+    if (bundledId !== undefined && declaration) return registerDeclared(manifest, declaration, { kind: "bundled", id: bundledId });
+    if (bundledId === undefined && describe) {
+      const source: AppSource = { kind: "url", url: manifest.entry };
+      const described = await describe(manifest.id, source);
+      if (described.id !== manifest.id) throw new Error(`The bundle is "${described.id}", not "${manifest.id}"`);
+      return registerDeclared(manifest, described, source);
+    }
+
+    const module = validateModule(manifest.id, await loadEntry(manifest, loadModule));
     setAppSource(manifest.id, bundledId !== undefined ? { kind: "bundled", id: bundledId } : { kind: "url", url: manifest.entry });
     if (module.sprites) sprites.registerAll(module.sprites);
     registerApp(module.default);

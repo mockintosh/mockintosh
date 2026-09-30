@@ -10,7 +10,7 @@ import * as ui from "@mockintosh/ui";
 import * as renderer from "@mockintosh/ui/renderer";
 import * as quickdraw from "@mockintosh/quickdraw";
 import * as agent from "@mockintosh/agent";
-import type { SolidApp } from "@mockintosh/sdk";
+import type { SolidApp, Sprite } from "@mockintosh/sdk";
 import { APP_MODULES } from "../../../appModules";
 import { createAppLoader } from "./loader";
 import { runProcess, type ProcessScope } from "./runtime";
@@ -34,4 +34,9 @@ const load = createAppLoader({
   blobUrl: (code) => URL.createObjectURL(new Blob([code], { type: "text/javascript" })),
 });
 
-runProcess(self as unknown as ProcessScope, async (source) => (await load(source)) as SolidApp | undefined);
+runProcess(self as unknown as ProcessScope, async (source) => {
+  const module = await load(source);
+  const app = module?.default as SolidApp | undefined;
+  // A bundle's exported sprites are the app's, as the OS registers them.
+  return app && module?.sprites ? { ...app, sprites: { ...app.sprites, ...(module.sprites as Record<string, Sprite>) } } : app;
+});

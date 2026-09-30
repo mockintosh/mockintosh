@@ -11,7 +11,7 @@ import { getApp, type SolidApp } from "../apps";
 import { openSystemWindow } from "../systemWindows";
 
 const ICON_SIZE = 32;
-const ABOUT_SIZE = { width: 343, height: 120 };
+export const ABOUT_SIZE = { width: 343, height: 120 };
 
 export interface AppAboutBoxProps extends Record<string, unknown> {
   appId: string;

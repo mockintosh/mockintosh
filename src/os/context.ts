@@ -121,6 +121,8 @@ export interface OSServices {
    * cleanups skipped only if it's still answering.
    */
   forceQuit: () => void;
+  /** "About <app>…": the OS's box, or the app's own (drawn by the app, wherever it runs). */
+  openAbout: (appId: string) => void;
   /**
    * Run `hook` as each frame of the screen starts, before the OS decides
    * whether to draw it: an app process looks for new pictures here. Returns

@@ -138,6 +138,7 @@ On the web, every app runs in a process of its own when a process can give it ev
 - **Synchronous reads:** window size, catalog, fonts and sprites are answered in the worker from state the OS keeps current.
 - **Sound:** a process feeds the speaker's audio thread directly through `AudioService.openPort`.
 - **Stopping:** ending the instance asks the worker to run its cleanups, then terminates it.
+- **The page doesn't load app code** for an app it won't run itself. It registers apps from their declarations (`src/os/appDeclaration.ts`): bundled apps from `apps/declarations.generated.json` (regenerate with `npm run apps:declarations`), installed bundles and OS builds from a process that reads them (`process/describe.ts`). An app that has to run on the OS's thread is loaded when it opens.
 
 ### Apps, windows, and the menubar
 

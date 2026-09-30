@@ -42,7 +42,8 @@ describe("loading an app's code in a process", () => {
       },
       importUrl: async (url) => ({ default: { loadedFrom: url, code: blobs[Number(url.slice(5)) - 1] } }),
     });
-    const app = (await load({ kind: "code", code: 'import { createSignal } from "solid-js"; export default 1;', identity: "b1" })) as { code: string };
+    const module = await load({ kind: "code", code: 'import { createSignal } from "solid-js"; export default 1;', identity: "b1" });
+    const app = module!.default as { code: string };
     expect(app.code).toBe('import { createSignal } from "blob:1"; export default 1;');
   });
 });

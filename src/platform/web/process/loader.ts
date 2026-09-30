@@ -49,7 +49,13 @@ export interface LoaderOptions {
 
 const GLOBAL = "__mockintoshShared";
 
-export function createAppLoader(options: LoaderOptions): (source: AppSource) => Promise<unknown> {
+/** An app module: its `defineApp` result, and sprites it exports beside it. */
+export interface LoadedModule {
+  default?: unknown;
+  sprites?: Record<string, unknown>;
+}
+
+export function createAppLoader(options: LoaderOptions): (source: AppSource) => Promise<LoadedModule | undefined> {
   let shims: Record<string, string> | null = null;
   const shimUrls = (): Record<string, string> => {
     if (shims) return shims;
@@ -63,14 +69,14 @@ export function createAppLoader(options: LoaderOptions): (source: AppSource) => 
   return async (source) => {
     switch (source.kind) {
       case "bundled":
-        return (await options.bundled(source.id))?.default;
+        return (await options.bundled(source.id)) as LoadedModule | undefined;
       case "url": {
         const code = rewriteImports(await options.fetchText(source.url), shimUrls(), source.url);
-        return ((await options.importUrl(options.blobUrl(code))) as { default?: unknown }).default;
+        return (await options.importUrl(options.blobUrl(code))) as LoadedModule;
       }
       case "code": {
         const code = rewriteImports(source.code, shimUrls());
-        return ((await options.importUrl(options.blobUrl(code))) as { default?: unknown }).default;
+        return (await options.importUrl(options.blobUrl(code))) as LoadedModule;
       }
     }
   };
