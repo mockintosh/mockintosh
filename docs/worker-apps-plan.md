@@ -83,7 +83,7 @@ Each step is a commit (or a few) on `worker-apps`, with tests and a browser chec
 | 1 | Move the prototype into the OS: protocol, host, runtime, `Platform.processes`, shared module table; `SolidApp.runtime` | done |
 | 2 | One worker per instance: `onOpen` and `openWindow` in the worker, several windows per process, About box | done, except custom About boxes (those apps stay on the OS's thread) |
 | 3 | Input latency: render on input, not on the next tick after it; present the frame the same main-thread frame | done: pictures in shared memory (see below) |
-| 4 | Measure memory and start-up per worker; decide whether small apps stay on the main thread | |
+| 4 | Measure memory and start-up per worker; decide whether small apps stay on the main thread | done: every app can have a process (see below) |
 | 5 | Close the gaps, app by app: installed fonts, full sprite registry, microphone port, `printPage`, live video frames, `busy`, `keepAlive`, errors into the instance journal | |
 | 6 | Third-party and built apps: import shims in the worker | |
 | 7 | Make `worker` the default; retire the Webworker twins; Force Quit (⌘⌥Esc) | |
@@ -101,6 +101,20 @@ Measured from `pointerdown` to the pixels changing on the display canvas, clicki
 | Canvas in a process, pictures in shared memory | 11.8 ms |
 
 The worker needs about 1 ms to handle a click and draw. The rest was the message queue. After an input event the browser renders before it delivers other messages, so a picture that was ready in time still arrived just after the OS's frame and waited a whole frame for the next one. The worker now publishes each window's picture in shared memory (`src/os/process/sharedFrame.ts`), and the OS takes it as its frame starts (`OSServices.beforeFrame`). Shared memory needs a cross-origin-isolated page, which the dev server and `vercel.json` provide. Where the browser can't isolate the page (Safari doesn't support `credentialless`), pictures still go by message and cost the extra frame.
+
+## Cost of a process (step 4)
+
+Production build (`vite build` + `vite preview`), headless Chrome, `performance.measureUserAgentSpecificMemory()`:
+
+| | Page | Workers | Total | First picture |
+| --- | --- | --- | --- | --- |
+| Idle desktop | 7.0 MB | — | 9.4 MB | — |
+| Canvas on the OS's thread | 9.2 MB | — | 11.1 MB | — |
+| Canvas in a process | 6.6 MB | 4.2 MB | 16.2 MB | 49 ms after spawn |
+| Showreel in a process | 11.9 MB | 7.0 MB | 19.8 MB | 158 ms |
+| OP-1 in a process | 7.0 MB | 34.0 MB (its tapes) | 46.0 MB | 157 ms |
+
+A process costs about 3–5 MB beyond the app's own memory (its runtime, fonts, and a second copy of the app's code) and 50–160 ms to its first picture. Ten open apps would cost about 40 MB. That's affordable, so no app stays on the OS's thread to save memory. The page still loads each process app's module to read its declaration. Loading only a manifest would save that copy (step 7).
 
 ## Risks
 
