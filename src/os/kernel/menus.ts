@@ -78,6 +78,11 @@ export function appleMenu(os: OSServices): MenubarDefinition {
     }, {
       label: "Puzzle",
       disabled: true
+    }, {
+      type: "separator"
+    }, {
+      label: "Force Quit…",
+      onClick: () => os.forceQuit()
     }]
   };
 }

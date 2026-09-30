@@ -131,7 +131,7 @@ Finder is registered like any other app (`FINDER_APP_ID`): the desktop is its wi
 
 ### App processes
 
-An app that declares `runtime: "worker"` runs in a process of its own when the platform has `processes` and a process can give it everything it declares (`processBlocker` in `src/os/process/eligible.ts`). Otherwise it runs on the OS's thread like every other app ([plan](docs/worker-apps-plan.md)).
+On the web, every app runs in a process of its own when a process can give it everything it declares (`processBlocker` in `src/os/process/eligible.ts`). The exceptions are the shell apps (Finder, App Store, Icon Gallery), apps that need something a process can't serve (Spotify's `browser.loadScript`, fx's agent runtime), and apps that declare `runtime: "main"`. A platform without `processes` (headless, tests) runs every app on the OS's thread. `?processes=main` does the same on the web, and `?processes=stats` adds timing menus ([plan](docs/worker-apps-plan.md)). Force Quit is in the Apple menu.
 
 - **The worker** (`src/platform/web/process/`) loads the app from `src/appModules.ts` and runs its `onOpen`. It lays every window the app opens out in its own band of one offscreen bitmap, in its own focus scope, and draws them with the worker's own Solid, `@mockintosh/ui` and QuickDraw.
 - **`AppProcess`** (`src/os/process/host.ts`) is on the OS's side. It opens a real OS window for each window the app opens; the window's content (`ProcessWindow`) shows that window's latest picture and sends its input back. `AppProcess` answers the app's calls (`src/os/process/protocol.ts`) with the instance's real `AppContext`.

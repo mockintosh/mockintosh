@@ -618,7 +618,8 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
    * Where the app's code runs. `"worker"`: in a process of its own (a Web
    * Worker on the web), when the platform has processes and can give the app
    * everything it declares; otherwise on the OS's thread. `"main"`: always on
-   * the OS's thread. Default `"main"` while processes are being brought up.
+   * the OS's thread. Unset: the platform decides (the web runs apps in
+   * processes). Declare `"main"` only for something a process can't serve.
    */
   runtime?: "worker" | "main";
   /** Content size of the main window. */

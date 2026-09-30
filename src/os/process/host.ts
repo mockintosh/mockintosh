@@ -240,6 +240,12 @@ export class AppProcess {
     this.send({ t: "window.detach", key });
   }
 
+  /** End the worker now, without waiting for its cleanups: Force Quit, or a stuck app. */
+  kill(): void {
+    this.stop();
+    this.port.terminate();
+  }
+
   /** Stop the worker: its cleanups run, then it's terminated. The instance calls this as it ends. */
   stop(): void {
     if (this.stopped) return;

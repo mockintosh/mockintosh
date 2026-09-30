@@ -267,9 +267,12 @@ export type ModuleLoader = (url: string) => Promise<unknown>;
 export interface AppProcesses {
   /**
    * Where an app that doesn't say (`SolidApp.runtime` unset) runs. The web
-   * host says `"main"` unless the page is opened with `?processes=all`.
+   * host says `"worker"`; `?processes=main` puts every app back on the OS's
+   * thread, to compare.
    */
   defaultRuntime: "main" | "worker";
+  /** Give each process's windows the Worker menu (frame, input and audio timings): `?processes=stats`. */
+  stats?: boolean;
   /** Whether a process can load this code: a bundled app in its module table, a bundle URL, or a build. */
   canRun(source: import("../os/process/protocol").AppSource): boolean;
   /** Start a process for `appId`; the name shows in the host's debugger. */

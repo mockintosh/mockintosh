@@ -86,9 +86,21 @@ Each step is a commit (or a few) on `worker-apps`, with tests and a browser chec
 | 4 | Measure memory and start-up per worker; decide whether small apps stay on the main thread | done: every app can have a process (see below) |
 | 5 | Close the gaps, app by app: installed fonts, full sprite registry, microphone port, `printPage`, live video frames, `busy`, `keepAlive`, errors into the instance journal | done (see below) |
 | 6 | Third-party and built apps: import shims in the worker | done: `src/platform/web/process/loader.ts` |
-| 7 | Make `worker` the default; retire the Webworker twins; Force Quit (⌘⌥Esc) | |
+| 7 | Make `worker` the default; retire the Webworker twins; Force Quit (⌘⌥Esc) | done |
 
-The prototype twins stay until step 7, so each step can be compared with the main-thread app.
+The prototype twins stayed until step 7, so each step could be compared with the main-thread app. Now the web host runs every eligible app in a process. Two URL switches remain for comparing:
+
+- **`?processes=main`** puts every app back on the OS's thread.
+- **`?processes=stats`** adds the Worker menu (frame, input and audio timings) to every process's windows and " (Worker)" to their titles.
+
+Force Quit is in the Apple menu. ⌘⌥Esc and ⌃⌥Esc also open it; a Mac host keeps ⌘⌥Esc for its own Force Quit window.
+
+## Next
+
+- **Load only a manifest on the page.** The page still imports each process app's module to read its declaration, so a process app's code is loaded twice.
+- **`os.openersFor` and `signIn`** in processes.
+- **Bundles split into chunks** that import shared modules themselves.
+- **App-to-app drag and Apple Events**, then the Finder can move too.
 
 ## Input latency (step 3)
 

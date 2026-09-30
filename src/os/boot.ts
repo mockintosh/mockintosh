@@ -46,6 +46,7 @@ import {
   getMenubarMenus,
   isMenubarHidden,
   setOpenMenuIndex,
+  FINDER_APP_ID,
 } from "./state";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
@@ -146,6 +147,8 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   }
 
   const instances = new AppInstances(id => closeOSWindow(id));
+  /** App processes by instance, for Force Quit. */
+  const processes = new Map<string, AppProcess>();
 
   /** The host's image decoder as `<image>` sources want it: bytes, or a URL fetched first. Processes get it too. */
   const uiImages: UIImageService | undefined = platform.images
@@ -293,11 +296,15 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
           os: osServices,
           clipboard: platform.clipboard,
           images: uiImages,
-          titleSuffix: app.processStats ? " (Worker)" : "",
-          stats: !!app.processStats,
-          windowComponent: (process, key) => processWindowComponent(process, key, !!app.processStats),
+          titleSuffix: platform.processes.stats ? " (Worker)" : "",
+          stats: !!platform.processes.stats,
+          windowComponent: (process, key) => processWindowComponent(process, key, !!platform.processes?.stats),
         });
-        instances.own(instanceId, () => proc.stop());
+        processes.set(instanceId, proc);
+        instances.own(instanceId, () => {
+          processes.delete(instanceId);
+          proc.stop();
+        });
         instances.finishOpen(instanceId);
         return;
       }
@@ -387,6 +394,26 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       setWindowOutline(null);
     },
     scheduleRepaint,
+    forceQuit() {
+      const active = getWindows().find((w) => w.id === getActiveWindowId());
+      const instanceId = active?.instanceId;
+      const app = active && getApp(active.appId);
+      if (!instanceId || !app || active.appId === FINDER_APP_ID) {
+        void osServices.showDialog({ message: "There's no application to force to quit.", variant: "note" });
+        return;
+      }
+      void osServices
+        .showDialog({
+          message: `Force "${app.title}" to quit? Unsaved work is lost.`,
+          buttons: ["Cancel", "Force Quit"],
+          variant: "caution",
+        })
+        .then((choice) => {
+          if (choice !== "Force Quit") return;
+          processes.get(instanceId)?.kill();
+          instances.stop(instanceId);
+        });
+    },
     beforeFrame(hook) {
       beforeFrameHooks.add(hook);
       return () => beforeFrameHooks.delete(hook);
@@ -750,6 +777,12 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       return;
     }
     const command = mods.meta || mods.ctrl;
+    // ⌘⌥Esc, as on the Mac; the host keeps that one on a Mac, so ⌃⌥Esc too.
+    if (command && mods.alt && e.key === "Escape") {
+      osServices.forceQuit();
+      scheduleRepaint();
+      return;
+    }
     // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
     if (command && e.key.toLowerCase() === "v") {
       if (!(mods.meta && runMenuShortcut(e.key))) pasteFromClipboard();

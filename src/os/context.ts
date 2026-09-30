@@ -116,6 +116,12 @@ export interface OSServices {
   hideWindowOutline: () => void;
   scheduleRepaint: () => void;
   /**
+   * Offer to end the frontmost app at once, without its cleanups. An app in a
+   * process stops even while it's stuck; one on the OS's thread has had its
+   * cleanups skipped only if it's still answering.
+   */
+  forceQuit: () => void;
+  /**
    * Run `hook` as each frame of the screen starts, before the OS decides
    * whether to draw it: an app process looks for new pictures here. Returns
    * a function that removes the hook.
