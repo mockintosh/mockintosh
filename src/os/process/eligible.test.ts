@@ -18,6 +18,6 @@ describe("processBlocker", () => {
     expect(processBlocker(app({ runtime: "main" }), { ...processes, defaultRuntime: "worker" })).toMatch(/OS's thread/);
     expect(processBlocker(app(), undefined)).toMatch(/no app processes/);
     expect(processBlocker(app({ id: "unknown" }), processes)).toMatch(/can't load/);
-    expect(processBlocker(app({ requires: ["camera"] }), processes)).toBe("camera isn't served to processes yet");
+    expect(processBlocker(app({ requires: ["agent-runtime"] }), processes)).toBe("agent-runtime isn't served to processes yet");
   });
 });
