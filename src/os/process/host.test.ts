@@ -29,6 +29,7 @@ function setup() {
       return `os-window-${opened.length}`;
     }),
     storage,
+    fonts: { register: vi.fn(), list: () => [], onChange: () => () => {} },
     quit: vi.fn(),
     os: { showDialog: vi.fn(async () => "OK") },
   } as unknown as AppContext;

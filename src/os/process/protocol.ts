@@ -8,7 +8,7 @@
  * input back. Everything the app asks of the OS is a `call`, answered by the
  * instance's real `AppContext`.
  */
-import type { CursorSpec, Modifiers, Sprite } from "@mockintosh/ui";
+import type { CursorSpec, FontRegistration, Modifiers, Sprite } from "@mockintosh/ui";
 import type { FSNode } from "@mockintosh/fs";
 import type { VideoExcerpt, VideoPicture, WindowKind, WindowSpec } from "@mockintosh/sdk";
 
@@ -66,6 +66,12 @@ export interface ProcessStart {
   sprites: Record<string, Sprite>;
   /** Send `frameStats` for the Worker menu. */
   stats: boolean;
+  /** Fonts installed since boot (System Folder › Fonts, Foundry), to replay before the app starts. */
+  fonts: FontRegistration[];
+  /** `fontRaster.modes()` when the host can rasterize fonts; absent = no `fontRaster`. */
+  fontRasterModes?: string[];
+  /** The Font Manager can save suitcases into System Folder › Fonts. */
+  fontInstall: boolean;
 }
 
 /** Progress of a `video.excerpt` call: the excerpt once it exists, then its pictures as they decode. */
@@ -96,6 +102,8 @@ export type HostToProcess =
   | { t: "menu"; action: number; value?: string }
   | { t: "fs"; snapshot: FsSnapshot }
   | { t: "printer"; connected: boolean }
+  /** A font was installed or removed on the OS's side. */
+  | { t: "font"; registration: FontRegistration }
   | { t: "audio"; streamId: number; state: "suspended" | "running" | "closed"; latencyFrames: number }
   | { t: "video"; event: VideoEvent }
   | { t: "reply"; id: number; ok: true; value: unknown }

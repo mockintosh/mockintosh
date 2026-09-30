@@ -116,8 +116,11 @@ export {
   onFontsChanged,
   fontsVersion,
   DEFAULT_FAMILY_SETTINGS,
+  fontRegistrations,
+  onFontRegistration,
+  replayFontRegistration,
 } from "./fonts/registry";
-export type { FontFamilyInfo, OutlineFaceRegistration } from "./fonts/registry";
+export type { FontFamilyInfo, FontRegistration, OutlineFaceRegistration } from "./fonts/registry";
 export type { FamilyScalerSettings } from "./fonts/outlineStrike";
 export { OutlineFace, openOutlineFace, DEFAULT_SCALER_OPTIONS } from "./fonts/truetype/scaler";
 export type { ScalerOptions, StrikeMetrics, RenderedGlyph } from "./fonts/truetype/scaler";

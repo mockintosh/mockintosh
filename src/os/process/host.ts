@@ -7,7 +7,7 @@
  */
 import { createEffect, createRoot, untrack } from "solid-js";
 import type { BitMap } from "@mockintosh/quickdraw";
-import type { CursorSpec, UIClipboard } from "@mockintosh/ui";
+import { fontRegistrations, onFontRegistration, type CursorSpec, type UIClipboard } from "@mockintosh/ui";
 import type {
   AppContext,
   AppServices,
@@ -142,6 +142,7 @@ export class AppProcess {
   private latencyTimer: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
   private removeBeforeFrame: () => void = () => {};
+  private removeFontListener: () => void = () => {};
 
   constructor(private readonly options: AppProcessOptions) {
     this.spawnedAt = options.os.scheduler.now();
@@ -171,8 +172,12 @@ export class AppProcess {
         video: typeof this.context.video?.excerpt === "function",
         sprites: this.os.sprites.all(),
         stats: !!options.stats,
+        fonts: [...fontRegistrations()],
+        fontRasterModes: this.context.fontRaster ? [...this.context.fontRaster.modes()] : undefined,
+        fontInstall: typeof this.context.fonts.install === "function",
       },
     });
+    this.removeFontListener = onFontRegistration((registration) => this.send({ t: "font", registration }));
     this.removeBeforeFrame = this.os.beforeFrame(() => this.takeSharedFrames());
     createRoot((dispose) => {
       this.disposeRoot = dispose;
@@ -222,6 +227,7 @@ export class AppProcess {
     this.stopped = true;
     this.disposeRoot();
     this.removeBeforeFrame();
+    this.removeFontListener();
     if (this.latencyTimer) clearInterval(this.latencyTimer);
     for (const load of this.videoLoads.values()) load.abort();
     for (const stream of this.audioStreams.values()) stream.close();
@@ -361,6 +367,17 @@ export class AppProcess {
       case "print":
         if (!ctx.print) throw new Error("This Macintosh has no printer");
         return name === "connect" ? ctx.print.connect() : ctx.print.printPicture(args[0] as never, args[1] as never);
+      case "fonts":
+        if (name === "register") return ctx.fonts.register(args[0] as string, args[1] as string, args[2] as number | undefined);
+        if (name === "install") {
+          if (!ctx.fonts.install) throw new Error("This Macintosh can't install fonts");
+          return ctx.fonts.install(args[0] as never);
+        }
+        if (name === "rasterize") {
+          if (!ctx.fontRaster) throw new Error("This Macintosh can't rasterize fonts");
+          return ctx.fontRaster.rasterize(args[0] as Uint8Array, args[1] as never);
+        }
+        break;
       case "download":
         if (!ctx.download) throw new Error("This Macintosh can't save files to the host");
         return ctx.download.save(args[0] as never);

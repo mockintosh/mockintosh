@@ -16,6 +16,7 @@ import {
   listFontFamilies,
   onFontsChanged,
   registerFont,
+  replayFontRegistration,
   type CanvasNode,
   type CursorSpec,
   type JSX,
@@ -267,9 +268,18 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       audio: start.audio ? audio.service : undefined,
       video: start.video ? video.service : undefined,
       fonts: {
-        register: (name, data, size) => void registerFont(name, data, size),
+        // Registered here for this app straight away, and with the OS for every other app.
+        register: (name, data, size) => {
+          registerFont(name, data, size);
+          notify("fonts.register", name, data, size);
+        },
         list: () => listFontFamilies(),
         onChange: onFontsChanged,
+        install: start.fontInstall ? (suitcase) => call("fonts.install", [suitcase]) as Promise<string> : undefined,
+      },
+      fontRaster: start.fontRasterModes && {
+        modes: () => start.fontRasterModes as ReturnType<NonNullable<AppContext["fontRaster"]>["modes"]>,
+        rasterize: (bytes, options) => call("fonts.rasterize", [bytes, options]) as ReturnType<NonNullable<AppContext["fontRaster"]>["rasterize"]>,
       },
       scheduler: {
         now: () => performance.now(),
@@ -374,6 +384,8 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     }
     app = loaded;
     sendStats = startMessage.stats;
+    // The OS's fonts before any text is measured.
+    for (const registration of startMessage.fonts) replayFontRegistration(registration);
     screenWidth = startMessage.screen.width;
     bandHeight = startMessage.screen.height;
     screen = newBitMap(screenWidth, bandHeight);
@@ -499,6 +511,11 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       case "printer":
         setPrinterConnected(msg.connected);
         flush();
+        return;
+      case "font":
+        replayFontRegistration(msg.registration);
+        flush();
+        scheduleFrame();
         return;
       case "audio":
         audio.update(msg.streamId, msg.state, msg.latencyFrames);
