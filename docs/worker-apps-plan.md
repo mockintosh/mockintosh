@@ -82,13 +82,25 @@ Each step is a commit (or a few) on `worker-apps`, with tests and a browser chec
 | 0 | Prototypes, speaker port, faster RGBA expansion | done |
 | 1 | Move the prototype into the OS: protocol, host, runtime, `Platform.processes`, shared module table; `SolidApp.runtime` | done |
 | 2 | One worker per instance: `onOpen` and `openWindow` in the worker, several windows per process, About box | done, except custom About boxes (those apps stay on the OS's thread) |
-| 3 | Input latency: render on input, not on the next tick after it; present the frame the same main-thread frame | |
+| 3 | Input latency: render on input, not on the next tick after it; present the frame the same main-thread frame | done: pictures in shared memory (see below) |
 | 4 | Measure memory and start-up per worker; decide whether small apps stay on the main thread | |
 | 5 | Close the gaps, app by app: installed fonts, full sprite registry, microphone port, `printPage`, live video frames, `busy`, `keepAlive`, errors into the instance journal | |
 | 6 | Third-party and built apps: import shims in the worker | |
 | 7 | Make `worker` the default; retire the Webworker twins; Force Quit (⌘⌥Esc) | |
 
 The prototype twins stay until step 7, so each step can be compared with the main-thread app.
+
+## Input latency (step 3)
+
+Measured from `pointerdown` to the pixels changing on the display canvas, clicking a Canvas tool at a random point in the display's frame (headless Chrome, 40 clicks each):
+
+| | Click to pixels |
+| --- | --- |
+| Canvas on the OS's thread | 9.4 ms |
+| Canvas in a process, pictures by message | 26.1 ms |
+| Canvas in a process, pictures in shared memory | 11.8 ms |
+
+The worker needs about 1 ms to handle a click and draw. The rest was the message queue. After an input event the browser renders before it delivers other messages, so a picture that was ready in time still arrived just after the OS's frame and waited a whole frame for the next one. The worker now publishes each window's picture in shared memory (`src/os/process/sharedFrame.ts`), and the OS takes it as its frame starts (`OSServices.beforeFrame`). Shared memory needs a cross-origin-isolated page, which the dev server and `vercel.json` provide. Where the browser can't isolate the page (Safari doesn't support `credentialless`), pictures still go by message and cost the extra frame.
 
 ## Risks
 

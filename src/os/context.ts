@@ -115,6 +115,12 @@ export interface OSServices {
   /** Remove the drag/resize outline and call the stored commit callback. */
   hideWindowOutline: () => void;
   scheduleRepaint: () => void;
+  /**
+   * Run `hook` as each frame of the screen starts, before the OS decides
+   * whether to draw it: an app process looks for new pictures here. Returns
+   * a function that removes the hook.
+   */
+  beforeFrame: (hook: () => void) => () => void;
   /** Full-screen and selection captures, saved as PNGs on the desktop. */
   screenshots: ScreenshotCommands;
   /**

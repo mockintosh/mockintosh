@@ -289,6 +289,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
           os: osServices,
           clipboard: platform.clipboard,
           titleSuffix: app.processStats ? " (Worker)" : "",
+          stats: !!app.processStats,
           windowComponent: (process, key) => processWindowComponent(process, key, !!app.processStats),
         });
         instances.own(instanceId, () => proc.stop());
@@ -381,6 +382,10 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       setWindowOutline(null);
     },
     scheduleRepaint,
+    beforeFrame(hook) {
+      beforeFrameHooks.add(hook);
+      return () => beforeFrameHooks.delete(hook);
+    },
     screenshots: {
       captureEntireScreen: () => screenshotCapture.captureEntireScreen(),
       beginPortionCapture() {
@@ -585,6 +590,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   }
 
   // --- Frame loop ---
+  const beforeFrameHooks = new Set<() => void>();
   function renderFrame() {
     if (stopped) return;
     ui.frame();
@@ -625,6 +631,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   function frameLoop() {
     if (stopped) return;
     scheduler.requestFrame(frameLoop);
+    for (const hook of beforeFrameHooks) hook();
     if (stepMenubarReveal(scheduler.now())) scheduleRepaint();
     if (!screenDirty || animating) return;
     screenDirty = false;

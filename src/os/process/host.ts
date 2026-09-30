@@ -22,6 +22,7 @@ import type { FSNode } from "@mockintosh/fs";
 import type { OSServices } from "../context";
 import type { WindowComponent } from "../state";
 import { unwireMenus } from "./menus";
+import { readSharedFrame, sharedFrameCount } from "./sharedFrame";
 import type { AppSource, FsSnapshot, HostToProcess, ProcessPort, ProcessToHost, WindowState, WireMenu, WireWindowSpec } from "./protocol";
 
 export interface AppProcessOptions {
@@ -36,6 +37,8 @@ export interface AppProcessOptions {
   clipboard?: UIClipboard;
   /** Appended to every title the app sets (the Webworker twins' " (Worker)"). */
   titleSuffix?: string;
+  /** Collect the worker's timings for the Worker menu. */
+  stats?: boolean;
   /** Makes the host-side component for one of the process's windows. */
   windowComponent(process: AppProcess, key: string): WindowComponent;
 }
@@ -76,6 +79,8 @@ export interface ProcessWindowHost {
   frameBytes: number;
   cursor?: CursorSpec;
   menus: MenubarDefinition[];
+  /** Shared memory the worker publishes this window's pictures in, and the last count seen. */
+  shared?: { buffer: SharedArrayBuffer; count: number };
   /** Tells the window's content a new frame, cursor or menus arrived. */
   changed?(what: "frame" | "cursor" | "menus"): void;
 }
@@ -127,6 +132,7 @@ export class AppProcess {
   private releaseLaunch: (() => void) | null;
   private latencyTimer: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
+  private removeBeforeFrame: () => void = () => {};
 
   constructor(private readonly options: AppProcessOptions) {
     this.port = options.port;
@@ -154,8 +160,10 @@ export class AppProcess {
         download: this.context.download !== undefined,
         video: typeof this.context.video?.excerpt === "function",
         sprites: this.os.sprites.all(),
+        stats: !!options.stats,
       },
     });
+    this.removeBeforeFrame = this.os.beforeFrame(() => this.takeSharedFrames());
     createRoot((dispose) => {
       this.disposeRoot = dispose;
       createEffect(
@@ -203,6 +211,7 @@ export class AppProcess {
     this.send({ t: "stop" });
     this.stopped = true;
     this.disposeRoot();
+    this.removeBeforeFrame();
     if (this.latencyTimer) clearInterval(this.latencyTimer);
     for (const load of this.videoLoads.values()) load.abort();
     for (const stream of this.audioStreams.values()) stream.close();
@@ -218,6 +227,22 @@ export class AppProcess {
     this.os.instances?.fail(this.options.instanceId, new Error(message));
     void this.os.showDialog({ message: `"${this.options.appId}" stopped: ${message}` });
     this.os.instances?.stop(this.options.instanceId);
+  }
+
+  /** At the start of the OS's frame: take any picture the worker published since the last one. */
+  private takeSharedFrames(): void {
+    for (const w of this.windows.values()) {
+      if (!w.shared) continue;
+      const count = sharedFrameCount(w.shared.buffer);
+      if (count === w.shared.count) continue;
+      w.shared.count = count;
+      const { bits, seq, bytes } = readSharedFrame(w.shared.buffer);
+      w.frame = bits;
+      w.frameSeq = seq;
+      w.frameBytes = bytes;
+      w.changed?.("frame");
+      this.os.scheduleRepaint();
+    }
   }
 
   private withWindow(key: string, run: (services: AppServices) => void): void {
@@ -245,12 +270,19 @@ export class AppProcess {
         w.frame = { baseAddr: new Uint8Array(msg.buffer), rowBytes: msg.rowBytes, bounds: { top: 0, left: 0, bottom: msg.height, right: msg.width } };
         w.frameSeq = msg.seq;
         w.frameBytes = msg.buffer.byteLength;
-        this.stats.frames++;
-        this.stats.worker.add(msg.frameMs);
-        for (const ms of msg.audioMs) this.stats.audio.add(ms);
         w.changed?.("frame");
         return;
       }
+      case "frameBuffer": {
+        const w = this.windows.get(msg.key);
+        if (w) w.shared = { buffer: msg.buffer, count: 0 };
+        return;
+      }
+      case "frameStats":
+        this.stats.frames++;
+        this.stats.worker.add(msg.frameMs);
+        for (const ms of msg.audioMs) this.stats.audio.add(ms);
+        return;
       case "cursor": {
         const w = this.windows.get(msg.key);
         if (!w) return;

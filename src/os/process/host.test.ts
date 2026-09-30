@@ -38,6 +38,7 @@ function setup() {
     sprites: { all: () => ({}) },
     fs: { volumes: () => [], node: () => undefined, children: () => [] },
     scheduler: { now: () => 0 },
+    beforeFrame: () => () => {},
     instances: { note: vi.fn(), fail: vi.fn(), stop: vi.fn() },
     showDialog: vi.fn(async () => "OK"),
     closeWindow: vi.fn(),

@@ -35,6 +35,7 @@ import {
 } from "@mockintosh/sdk";
 import type { FSNode } from "@mockintosh/fs";
 import { wireMenus, type MenuActions } from "../../../os/process/menus";
+import { publishSharedFrame, sharedFrameBytes } from "../../../os/process/sharedFrame";
 import type { AppSource, HostToProcess, ProcessStart, ProcessToHost, WindowState, WireWindowSpec } from "../../../os/process/protocol";
 import { createWorkerAudio } from "./audio";
 import { createFsMirror } from "./fsMirror";
@@ -64,6 +65,8 @@ interface ProcessWindow {
   node: CanvasNode | null;
   /** The picture last sent, to skip frames where this window didn't change. */
   sent: Uint8Array | null;
+  /** Where this window's pictures go when memory can be shared with the OS. */
+  shared: SharedArrayBuffer | null;
   cursor?: CursorSpec;
   /** Action ids of this window's current menus, dropped when it sets new ones. */
   menuIds: number[];
@@ -120,6 +123,9 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
   let frameScheduled = false;
   let nextWindow = 0;
   let nextKeepAlive = 0;
+  let sendStats = false;
+  /** Shared memory needs a cross-origin-isolated page; elsewhere (Safari) pictures go by message. */
+  const canShare = typeof SharedArrayBuffer !== "undefined" && (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated === true;
 
   function scheduleFrame(): void {
     if (frameScheduled) return;
@@ -127,6 +133,15 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     // A task, not a vsync: input that arrived together is handled first, then
     // each changed window goes to the OS, which presents it on its next frame.
     setTimeout(renderFrame, 0);
+  }
+
+  /**
+   * Draw input's effect straight away rather than on the next task: the OS
+   * presents on its own next frame, and every millisecond here decides
+   * whether the picture makes that frame or waits for the one after.
+   */
+  function renderNow(): void {
+    if (frameScheduled) renderFrame();
   }
 
   function renderFrame(): void {
@@ -137,6 +152,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     frameMs = performance.now() - start;
     performance.measure("app-process:frame", { start });
     const audioMs = audio.renderMs.splice(0);
+    if (sendStats) post({ t: "frameStats", frameMs, audioMs: audioMs.splice(0) });
     for (const w of attached()) {
       const width = untrack(w.width);
       const height = untrack(w.height);
@@ -149,6 +165,10 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       }
       if (w.sent && sameBytes(w.sent, picture)) continue;
       w.sent = picture.slice();
+      if (w.shared) {
+        publishSharedFrame(w.shared, picture, width, height, rowBytes, lastSeq);
+        continue;
+      }
       post(
         { t: "frame", key: w.key, buffer: picture.buffer, rowBytes, width, height, seq: lastSeq, frameMs, audioMs: audioMs.splice(0) },
         [picture.buffer],
@@ -294,8 +314,10 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       services: null as unknown as AppServices,
       node: null,
       sent: null,
+      shared: canShare ? new SharedArrayBuffer(sharedFrameBytes(screenWidth, bandHeight)) : null,
       menuIds: [],
     };
+    if (w.shared) post({ t: "frameBuffer", key, buffer: w.shared });
     const appWindow: AppWindow = {
       id: key,
       width,
@@ -351,6 +373,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       return;
     }
     app = loaded;
+    sendStats = startMessage.stats;
     screenWidth = startMessage.screen.width;
     bandHeight = startMessage.screen.height;
     screen = newBitMap(screenWidth, bandHeight);
@@ -442,6 +465,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
           const y = msg.y + w.slot * bandHeight;
           ui.dispatchPointer(msg.kind, msg.x, y, { deltaY: msg.deltaY, modifiers: msg.modifiers });
           if (msg.kind !== "scroll") trackCursor(w, msg.x, y);
+          renderNow();
           return;
         }
         case "key": {
@@ -450,6 +474,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
           lastSeq = Math.max(lastSeq, msg.seq);
           focusWindow(w);
           ui.dispatchKeyboard(msg.kind, msg.value, msg.modifiers);
+          renderNow();
           return;
         }
         case "menu":

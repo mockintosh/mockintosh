@@ -64,6 +64,8 @@ export interface ProcessStart {
   video: boolean;
   /** Sprites the app may ask for by name that aren't its own (OS icons, other apps'). */
   sprites: Record<string, Sprite>;
+  /** Send `frameStats` for the Worker menu. */
+  stats: boolean;
 }
 
 /** Progress of a `video.excerpt` call: the excerpt once it exists, then its pictures as they decode. */
@@ -121,6 +123,13 @@ export type ProcessToHost =
       /** `render` times of the audio chunks made since the last frame. */
       audioMs: number[];
     }
+  /**
+   * Window `key` publishes its pictures in shared memory (`sharedFrame.ts`)
+   * from now on, instead of in `frame` messages.
+   */
+  | { t: "frameBuffer"; key: string; buffer: SharedArrayBuffer }
+  /** Timings for the Worker menu, when the start asked for them. */
+  | { t: "frameStats"; frameMs: number; audioMs: number[] }
   | { t: "cursor"; key: string; cursor: CursorSpec }
   /** `menus` for window `key`; `null` gives the window back the app's menus. */
   | { t: "menus"; key: string; menus: WireMenu[] }
