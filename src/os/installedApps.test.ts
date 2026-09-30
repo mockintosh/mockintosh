@@ -215,11 +215,21 @@ describe("App Store window", () => {
       os.kernel.invoke(caller, "inspect", { window: window.id }) as Promise<InspectionNode[]>;
     const text = (nodes: InspectionNode[]) => nodes.map((node) => node.text).join("\n");
 
-    const before = text(await inspect());
+    const beforeNodes = await inspect();
+    const before = text(beforeNodes);
     expect(before).toContain("Mockintosh Apps");
     expect(before).toContain("Shelf");
-    expect(before).toContain("Sits on a shelf.");
+    expect(before).not.toContain("Sits on a shelf.");
     expect(before).not.toContain("From the Registry");
+    expect(beforeNodes.some((node) => node.name === "app-shelf")).toBe(true);
+    expect(beforeNodes.some((node) => node.name === "install-shelf")).toBe(false);
+
+    await os.kernel.invoke(caller, "click", { name: "app-shelf", window: window.id });
+    platform.tick();
+    const opened = text(await inspect());
+    expect(opened).toContain("Shelf");
+    expect(opened).toContain("Sits on a shelf.");
+    expect(opened).not.toContain("Mockintosh Apps");
 
     await os.kernel.invoke(caller, "click", { name: "install-shelf", window: window.id });
     await vi.waitFor(async () => {
@@ -232,5 +242,12 @@ describe("App Store window", () => {
     const shortcut = os.services.fs.child(os.services.fs.locate("desktop")!.id, "Shelf");
     expect(shortcut).toMatchObject({ kind: "file", type: MIME.appShortcut });
     expect((await inspect()).some((node) => node.name === "open-shelf")).toBe(true);
+
+    await os.kernel.invoke(caller, "click", { name: "app-back", window: window.id });
+    platform.tick();
+    const list = text(await inspect());
+    expect(list).toContain("Mockintosh Apps");
+    expect(list).toContain("Shelf");
+    expect(list).not.toContain("Sits on a shelf.");
   });
 });
