@@ -825,8 +825,21 @@ function drawBitmap(
   SetPort(ctx.port);
   const savedClip = snapshotClip(ctx.port);
   intersectClip(ctx.port, makeRect(y, x, y + height, x + width));
-  createRasterSurface(ctx.port, { x, y, width, height }).blitPixels(pixels, bufW, rows);
+  // CopyBits clips to the port's clip region itself (StdBits), so a bitmap
+  // in a rounded box is masked by QuickDraw's own region blit.
+  CopyBits(packedBitmap(pixels, bufW, rows), ctx.port.portBits, makeRect(0, 0, rows, bufW), makeRect(y, x, y + rows, x + bufW), srcCopy, null);
   restoreClip(ctx.port, savedClip);
+}
+
+/** Packed copies of `<bitmap>` buffers; a new `pixels` array is a new picture. */
+const packedBitmaps = new WeakMap<Uint8Array, BitMap>();
+
+function packedBitmap(pixels: Uint8Array, width: number, rows: number): BitMap {
+  const have = packedBitmaps.get(pixels);
+  if (have && have.bounds.right === width && have.bounds.bottom === rows) return have;
+  const packed = bitMapFromPixels(pixels, width, rows);
+  packedBitmaps.set(pixels, packed);
+  return packed;
 }
 
 // -------------------------------------------------------------------------

@@ -158,3 +158,43 @@ describe("ink fill", () => {
     expect(pixels.every((p) => p === 0 || p === 1)).toBe(true);
   });
 });
+
+describe("bitmap under a rounded clip", () => {
+  it("draws exactly the pixels inside the clip region", () => {
+    const size = 40;
+    const screen = newBitMap(size, size);
+    const ctx = createDrawContext(screen);
+    const root = createNode("_root");
+    root.style.width = size;
+    root.style.height = size;
+    root.layout = { x: 0, y: 0, width: size, height: size };
+    const clip = createNode("box");
+    clip.style = { width: size, height: size, overflow: "hidden" };
+    clip.props = { borderRadius: size / 2 };
+    clip.parent = root;
+    root.children = [clip];
+    const bitmap = createNode("bitmap");
+    bitmap.style = { width: size, height: size };
+    bitmap.props = { pixels: new Uint8Array(size * size).fill(1) };
+    bitmap.parent = clip;
+    clip.children = [bitmap];
+    computeLayout(root, size, size, () => ({ width: 0, height: 0 }));
+    drawTree(root, ctx);
+
+    // The clip is the filled round rect: the same shape PaintRoundRect inks.
+    const expected = newBitMap(size, size);
+    const reference = createDrawContext(expected);
+    const disc = createNode("box");
+    disc.style = { width: size, height: size };
+    disc.props = { background: 1, borderRadius: size / 2 };
+    disc.parent = root;
+    root.children = [disc];
+    computeLayout(root, size, size, () => ({ width: 0, height: 0 }));
+    drawTree(root, reference);
+
+    const drawn = pixelsFromBitMap(screen);
+    expect(drawn).toEqual(pixelsFromBitMap(expected));
+    expect(drawn[0]).toBe(0);
+    expect(drawn[(size / 2) * size + size / 2]).toBe(1);
+  });
+});
