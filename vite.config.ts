@@ -51,21 +51,14 @@ function sharedRuntimeImportMap(): Plugin {
   };
 }
 
-export default defineConfig({
-  optimizeDeps: {
-    exclude: ["@rollup/browser", "@solidjs/compiler-wasm32-wasi", "libfx"],
-    include: ["solid-js", "solid-js/refresh", "@solidjs/universal", "typescript"],
-  },
-  // The Oxc WASM loader uses top-level await and nested workers; IIFE
-  // worker bundles reject both. Keep the compiler worker as ESM so the
-  // 5.8 MB .wasm stays out of the desktop entry.
-  worker: {
-    format: "es",
-  },
-  plugins: [
-    // Only transform files in packages/ui and apps that use Solid JSX.
-    // Must use "universal" generate mode so JSX compiles to the custom
-    // CanvasNode renderer instead of the DOM.
+/**
+ * Only transform files in packages/ui and apps that use Solid JSX.
+ * Must use "universal" generate mode so JSX compiles to the custom
+ * CanvasNode renderer instead of the DOM. The page and the app-process
+ * worker both need it; Vite bundles workers with their own plugin list.
+ */
+function solidJsx(): Plugin[] {
+  return [
     solid({
       include: [
         /packages\/ui\/(?!src\/primitives\/).*\.[tj]sx?$/,
@@ -80,6 +73,23 @@ export default defineConfig({
         moduleName: "@mockintosh/ui/renderer",
       },
     }),
+  ];
+}
+
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ["@rollup/browser", "@solidjs/compiler-wasm32-wasi", "libfx"],
+    include: ["solid-js", "solid-js/refresh", "@solidjs/universal", "typescript"],
+  },
+  // The Oxc WASM loader uses top-level await and nested workers; IIFE
+  // worker bundles reject both. Keep the compiler worker as ESM so the
+  // 5.8 MB .wasm stays out of the desktop entry.
+  worker: {
+    format: "es",
+    plugins: () => solidJsx(),
+  },
+  plugins: [
+    solidJsx(),
     sharedRuntimeImportMap(),
   ],
   resolve: {

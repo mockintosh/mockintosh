@@ -117,7 +117,16 @@ const STOP_GRACE_MS = 250;
 
 export class AppProcess {
   readonly windows = new Map<string, ProcessWindowHost>();
-  readonly stats = { worker: new Samples(), blit: new Samples(), latency: new Samples(), audio: new Samples(), frames: 0 };
+  readonly stats = {
+    worker: new Samples(),
+    blit: new Samples(),
+    latency: new Samples(),
+    audio: new Samples(),
+    frames: 0,
+    /** From spawning the worker to the OS taking its first picture. */
+    firstPictureMs: null as number | null,
+  };
+  private readonly spawnedAt: number;
   /** Input sent and not yet seen in a frame: seq → time sent. */
   readonly sentAt = new Map<number, number>();
   private seq = 0;
@@ -135,6 +144,7 @@ export class AppProcess {
   private removeBeforeFrame: () => void = () => {};
 
   constructor(private readonly options: AppProcessOptions) {
+    this.spawnedAt = options.os.scheduler.now();
     this.port = options.port;
     this.context = options.context;
     this.os = options.os;
@@ -229,6 +239,12 @@ export class AppProcess {
     this.os.instances?.stop(this.options.instanceId);
   }
 
+  private notePicture(): void {
+    if (this.stats.firstPictureMs !== null) return;
+    this.stats.firstPictureMs = this.os.scheduler.now() - this.spawnedAt;
+    if (this.options.stats) console.info(`[process] ${this.options.appId}: first picture ${this.stats.firstPictureMs.toFixed(0)} ms after spawn`);
+  }
+
   /** At the start of the OS's frame: take any picture the worker published since the last one. */
   private takeSharedFrames(): void {
     for (const w of this.windows.values()) {
@@ -240,6 +256,7 @@ export class AppProcess {
       w.frame = bits;
       w.frameSeq = seq;
       w.frameBytes = bytes;
+      this.notePicture();
       w.changed?.("frame");
       this.os.scheduleRepaint();
     }
@@ -270,6 +287,7 @@ export class AppProcess {
         w.frame = { baseAddr: new Uint8Array(msg.buffer), rowBytes: msg.rowBytes, bounds: { top: 0, left: 0, bottom: msg.height, right: msg.width } };
         w.frameSeq = msg.seq;
         w.frameBytes = msg.buffer.byteLength;
+        this.notePicture();
         w.changed?.("frame");
         return;
       }

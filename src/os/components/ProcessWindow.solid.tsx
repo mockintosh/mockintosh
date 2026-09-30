@@ -45,6 +45,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
         onClick: () => {
           const s = proc.stats;
           const lines = [
+            `First picture ${s.firstPictureMs === null ? "—" : `${s.firstPictureMs.toFixed(0)} ms`} after start`,
             `${s.frames} frames, ${((host?.frameBytes ?? 0) / 1024).toFixed(1)} KB each`,
             `Worker draw: ${s.worker.summary()}`,
             `Main blit: ${s.blit.summary()}`,

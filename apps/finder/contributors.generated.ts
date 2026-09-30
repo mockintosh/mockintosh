@@ -9,6 +9,6 @@ export interface Contributor {
 export const contributors: Contributor[] = [
   {
     "username": "gustavlrsn",
-    "commits": 178
+    "commits": 205
   }
 ];
