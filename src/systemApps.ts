@@ -22,6 +22,7 @@ import { spotifySprites } from "@/apps/sprites/spotify";
 import { sprites as macpaintSprites } from "@/apps/macpaint/icons";
 import { sprites as canvasSprites } from "@/apps/canvas/icons";
 import { sprites as surfaceSprites } from "@/apps/surface/icons";
+import { sprites as showreelSprites } from "@/apps/showreel/icons";
 import { sprites as synthSprites } from "@/apps/synth/icons";
 import { sprites as chordSprites } from "@/apps/chord/icons";
 import { sprites as op1Sprites } from "@/apps/op1/icons";
@@ -114,6 +115,15 @@ registerBundledApp({
 });
 
 registerBundledApp({
+  id: "canvas-worker",
+  title: "Canvas Webworker",
+  description: "Canvas running in a Web Worker, to compare with the main-thread Canvas. Its Worker menu shows timings.",
+  icon: "canvas/icon",
+  sprites: canvasSprites,
+  load: () => import("@/apps/CanvasWorker"),
+});
+
+registerBundledApp({
   id: "surface",
   title: "Surface",
   description: "Plots z = f(x, y, t) as a 3D mesh you can orbit.",
@@ -162,6 +172,25 @@ registerBundledApp({
   sprites: op1Sprites,
   requires: ["audio"],
   load: () => import("@/apps/OP1"),
+});
+
+registerBundledApp({
+  id: "showreel-worker",
+  title: "Showreel Webworker",
+  description: "The Showreel running in a Web Worker, sound included, to compare with the main-thread Showreel. Its Worker menu shows timings.",
+  icon: "showreel/icon",
+  sprites: showreelSprites,
+  load: () => import("@/apps/ShowreelWorker"),
+});
+
+registerBundledApp({
+  id: "op1-worker",
+  title: "OP-1 Webworker",
+  description: "The OP-1 running in a Web Worker, sound included, to compare with the main-thread OP-1. Its Worker menu shows timings.",
+  icon: "op1/icon",
+  sprites: op1Sprites,
+  requires: ["audio"],
+  load: () => import("@/apps/OP1Worker"),
 });
 
 registerBundledApp({
