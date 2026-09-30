@@ -117,6 +117,8 @@ export type {
 export type {
   AudioService,
   AudioMonitor,
+  AudioPortOptions,
+  AudioPortStream,
   AudioStream,
   AudioStreamOptions,
   AudioStreamState,

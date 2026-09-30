@@ -94,6 +94,37 @@ export interface AudioService {
    * meters and visualizers. Absent on a speaker whose mix can't be read back.
    */
   monitor?(): Promise<AudioMonitor>;
+  /**
+   * Host-only: open a stream whose samples are rendered on another thread.
+   * The OS hands the returned `port` to a worker-hosted app, which feeds the
+   * speaker through it directly, so the main thread stays out of the audio
+   * path. Absent where the speaker can't take a port.
+   */
+  openPort?(options: AudioPortOptions): Promise<AudioPortStream>;
+}
+
+export interface AudioPortOptions {
+  channels?: 1 | 2;
+  latency?: AudioLatency;
+}
+
+/**
+ * A speaker stream fed through a port. The speaker posts `{ played }` (frames
+ * played so far) on `port` every few quanta; the renderer answers with
+ * `{ type: "chunk", data }`, `data` an interleaved `Float32Array`, keeping
+ * about `target` frames queued. `port` is a `MessagePort`; transfer it.
+ */
+export interface AudioPortStream {
+  readonly sampleRate: number;
+  readonly channels: 1 | 2;
+  /** Frames to keep queued ahead of the speaker. */
+  readonly target: number;
+  /** Frames between a sample leaving the stream and being heard, right now. */
+  outputLatencyFrames(): number;
+  readonly port: unknown;
+  state(): AudioStreamState;
+  onStateChange(listener: (state: AudioStreamState) => void): () => void;
+  close(): void;
 }
 
 /** Equal-tempered frequency of a MIDI note (A4 = 69 = 440 Hz). */

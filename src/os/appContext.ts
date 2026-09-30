@@ -8,6 +8,8 @@ import type {
   AgentRuntime,
   AppContext,
   AudioMonitor,
+  AudioPortOptions,
+  AudioPortStream,
   AudioService,
   KernelClient,
   MicrophoneService,
@@ -73,7 +75,19 @@ function kernelClientFor(os: OSServices, appId: string, instanceId?: string): Ke
 /** The speaker as one launch sees it: its streams and monitors close when the launch ends. */
 function instanceAudio(os: OSServices, audio: AudioService, instanceId?: string): AudioService {
   const monitor = audio.monitor?.bind(audio);
+  const openPort = audio.openPort?.bind(audio);
   return {
+    ...(openPort && {
+      async openPort(portOptions: AudioPortOptions): Promise<AudioPortStream> {
+        const stream = await openPort(portOptions);
+        if (!instanceId || !os.instances) return stream;
+        const disown = os.instances.own(instanceId, () => stream.close());
+        stream.onStateChange((state) => {
+          if (state === "closed") disown();
+        });
+        return stream;
+      },
+    }),
     async open(streamOptions) {
       const stream = await audio.open(streamOptions);
       if (!instanceId || !os.instances) return stream;
