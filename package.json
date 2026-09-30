@@ -38,6 +38,7 @@
     "fonts:import-pixel": "python3 scripts/import-geist-pixel.py",
     "fonts:import-lisa": "python3 scripts/import-lisa-terminal.py",
     "fonts:import-bmfont": "python3 scripts/import-bmfont.py",
+    "fonts:import-redaction": "tsx scripts/import-redaction.ts",
     "fonts:import-geneva-bold": "tsx scripts/import-geneva-bold.ts",
     "fonts:import-geneva-12": "python3 scripts/import-geneva-12.py && tsx scripts/import-geneva-12-bold.ts",
     "fonts:import-city": "python3 scripts/import-city-fonts.py",

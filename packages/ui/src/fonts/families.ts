@@ -4,14 +4,7 @@ import { BUILTIN_FONT_GENEVA_12 } from "./faces/geneva12";
 import { BUILTIN_FONT_GENEVA_12_BOLD } from "./faces/genevaTwelveBold";
 import { BUILTIN_FONT_LISA } from "./faces/lisa";
 import { BUILTIN_FONT_PIXEL } from "./faces/pixel";
-import {
-  BUILTIN_FONT_REDACTION_20,
-  BUILTIN_FONT_REDACTION_20_INFO,
-  BUILTIN_FONT_REDACTION_20_OVERHANGS,
-  BUILTIN_FONT_REDACTION_35,
-  BUILTIN_FONT_REDACTION_35_INFO,
-  BUILTIN_FONT_REDACTION_35_OVERHANGS,
-} from "./faces/redaction";
+import * as R from "./faces/redaction";
 import { BUILTIN_FONT_JISKAN_16, BUILTIN_FONT_JISKAN_16_INFO } from "./faces/jiskan";
 import { CITY_GENERATED } from "./faces/city/generated";
 
@@ -31,7 +24,10 @@ export interface FontFamilyInfo {
 export interface FontStrikeSpec {
   family: string;
   size: number;
-  data: string;
+  /** Styled face this strike draws (1 bold, 2 italic); plain when absent. */
+  style?: 1 | 2;
+  /** `%%FNT1` block, or a loader for a large strike fetched on first use. */
+  data: string | (() => Promise<string>);
   info?: { ascent: number; descent: number; leading: number };
   /**
    * Ordinal → [advance, originX] for glyphs whose ink overhangs their
@@ -99,6 +95,62 @@ export const CITY_FAMILY_ORDER = [
   "losAngeles",
 ] as const;
 
+type RedactionSize = 10 | 14 | 20 | 29 | 50 | 100;
+const REDACTION_SIZES: readonly RedactionSize[] = [10, 14, 20, 29, 50, 100];
+
+/** Redaction's bitmaps by size: Regular 10–29 are bundled, the rest load on first use. */
+const REDACTION_DATA: Readonly<Record<RedactionSize, FontStrikeSpec["data"]>> = {
+  10: R.BUILTIN_FONT_REDACTION_10,
+  14: R.BUILTIN_FONT_REDACTION_14,
+  20: R.BUILTIN_FONT_REDACTION_20,
+  29: R.BUILTIN_FONT_REDACTION_29,
+  50: () => import("./faces/redaction50").then((m) => m.BUILTIN_FONT_REDACTION_50),
+  100: () => import("./faces/redaction100").then((m) => m.BUILTIN_FONT_REDACTION_100),
+};
+const REDACTION_BOLD_DATA: Readonly<Record<RedactionSize, FontStrikeSpec["data"]>> = {
+  10: () => import("./faces/redactionBold").then((m) => m.BUILTIN_FONT_REDACTION_BOLD_10),
+  14: () => import("./faces/redactionBold").then((m) => m.BUILTIN_FONT_REDACTION_BOLD_14),
+  20: () => import("./faces/redactionBold").then((m) => m.BUILTIN_FONT_REDACTION_BOLD_20),
+  29: () => import("./faces/redactionBold").then((m) => m.BUILTIN_FONT_REDACTION_BOLD_29),
+  50: () => import("./faces/redactionBold50").then((m) => m.BUILTIN_FONT_REDACTION_BOLD_50),
+  100: () => import("./faces/redactionBold100").then((m) => m.BUILTIN_FONT_REDACTION_BOLD_100),
+};
+const REDACTION_ITALIC_DATA: Readonly<Record<RedactionSize, FontStrikeSpec["data"]>> = {
+  10: () => import("./faces/redactionItalic").then((m) => m.BUILTIN_FONT_REDACTION_ITALIC_10),
+  14: () => import("./faces/redactionItalic").then((m) => m.BUILTIN_FONT_REDACTION_ITALIC_14),
+  20: () => import("./faces/redactionItalic").then((m) => m.BUILTIN_FONT_REDACTION_ITALIC_20),
+  29: () => import("./faces/redactionItalic").then((m) => m.BUILTIN_FONT_REDACTION_ITALIC_29),
+  50: () => import("./faces/redactionItalic50").then((m) => m.BUILTIN_FONT_REDACTION_ITALIC_50),
+  100: () => import("./faces/redactionItalic100").then((m) => m.BUILTIN_FONT_REDACTION_ITALIC_100),
+};
+
+/** Redaction's pixel cuts (100, 70, 50, 35, 20, 10), each at the size where its grid is one pixel. */
+const REDACTION_STRIKES: readonly FontStrikeSpec[] = REDACTION_SIZES.flatMap((size): FontStrikeSpec[] => [
+  {
+    family: "redaction",
+    size,
+    data: REDACTION_DATA[size],
+    info: R[`BUILTIN_FONT_REDACTION_${size}_INFO`],
+    overhangs: R[`BUILTIN_FONT_REDACTION_${size}_OVERHANGS`],
+  },
+  {
+    family: "redaction",
+    size,
+    style: 1,
+    data: REDACTION_BOLD_DATA[size],
+    info: R[`BUILTIN_FONT_REDACTION_BOLD_${size}_INFO`],
+    overhangs: R[`BUILTIN_FONT_REDACTION_BOLD_${size}_OVERHANGS`],
+  },
+  {
+    family: "redaction",
+    size,
+    style: 2,
+    data: REDACTION_ITALIC_DATA[size],
+    info: R[`BUILTIN_FONT_REDACTION_ITALIC_${size}_INFO`],
+    overhangs: R[`BUILTIN_FONT_REDACTION_ITALIC_${size}_OVERHANGS`],
+  },
+]);
+
 const VENDORED_STRIKES: readonly FontStrikeSpec[] = [
   { family: "chicago", size: 12, data: BUILTIN_FONT_MENU, info: { ascent: 12, descent: 3, leading: 0 } },
   { family: "geneva", size: 9, data: BUILTIN_FONT_BODY, info: { ascent: 10, descent: 2, leading: 0 } },
@@ -106,20 +158,7 @@ const VENDORED_STRIKES: readonly FontStrikeSpec[] = [
   { family: "monaco", size: 9, data: BUILTIN_FONT_MONO, info: { ascent: 9, descent: 2, leading: 0 } },
   { family: "lisa", size: 12, data: BUILTIN_FONT_LISA, info: { ascent: 10, descent: 2, leading: 0 } },
   { family: "pixel", size: 24, data: BUILTIN_FONT_PIXEL },
-  {
-    family: "redaction",
-    size: 20,
-    data: BUILTIN_FONT_REDACTION_20,
-    info: BUILTIN_FONT_REDACTION_20_INFO,
-    overhangs: BUILTIN_FONT_REDACTION_20_OVERHANGS,
-  },
-  {
-    family: "redaction",
-    size: 35,
-    data: BUILTIN_FONT_REDACTION_35,
-    info: BUILTIN_FONT_REDACTION_35_INFO,
-    overhangs: BUILTIN_FONT_REDACTION_35_OVERHANGS,
-  },
+  ...REDACTION_STRIKES,
   { family: "jiskan", size: 16, data: BUILTIN_FONT_JISKAN_16, info: BUILTIN_FONT_JISKAN_16_INFO },
 ];
 

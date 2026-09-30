@@ -106,6 +106,7 @@ export {
   listFontFamilies,
   getFont,
   requireFont,
+  fetchFont,
   defaultFontSize,
   registerOutlineFace,
   registerStyledStrike,

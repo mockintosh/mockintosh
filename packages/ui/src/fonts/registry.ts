@@ -15,10 +15,13 @@ import {
   ROLE_ALIASES,
   familyDisplayName,
   type FontFamilyInfo,
+  type FontStrikeSpec,
 } from "./families";
 
 let strikes: Map<string, Map<number, DeckerFont>> | undefined;
 let pendingStrikes: Map<string, Map<number, string>> | undefined;
+let lazyStrikes: Map<string, Map<number, () => Promise<string>>> | undefined;
+let fetchingStrikes: Map<string, Promise<void>> | undefined;
 let pendingBaked: Map<string, { family: string; size: number; data: string }> | undefined;
 let aliases: Map<string, { family: string; size: number }> | undefined;
 let defaults: Map<string, number> | undefined;
@@ -30,6 +33,9 @@ function strikeMap(): Map<string, Map<number, DeckerFont>> {
 }
 function pendingStrikeMap(): Map<string, Map<number, string>> {
   return (pendingStrikes ??= new Map());
+}
+function lazyStrikeMap(): Map<string, Map<number, () => Promise<string>>> {
+  return (lazyStrikes ??= new Map());
 }
 function pendingBakedMap(): Map<string, { family: string; size: number; data: string }> {
   return (pendingBaked ??= new Map());
@@ -118,7 +124,8 @@ function nearestSize(sizes: Iterable<number>, requested: number): number {
   return best;
 }
 
-function knownSizes(family: string): number[] {
+/** Sizes in memory (decoded or not), without lazy strikes still to fetch. */
+function readySizes(family: string): number[] {
   const decoded = strikeMap().get(family);
   const pending = pendingStrikeMap().get(family);
   const sizes = new Set<number>();
@@ -127,12 +134,55 @@ function knownSizes(family: string): number[] {
   return [...sizes];
 }
 
+function knownSizes(family: string): number[] {
+  const lazy = lazyStrikeMap().get(family);
+  return lazy ? [...new Set([...readySizes(family), ...lazy.keys()])] : readySizes(family);
+}
+
+/** Fetch a lazy built-in strike; fonts change once it lands (or is dropped on failure). */
+function fetchStrike(family: string, size: number): Promise<void> {
+  const key = fontInfoKey(family, size);
+  const fetching = (fetchingStrikes ??= new Map());
+  const inFlight = fetching.get(key);
+  if (inFlight) return inFlight;
+  const load = lazyStrikeMap().get(family)?.get(size);
+  if (!load) return Promise.resolve();
+  const done = load()
+    .then(
+      (data) => {
+        if (lazyStrikeMap().get(family)?.has(size)) sizesOf(pendingStrikeMap(), family).set(size, data);
+      },
+      (error: unknown) => console.warn(`Fonts: couldn't load ${family} ${size}`, error),
+    )
+    .finally(() => {
+      lazyStrikeMap().get(family)?.delete(size);
+      fetching.delete(key);
+      fontsChanged();
+    });
+  fetching.set(key, done);
+  return done;
+}
+
 function ensureStrike(family: string, size: number): DeckerFont | null {
   const have = strikeMap().get(family)?.get(size);
   if (have) return have;
   const data = pendingStrikeMap().get(family)?.get(size);
-  if (!data) return null;
+  if (!data) {
+    if (!lazyStrikeMap().get(family)?.has(size)) return null;
+    void fetchStrike(family, size);
+    // Until it lands a styled request is synthesized on the plain face;
+    // a plain one draws with the nearest size already in memory.
+    if (family.includes(STYLE_MARK)) return null;
+    const ready = readySizes(family);
+    return ready.length ? ensureStrike(family, nearestSize(ready, size)) : null;
+  }
   const font = loadStrike(family, size, data);
+  const mark = family.indexOf(STYLE_MARK);
+  if (mark >= 0) {
+    // A built-in styled face: named for its family, as registerStyledStrike does.
+    font.name = family.slice(0, mark);
+    font.fontInfo ??= infoMap().get(fontInfoKey(family, size));
+  }
   putStrike(family, size, font);
   pendingStrikeMap().get(family)?.delete(size);
   return font;
@@ -176,17 +226,28 @@ function loadFont(name: string, data: string): DeckerFont {
   return applyExtraGlyphs(decodeDeckerFont(data, name));
 }
 
+function sizesOf<T>(map: Map<string, Map<number, T>>, family: string): Map<number, T> {
+  let bySize = map.get(family);
+  if (!bySize) {
+    bySize = new Map();
+    map.set(family, bySize);
+  }
+  return bySize;
+}
+
+function addBuiltinStrike({ family: base, size, style, data }: FontStrikeSpec): void {
+  const family = strikeKey(base, style ?? 0);
+  if (typeof data === "string") sizesOf(pendingStrikeMap(), family).set(size, data);
+  else if (!readySizes(family).includes(size)) sizesOf(lazyStrikeMap(), family).set(size, data);
+}
+
 export function initBuiltinFonts(): void {
   if (builtInsInitialized) return;
   for (const strike of BUILTIN_STRIKES) {
-    let bySize = pendingStrikeMap().get(strike.family);
-    if (!bySize) {
-      bySize = new Map();
-      pendingStrikeMap().set(strike.family, bySize);
-    }
-    bySize.set(strike.size, strike.data);
-    rememberInfo(strike.family, strike.size, strike.info);
-    if (strike.overhangs) overhangMap().set(fontInfoKey(strike.family, strike.size), strike.overhangs);
+    addBuiltinStrike(strike);
+    const key = strikeKey(strike.family, strike.style ?? 0);
+    rememberInfo(key, strike.size, strike.info);
+    if (strike.overhangs) overhangMap().set(fontInfoKey(key, strike.size), strike.overhangs);
   }
   for (const [name, alias] of Object.entries(BAKED_STYLE_ALIASES)) {
     pendingBakedMap().set(name, alias);
@@ -297,6 +358,20 @@ export function getFontForScaling(name: string = "body", size?: number): DeckerF
     sizes.find((s) => s > size) ??
     sizes[sizes.length - 1]!;
   return ensureStrike(family, pick);
+}
+
+/**
+ * {@link getFont}, after fetching the strike if it's a lazy built-in
+ * (large sizes load on first use; until then `getFont` returns the nearest
+ * size in memory). With `bits` (1 bold, 2 italic), that styled face's
+ * strike, or null when the family has none at that size.
+ */
+export async function fetchFont(name: string = "body", size?: number, bits = 0): Promise<DeckerFont | null> {
+  initBuiltinFonts();
+  const ref = resolveFaceRef(name, size);
+  const key = strikeKey(ref.family, bits & (STYLE_BOLD | STYLE_ITALIC));
+  await fetchStrike(key, ref.size);
+  return key === ref.family ? getFont(name, size) : ensureStrike(key, ref.size);
 }
 
 export function requireFont(name: string = "body", size?: number): DeckerFont {
@@ -533,14 +608,7 @@ export function unregisterFamily(family: string): void {
     if (key.startsWith(`${family}${STYLE_MARK}`)) pendingStrikeMap().delete(key);
   }
   const builtin = BUILTIN_STRIKES.filter((s) => s.family === family);
-  for (const strike of builtin) {
-    let bySize = pendingStrikeMap().get(family);
-    if (!bySize) {
-      bySize = new Map();
-      pendingStrikeMap().set(family, bySize);
-    }
-    bySize.set(strike.size, strike.data);
-  }
+  for (const strike of builtin) addBuiltinStrike(strike);
   if (builtin.length === 0) defaultMap().delete(family);
   fontsChanged();
 }

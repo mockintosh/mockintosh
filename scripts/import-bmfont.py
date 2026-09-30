@@ -28,14 +28,6 @@ FACES = ROOT / "packages/ui/src/fonts/faces"
 
 # family key, output module, [(export name, source .fnt, point size)]
 IMPORTS = [
-    (
-        "redaction",
-        "redaction.ts",
-        [
-            ("BUILTIN_FONT_REDACTION_20", "Redaction20-Regular.fnt", 20),
-            ("BUILTIN_FONT_REDACTION_35", "Redaction35-Regular.fnt", 35),
-        ],
-    ),
     ("jiskan", "jiskan.ts", [("BUILTIN_FONT_JISKAN_16", "Jiskan16.fnt", 16)]),
 ]
 
