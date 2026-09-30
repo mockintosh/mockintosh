@@ -310,7 +310,7 @@ export class FileSystem {
     const parent = this.requireDirectory(parentId);
     const existing = this.child(parent.id, name);
     if (existing) {
-      if (existing.kind === "directory") return existing;
+      if (existing.kind === "directory") return this.adoptRole(existing, options.role);
       throw new FSError("exists", `A file named "${name}" already exists`);
     }
     const now = this.now();
@@ -340,6 +340,22 @@ export class FileSystem {
       s.childIds[parent.id].push(dir.id);
       indexRole(s, dir.id);
       touch(s, parent.id, now);
+    });
+    return (this.state.nodes[dir.id] as FSDirectory | undefined) ?? dir;
+  }
+
+  /**
+   * A plain folder that already has a role folder's name (a user-made
+   * "Fonts" from before the OS knew the role) becomes that role folder,
+   * so the OS finds what the user put in it.
+   */
+  private adoptRole(dir: FSDirectory, role: NodeRole | undefined): FSDirectory {
+    if (!role || dir.role || role === "root" || role === "volume") return dir;
+    const vol = volumeIdOf(this.state.nodes, dir.id);
+    if (!vol || this.state.roles[roleKey(vol, role)]) return dir;
+    this.commit((s) => {
+      s.nodes[dir.id]!.role = role;
+      indexRole(s, dir.id);
     });
     return (this.state.nodes[dir.id] as FSDirectory | undefined) ?? dir;
   }

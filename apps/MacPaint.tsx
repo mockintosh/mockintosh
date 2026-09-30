@@ -220,6 +220,7 @@ function startSession(app: AppContext, screenWidth: number, screenHeight: number
       await app.print?.printPicture(pageImage(page));
     },
     fontNames: () => listFontFamilies().map((f) => f.name),
+    fontLabel: (name) => listFontFamilies().find((f) => f.name === name)?.displayName,
     fontNumber: (name) => fontFamilyId(name),
     applicationFont: () => "geneva",
   };
@@ -257,7 +258,10 @@ function startSession(app: AppContext, screenWidth: number, screenHeight: number
     dialog: (id) => dialogs.get(id)?.win,
   };
 
+  const stopFontWatch = app.fonts.onChange(() => program.refreshFonts());
+
   app.onCleanup?.(() => {
+    stopFontWatch();
     cancelFrame?.();
     if (current === session) current = null;
   });

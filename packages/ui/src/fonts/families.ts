@@ -9,7 +9,14 @@ import { CITY_GENERATED } from "./faces/city/generated";
 export interface FontFamilyInfo {
   name: string;
   defaultSize: number;
+  /** Bitmap strike sizes (the ones a size menu shows outlined). */
   sizes: readonly number[];
+  /** Ships with the system (not installed from the Fonts folder or at run time). */
+  builtIn?: boolean;
+  /** Has an outline: any size draws without bitmap scaling. */
+  scalable?: boolean;
+  /** Name for menus (`name` is the registry key): the font's own family name for outlines. */
+  displayName: string;
 }
 
 export interface FontStrikeSpec {
@@ -48,6 +55,19 @@ export const FAMILY_DEFAULTS: Readonly<Record<string, number>> = {
   lisa: 12,
   pixel: 24,
 };
+
+/** Menu names for built-in families whose key isn't just the name lowercased. */
+const BUILTIN_DISPLAY_NAMES: Readonly<Record<string, string>> = {
+  newYork: "New York",
+  sanFrancisco: "San Francisco",
+  losAngeles: "Los Angeles",
+  pixel: "Geist Pixel",
+};
+
+/** How a menu shows a family key: `newYork` → "New York", `futura` → "Futura". */
+export function familyDisplayName(key: string): string {
+  return BUILTIN_DISPLAY_NAMES[key] ?? key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
+}
 
 export const CITY_FAMILY_ORDER = [
   "chicago",

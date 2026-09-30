@@ -1,3 +1,4 @@
+import { drawableFont } from "./fonts";
 import { describe, expect, it } from "vitest";
 import {
   allocateId,
@@ -49,16 +50,34 @@ describe("parseDocument", () => {
     expect(doc.height).toBe(384);
   });
 
-  it("keeps Geist Pixel and falls unknown faces back to body", () => {
+  it("keeps any family name, so a document outlives an uninstalled font; blank falls back to body", () => {
     const doc = parseDocument({
       version: 1,
       elements: [
         { id: "e1", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "pixel", align: "left" },
-        { id: "e2", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "chicago", align: "left" },
+        { id: "e2", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "futura", align: "left" },
+        { id: "e3", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "", align: "left" },
       ],
     });
     expect((doc.elements[0] as TextElement).font).toBe("pixel");
-    expect((doc.elements[1] as TextElement).font).toBe("body");
+    expect((doc.elements[1] as TextElement).font).toBe("futura");
+    expect((doc.elements[2] as TextElement).font).toBe("body");
+    expect(drawableFont("futura")).toBe("body");
+    expect(drawableFont("pixel")).toBe("pixel");
+  });
+
+  it("keeps a text size in range and drops a bad one", () => {
+    const doc = parseDocument({
+      version: 1,
+      elements: [
+        { id: "e1", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "body", size: 24, align: "left" },
+        { id: "e2", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "body", size: 900, align: "left" },
+        { id: "e3", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "body", align: "left" },
+      ],
+    });
+    expect((doc.elements[0] as TextElement).size).toBe(24);
+    expect((doc.elements[1] as TextElement).size).toBeUndefined();
+    expect(doc.elements[2]).not.toHaveProperty("size");
   });
 
   it("rejects the wrong version", () => {

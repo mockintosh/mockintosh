@@ -1,20 +1,12 @@
-import type { FontRasterMode, FontRasterOptions, FontRasterService } from "@mockintosh/sdk";
-import { rasterizeOutline } from "./raster";
+import type { FontRasterOptions, FontRasterService } from "@mockintosh/sdk";
+import { SCALER_MODES, rasterizeWithScaler } from "./raster";
 
+/** Rasterizing without a host font engine: the Font Manager's own scaler. */
 export function createOutlineFontRasterService(): FontRasterService {
   return {
-    modes: () => ["outline", "x2", "x3"] as const,
+    modes: () => SCALER_MODES,
     async rasterize(bytes, options: FontRasterOptions) {
-      const oversample = options.mode === "x3" ? 3 : options.mode === "x2" ? 2 : 1;
-      return rasterizeOutline(bytes, {
-        size: options.size,
-        threshold: options.threshold,
-        spacing: options.spacing,
-        chars: options.chars,
-        oversample,
-      });
+      return rasterizeWithScaler(bytes, options.mode === "hinted" ? { ...options, mode: "auto" } : options);
     },
   };
 }
-
-export const OUTLINE_MODES: readonly FontRasterMode[] = ["outline", "x2", "x3"];

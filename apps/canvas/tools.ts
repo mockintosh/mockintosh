@@ -1,4 +1,3 @@
-import type { CanvasFont } from "./document";
 
 export const TOOL_IDS = ["select", "text", "rect", "roundrect", "oval", "line"] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
@@ -19,13 +18,6 @@ export const TOOL_GRID: readonly ToolId[][] = [
 ];
 
 export const SHAPE_TOOLS = new Set<ToolId>(["rect", "roundrect", "oval", "line"]);
-
-export const FONT_LABEL: Record<CanvasFont, string> = {
-  body: "Geneva",
-  menu: "Chicago",
-  mono: "Monaco",
-  pixel: "Geist Pixel",
-};
 
 export const FILL_LABEL: Record<"none" | "white" | "black" | "gray25" | "gray50" | "gray75", string> = {
   none: "None",

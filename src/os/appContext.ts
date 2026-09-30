@@ -14,7 +14,7 @@ import type {
   SignInService,
   WindowSpec,
 } from "@mockintosh/sdk";
-import { listFontFamilies, registerFont } from "@mockintosh/ui";
+import { listFontFamilies, onFontsChanged, registerFont } from "@mockintosh/ui";
 import type { OSServices, IconScreenRect } from "./context";
 import { createAppSignIn, type SystemSignIn } from "./signIn";
 import { createAppStorage } from "./appStorage";
@@ -194,6 +194,8 @@ export function createAppContext(
         registerFont(name, data, size);
       },
       list: () => listFontFamilies(),
+      onChange: onFontsChanged,
+      install: os.fontFolder && ((suitcase) => os.fontFolder!.install(suitcase)),
     },
     kernel: kernelClientFor(os, appId, options.instanceId),
     scheduler: {

@@ -1,5 +1,5 @@
 import type { DeckerFont } from "./font";
-import { getGlyphPixel, getGlyphWidth } from "./font";
+import { carryAdvances, getGlyphPixel, getGlyphWidth } from "./font";
 
 /**
  * Font Manager bold (`DrawText.a` smear): each pixel ORs onto its right
@@ -9,7 +9,9 @@ import { getGlyphPixel, getGlyphWidth } from "./font";
 export function smearDeckerFontBold(font: DeckerFont, name: string): DeckerFont {
   const maxWidth = font.maxWidth + 1;
   const glyphHeight = font.glyphHeight;
-  const glyphStride = Math.ceil(maxWidth / 8) * glyphHeight;
+  const above = font.inkAbove ?? 0;
+  const below = font.inkBelow ?? 0;
+  const glyphStride = Math.ceil(maxWidth / 8) * (above + glyphHeight + below);
   const glyphWidths = new Uint8Array(256);
   const glyphData = new Uint8Array(256 * glyphStride);
   const byteWidth = Math.ceil(maxWidth / 8);
@@ -20,11 +22,11 @@ export function smearDeckerFontBold(font: DeckerFont, name: string): DeckerFont 
     const nextWidth = width + 1;
     glyphWidths[glyphIndex] = nextWidth;
     const base = glyphIndex * glyphStride;
-    for (let y = 0; y < glyphHeight; y++) {
+    for (let y = -above; y < glyphHeight + below; y++) {
       for (let x = 0; x < nextWidth; x++) {
         const ink = getGlyphPixel(font, glyphIndex, x, y) || getGlyphPixel(font, glyphIndex, x - 1, y);
         if (!ink) continue;
-        glyphData[base + y * byteWidth + (x >> 3)] |= 1 << (7 - (x & 7));
+        glyphData[base + (y + above) * byteWidth + (x >> 3)] |= 1 << (7 - (x & 7));
       }
     }
   }
@@ -38,6 +40,7 @@ export function smearDeckerFontBold(font: DeckerFont, name: string): DeckerFont 
     glyphStride,
     glyphWidths,
     glyphData,
+    ...carryAdvances(font, glyphWidths),
     sourceFormat: "FNT1",
     outlinePad: font.outlinePad,
     shadowPad: font.shadowPad,

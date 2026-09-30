@@ -369,6 +369,7 @@ export function DrText(
   const fm = globals.fontPtr as FMOutput | null;
   if (!fm?.fontHandle) return; // Text.a:607-611 — nil font: no draw, no bump
   const strike = fm.fontHandle;
+  strike.prepare?.(textAddr, count);
   const widths = fm.widthTable;
   const penLoc = clonePt(port.pnLoc);
 

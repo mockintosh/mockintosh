@@ -1,5 +1,5 @@
 import type { DeckerFont } from "./font";
-import { getGlyphPixel, getGlyphWidth } from "./font";
+import { carryAdvances, getGlyphPixel, getGlyphWidth } from "./font";
 
 /** 1px on every side of the core. */
 export const OUTLINE_PAD = 1;
@@ -24,7 +24,9 @@ export function outlineDeckerFont(font: DeckerFont, name: string): DeckerFont {
   const pad = OUTLINE_PAD;
   const maxWidth = font.maxWidth + pad * 2;
   const glyphHeight = font.glyphHeight + pad * 2;
-  const glyphStride = Math.ceil(maxWidth / 8) * glyphHeight;
+  const above = font.inkAbove ?? 0;
+  const below = font.inkBelow ?? 0;
+  const glyphStride = Math.ceil(maxWidth / 8) * (above + glyphHeight + below);
   const glyphWidths = new Uint8Array(256);
   const glyphData = new Uint8Array(256 * glyphStride);
   const byteWidth = Math.ceil(maxWidth / 8);
@@ -35,7 +37,7 @@ export function outlineDeckerFont(font: DeckerFont, name: string): DeckerFont {
     const nextWidth = width + pad * 2;
     glyphWidths[glyphIndex] = nextWidth;
     const dest = glyphIndex * glyphStride;
-    for (let y = 0; y < glyphHeight; y++) {
+    for (let y = -above; y < glyphHeight + below; y++) {
       for (let x = 0; x < nextWidth; x++) {
         const ox = x - pad;
         const oy = y - pad;
@@ -47,7 +49,7 @@ export function outlineDeckerFont(font: DeckerFont, name: string): DeckerFont {
           break;
         }
         if (!ring) continue;
-        glyphData[dest + y * byteWidth + (x >> 3)] |= 1 << (7 - (x & 7));
+        glyphData[dest + (y + above) * byteWidth + (x >> 3)] |= 1 << (7 - (x & 7));
       }
     }
   }
@@ -61,6 +63,7 @@ export function outlineDeckerFont(font: DeckerFont, name: string): DeckerFont {
     glyphStride,
     glyphWidths,
     glyphData,
+    ...carryAdvances(font, glyphWidths),
     sourceFormat: "FNT1",
     outlinePad: pad,
     shadowPad: font.shadowPad,
@@ -74,7 +77,9 @@ export function padDeckerShadow(font: DeckerFont, name: string): DeckerFont {
   const pad = SHADOW_PAD;
   const maxWidth = font.maxWidth + pad;
   const glyphHeight = font.glyphHeight + pad;
-  const glyphStride = Math.ceil(maxWidth / 8) * glyphHeight;
+  const above = font.inkAbove ?? 0;
+  const below = font.inkBelow ?? 0;
+  const glyphStride = Math.ceil(maxWidth / 8) * (above + glyphHeight + below);
   const glyphWidths = new Uint8Array(256);
   const glyphData = new Uint8Array(256 * glyphStride);
   const byteWidth = Math.ceil(maxWidth / 8);
@@ -85,10 +90,10 @@ export function padDeckerShadow(font: DeckerFont, name: string): DeckerFont {
     const nextWidth = width + pad;
     glyphWidths[glyphIndex] = nextWidth;
     const dest = glyphIndex * glyphStride;
-    for (let y = 0; y < font.glyphHeight; y++) {
+    for (let y = -above; y < font.glyphHeight + below; y++) {
       for (let x = 0; x < width; x++) {
         if (!getGlyphPixel(font, glyphIndex, x, y)) continue;
-        glyphData[dest + y * byteWidth + (x >> 3)] |= 1 << (7 - (x & 7));
+        glyphData[dest + (y + above) * byteWidth + (x >> 3)] |= 1 << (7 - (x & 7));
       }
     }
   }
@@ -102,6 +107,7 @@ export function padDeckerShadow(font: DeckerFont, name: string): DeckerFont {
     glyphStride,
     glyphWidths,
     glyphData,
+    ...carryAdvances(font, glyphWidths),
     sourceFormat: "FNT1",
     outlinePad: font.outlinePad,
     shadowPad: (font.shadowPad ?? 0) + pad,

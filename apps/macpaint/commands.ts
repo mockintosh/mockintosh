@@ -80,8 +80,8 @@ function item(label: string, enabled: boolean, checked = false, shortcut?: strin
   return shortcut ? { label, shortcut, enabled, checked } : { label, enabled, checked };
 }
 
-function fontLabel(name: string): string {
-  return name.replace(/(^|[\s-])\w/g, (c) => c.toUpperCase());
+function fontLabel(p: Paint, name: string): string {
+  return p.host.fontLabel?.(name) ?? name.replace(/(^|[\s-])\w/g, (c) => c.toUpperCase());
 }
 
 /** The menubar as `CheckMenus` and the `CheckItem` calls leave it. */
@@ -147,7 +147,7 @@ export function menuModel(p: Paint): PaintMenu[] {
     {
       id: FONT_MENU,
       title: "Font",
-      items: p.fonts.map((name, i) => item(fontLabel(name), on(textOk), p.theFont === i + 1)),
+      items: p.fonts.map((name, i) => item(fontLabel(p, name), on(textOk), p.theFont === i + 1)),
     },
     {
       id: SIZE_MENU,

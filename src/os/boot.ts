@@ -28,6 +28,7 @@ import { cursorForName, cursors } from "./cursors";
 import { animateZoomRect, type AnimRect } from "./zoomAnimation";
 import { buildFolderWindow, windowOuterRect } from "../../apps/Finder.solid";
 import { bootstrapFileSystem } from "./fsBootstrap";
+import { createFontFolder } from "./fontFolder";
 import { resolveOpenAction } from "./openers";
 import { claimMenubarEdge, stepMenubarReveal } from "./menubarReveal";
 import { createScreenshots, type Screenshots } from "./screenshot";
@@ -182,6 +183,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   const kernel = new Kernel();
   registerFileOperations(kernel, fs, platform.source);
   const desktopSettings = await createDesktopSettings(fs);
+  const fontFolder = await createFontFolder(fs);
 
   // --- Installed apps (manifests live in /Applications) ---
   const capabilities = platformCapabilities(platform);
@@ -240,6 +242,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     microphone: platform.microphone,
     agentRuntime: platform.agentRuntime,
     fonts: platform.fonts,
+    fontFolder,
     crypto: platform.crypto,
     browser: platform.browser,
     signIn: platform.signInRelay && systemSignIn(platform.signInRelay),

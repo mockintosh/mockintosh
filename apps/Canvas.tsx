@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onSettled } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onSettled } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { fontLineHeight, layoutText, requireFont } from "@mockintosh/ui";
 import {
@@ -18,6 +18,8 @@ import {
   emptyDocument,
   HANDLE_SIZE,
   handlePosition,
+  MAX_TEXT_SIZE,
+  MIN_TEXT_SIZE,
   lineEndpoints,
   lineFrame,
   normalizeFrame,
@@ -41,10 +43,10 @@ import { sprites, TOOL_ICONS } from "./canvas/icons";
 import { matchingPageSize, pageSize, pageSizeLabel, type PageSizeId } from "./canvas/page";
 import {
   FILL_LABEL,
-  FONT_LABEL,
   TOOL_GRID,
   type ToolId,
 } from "./canvas/tools";
+import { drawableFont, effectiveSize, fontFamilyOf, fontLabel, fontMenu, sizeChoices } from "./canvas/fonts";
 
 const TOOLS_W = 37;
 const CELL = 16;
@@ -117,6 +119,11 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   const [fill, setFill] = createSignal<FillStyle>("none");
   const [stroke, setStroke] = createSignal(true);
   const [font, setFont] = createSignal<CanvasFont>("body");
+  /** Size for new text; undefined draws at the font's default. */
+  const [size, setSize] = createSignal<number | undefined>(undefined);
+  // Every family: built in, from System Folder › Fonts, or installed by Foundry. Live.
+  const [families, setFamilies] = createSignal(app.fonts.list());
+  onCleanup(app.fonts.onChange(() => setFamilies(app.fonts.list())));
   const [fileId, setFileId] = createSignal<string | undefined>(
     typeof props.fileId === "string" ? props.fileId : undefined,
   );
@@ -203,7 +210,10 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
       setFill(el.fill);
       setStroke(el.stroke);
     }
-    if (el?.type === "text") setFont(el.font);
+    if (el?.type === "text") {
+      setFont(el.font);
+      setSize(el.size);
+    }
   }
 
   function updateElement(id: string, update: (el: CanvasElement) => CanvasElement): void {
@@ -238,10 +248,10 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   }
 
   function defaultTextSize(): { width: number; height: number } {
-    const face = font();
+    const face = drawableFont(font());
     return {
-      width: Math.max(48, measureText("Text", face) + 8),
-      height: fontLineHeight(face) + 4,
+      width: Math.max(48, measureText("Text", face, {}, size()) + 8),
+      height: fontLineHeight(face, size()) + 4,
     };
   }
 
@@ -260,6 +270,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
         height: frame.height,
         text: "Text",
         font: font(),
+        ...(size() === undefined ? {} : { size: size() }),
         align: "left",
       };
     }
@@ -395,7 +406,35 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     const el = selected();
     if (!el || el.type !== "text") return;
     pushUndo();
-    updateElement(el.id, () => ({ ...el, font: next, height: Math.max(el.height, fontLineHeight(next) + 4) }));
+    updateElement(el.id, () => fitText({ ...el, font: next }));
+  }
+
+  async function chooseSize(current: number): Promise<void> {
+    const typed = await app.os.showDialog({
+      message: `Font size (${MIN_TEXT_SIZE}–${MAX_TEXT_SIZE}):`,
+      buttons: ["Cancel", "OK"],
+      showInput: true,
+      inputDefault: String(current),
+      variant: "note",
+    });
+    const n = Math.round(Number(typed));
+    if (typed && Number.isFinite(n)) applySize(Math.max(MIN_TEXT_SIZE, Math.min(MAX_TEXT_SIZE, n)));
+  }
+
+  function applySize(next: number): void {
+    setSize(next);
+    const el = selected();
+    if (!el || el.type !== "text") return;
+    pushUndo();
+    updateElement(el.id, () => fitText({ ...el, size: next }));
+  }
+
+  /** Grow a text box to fit its text in a new font or size, never shrinking it. */
+  function fitText(el: TextElement): TextElement {
+    const face = requireFont(drawableFont(el.font), el.size);
+    const width = Math.max(el.width, Math.min(layoutText(face, el.text).width, artW() - el.x));
+    const height = Math.max(el.height, layoutText(face, el.text, width).height, fontLineHeight(drawableFont(el.font), el.size) + 4);
+    return { ...el, width, height };
   }
 
   function applyAlign(next: TextElement["align"]): void {
@@ -411,6 +450,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     setSelectedId(el.id);
     setEditingId(el.id);
     setFont(el.font);
+    setSize(el.size);
   }
 
   /** Leaving a text box with nothing in it removes it, as in Figma and Sketch. */
@@ -427,7 +467,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   function onTextChange(id: string, value: string): void {
     updateElement(id, (el) => {
       if (el.type !== "text") return el;
-      const font = requireFont(el.font);
+      const font = requireFont(drawableFont(el.font), el.size);
       const width = Math.max(el.width, Math.min(layoutText(font, value).width, artW() - el.x));
       const height = Math.max(el.height, layoutText(font, value, width).height);
       return { ...el, text: value, width, height };
@@ -640,12 +680,16 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
         isShape: !!el && el.type !== "text",
         editing: editingId() !== null,
         font: el?.type === "text" ? el.font : font(),
+        size: effectiveSize(el?.type === "text" ? el.font : font(), el?.type === "text" ? el.size : size()),
+        sizes: sizeChoices(el?.type === "text" ? el.font : font(), families()),
+        scalable: families().some((f) => f.scalable && f.name === fontFamilyOf(el?.type === "text" ? el.font : font())),
         align: el?.type === "text" ? el.align : "left",
         fill: el && el.type !== "text" ? el.fill : fill(),
         stroke: el && el.type !== "text" ? el.stroke : stroke(),
         pageW: doc().width,
         pageH: doc().height,
         paper: print?.paperWidth,
+        families: families(),
       };
     },
     (s) => {
@@ -708,14 +752,9 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
           items: [
             {
               type: "radiogroup",
-              value: s.font,
+              value: fontFamilyOf(s.font),
               onValueChange: (v) => applyFont(v as CanvasFont),
-              items: [
-                { label: FONT_LABEL.menu, value: "menu" },
-                { label: FONT_LABEL.body, value: "body" },
-                { label: FONT_LABEL.mono, value: "mono" },
-                { label: FONT_LABEL.pixel, value: "pixel" },
-              ],
+              items: fontMenu(s.families).map((f) => ({ label: f.displayName, value: f.name })),
             },
             { type: "separator" },
             {
@@ -728,6 +767,25 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
                 { label: "Right", value: "right", disabled: !s.isText },
               ],
             },
+          ],
+        },
+        {
+          label: "Size",
+          items: [
+            {
+              type: "radiogroup",
+              value: String(s.size),
+              onValueChange: (v) => applySize(Number(v)),
+              items: [...new Set([...s.sizes, s.size])]
+                .sort((a, b) => a - b)
+                .map((n) => ({ label: `${n} point`, value: String(n) })),
+            },
+            ...(s.scalable
+              ? ([
+                  { type: "separator" },
+                  { label: "Other…", onClick: () => void chooseSize(s.size) },
+                ] satisfies MenubarItemDef[])
+              : []),
           ],
         },
         {
@@ -855,7 +913,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
           <Show
             when={editingId() === el().id}
             fallback={
-              <text font={textEl().font} align={textEl().align} wrap>
+              <text font={drawableFont(textEl().font)} size={textEl().size} align={textEl().align} wrap>
                 {textEl().text}
               </text>
             }
@@ -863,7 +921,8 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
             <EditableText
               name={`text-${el().id}`}
               value={textEl().text}
-              font={textEl().font}
+              font={drawableFont(textEl().font)}
+              size={textEl().size}
               align={textEl().align}
               width={el().width}
               height={el().height}
@@ -952,7 +1011,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
   const status = () => {
     const el = selected();
     if (!el) return `${elements().length} object${elements().length === 1 ? "" : "s"}`;
-    if (el.type === "text") return `${FONT_LABEL[el.font]} text`;
+    if (el.type === "text") return `${fontLabel(el.font, families())} ${effectiveSize(el.font, el.size)} text`;
     return `${el.width} x ${el.height}`;
   };
 

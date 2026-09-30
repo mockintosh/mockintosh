@@ -3,6 +3,8 @@
  * font records and sprite data encode and decode identically on every engine.
  */
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const INDEX = new Int8Array(128).fill(-1);
+for (let i = 0; i < ALPHABET.length; i++) INDEX[ALPHABET.charCodeAt(i)] = i;
 
 export function decodeBase64(s: string): Uint8Array {
   const clean = s.replace(/[^A-Za-z0-9+/]/g, "");
@@ -11,7 +13,7 @@ export function decodeBase64(s: string): Uint8Array {
   let bits = 0;
   let n = 0;
   for (let i = 0; i < clean.length; i++) {
-    acc = ((acc << 6) | ALPHABET.indexOf(clean[i])) & 0xffffff;
+    acc = ((acc << 6) | INDEX[clean.charCodeAt(i)]!) & 0xffffff;
     bits += 6;
     if (bits >= 8) {
       bits -= 8;

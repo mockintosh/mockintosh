@@ -10,7 +10,7 @@
 
 import { EraseRect, PaintRect } from "@mockintosh/quickdraw";
 import { makeRect } from "@mockintosh/quickdraw/bits";
-import { charAdvance, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, textAdvance, type DeckerFont } from "./font";
+import { charAdvance, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, glyphOriginX, textAdvance, type DeckerFont } from "./font";
 import { faceMetrics } from "./metrics";
 
 /** Pixels `[left, right)` of an underline, measured from the pen. */
@@ -36,8 +36,9 @@ export function underlineSpans(font: DeckerFont, text: string): UnderlineSpan[] 
     const glyph = getGlyphIndexForChar(font, ch);
     if (glyph >= 0) {
       const glyphWidth = getGlyphWidth(font, glyph);
-      for (let x = 0; x < glyphWidth && pen + x < width; x++) {
-        if (rows.some((y) => getGlyphPixel(font, glyph, x, y))) ink[pen + x + 1] = 1;
+      const left = pen - glyphOriginX(font, glyph);
+      for (let x = 0; x < glyphWidth && left + x < width; x++) {
+        if (left + x >= -1 && rows.some((y) => getGlyphPixel(font, glyph, x, y))) ink[left + x + 1] = 1;
       }
     }
     pen += charAdvance(font, ch);

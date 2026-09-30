@@ -17,7 +17,7 @@ import {
 } from "@mockintosh/quickdraw";
 import { initBuiltinFonts } from "./registry";
 import { resolveFont, textFace, type FontStyle } from "./style";
-import { encodeUiText, fontAscent, fontFamilyId, hostSwapFont } from "./strike";
+import { drawUiText, encodeUiText, fontAscent, fontFamilyId, hostSwapFont } from "./strike";
 import { textAdvance } from "./font";
 import { faceMetricsByName } from "./metrics";
 import { drawUnderline } from "./underline";
@@ -103,9 +103,7 @@ export function drawStyledLine(
       }
       TextFace(face);
       applyInk(color ? 0 : 1);
-      MoveTo(cursor + pad, y + pad + inner.glyphHeight);
-      const innerBytes = encodeUiText(inner, ch);
-      DrawText(innerBytes, 0, innerBytes.length);
+      drawUiText(inner, ch, cursor + pad, y + pad + inner.glyphHeight);
       TextFace(ringFace);
       applyInk(color);
       MoveTo(cursor, y + ring.glyphHeight);
@@ -113,9 +111,7 @@ export function drawStyledLine(
     } else {
       TextFace(face);
       applyInk(color);
-      const bytes = encodeUiText(inner, ch);
-      MoveTo(cursor, y + inner.glyphHeight);
-      DrawText(bytes, 0, bytes.length);
+      drawUiText(inner, ch, cursor, y + inner.glyphHeight);
     }
     cursor += textAdvance(measured, ch);
   }
@@ -157,9 +153,7 @@ export function drawString(
   } else {
     TextFace(textFace(style));
     applyInk(color);
-    const bytes = encodeUiText(font, text);
-    MoveTo(x, y + font.glyphHeight);
-    DrawText(bytes, 0, bytes.length);
+    drawUiText(font, text, x, y + font.glyphHeight);
     if (style.underline) drawUnderline(font, text, x, y, color);
   }
   if (previous) SetPort(previous);

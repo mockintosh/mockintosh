@@ -36,6 +36,12 @@ export interface FontStrike {
   owTable: Int16Array;
   /** Optional; present when `fontType` bit 0 is set. High=top, low=height. */
   heightTable?: Int16Array;
+  /**
+   * Host hook, not in the Mac record: an outline-scaled strike renders
+   * glyphs on first use, so `DrText` asks it to fill these characters
+   * into `bitImage` before blitting.
+   */
+  prepare?: (chars: readonly number[], count: number) => void;
 }
 
 /** Packed `FMInput` (`Text.a:614-622`). */

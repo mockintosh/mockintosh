@@ -10,7 +10,8 @@ export const DOCUMENT_VERSION = 1 as const;
 /** New documents, and saved files that don't record a size yet. */
 export const DEFAULT_PAGE = { width: 288, height: 288 } as const;
 
-export type CanvasFont = "body" | "menu" | "mono" | "pixel";
+/** A system face (`body`, `menu`, `mono`, `pixel`) or an installed family's registry key. */
+export type CanvasFont = string;
 export type CanvasAlign = "left" | "center" | "right";
 export type FillStyle = "none" | "white" | "black" | "gray25" | "gray50" | "gray75";
 export type ShapeKind = "rect" | "roundrect" | "oval" | "line";
@@ -37,6 +38,8 @@ export interface TextElement extends Frame {
   type: "text";
   text: string;
   font: CanvasFont;
+  /** Point size; absent means the font's own default size. */
+  size?: number;
   align: CanvasAlign;
 }
 
@@ -55,10 +58,11 @@ export type Handle = ResizeHandle | LineHandle;
 
 export const MIN_SHAPE = 8;
 export const MIN_TEXT_W = 24;
+export const MIN_TEXT_SIZE = 4;
+export const MAX_TEXT_SIZE = 127;
 export const LINE_HIT_SLACK = 3;
 export const HANDLE_SIZE = 5;
 
-const FONTS = new Set<CanvasFont>(["body", "menu", "mono", "pixel"]);
 const ALIGNS = new Set<CanvasAlign>(["left", "center", "right"]);
 const FILLS = new Set<FillStyle>(["none", "white", "black", "gray25", "gray50", "gray75"]);
 const SHAPES = new Set<ShapeKind>(["rect", "roundrect", "oval", "line"]);
@@ -115,7 +119,10 @@ function parseText(raw: Record<string, unknown>, id: string): TextElement {
     type: "text",
     ...parseFrame(raw),
     text: typeof raw.text === "string" ? raw.text : "",
-    font: FONTS.has(raw.font as CanvasFont) ? (raw.font as CanvasFont) : "body",
+    font: typeof raw.font === "string" && raw.font ? raw.font : "body",
+    ...(typeof raw.size === "number" && raw.size >= MIN_TEXT_SIZE && raw.size <= MAX_TEXT_SIZE
+      ? { size: Math.round(raw.size) }
+      : {}),
     align: ALIGNS.has(raw.align as CanvasAlign) ? (raw.align as CanvasAlign) : "left",
   };
 }

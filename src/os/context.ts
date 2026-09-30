@@ -69,6 +69,8 @@ export interface OSServices {
   microphone?: MicrophoneService;
   agentRuntime?: AgentRuntime;
   fonts?: FontRasterService;
+  /** System Folder › Fonts, installed with the Font Manager. */
+  fontFolder?: import("./fontFolder").FontFolder;
   crypto: AppCrypto;
   browser?: BrowserService;
   /** Phone sign-in (`useApp().signIn`), when the platform has a relay. */

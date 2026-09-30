@@ -14,11 +14,12 @@ describe("bootstrapFileSystem", () => {
     const fs = await bootedFS();
     const hd = fs.locate("volume")!;
     expect(hd.name).toBe(STARTUP_VOLUME_NAME);
-    for (const role of ["desktop", "trash", "applications", "system", "preferences", "pictures", "extensions", "printer-drivers"] as const) {
+    for (const role of ["desktop", "trash", "applications", "system", "preferences", "pictures", "extensions", "printer-drivers", "fonts"] as const) {
       expect(fs.locate(role, hd.id), role).toBeDefined();
     }
     expect(fs.pathOf(fs.locate("preferences")!.id)).toBe(`/${STARTUP_VOLUME_NAME}/System Folder/Preferences`);
     expect(fs.pathOf(fs.locate("pictures")!.id)).toBe(`/${STARTUP_VOLUME_NAME}/Pictures`);
+    expect(fs.pathOf(fs.locate("fonts")!.id)).toBe(`/${STARTUP_VOLUME_NAME}/System Folder/Fonts`);
     expect(fs.pathOf(fs.locate("printer-drivers")!.id)).toBe(
       `/${STARTUP_VOLUME_NAME}/System Folder/Extensions/Printer Drivers`,
     );

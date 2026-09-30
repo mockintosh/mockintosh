@@ -5,10 +5,10 @@ import {
   type Style,
 } from "@mockintosh/quickdraw";
 import type { DeckerFont } from "./font";
-import { getGlyphPixel, getGlyphWidth } from "./font";
+import { carryAdvances, getGlyphPixel, getGlyphWidth } from "./font";
 import { smearDeckerFontBold } from "./boldSmear";
 import { outlineDeckerFont, padDeckerShadow } from "./outlineSmear";
-import { requireFont } from "./registry";
+import { getRealFace, requireFont } from "./registry";
 
 /**
  * Synthesized type style. Bold, italic, outline, and shadow are Font Manager
@@ -84,7 +84,17 @@ function styleBits(style: FontStyle): number {
  * FontInfo stays on the base name. Drawing uses {@link textFace}.
  */
 export function resolveFont(name: string = "body", style: FontStyle = {}, size?: number): DeckerFont {
-  const base = requireFont(name, size);
+  // A real Bold / Italic face (suitcase strike or outline) replaces the smear / slant.
+  const wanted = (style.bold ? STYLE_BOLD : 0) | (style.italic ? STYLE_ITALIC : 0);
+  const real = wanted ? getRealFace(name, wanted, size) : null;
+  if (real?.covered) {
+    style = {
+      ...style,
+      bold: style.bold && !(real.covered & STYLE_BOLD),
+      italic: style.italic && !(real.covered & STYLE_ITALIC),
+    };
+  }
+  const base = real?.covered ? real.font : requireFont(name, size);
   const bits = styleBits(style);
   if (bits === 0) return base;
 
@@ -110,7 +120,9 @@ export function widenDeckerAdvance(font: DeckerFont, extra: number, name: string
   if (extra < 1) return font;
   const maxWidth = font.maxWidth + extra;
   const glyphHeight = font.glyphHeight;
-  const glyphStride = Math.ceil(maxWidth / 8) * glyphHeight;
+  const above = font.inkAbove ?? 0;
+  const below = font.inkBelow ?? 0;
+  const glyphStride = Math.ceil(maxWidth / 8) * (above + glyphHeight + below);
   const glyphWidths = new Uint8Array(256);
   const glyphData = new Uint8Array(256 * glyphStride);
   const byteWidth = Math.ceil(maxWidth / 8);
@@ -121,10 +133,10 @@ export function widenDeckerAdvance(font: DeckerFont, extra: number, name: string
     const nextWidth = width + extra;
     glyphWidths[glyphIndex] = nextWidth;
     const dest = glyphIndex * glyphStride;
-    for (let y = 0; y < glyphHeight; y++) {
+    for (let y = -above; y < glyphHeight + below; y++) {
       for (let x = 0; x < width; x++) {
         if (!getGlyphPixel(font, glyphIndex, x, y)) continue;
-        glyphData[dest + y * byteWidth + (x >> 3)] |= 1 << (7 - (x & 7));
+        glyphData[dest + (y + above) * byteWidth + (x >> 3)] |= 1 << (7 - (x & 7));
       }
     }
   }
@@ -138,6 +150,7 @@ export function widenDeckerAdvance(font: DeckerFont, extra: number, name: string
     glyphStride,
     glyphWidths,
     glyphData,
+    ...carryAdvances(font, glyphWidths),
     sourceFormat: "FNT1",
     outlinePad: font.outlinePad,
     shadowPad: font.shadowPad,

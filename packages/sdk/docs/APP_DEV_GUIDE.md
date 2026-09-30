@@ -152,7 +152,11 @@ The screen is 1-bit. Every colour prop (`background`, `color`, `borderColor`) ta
 - `"menu"` — titles and control labels
 - `"mono"` — fixed-width content
 
-`measureText(text, font?)` is re-exported from `@mockintosh/ui`.
+Any installed family works too: the Mac city fonts (`"geneva"`, `"newYork"`, …) and whatever the user put in System Folder › Fonts, by registry key (`familyKey("Futura")` → `"futura"`). `<text size={n}>` picks the strike: a bitmap family snaps to its nearest bitmap size, a TrueType family draws at exactly `n`, rendered and hinted by the Font Manager's scaler. `bold` / `italic` use a real Bold or Italic face when the family has one and synthesize otherwise.
+
+`useApp().fonts.list()` returns every family (`scalable` marks outline families, `displayName` is the font's own name for menus). Rebuild a Font menu from `fonts.onChange(listener)`. `fonts.install(suitcase)` saves a `FontSuitcase` into the Fonts folder for every app; Foundry is the app that makes them.
+
+`measureText(text, font?, style?, size?)` is re-exported from `@mockintosh/ui`; it includes pair kerning, so measure with it rather than summing glyph widths.
 
 ### Text alignment
 

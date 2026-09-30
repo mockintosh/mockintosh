@@ -288,6 +288,11 @@ EXTRA_GLYPHS.forEach((def, index) => {
   extraOrdinalByCodeUnit.set(def.char.charCodeAt(0), EXTRA_ORDINAL_BASE + index);
 });
 
+/** The symbol at a Mockintosh ordinal, or `undefined` outside the extra range. */
+export function extraCharForOrdinal(ordinal: number): string | undefined {
+  return EXTRA_GLYPHS[ordinal - EXTRA_ORDINAL_BASE]?.char;
+}
+
 /** Ordinal for a Mockintosh symbol, or `undefined` if the code unit isn't one. */
 export function extraOrdinalForCharCode(codeUnit: number): number | undefined {
   return extraOrdinalByCodeUnit.get(codeUnit);

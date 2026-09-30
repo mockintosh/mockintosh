@@ -131,10 +131,6 @@ The original Mac Window Record had a **refCon** (reference constant) field: an a
 
 Today we have `windowId`, `appId`, and `props` per window; `refCon` would be a single optional slot (e.g. `refCon?: unknown`) set at open time. The OS would never read or interpret it—only pass it back when the window is referenced. If we later want a cleaner “window ↔ document” story or fewer ad-hoc maps in app code, adding refCon is a small, Mac-aligned option. See the Window Manager refactor plan for the deferred refCon item.
 
-## Font System Overhaul
+## Fonts
 
-The current font rendering path triggers `willReadFrequently` warnings from Chrome — `buildGlyphCache` in `fontAdapter.ts` makes repeated `getImageData` calls on a canvas that wasn't created with the `willReadFrequently` hint. The immediate fix is to pass `{ willReadFrequently: true }` when creating that offscreen canvas, but this is a good opportunity to review the font subsystem more broadly:
-
-- **Performance:** Profile glyph cache construction. Are we rebuilding caches that could be reused across frames or app reloads? Could we pre-build the cache at startup and store it in an `ImageBitmap` or similar?
-- **Custom fonts:** Allow users (and third-party apps) to supply their own bitmap fonts. This means defining a font format — likely a PNG sprite sheet plus a JSON descriptor mapping codepoints to glyph rects — and a registration API on `AppContext` or `OSServices`.
-- **Multi-size support:** Currently fonts are a single pixel size. Consider whether the system should support multiple sizes per typeface, or rely on nearest-neighbor scaling from a base size.
+Font ideas (built-in suitcases in the Fonts folder, a TrueType bytecode interpreter, printing at device resolution) live in [`docs/fonts.md`](docs/fonts.md#future-ideas).

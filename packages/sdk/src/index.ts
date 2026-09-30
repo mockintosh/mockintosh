@@ -151,11 +151,34 @@ export {
   getGlyphPixel,
   getGlyphWidth,
   getGlyphIndexForChar,
+  glyphAdvance,
+  glyphOriginX,
   registerFont,
   listFonts,
   listFontFamilies,
+  bakeOutlineStrike,
+  clampBakeSize,
+  MIN_BAKE_SIZE,
+  MAX_BAKE_SIZE,
+  OutlineFace,
+  peekSfntFamily,
+  familyKey,
+  encodeSuitcase,
+  decodeSuitcase,
+  outlineStyleOf,
+  SUITCASE_BOLD,
+  SUITCASE_ITALIC,
 } from "@mockintosh/ui";
-export type { FontStrikeDraft, FontStrikeGlyph, DeckerFont, FontFamilyInfo } from "@mockintosh/ui";
+export type {
+  FontStrikeDraft,
+  FontStrikeGlyph,
+  DeckerFont,
+  FontFamilyInfo,
+  FontSuitcase,
+  SuitcaseStrike,
+  SuitcaseOutline,
+  FamilyScalerSettings,
+} from "@mockintosh/ui";
 export type { KernelClient, KernelInvokeOptions, KernelPermission, OperationContract } from "./kernel";
 export type { AppCrypto } from "./crypto";
 export type { BrowserService } from "./browser";
@@ -486,9 +509,9 @@ export interface AppContext {
   microphone?: MicrophoneService;
   /** Language-model agents, when this platform can run them. */
   agentRuntime?: AgentRuntime;
-  /** Rasterize a host TrueType/OpenType file to a 1-bit strike, when this platform can. */
+  /** Bake a TrueType / OpenType file into a 1-bit strike (Foundry). */
   fontRaster?: FontRasterService;
-  /** Install a Decker strike for this boot (Font/DA Mover). */
+  /** The Font Manager: installed families, session strikes, and System Folder › Fonts. */
   fonts: FontRegistryService;
   /** Frame clock and monotonic time. */
   scheduler: AppScheduler;

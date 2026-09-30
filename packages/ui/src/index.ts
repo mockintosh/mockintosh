@@ -99,13 +99,46 @@ export { computeLayout } from "./layout";
 export type { MeasureFunc } from "./layout";
 export { useFocus, getFocusManager } from "./focusContext";
 export { useMeasure } from "./measure";
-export { registerFont, listFonts, listFontSizes, listFontFamilies, getFont, requireFont, defaultFontSize } from "./fonts/registry";
-export type { FontFamilyInfo } from "./fonts/registry";
+export {
+  registerFont,
+  listFonts,
+  listFontSizes,
+  listFontFamilies,
+  getFont,
+  requireFont,
+  defaultFontSize,
+  registerOutlineFace,
+  registerStyledStrike,
+  unregisterFamily,
+  setFamilySettings,
+  familySettings,
+  familyKey,
+  onFontsChanged,
+  fontsVersion,
+  DEFAULT_FAMILY_SETTINGS,
+} from "./fonts/registry";
+export type { FontFamilyInfo, OutlineFaceRegistration } from "./fonts/registry";
+export type { FamilyScalerSettings } from "./fonts/outlineStrike";
+export { OutlineFace, openOutlineFace, DEFAULT_SCALER_OPTIONS } from "./fonts/truetype/scaler";
+export type { ScalerOptions, StrikeMetrics, RenderedGlyph } from "./fonts/truetype/scaler";
+export { bakeOutlineStrike, clampBakeSize, MIN_BAKE_SIZE, MAX_BAKE_SIZE } from "./fonts/truetype/bake";
+export type { BakeOptions } from "./fonts/truetype/bake";
+export { peekSfntFamily } from "./fonts/truetype/sfnt";
+export {
+  encodeSuitcase,
+  decodeSuitcase,
+  installSuitcase,
+  suitcaseKey,
+  outlineStyleOf,
+  SUITCASE_BOLD,
+  SUITCASE_ITALIC,
+} from "./fonts/suitcase";
+export type { FontSuitcase, SuitcaseStrike, SuitcaseOutline } from "./fonts/suitcase";
 export { encodeDeckerFont, decodeDeckerFont } from "./fonts/codec";
 export { deckerFontFromDraft, draftFromDeckerFont } from "./fonts/draft";
 export type { FontStrikeDraft, FontStrikeGlyph } from "./fonts/draft";
 export { DROM_CHARS, deckerOrdinalForCharCode, defaultRasterCharset } from "./fonts/drom";
-export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar } from "./fonts/font";
+export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar, glyphAdvance, glyphOriginX } from "./fonts/font";
 export type { DeckerFont } from "./fonts/font";
 export { resolveFont, fontStyleFromProps, fontFromProps, textFace } from "./fonts/style";
 export type { FontStyle } from "./fonts/style";

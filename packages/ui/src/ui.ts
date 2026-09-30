@@ -21,7 +21,7 @@ import { createDrawContext, drawTree, resizeDrawContext } from "./draw";
 import { createFocusManager, applyPendingAutoFocus, registerFocusRoot } from "./focus";
 import { FocusContext } from "./focusContext";
 import { installFontBridge } from "./fonts/bridge";
-import { registerFont as registerFontInRegistry } from "./fonts/registry";
+import { onFontsChanged, registerFont as registerFontInRegistry } from "./fonts/registry";
 import { measureText } from "./fonts/bridge";
 import { createPointerDispatcher, type PointerDispatcher, type PointerExtras, type PointerType } from "./pointer";
 import { noteModifiers } from "./modifiers";
@@ -171,6 +171,12 @@ export function createUI(config: UIConfig): UIInstance {
   const measureApi = { measureText };
 
   const pointer: PointerDispatcher = createPointerDispatcher(root, focusManager, (error) => services.onError?.(error));
+
+  // Installing or removing a font can change any text's metrics.
+  onFontsChanged(() => {
+    markDirty(root);
+    scheduleRender();
+  });
 
   function layoutIfDirty(): void {
     if (!root._dirty) return;

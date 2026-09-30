@@ -6,6 +6,8 @@ import {
   getGlyphIndexForChar,
   getGlyphPixel,
   getGlyphWidth,
+  glyphAdvance,
+  glyphOriginX,
   layoutText,
   lineLeft,
   lineTop,
@@ -13,6 +15,7 @@ import {
   type RasterSurface,
 } from "@mockintosh/ui";
 import type { PrintableImage } from "@mockintosh/sdk";
+import { drawableFont } from "./fonts";
 import { cornerRadius, type CanvasDocument, type CanvasElement, type ShapeElement, type TextElement } from "./document";
 import { fillInk, paintLine, paintOval } from "./draw";
 
@@ -109,7 +112,7 @@ function paintBox(data: Uint8Array, pageW: number, pageH: number, el: ShapeEleme
 
 /** Same line breaks and positions as the `<text wrap align>` the app shows on screen. */
 function paintText(data: Uint8Array, pageW: number, pageH: number, el: TextElement): void {
-  const font = requireFont(el.font);
+  const font = requireFont(drawableFont(el.font), el.size);
   const block = layoutText(font, el.text, el.width);
   for (let row = 0; row < block.lines.length; row++) {
     const line = block.lines[row]!;
@@ -119,16 +122,17 @@ function paintText(data: Uint8Array, pageW: number, pageH: number, el: TextEleme
     for (const ch of line.text) {
       const glyph = getGlyphIndexForChar(font, ch);
       const gw = getGlyphWidth(font, glyph);
+      const left = x - glyphOriginX(font, glyph);
       for (let gy = 0; gy < font.glyphHeight; gy++) {
         const py = y + gy;
         if (py < el.y || py >= el.y + el.height || py < 0 || py >= pageH) continue;
         for (let gx = 0; gx < gw; gx++) {
-          const px = x + gx;
+          const px = left + gx;
           if (px < el.x || px >= el.x + el.width || px < 0 || px >= pageW) continue;
           if (getGlyphPixel(font, glyph, gx, gy)) data[py * pageW + px] = 1;
         }
       }
-      x += gw + font.spacing;
+      x += glyphAdvance(font, glyph) + font.spacing;
     }
   }
 }

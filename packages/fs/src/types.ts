@@ -25,6 +25,7 @@ export const ROOT_ID: NodeId = "__root__";
  *   system         the System Folder
  *   preferences    per-app storage folders (`System Folder/Preferences/<appId>`)
  *   pictures       the volume's Pictures folder (user pictures, not settings)
+ *   fonts          `System Folder/Fonts`: suitcases, TrueType files and strikes loaded at boot
  */
 export type NodeRole =
   | "root"
@@ -36,7 +37,8 @@ export type NodeRole =
   | "preferences"
   | "pictures"
   | "extensions"
-  | "printer-drivers";
+  | "printer-drivers"
+  | "fonts";
 
 export interface FSNodeBase {
   id: NodeId;
@@ -107,6 +109,8 @@ export const MIME = {
   truetype: "font/ttf",
   /** Decker `%%FNT1` strike text. */
   deckerFont: "application/x-mockintosh-font",
+  /** Font suitcase (FOND): a family's bitmap strikes and outlines, as JSON. */
+  suitcase: "application/x-mockintosh-suitcase",
 } as const;
 
 export type KnownMime = (typeof MIME)[keyof typeof MIME];

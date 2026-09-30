@@ -24,8 +24,6 @@ import {
   PtInRgn,
   CopyBits,
   ForeColor,
-  MoveTo,
-  DrawText,
   PaintRect,
   PaintRoundRect,
   EraseRect,
@@ -90,7 +88,7 @@ import { fontFromProps, fontNameFromProps, fontStyleFromProps, textFace } from "
 import { drawUnderline } from "./fonts/underline";
 import { layoutNodeRuns, runFont, runLineLeft, runStyle } from "./fonts/runLayout";
 import { nodeRuns, runFaceOf } from "./textRuns";
-import { encodeUiText, fontFamilyId } from "./fonts/strike";
+import { drawUiText, fontFamilyId } from "./fonts/strike";
 import { drawStyledLine } from "./fonts/bridge";
 import { textSelectionOf } from "./selectable";
 import { scrollPaintOffset, scrollTrack } from "./scroll";
@@ -568,9 +566,7 @@ function drawText(
         const runFace = runFont(face, run);
         const runStyleValue = runStyle(face.style, run);
         TextFace(textFace(runStyleValue));
-        const bytes = encodeUiText(runFace, fragment.text);
-        MoveTo(lineX + fragment.x, lineY + runFace.glyphHeight);
-        DrawText(bytes, 0, bytes.length);
+        drawUiText(runFace, fragment.text, lineX + fragment.x, lineY + runFace.glyphHeight);
         if (runStyleValue.underline) drawUnderline(runFace, fragment.text, lineX + fragment.x, lineY, color);
       }
       lineY += block.lineHeight;
@@ -601,9 +597,7 @@ function drawText(
       if (style.outline || style.shadow) {
         drawStyledLine(line.text, lineX, lineY, fontName, style, color, font.size);
       } else {
-        const bytes = encodeUiText(font, line.text);
-        MoveTo(lineX, lineY + strikeAscent);
-        DrawText(bytes, 0, bytes.length);
+        drawUiText(font, line.text, lineX, lineY + strikeAscent);
         if (style.underline) drawUnderline(font, line.text, lineX, lineY, color);
       }
     }
@@ -622,9 +616,7 @@ function drawText(
         if (style.outline || style.shadow) {
           drawStyledLine(slice, left, lineY, fontName, style, 0, font.size);
         } else {
-          const selected = encodeUiText(font, slice);
-          MoveTo(left, lineY + strikeAscent);
-          DrawText(selected, 0, selected.length);
+          drawUiText(font, slice, left, lineY + strikeAscent);
           if (style.underline) drawUnderline(font, slice, left, lineY, 0);
         }
         if (color) {

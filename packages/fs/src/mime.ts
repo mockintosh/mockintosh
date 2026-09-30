@@ -23,6 +23,8 @@ const BY_EXTENSION: Readonly<Record<string, string>> = {
   ttf: MIME.truetype,
   otf: "font/otf",
   fnt: MIME.deckerFont,
+  ttc: "font/collection",
+  suit: MIME.suitcase,
 };
 
 /** Browser stills Preview (and, as alternates, Dither / Trace) open. */
@@ -36,6 +38,7 @@ export const FONT_TYPES = [
   "application/font-sfnt",
   "application/x-font-ttf",
   "application/x-font-otf",
+  "font/collection",
 ] as const;
 
 export function isImageType(type: string): boolean {
@@ -68,6 +71,7 @@ export function isTextType(type: string): boolean {
     type === MIME.appShortcut ||
     type === MIME.app ||
     type === MIME.deckerFont ||
+    type === MIME.suitcase ||
     type.endsWith("+json") ||
     type.endsWith("+xml")
   );

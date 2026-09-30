@@ -154,6 +154,19 @@ export class PaintProgram {
     return menuModel(this.paint);
   }
 
+  /**
+   * Fonts were installed or removed: rebuild the Font menu
+   * (`AddResMenu(…, 'FONT')` again), keeping the checked family if it's still there.
+   */
+  refreshFonts(): void {
+    const p = this.paint;
+    const current = p.fonts[p.theFont - 1];
+    p.fonts = p.host.fontNames();
+    const at = current === undefined ? -1 : p.fonts.indexOf(current);
+    p.theFont = at >= 0 ? at + 1 : Math.max(1, p.fonts.indexOf(p.host.applicationFont()) + 1);
+    this.report();
+  }
+
   /** What `SetCursor` last installed. */
   cursor(): CursorSpec {
     const p = this.paint;

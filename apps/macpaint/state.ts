@@ -131,6 +131,8 @@ export interface PaintHost {
   printPage(page: BitMap): Promise<void>;
   /** Font family names for the Font menu (`AddResMenu(…, 'FONT')`). */
   fontNames(): string[];
+  /** How the Font menu shows `name`, when the font has its own display name. */
+  fontLabel?(name: string): string | undefined;
   /** QuickDraw family number for a Font menu name (`GetFNum`). */
   fontNumber(name: string): number;
   /** The name of the application font (`GetFontName(1, …)`). */

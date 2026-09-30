@@ -1,8 +1,7 @@
 import type { FontRasterMode, FontRasterOptions, FontRasterService } from "@mockintosh/sdk";
 import type { FontStrikeDraft, FontStrikeGlyph } from "@mockintosh/ui";
-import { defaultRasterCharset, deckerOrdinalForCharCode } from "@mockintosh/ui";
-import { peekFontFamily } from "../fontRaster/parseTtf";
-import { clampStrikeSize, downsampleThreshold, rasterizeOutline, sanitizeFamily } from "../fontRaster/raster";
+import { defaultRasterCharset, deckerOrdinalForCharCode, peekSfntFamily } from "@mockintosh/ui";
+import { SCALER_MODES, clampStrikeSize, rasterizeWithScaler, sanitizeFamily } from "../fontRaster/raster";
 
 function coverageFromImage(data: ImageData): Uint8Array {
   const cover = new Uint8Array(data.width * data.height);
@@ -13,13 +12,9 @@ function coverageFromImage(data: ImageData): Uint8Array {
   return cover;
 }
 
-async function rasterizeHinted(
-  bytes: Uint8Array,
-  options: FontRasterOptions,
-  oversample: number,
-): Promise<FontStrikeDraft> {
+async function rasterizeHinted(bytes: Uint8Array, options: FontRasterOptions): Promise<FontStrikeDraft> {
   const size = clampStrikeSize(options.size);
-  const ppem = size * oversample;
+  const ppem = size;
   const fontId = `foundry-${Math.random().toString(36).slice(2)}`;
   const face = new FontFace(fontId, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
   await face.load();
@@ -59,23 +54,15 @@ async function rasterizeHinted(
       ctx.fillStyle = "#000000";
       ctx.fillText(ch, padL, ascent);
       const cover = coverageFromImage(ctx.getImageData(0, 0, srcW, srcH));
-      const binary =
-        oversample === 1
-          ? {
-              width: srcW,
-              height: srcH,
-              pixels: Uint8Array.from(cover, (v) => (v >= options.threshold ? 1 : 0)),
-            }
-          : downsampleThreshold(cover, srcW, srcH, oversample, options.threshold);
-      maxWidth = Math.max(maxWidth, binary.width);
-      glyphs.push({ ordinal, width: binary.width, pixels: binary.pixels });
+      maxWidth = Math.max(maxWidth, srcW);
+      glyphs.push({ ordinal, width: srcW, pixels: Uint8Array.from(cover, (v) => (v >= options.threshold ? 1 : 0)) });
     }
 
     return {
-      family: sanitizeFamily(peekFontFamily(bytes)),
+      family: sanitizeFamily(peekSfntFamily(bytes)),
       size,
       maxWidth,
-      glyphHeight: oversample === 1 ? srcH : Math.max(1, Math.ceil(srcH / oversample)),
+      glyphHeight: srcH,
       spacing: Math.max(0, Math.round(options.spacing)),
       glyphs,
     };
@@ -84,33 +71,14 @@ async function rasterizeHinted(
   }
 }
 
+/** The scaler's modes plus `hinted`: the browser running the font's own hints. */
 export function createWebFontRasterService(): FontRasterService {
-  const modes: readonly FontRasterMode[] = ["hinted", "outline", "x2", "x3"];
+  const modes: readonly FontRasterMode[] = [...SCALER_MODES, "hinted"];
   return {
     modes: () => modes,
     async rasterize(bytes, options) {
-      if (options.mode === "outline") {
-        return rasterizeOutline(bytes, {
-          size: options.size,
-          threshold: options.threshold,
-          spacing: options.spacing,
-          chars: options.chars,
-          oversample: 1,
-        });
-      }
-      const oversample = options.mode === "x3" ? 3 : options.mode === "x2" ? 2 : 1;
-      try {
-        return await rasterizeHinted(bytes, options, oversample);
-      } catch (err) {
-        if (options.mode === "hinted") throw err;
-        return rasterizeOutline(bytes, {
-          size: options.size,
-          threshold: options.threshold,
-          spacing: options.spacing,
-          chars: options.chars,
-          oversample,
-        });
-      }
+      if (options.mode !== "hinted") return rasterizeWithScaler(bytes, options);
+      return rasterizeHinted(bytes, options);
     },
   };
 }

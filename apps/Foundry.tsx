@@ -7,16 +7,24 @@ import {
   Radio,
   Slider,
   TextInput,
+  MAX_BAKE_SIZE,
+  MIN_BAKE_SIZE,
+  clampBakeSize,
   decodeDeckerFont,
+  decodeSuitcase,
   deckerFontFromDraft,
   draftFromDeckerFont,
   encodeDeckerFont,
+  encodeSuitcase,
+  familyKey,
   isFontType,
+  peekSfntFamily,
   defineApp,
   useApp,
   type FileDocumentProps,
   type FontRasterMode,
   type FontStrikeDraft,
+  type FontSuitcase,
   type MenubarDefinition,
 } from "@mockintosh/sdk";
 import {
@@ -37,6 +45,15 @@ import {
   uniqueDesktopName,
 } from "./foundry/strike";
 import { sprites } from "./foundry/icons";
+import {
+  STYLE_NAMES,
+  describeSuitcase,
+  detectedStyle,
+  styleOfOutline,
+  suitcaseFromOutline,
+  withOutline,
+  withStrike,
+} from "./foundry/suitcase";
 
 const SIZES = [9, 10, 12, 14, 18, 24, 36, 48] as const;
 const MAG = 3;
@@ -62,17 +79,19 @@ function Foundry(props: FoundryProps): JSX.Element {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
   const [size, setSize] = createSignal(36);
-  const [mode, setMode] = createSignal<FontRasterMode>("hinted");
+  const [mode, setMode] = createSignal<FontRasterMode>("auto");
   const [threshold, setThreshold] = createSignal(DEFAULT_THRESHOLD);
   const [spacing, setSpacing] = createSignal(0);
   const [family, setFamily] = createSignal("untitled");
   const [selected, setSelected] = createSignal("A".charCodeAt(0));
   const [dirty, setDirty] = createSignal(false);
   const [paintRev, setPaintRev] = createSignal(0);
+  const [suitcase, setSuitcase] = createSignal<FontSuitcase | null>(null);
   let rasterGen = 0;
 
   const modes = () => raster?.modes() ?? [];
   const hintedOk = () => modes().includes("hinted");
+  const usesThreshold = () => mode() === "x2" || mode() === "x3" || mode() === "hinted";
   const isFullScreen = () => win.kind() === "fullscreen";
 
   function toggleFullScreen(): void {
@@ -126,7 +145,7 @@ function Foundry(props: FoundryProps): JSX.Element {
       const chosen = mode();
       const next = await raster.rasterize(bytes, {
         size: size(),
-        mode: chosen === "hinted" && !hintedOk() ? "outline" : chosen,
+        mode: chosen === "hinted" && !hintedOk() ? "auto" : chosen,
         threshold: threshold(),
         spacing: spacing(),
       });
@@ -149,6 +168,26 @@ function Foundry(props: FoundryProps): JSX.Element {
       return;
     }
     if (title) win.setTitle(title);
+    if (file.type === MIME.suitcase) {
+      try {
+        const opened = decodeSuitcase((await app.fs.readText(fileId)) ?? "");
+        setSuitcase(opened);
+        setFamily(opened.family);
+        const outline = opened.outlines.find((o) => o.style === 0) ?? opened.outlines[0];
+        if (outline) setSourceBytes(outline.bytes);
+        else if (opened.strikes[0]) {
+          const first = opened.strikes[0];
+          setSourceBytes(null);
+          setSize(first.size);
+          applyDraft(draftFromDeckerFont(decodeDeckerFont(first.data, opened.family), opened.family, first.size));
+        }
+        setDirty(false);
+        setError("");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+      return;
+    }
     if (file.type === MIME.deckerFont) {
       const text = await app.fs.readText(fileId);
       if (!text) {
@@ -173,12 +212,24 @@ function Foundry(props: FoundryProps): JSX.Element {
       setError("Couldn't read that font.");
       return;
     }
+    const name = peekSfntFamily(bytes);
+    const current = suitcase();
+    try {
+      if (current && familyKey(current.family) === familyKey(name)) {
+        setSuitcase(withOutline(current, detectedStyle(bytes), bytes));
+      } else {
+        setSuitcase(suitcaseFromOutline(bytes));
+        setFamily(name === "untitled" ? sanitizeOpenName(file.name) : name);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    }
     setSourceBytes(bytes);
-    setFamily(sanitizeOpenName(file.name));
   }
 
   function sanitizeOpenName(name: string): string {
-    const stem = name.replace(/\.(ttf|otf|fnt)$/i, "");
+    const stem = name.replace(/\.(ttf|otf|ttc|fnt|suit)$/i, "");
     return stem.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "untitled";
   }
 
@@ -186,7 +237,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     const desktop = app.fs.locate("desktop");
     if (!desktop) return [];
     return app.fs.children(desktop.id).filter(
-      (n) => n.kind === "file" && (isFontType(n.type) || n.type === MIME.deckerFont),
+      (n) => n.kind === "file" && (isFontType(n.type) || n.type === MIME.deckerFont || n.type === MIME.suitcase),
     );
   };
 
@@ -211,7 +262,7 @@ function Foundry(props: FoundryProps): JSX.Element {
 
   async function chooseSize(): Promise<void> {
     const typed = await app.os.showDialog({
-      message: "Strike size (9–72):",
+      message: `Strike size (${MIN_BAKE_SIZE}–${MAX_BAKE_SIZE}):`,
       buttons: ["Cancel", "Set"],
       showInput: true,
       inputDefault: String(size()),
@@ -219,13 +270,13 @@ function Foundry(props: FoundryProps): JSX.Element {
     });
     const n = Number(typed);
     if (!Number.isFinite(n)) return;
-    setSize(Math.max(9, Math.min(72, Math.round(n))));
+    setSize(clampBakeSize(n));
   }
 
   function currentDraft(): FontStrikeDraft | null {
     const d = draft();
     if (!d) return null;
-    return { ...d, family: family() || d.family, spacing: spacing() };
+    return { ...d, family: familyKey(family() || d.family), spacing: spacing() };
   }
 
   async function installStrike(): Promise<void> {
@@ -233,11 +284,96 @@ function Foundry(props: FoundryProps): JSX.Element {
     if (!d) return;
     const packed = encodeDeckerFont(deckerFontFromDraft(d));
     app.fonts.register(d.family, packed, d.size);
-    setDirty(false);
     await app.os.showDialog({
       message: `Installed “${d.family}” ${d.size} for this session.`,
       variant: "note",
     });
+  }
+
+  /** The suitcase as it would be installed: named, with unsaved pixel edits frozen in. */
+  function currentSuitcase(): FontSuitcase | null {
+    const d = currentDraft();
+    let s = suitcase();
+    if (!s && d) s = { family: family() || d.family, strikes: [], outlines: [] };
+    if (!s) return null;
+    s = { ...s, family: family() || s.family };
+    if (d && (dirty() || s.outlines.length === 0)) {
+      s = withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeDeckerFont(deckerFontFromDraft(d)));
+    }
+    return s;
+  }
+
+  function keepThisSize(): void {
+    const d = currentDraft();
+    const s = currentSuitcase();
+    if (!d || !s) return;
+    setSuitcase(withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeDeckerFont(deckerFontFromDraft(d))));
+    setDirty(false);
+  }
+
+  async function addFontFile(): Promise<void> {
+    const s = currentSuitcase();
+    if (!s) return;
+    const files = desktopFonts().filter((f) => f.kind === "file" && isFontType(f.type));
+    if (files.length === 0) {
+      await app.os.showDialog({ message: "Put the other font file on the desktop first.", variant: "note" });
+      return;
+    }
+    const choice = await app.os.showDialog({
+      message: "Add which font file?",
+      buttons: [...files.map((f) => f.name), "Cancel"],
+      variant: "note",
+    });
+    const file = files.find((f) => f.name === choice);
+    if (!file) return;
+    const bytes = await app.fs.readBytes(file.id);
+    if (!bytes) return;
+    const style = await app.os.showDialog({
+      message: `Use “${file.name}” as which style of ${s.family}?`,
+      buttons: [...STYLE_NAMES, "Cancel"],
+      variant: "note",
+    });
+    const slot = STYLE_NAMES.indexOf(style as (typeof STYLE_NAMES)[number]);
+    if (slot < 0) return;
+    setSuitcase(withOutline(s, slot, bytes));
+  }
+
+  function toggleSetting(key: "kerning" | "preserveGlyph" | "preferOutline"): void {
+    const s = suitcase();
+    if (!s) return;
+    const fallback = key !== "preferOutline";
+    setSuitcase({ ...s, settings: { ...s.settings, [key]: !(s.settings?.[key] ?? fallback) } });
+  }
+
+  async function installSuitcase(): Promise<void> {
+    const s = currentSuitcase();
+    if (!s) return;
+    if (!app.fonts.install) {
+      await installStrike();
+      return;
+    }
+    try {
+      await app.fonts.install(s);
+      setSuitcase(s);
+      setDirty(false);
+      await app.os.showDialog({
+        message: `Installed “${s.family}” in the Fonts folder. Every app can use it now, at any size.`,
+        variant: "note",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function saveSuitcase(): Promise<void> {
+    const s = currentSuitcase();
+    const desktop = app.fs.locate("desktop");
+    if (!s || !desktop) return;
+    const names = app.fs.children(desktop.id).filter((n) => n.kind === "file").map((n) => n.name);
+    const name = uniqueDesktopName(names, `${s.family.replace(/[/:]/g, "-")}.suit`);
+    await app.fs.writeFile(desktop.id, name, encodeSuitcase(s), { type: MIME.suitcase });
+    setSuitcase(s);
+    setDirty(false);
   }
 
   async function saveStrike(): Promise<void> {
@@ -257,7 +393,7 @@ function Foundry(props: FoundryProps): JSX.Element {
   }
 
   onSettled(() => {
-    if (!hintedOk() && mode() === "hinted") setMode("outline");
+    if (!hintedOk() && mode() === "hinted") setMode("auto");
     if (typeof props.fileId !== "string") return;
     void loadFile(props.fileId, typeof props.title === "string" ? props.title : undefined);
   });
@@ -293,6 +429,8 @@ function Foundry(props: FoundryProps): JSX.Element {
         mode: mode(),
         size: size(),
         full: isFullScreen(),
+        suitcase: suitcase(),
+        canInstall: !!app.fonts.install,
       };
     },
     (s) => {
@@ -303,8 +441,42 @@ function Foundry(props: FoundryProps): JSX.Element {
             { label: "Open…", shortcut: "O", onClick: () => void openDocument() },
             { type: "separator" },
             { label: "Save Strike", shortcut: "S", onClick: () => void saveStrike(), disabled: !s.hasDraft },
-            { label: "Install", onClick: () => void installStrike(), disabled: !s.hasDraft },
+            { label: "Save Suitcase", onClick: () => void saveSuitcase(), disabled: !s.hasDraft && !s.suitcase },
             { label: "Revert", onClick: () => void revert(), disabled: !s.canRaster },
+          ],
+        },
+        {
+          label: "Suitcase",
+          items: [
+            { label: "Keep This Size as Bitmap", shortcut: "K", onClick: keepThisSize, disabled: !s.hasDraft },
+            { label: "Add Font File…", onClick: () => void addFontFile(), disabled: !s.suitcase },
+            { type: "separator" },
+            {
+              label: "Kerning",
+              checked: s.suitcase?.settings?.kerning ?? true,
+              onClick: () => toggleSetting("kerning"),
+              disabled: !s.suitcase,
+            },
+            {
+              label: "Preserve Glyph Shapes",
+              checked: s.suitcase?.settings?.preserveGlyph ?? true,
+              onClick: () => toggleSetting("preserveGlyph"),
+              disabled: !s.suitcase,
+            },
+            {
+              label: "Prefer Outlines",
+              checked: s.suitcase?.settings?.preferOutline ?? false,
+              onClick: () => toggleSetting("preferOutline"),
+              disabled: !s.suitcase,
+            },
+            { type: "separator" },
+            {
+              label: "Install in Fonts Folder",
+              shortcut: "I",
+              onClick: () => void installSuitcase(),
+              disabled: !s.canInstall || (!s.hasDraft && !s.suitcase),
+            },
+            { label: "Install Strike for This Session", onClick: () => void installStrike(), disabled: !s.hasDraft },
           ],
         },
         {
@@ -338,10 +510,11 @@ function Foundry(props: FoundryProps): JSX.Element {
               value: s.mode,
               onValueChange: (value) => setMode(value as FontRasterMode),
               items: [
-                { label: "Hinted", value: "hinted", disabled: !s.hinted },
+                { label: "Auto-Hinted", value: "auto" },
                 { label: "Outline", value: "outline" },
                 { label: "2x Majority", value: "x2" },
                 { label: "3x Majority", value: "x3" },
+                { label: "Browser Hinted", value: "hinted", disabled: !s.hinted },
               ],
             },
           ],
@@ -381,17 +554,21 @@ function Foundry(props: FoundryProps): JSX.Element {
           <Show when={isFullScreen()}>
             <Button label="Menu Bar" onClick={toggleFullScreen} />
           </Show>
+          <Radio name="mode-auto" label="Auto" checked={mode() === "auto"} onChange={() => setMode("auto")} />
+          <Radio name="mode-outline" label="Outline" checked={mode() === "outline"} onChange={() => setMode("outline")} />
+          <Radio name="mode-x2" label="2x" checked={mode() === "x2"} onChange={() => setMode("x2")} />
+          <Radio name="mode-x3" label="3x" checked={mode() === "x3"} onChange={() => setMode("x3")} />
           <Radio
             name="mode-hinted"
-            label="Hinted"
+            label="Browser"
             checked={mode() === "hinted"}
             disabled={!hintedOk()}
             onChange={() => setMode("hinted")}
           />
-          <Radio name="mode-outline" label="Outline" checked={mode() === "outline"} onChange={() => setMode("outline")} />
-          <Radio name="mode-x2" label="2x" checked={mode() === "x2"} onChange={() => setMode("x2")} />
-          <Radio name="mode-x3" label="3x" checked={mode() === "x3"} onChange={() => setMode("x3")} />
         </box>
+        <Show when={suitcase()}>
+          {(s) => <text font="body">{describeSuitcase(s())}</text>}
+        </Show>
         <box flexDirection="row" gap={6} alignItems="flex-start">
           <box flexDirection="column" gap={3} width={200}>
             <Slider
@@ -405,17 +582,19 @@ function Foundry(props: FoundryProps): JSX.Element {
               value={size()}
               onChange={setSize}
             />
-            <Slider
-              name="threshold"
-              label="Thresh"
-              labelWidth={40}
-              width={120}
-              min={16}
-              max={200}
-              step={4}
-              value={threshold()}
-              onChange={setThreshold}
-            />
+            <Show when={usesThreshold()}>
+              <Slider
+                name="threshold"
+                label="Thresh"
+                labelWidth={40}
+                width={120}
+                min={16}
+                max={200}
+                step={4}
+                value={threshold()}
+                onChange={setThreshold}
+              />
+            </Show>
             <Slider
               name="spacing"
               label="Track"
@@ -525,12 +704,12 @@ export default defineApp({
   defaultSize: { width: 420, height: 300 },
   minSize: { width: 300, height: 220 },
   resizable: true,
-  fileTypes: [...FONT_TYPES, MIME.deckerFont],
+  fileTypes: [...FONT_TYPES, MIME.deckerFont, MIME.suitcase],
   sprites,
   about: {
-    version: "1.0",
+    version: "2.0",
     description:
-      "Applies a font’s existing hints through the host rasterizer. It does not edit Twilight-zone points or emit a new TTF. 24px condensed Garaldes still need pixel toggles; 36px usually survives.",
+      "Turns TrueType and OpenType fonts into Mac font suitcases. Auto-Hinted uses the Font Manager’s own scaler, so the preview is exactly what apps draw. Keep a size as a bitmap to hand-tune its pixels; installed suitcases work in every app at any size.",
   },
   Component: Foundry,
 });

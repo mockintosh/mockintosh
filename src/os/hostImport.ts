@@ -28,8 +28,9 @@ export function isImportableImage(file: HostFileDrop): boolean {
 }
 
 export function isImportableFont(file: HostFileDrop): boolean {
-  if (isFontType(file.type)) return true;
-  return isFontType(inferMimeType(file.name));
+  if (isFontType(file.type) || file.type === MIME.suitcase) return true;
+  const inferred = inferMimeType(file.name);
+  return isFontType(inferred) || inferred === MIME.suitcase;
 }
 
 export function isImportableHostFile(file: HostFileDrop): boolean {
