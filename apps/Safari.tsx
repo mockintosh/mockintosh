@@ -3,13 +3,12 @@ import { useUIServices, type JSX } from "@mockintosh/ui";
 import { DocumentView, useApp, defineApp, type AppWindow, type FormField, type MenubarItemDef, type WebForm } from "@mockintosh/sdk";
 import type { ImageFrame } from "@mockintosh/ui";
 import { addressToUrl, formRequest, isSecure, resolveLink, urlToAddress } from "./safari/address";
-import { AddressField, BACK_FORWARD_W, BackForward, HEADER_H, TOOLBAR_BUTTON_W, TOOLBAR_H, TabBar, ToolbarButton, type TabLabel } from "./safari/chrome";
+import { AddressField, BACK_FORWARD_W, BackForward, HEADER_H, TOOLBAR_BUTTON_W, TOOLBAR_H, TOOLBAR_HEADER_H, TabBar, ToolbarButton, type TabLabel } from "./safari/chrome";
 import { goBack, goForward, replace, visit } from "./safari/history";
-import { backIcon, forwardIcon, shareIcon, windowsIcon } from "./safari/icons";
-import { START_URL, pageRequest, type PageRequest, type SiteBookmark, type WebPage } from "./safari/page";
+import { backIcon, forwardIcon, plusIcon, shareIcon, windowsIcon } from "./safari/icons";
+import { START_URL, pageRequest, type PageRequest, type WebPage } from "./safari/page";
 import { remoteImageLoader } from "./safari/remote";
 import { loadPage, readerApplies, type PageResult } from "./safari/router";
-import { SITE_BOOKMARKS } from "./safari/sites";
 import { BOOKMARKS } from "./safari/start";
 import { activeTab, closeTab, navigateActive, openTab, selectTab, startTabs, updateTab, type TabSet } from "./safari/tabs";
 
@@ -19,7 +18,7 @@ const MIN_SIZE = { width: 300, height: 180 };
 const TOOLBAR_PAD = 4;
 const TOOLBAR_GAP = 5;
 /** Everything in the toolbar but the address field, and the field's shadow. */
-const TOOLBAR_FIXED = BACK_FORWARD_W + TOOLBAR_BUTTON_W * 2 + TOOLBAR_GAP * 3 + TOOLBAR_PAD * 2 + 1;
+const TOOLBAR_FIXED = BACK_FORWARD_W + TOOLBAR_BUTTON_W * 3 + TOOLBAR_GAP * 4 + TOOLBAR_PAD * 2 + 1;
 const PAGE_PADDING = 6;
 
 /** A tab's page as shown: which tab and history entry it is for. */
@@ -193,7 +192,11 @@ function Safari(props: Record<string, unknown>): JSX.Element {
   }
 
   function closeFrontTab(): void {
-    const remaining = closeTab(tabs(), tabs().activeId);
+    closeOneTab(tabs().activeId);
+  }
+
+  function closeOneTab(id: number): void {
+    const remaining = closeTab(tabs(), id);
     if (remaining) setTabs(remaining);
     else win.close();
   }
@@ -311,18 +314,23 @@ function Safari(props: Record<string, unknown>): JSX.Element {
 
   /** The header band spans the scrollbar column too, so it measures itself. */
   const [barWidth, setBarWidth] = createSignal(win.width() + 15);
+  const manyTabs = () => tabs().tabs.length > 1;
+  const headerH = () => (manyTabs() ? HEADER_H : TOOLBAR_HEADER_H);
   const tabLabels = (): TabLabel[] =>
     tabs().tabs.map((tab) => ({
       id: tab.id,
-      label: tab.id === tabs().activeId && loading() ? "Loading…" : tab.title || urlToAddress(tab.history.current.url) || "Untitled",
+      label:
+        tab.id === tabs().activeId && loading()
+          ? "Loading…"
+          : tab.title || (tab.history.current.url === START_URL ? "Start page" : urlToAddress(tab.history.current.url) || "Untitled"),
     }));
   const message = (text: string) => <text font="body" wrap>{text}</text>;
   const reportHeight = ({ height }: { height: number }) => win.setContentSize(win.width(), height);
 
   return (
     <>
-      <WindowHeader height={HEADER_H}>
-        <box width="100%" height={HEADER_H - 1} flexDirection="column" background={0} onLayout={({ width }) => setBarWidth(width)}>
+      <WindowHeader height={headerH()}>
+        <box width="100%" height={headerH() - 1} flexDirection="column" background={0} onLayout={({ width }) => setBarWidth(width)}>
           <box height={TOOLBAR_H} flexDirection="row" alignItems="center" gap={TOOLBAR_GAP} paddingLeft={TOOLBAR_PAD} paddingRight={TOOLBAR_PAD}>
             <BackForward
               back={{ name: "safari-back", icon: backIcon, disabled: front().history.back.length === 0, onClick: () => setTabs((set) => navigateActive(set, goBack)) }}
@@ -336,18 +344,19 @@ function Safari(props: Record<string, unknown>): JSX.Element {
               width={Math.max(60, barWidth() - TOOLBAR_FIXED)}
             />
             <ToolbarButton name="safari-copy-link" icon={shareIcon} disabled={!canCopyLink()} onClick={copyLink} />
+            <ToolbarButton name="safari-new-tab" icon={plusIcon} onClick={newTab} />
             <ToolbarButton name="safari-new-window" icon={windowsIcon} onClick={newWindow} />
           </box>
-          <box height={1} background={1} />
-          <TabBar
-            width={barWidth()}
-            bookmarks={SITE_BOOKMARKS}
-            tabs={tabLabels()}
-            activeId={tabs().activeId}
-            onBookmark={(bookmark: SiteBookmark) => openBookmark(bookmark)}
-            onSelect={(id) => setTabs((set) => selectTab(set, id))}
-            onNewTab={newTab}
-          />
+          <Show when={manyTabs()}>
+            <box height={1} background={1} />
+            <TabBar
+              width={barWidth()}
+              tabs={tabLabels()}
+              activeId={tabs().activeId}
+              onSelect={(id) => setTabs((set) => selectTab(set, id))}
+              onClose={closeOneTab}
+            />
+          </Show>
         </box>
       </WindowHeader>
       <Show

@@ -46,5 +46,5 @@ export function startPage(): DocumentPage {
       segments: [link(bookmark.title, bookmark.url), { kind: "text", text: ` — ${bookmark.note}` }],
     })),
   ];
-  return { kind: "document", url: START_URL, title: "Safari", nodes };
+  return { kind: "document", url: START_URL, title: "Start page", nodes };
 }

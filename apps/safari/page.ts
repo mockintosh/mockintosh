@@ -1,4 +1,4 @@
-import type { FetchFunction, LayoutNode, Sprite, WebUrl } from "@mockintosh/sdk";
+import type { FetchFunction, LayoutNode, WebUrl } from "@mockintosh/sdk";
 
 /** What Safari asks for when it goes somewhere. */
 export interface PageRequest {
@@ -53,17 +53,9 @@ export interface SiteContext {
  */
 export interface SiteAdapter {
   id: string;
-  /** A button for the site in Safari's bookmarks bar. Sites without one are only reached by address. */
-  bookmark?: SiteBookmark;
   /** The URLs this adapter draws. Adapters only see GET requests. */
   handles(url: WebUrl): boolean;
   load(url: WebUrl, context: SiteContext): Promise<WebPage>;
-}
-
-export interface SiteBookmark {
-  title: string;
-  url: string;
-  icon: Sprite;
 }
 
 /** An error to show in place of the page. */

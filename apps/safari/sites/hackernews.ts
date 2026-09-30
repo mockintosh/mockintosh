@@ -1,5 +1,4 @@
 import { parseUrl, queryParam, type FetchFunction, type InlineSegment, type LayoutNode, type WebUrl } from "@mockintosh/sdk";
-import { hackerNewsIcon } from "../icons";
 import { PageError, type DocumentPage, type SiteAdapter } from "../page";
 
 const SITE = "https://news.ycombinator.com";
@@ -51,7 +50,6 @@ function userUrl(id: string): string {
 
 export const hackerNewsSite: SiteAdapter = {
   id: "hackernews",
-  bookmark: { title: "Hacker News", url: `${SITE}/news`, icon: hackerNewsIcon },
   handles: (url) => parseHackerNewsUrl(url) !== null,
   async load(url, context) {
     const location = parseHackerNewsUrl(url);

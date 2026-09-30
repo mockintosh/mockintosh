@@ -1,5 +1,4 @@
 import { formatUrl, parseMarkdown, parseUrl, type InlineSegment, type LayoutNode } from "@mockintosh/sdk";
-import { githubIcon } from "../../icons";
 import { PageError, type DocumentPage, type SiteAdapter } from "../../page";
 import {
   GithubError,
@@ -16,7 +15,6 @@ import { formatGithubLocation, parseGithubLocation, type GithubLocation } from "
 /** github.com drawn from api.github.com: profiles, repositories, files, issues and pull requests. */
 export const githubSite: SiteAdapter = {
   id: "github",
-  bookmark: { title: "GitHub", url: "https://github.com/", icon: githubIcon },
   handles: (url) => /^(www\.)?github\.com$/i.test(url.hostname),
   async load(url, context) {
     const location = parseGithubLocation(formatUrl(url));
@@ -89,6 +87,8 @@ function homePage(): DocumentPage {
         link("octocat", { kind: "profile", login: "octocat", tab: "repos" }),
         text(", "),
         link("torvalds/linux", { kind: "tree", owner: "torvalds", repo: "linux", ref: "", path: "" }),
+        text(", "),
+        link("mockintosh/mockintosh", { kind: "tree", owner: "mockintosh", repo: "mockintosh", ref: "", path: "" }),
         text(" or "),
         link("apple", { kind: "profile", login: "apple", tab: "repos" }),
         text("."),

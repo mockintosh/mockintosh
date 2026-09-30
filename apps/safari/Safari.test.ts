@@ -1,7 +1,7 @@
 /**
- * Safari's window on a headless Macintosh: the toolbar and tab bar sit in
- * the header band, tabs keep their own pages, and the bookmarks bar opens
- * the site adapters' pages in the tab in front.
+ * Safari's window on a headless Macintosh: the toolbar sits in the header
+ * band, the tab bar appears once there is more than one tab, and each tab
+ * keeps its own page.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchResponse } from "@mockintosh/sdk";
@@ -89,34 +89,63 @@ describe("Safari", () => {
     await settle();
   }
 
+  async function hover(name: string): Promise<void> {
+    const target = await node(name);
+    expect(target, name).toBeDefined();
+    const { x, y, width, height } = target!.bounds;
+    platform.pointer({ type: "move", x: x + Math.floor(width / 2), y: y + Math.floor(height / 2) });
+    await settle();
+  }
+
   async function texts(): Promise<string[]> {
     return (await nodes()).flatMap((n) => (n.text ? [n.text] : []));
   }
 
-  it("opens a window on the start page, with one tab and the site bookmarks", async () => {
+  async function openBookmark(label: string): Promise<void> {
+    await os.kernel.invoke(session(), "menu", { menu: "Bookmarks", item: label });
+    await settle();
+  }
+
+  it("opens a window on the start page, with the new-tab button and no tab bar", async () => {
     expect(getWindows().some((w) => w.appId === "safari")).toBe(true);
-    expect(await node("safari-tab:1")).toBeDefined();
-    expect(await node("safari-bookmark:GitHub")).toBeDefined();
-    expect(await node("safari-bookmark:Hacker News")).toBeDefined();
+    expect(await node("safari-new-tab")).toBeDefined();
+    expect(await node("safari-tab:1")).toBeUndefined();
     expect(await texts()).toContain("Bookmarks");
   });
 
   it("opens a new tab on the start page and keeps the other tab's page", async () => {
-    await click("safari-bookmark:GitHub");
+    await openBookmark("GitHub");
     expect((await node("safari-address"))?.value).toBe("github.com");
 
     await click("safari-new-tab");
+    expect(await node("safari-tab:1")).toBeDefined();
     expect(await node("safari-tab:2")).toBeDefined();
     expect((await node("safari-address"))?.value).toBe("");
+    expect(await texts()).toContain("Start page");
     expect(await texts()).toContain("Bookmarks");
 
     await click("safari-tab:1");
     expect((await node("safari-address"))?.value).toBe("github.com");
   });
 
+  it("shows a close button on a hovered tab and closes that tab", async () => {
+    await openBookmark("GitHub");
+    await click("safari-new-tab");
+    expect(await node("safari-tab-close:1")).toBeUndefined();
+
+    await hover("safari-tab:1");
+    expect(await node("safari-tab-close:1")).toBeDefined();
+    await click("safari-tab-close:1");
+
+    expect(await node("safari-tab:1")).toBeUndefined();
+    expect(await node("safari-tab:2")).toBeUndefined();
+    expect((await node("safari-address"))?.value).toBe("");
+    expect(await texts()).toContain("Bookmarks");
+  });
+
   it("scrolls a long page in the window, and each tab comes back where it was", async () => {
     const safari = () => getWindows().find((w) => w.appId === "safari")!;
-    await click("safari-bookmark:Hacker News");
+    await openBookmark("Hacker News");
     expect(await texts()).toContain("30.");
     expect(safari().contentHeight).toBeGreaterThan(safari().height);
 
@@ -157,6 +186,7 @@ describe("Safari", () => {
     await os.kernel.invoke(session(), "menu", { menu: "File", item: "Close Tab" });
     await settle();
     expect(await node("safari-tab:2")).toBeUndefined();
+    expect(await node("safari-tab:1")).toBeUndefined();
     expect(getWindows().some((w) => w.appId === "safari")).toBe(true);
 
     await os.kernel.invoke(session(), "menu", { menu: "File", item: "Close Tab" });

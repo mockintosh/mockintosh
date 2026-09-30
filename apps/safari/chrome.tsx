@@ -1,17 +1,18 @@
-import { For, Show, measureText, type Sprite } from "@mockintosh/sdk";
+import { For, Show, createSignal, measureText, type Sprite } from "@mockintosh/sdk";
 import { TextInput, createPress, type JSX } from "@mockintosh/ui";
-import { dimmed, lockIcon, plusIcon } from "./icons";
-import type { SiteBookmark } from "./page";
+import { closeIcon, dimmed, lockIcon } from "./icons";
 
 export const TOOLBAR_H = 24;
 export const TAB_BAR_H = 17;
+/** Toolbar and the header band's own bottom rule (no tab bar). */
+export const TOOLBAR_HEADER_H = TOOLBAR_H + 1;
 /** Toolbar, rule, tab bar, and the header band's own bottom rule. */
 export const HEADER_H = TOOLBAR_H + 1 + TAB_BAR_H + 1;
 const FACE_H = 18;
 const TAB_FONT = "body";
-const CELL_W = 20;
 const ARROW_W = 23;
 const LOCK_GAP = 3;
+const CLOSE_W = 13;
 /** Outer widths, frames included and shadows not. */
 export const BACK_FORWARD_W = ARROW_W * 2 + 3;
 export const TOOLBAR_BUTTON_W = FACE_H + 2;
@@ -115,12 +116,10 @@ export interface TabLabel {
 
 export interface TabBarProps {
   width: number;
-  bookmarks: readonly SiteBookmark[];
   tabs: readonly TabLabel[];
   activeId: number;
-  onBookmark: (bookmark: SiteBookmark) => void;
   onSelect: (id: number) => void;
-  onNewTab: () => void;
+  onClose: (id: number) => void;
 }
 
 /** `text` cut to fit `width`, ending in an ellipsis when it had to be cut. */
@@ -131,55 +130,87 @@ function fitted(text: string, width: number): string {
   return cut ? `${cut.trimEnd()}…` : "";
 }
 
-function TabCell(props: { tab: TabLabel; active: boolean; width: number; onSelect: (id: number) => void }): JSX.Element {
-  const press = createPress({ name: `safari-tab:${props.tab.id}`, onClick: () => props.onSelect(props.tab.id) });
-  const dark = () => props.active || press.pressed();
+function TabCell(props: {
+  tab: TabLabel;
+  active: boolean;
+  width: number;
+  onSelect: (id: number) => void;
+  onClose: (id: number) => void;
+}): JSX.Element {
+  const [hovered, setHovered] = createSignal(false);
+  const select = createPress({ name: `safari-tab:${props.tab.id}`, onClick: () => props.onSelect(props.tab.id) });
+  const close = createPress({ name: `safari-tab-close:${props.tab.id}`, onClick: () => props.onClose(props.tab.id) });
+  const dark = () => props.active || select.pressed();
+  const closeDark = () => (close.pressed() ? !dark() : dark());
   return (
     <box
-      {...press.rootProps()}
       width={props.width}
       height={TAB_BAR_H}
       background={dark() ? 1 : 0}
-      justifyContent="center"
-      alignItems="center"
       overflow="hidden"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      <text font={TAB_FONT} color={dark() ? 0 : 1} nowrap>{fitted(props.tab.label, props.width - 8)}</text>
+      <box
+        {...select.rootProps()}
+        width={props.width}
+        height={TAB_BAR_H}
+        justifyContent="center"
+        alignItems="center"
+        overflow="hidden"
+      >
+        <text font={TAB_FONT} color={dark() ? 0 : 1} nowrap>{fitted(props.tab.label, props.width - 8)}</text>
+      </box>
+      <Show when={hovered()}>
+        <box
+          {...close.rootProps()}
+          position="absolute"
+          left={0}
+          top={0}
+          width={CLOSE_W}
+          height={TAB_BAR_H}
+          background={closeDark() ? 1 : 0}
+          justifyContent="center"
+          alignItems="center"
+        >
+          <image
+            src={closeIcon}
+            width={closeIcon.width}
+            height={closeIcon.height}
+            mode={closeDark() ? "inverted" : "normal"}
+          />
+        </box>
+      </Show>
     </box>
   );
 }
 
-/** Bookmark buttons on the left, the tabs sharing what's left, and a new-tab button. */
+/** Tabs sharing the bar width evenly. */
 export function TabBar(props: TabBarProps): JSX.Element {
-  const tabsWidth = () => props.width - props.bookmarks.length * (CELL_W + 1) - (CELL_W + 1);
   /** Tabs split the width evenly; the rounding goes to the first ones. */
   const tabWidth = (index: number) => {
     const count = props.tabs.length;
-    const room = tabsWidth() - (count - 1);
+    const room = props.width - (count - 1);
     return Math.floor(room / count) + (index < room % count ? 1 : 0);
   };
   return (
     <box width={props.width} height={TAB_BAR_H} flexDirection="row">
-      <For each={props.bookmarks}>
-        {(bookmark) => (
-          <>
-            <IconFace name={`safari-bookmark:${bookmark.title}`} icon={bookmark.icon} onClick={() => props.onBookmark(bookmark)} width={CELL_W} height={TAB_BAR_H} />
-            <box width={1} background={1} />
-          </>
-        )}
-      </For>
       <For each={props.tabs}>
         {(tab, index) => (
           <>
             <Show when={index() > 0}>
               <box width={1} background={1} />
             </Show>
-            <TabCell tab={tab} active={tab.id === props.activeId} width={tabWidth(index())} onSelect={props.onSelect} />
+            <TabCell
+              tab={tab}
+              active={tab.id === props.activeId}
+              width={tabWidth(index())}
+              onSelect={props.onSelect}
+              onClose={props.onClose}
+            />
           </>
         )}
       </For>
-      <box width={1} background={1} />
-      <IconFace name="safari-new-tab" icon={plusIcon} onClick={props.onNewTab} width={CELL_W} height={TAB_BAR_H} />
     </box>
   );
 }
