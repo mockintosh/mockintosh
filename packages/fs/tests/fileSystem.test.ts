@@ -35,6 +35,14 @@ describe("FileSystem — catalog", () => {
     expect(() => fs.mkdir(hd.id, "notes.txt")).toThrow(FSError);
   });
 
+  it("mkdir uses an id it's given, and refuses one that's taken", async () => {
+    const { fs, hd } = await openMac();
+    const made = fs.mkdir(hd.id, "From a process", { id: "chosen" });
+    expect(made.id).toBe("chosen");
+    expect(fs.child(hd.id, "From a process")?.id).toBe("chosen");
+    expect(() => fs.mkdir(hd.id, "Another", { id: "chosen" })).toThrow(FSError);
+  });
+
   it("children are folders first, then files, alphabetical", async () => {
     const { fs, hd } = await openMac();
     await fs.writeFile(hd.id, "b.txt", "");

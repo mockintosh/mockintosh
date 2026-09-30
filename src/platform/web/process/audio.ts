@@ -5,7 +5,7 @@
  * stream is: the app's `render` never runs on the main thread, and no sample
  * passes through it.
  */
-import type { AudioRenderBlock, AudioService, AudioStream, AudioStreamState } from "@mockintosh/sdk";
+import type { AudioMonitor, AudioRenderBlock, AudioService, AudioStream, AudioStreamState } from "@mockintosh/sdk";
 
 const QUANTUM = 128;
 const MAX_CHUNK = 1024;
@@ -25,14 +25,21 @@ export interface WorkerAudio {
   service: AudioService;
   /** The host saw a stream's state or output latency change. */
   update(streamId: number, state: AudioStreamState, latencyFrames: number): void;
+  /** The speaker's latest mix for a monitor, sent as the OS's frame started. */
+  monitorSnapshot(monitorId: number, left: Float32Array, right: Float32Array): void;
   /** Worst `render` time per chunk, for the Worker menu. */
   readonly renderMs: number[];
 }
 
 type Call = (method: string, args: unknown[]) => Promise<unknown>;
 
-export function createWorkerAudio(call: Call, notify: (method: string, ...args: unknown[]) => void): WorkerAudio {
+export function createWorkerAudio(
+  call: Call,
+  notify: (method: string, ...args: unknown[]) => void,
+  options: { monitor: boolean },
+): WorkerAudio {
   const streams = new Map<number, { setState(state: AudioStreamState, latencyFrames: number): void }>();
+  const monitors = new Map<number, { left: Float32Array; right: Float32Array }>();
   const renderMs: number[] = [];
 
   const service: AudioService = {
@@ -123,8 +130,39 @@ export function createWorkerAudio(call: Call, notify: (method: string, ...args: 
     },
   };
 
+  if (options.monitor) {
+    /**
+     * The mix as of the OS's last frame. A main-thread app reads the live mix;
+     * this one can be up to a frame older, which a meter can't see.
+     */
+    service.monitor = async (): Promise<AudioMonitor> => {
+      const { monitorId, sampleRate, capacity } = (await call("audio.monitor", [])) as { monitorId: number; sampleRate: number; capacity: number };
+      const latest = { left: new Float32Array(capacity), right: new Float32Array(capacity) };
+      monitors.set(monitorId, latest);
+      return {
+        sampleRate,
+        capacity,
+        read(left, right) {
+          const now = monitors.get(monitorId) ?? latest;
+          const n = Math.min(capacity, left.length, right.length);
+          left.fill(0, 0, left.length - n);
+          right.fill(0, 0, right.length - n);
+          left.set(now.left.subarray(capacity - n), left.length - n);
+          right.set(now.right.subarray(capacity - n), right.length - n);
+        },
+        close() {
+          if (!monitors.delete(monitorId)) return;
+          notify("audio.monitorClose", monitorId);
+        },
+      };
+    };
+  }
+
   return {
     service,
+    monitorSnapshot(monitorId, left, right) {
+      if (monitors.has(monitorId)) monitors.set(monitorId, { left, right });
+    },
     update(streamId, state, latencyFrames) {
       streams.get(streamId)?.setState(state, latencyFrames);
     },

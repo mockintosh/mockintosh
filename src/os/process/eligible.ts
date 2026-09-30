@@ -9,12 +9,12 @@ import type { AppProcesses } from "../../platform/types";
 import type { SolidApp } from "../apps";
 
 /** Capabilities a process serves today. */
-const SERVED: ReadonlySet<Capability> = new Set<Capability>(["audio", "printer", "download", "network", "clipboard"]);
+const SERVED: ReadonlySet<Capability> = new Set<Capability>(["audio", "microphone", "printer", "download", "network", "clipboard", "fonts"]);
 
 /** Why `app` can't run in a process, or `null` when it can. */
 export function processBlocker(app: SolidApp, processes: AppProcesses | undefined): string | null {
-  if (app.runtime !== "worker") return "the app runs on the OS's thread";
   if (!processes) return "this Macintosh has no app processes";
+  if ((app.runtime ?? processes.defaultRuntime) !== "worker") return "the app runs on the OS's thread";
   if (!processes.canRun(app.id)) return "a process can't load this app's code";
   if (app.permissions?.length) return "kernel sessions aren't served to processes yet";
   if (app.signIn) return "sign-in isn't served to processes yet";

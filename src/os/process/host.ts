@@ -13,6 +13,9 @@ import type {
   AppServices,
   AudioPortOptions,
   AudioPortStream,
+  AudioMonitor,
+  MicrophonePortInput,
+  MicrophonePortOptions,
   MenubarDefinition,
   VideoExcerpt,
   VideoExcerptRequest,
@@ -136,6 +139,8 @@ export class AppProcess {
   private readonly keepAlives = new Map<number, () => void>();
   private readonly audioStreams = new Map<number, AudioPortStream>();
   private audioIds = 0;
+  private readonly microphones = new Map<number, MicrophonePortInput>();
+  private readonly monitors = new Map<number, AudioMonitor>();
   private readonly videoLoads = new Map<number, { abort(): void }>();
   private disposeRoot: () => void = () => {};
   private releaseLaunch: (() => void) | null;
@@ -170,6 +175,8 @@ export class AppProcess {
         audio: typeof this.context.audio?.openPort === "function",
         download: this.context.download !== undefined,
         video: typeof this.context.video?.excerpt === "function",
+        microphone: typeof this.context.microphone?.openPort === "function",
+        monitor: typeof this.context.audio?.monitor === "function",
         sprites: this.os.sprites.all(),
         stats: !!options.stats,
         fonts: [...fontRegistrations()],
@@ -232,6 +239,10 @@ export class AppProcess {
     for (const load of this.videoLoads.values()) load.abort();
     for (const stream of this.audioStreams.values()) stream.close();
     this.audioStreams.clear();
+    for (const input of this.microphones.values()) input.close();
+    this.microphones.clear();
+    for (const monitor of this.monitors.values()) monitor.close();
+    this.monitors.clear();
     this.releaseLaunch?.();
     this.releaseLaunch = null;
     for (const release of this.keepAlives.values()) release();
@@ -253,6 +264,13 @@ export class AppProcess {
 
   /** At the start of the OS's frame: take any picture the worker published since the last one. */
   private takeSharedFrames(): void {
+    // The speaker's mix for any monitor the app has open, as fresh as a main-thread app would read it.
+    for (const [monitorId, monitor] of this.monitors) {
+      const left = new Float32Array(monitor.capacity);
+      const right = new Float32Array(monitor.capacity);
+      monitor.read(left, right);
+      this.send({ t: "monitor", monitorId, left, right }, [left.buffer, right.buffer]);
+    }
     for (const w of this.windows.values()) {
       if (!w.shared) continue;
       const count = sharedFrameCount(w.shared.buffer);
@@ -390,6 +408,8 @@ export class AppProcess {
         return this.audioCall(name, args);
       case "video":
         return this.videoCall(name, args);
+      case "microphone":
+        return this.microphoneCall(name, args);
       case "keepAlive": {
         const release = ctx.keepAlive?.();
         if (release) this.keepAlives.set(args[0] as number, release);
@@ -438,7 +458,36 @@ export class AppProcess {
     throw new Error(`Unknown call window.${name}`);
   }
 
+  private async microphoneCall(name: string, args: unknown[]): Promise<unknown> {
+    if (name === "close") {
+      this.microphones.get(args[0] as number)?.close();
+      this.microphones.delete(args[0] as number);
+      return;
+    }
+    const microphone = this.context.microphone;
+    if (!microphone?.openPort) throw new Error("This Macintosh's microphone can't be reached from an app process");
+    const input = await microphone.openPort(args[0] as MicrophonePortOptions);
+    const inputId = ++this.audioIds;
+    this.microphones.set(inputId, input);
+    input.onStateChange((state) => this.send({ t: "microphone", inputId, state }));
+    const port = input.port;
+    return new Transfer({ inputId, sampleRate: input.sampleRate, channels: input.channels, state: input.state(), port }, [port]);
+  }
+
   private async audioCall(name: string, args: unknown[]): Promise<unknown> {
+    if (name === "monitor") {
+      const open = this.context.audio?.monitor;
+      if (!open) throw new Error("This Macintosh's speaker can't be listened to");
+      const monitor = await open.call(this.context.audio);
+      const monitorId = ++this.audioIds;
+      this.monitors.set(monitorId, monitor);
+      return { monitorId, sampleRate: monitor.sampleRate, capacity: monitor.capacity };
+    }
+    if (name === "monitorClose") {
+      this.monitors.get(args[0] as number)?.close();
+      this.monitors.delete(args[0] as number);
+      return;
+    }
     if (name === "close") {
       this.audioStreams.get(args[0] as number)?.close();
       this.audioStreams.delete(args[0] as number);

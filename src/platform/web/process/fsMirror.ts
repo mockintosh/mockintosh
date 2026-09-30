@@ -1,15 +1,19 @@
 /**
  * The worker's view of the file system. `AppFileSystem` reads are
  * synchronous and reactive, so the worker keeps a mirror of the catalog that
- * the host re-sends whenever it changes. Contents and every mutation go to the
- * host's real `FileSystem` as calls.
+ * the host re-sends whenever it changes. Contents and asynchronous mutations
+ * go to the host's real `FileSystem` as calls. The synchronous mutations
+ * (`mkdir`, `rename`, `move`) are checked and applied to the mirror at once,
+ * as the real file system would, then sent to the host; its next snapshot is
+ * the truth either way.
  */
 import { createSignal } from "solid-js";
 import type { AppFileSystem } from "@mockintosh/sdk";
-import type { FSDirectory, FSFile, FSNode, NodeRole } from "@mockintosh/fs";
+import { FSError, ROOT_ID, type FSDirectory, type FSFile, type FSNode, type MkdirOptions, type NodeRole } from "@mockintosh/fs";
 import type { FsSnapshot } from "../../../os/process/protocol";
 
 type Call = (method: string, args: unknown[]) => Promise<unknown>;
+type Notify = (method: string, ...args: unknown[]) => void;
 
 interface Index {
   rootId: string;
@@ -17,21 +21,31 @@ interface Index {
   childIds: Map<string, string[]>;
 }
 
-function indexSnapshot(snapshot: FsSnapshot): Index {
+function indexNodes(rootId: string, list: Iterable<FSNode>): Index {
   const nodes = new Map<string, FSNode>();
   const childIds = new Map<string, string[]>();
-  for (const node of snapshot.nodes) {
+  for (const node of list) {
     nodes.set(node.id, node);
     if (node.parentId === null) continue;
     const siblings = childIds.get(node.parentId);
     if (siblings) siblings.push(node.id);
     else childIds.set(node.parentId, [node.id]);
   }
-  return { rootId: snapshot.rootId, nodes, childIds };
+  return { rootId, nodes, childIds };
 }
 
-/** Methods the host runs on its `FileSystem`; they return promises or plain values. */
-const REMOTE = ["readBytes", "readText", "readJSON", "mkdir", "writeFile", "writeJSON", "rename", "move", "remove"] as const;
+/** Methods the host runs on its `FileSystem`; they all return promises. */
+const REMOTE = ["readBytes", "readText", "readJSON", "writeFile", "writeJSON", "remove"] as const;
+
+function assertValidName(name: string): void {
+  if (!name || name.includes("/") || name === "." || name === "..") {
+    throw new FSError("invalid-name", `Invalid file name: "${name}"`);
+  }
+}
+
+function newId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
 
 export interface FsMirror {
   fs: AppFileSystem;
@@ -40,11 +54,8 @@ export interface FsMirror {
   upsert(node: FSNode): void;
 }
 
-export function createFsMirror(call: Call): FsMirror {
-  const [index, setIndex] = createSignal<Index>(indexSnapshot({ rootId: "", nodes: [] }), {
-    ownedWrite: true,
-    equals: false,
-  });
+export function createFsMirror(call: Call, notify: Notify): FsMirror {
+  const [index, setIndex] = createSignal<Index>(indexNodes("", []), { ownedWrite: true, equals: false });
 
   const node = (id: string): FSNode | undefined => index().nodes.get(id);
   const directory = (id: string): FSDirectory | undefined => {
@@ -74,6 +85,31 @@ export function createFsMirror(call: Call): FsMirror {
     }
     return undefined;
   };
+  const isWithin = (id: string, ancestorId: string): boolean => {
+    for (let n = node(id); n; n = n.parentId === null ? undefined : node(n.parentId)) if (n.id === ancestorId) return true;
+    return false;
+  };
+
+  /** Replace nodes in the mirror and re-index. */
+  function apply(changed: FSNode[]): void {
+    const idx = index();
+    const nodes = new Map(idx.nodes);
+    for (const n of changed) nodes.set(n.id, n);
+    setIndex(indexNodes(idx.rootId, nodes.values()));
+  }
+
+  function requireDirectory(id: string): FSDirectory {
+    const dir = directory(id);
+    if (!dir) throw new FSError("not-found", `No folder ${id}`);
+    return dir;
+  }
+
+  function requireMutable(id: string): FSNode {
+    const n = node(id);
+    if (!n) throw new FSError("not-found", `No node ${id}`);
+    if (n.parentId === null || n.id === ROOT_ID) throw new FSError("invalid-move", "The root can't be changed");
+    return n;
+  }
 
   const reads = {
     node,
@@ -118,10 +154,53 @@ export function createFsMirror(call: Call): FsMirror {
     volumeOf,
   };
 
+  const mutations = {
+    mkdir(parentId: string, name: string, options: MkdirOptions = {}): FSDirectory {
+      assertValidName(name);
+      const parent = requireDirectory(parentId);
+      const existing = child(parent.id, name);
+      if (existing) {
+        if (existing.kind === "directory") {
+          if (options.role) notify("fs.mkdir", parentId, name, options);
+          return existing;
+        }
+        throw new FSError("exists", `A file named "${name}" already exists`);
+      }
+      const now = Date.now();
+      const dir: FSDirectory = { id: options.id ?? newId(), name, kind: "directory", parentId: parent.id, createdAt: now, modifiedAt: now, revision: 1 };
+      if (options.role) dir.role = options.role;
+      apply([dir]);
+      notify("fs.mkdir", parentId, name, { ...options, id: dir.id });
+      return dir;
+    },
+    rename(id: string, name: string): void {
+      assertValidName(name);
+      const n = requireMutable(id);
+      if (n.name === name) return;
+      const clash = child(n.parentId!, name);
+      if (clash && clash.id !== id) throw new FSError("exists", `"${name}" already exists in this folder`);
+      apply([{ ...n, name, modifiedAt: Date.now(), revision: n.revision + 1 }]);
+      notify("fs.rename", id, name);
+    },
+    move(id: string, newParentId: string): void {
+      const n = requireMutable(id);
+      const target = requireDirectory(newParentId);
+      if (n.parentId === target.id) return;
+      if (isWithin(target.id, id)) throw new FSError("invalid-move", "Cannot move a folder into itself");
+      if (child(target.id, n.name)) throw new FSError("exists", `"${n.name}" already exists in the destination`);
+      if (n.role === "volume" || target.id === index().rootId) {
+        throw new FSError("invalid-move", "Volumes cannot be moved and only volumes live at the root");
+      }
+      apply([{ ...n, parentId: target.id, modifiedAt: Date.now(), revision: n.revision + 1 }]);
+      notify("fs.move", id, newParentId);
+    },
+  };
+
   const remote = Object.fromEntries(REMOTE.map((method) => [method, (...args: unknown[]) => call(`fs.${method}`, args)]));
 
   const fs = {
     ...reads,
+    ...mutations,
     ...remote,
     // Writes inside run one call at a time; the host's catalog batches nothing for us.
     batch: <T>(fn: () => T): T => fn(),
@@ -130,18 +209,10 @@ export function createFsMirror(call: Call): FsMirror {
   return {
     fs,
     update(snapshot) {
-      setIndex(indexSnapshot(snapshot));
+      setIndex(indexNodes(snapshot.rootId, snapshot.nodes));
     },
     upsert(n) {
-      const idx = index();
-      const previous = idx.nodes.get(n.id);
-      idx.nodes.set(n.id, n);
-      if (!previous && n.parentId !== null) {
-        const siblings = idx.childIds.get(n.parentId);
-        if (siblings) siblings.push(n.id);
-        else idx.childIds.set(n.parentId, [n.id]);
-      }
-      setIndex(idx);
+      apply([n]);
     },
   };
 }

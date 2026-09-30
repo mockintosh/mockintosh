@@ -29,6 +29,8 @@ const START: Omit<ProcessStart, "appId" | "source"> = {
   stats: false,
   fonts: [],
   fontInstall: false,
+  microphone: false,
+  monitor: false,
 };
 
 describe("an app process", () => {

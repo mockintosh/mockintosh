@@ -12,6 +12,8 @@ import type {
   AudioPortStream,
   AudioService,
   KernelClient,
+  MicrophonePortInput,
+  MicrophonePortOptions,
   MicrophoneService,
   SignInService,
   WindowSpec,
@@ -118,7 +120,19 @@ function instanceAudio(os: OSServices, audio: AudioService, instanceId?: string)
 
 /** The microphone as one launch sees it: its inputs close when the launch ends, so no app keeps listening after it quits. */
 function instanceMicrophone(os: OSServices, microphone: MicrophoneService, instanceId?: string): MicrophoneService {
+  const openPort = microphone.openPort?.bind(microphone);
   return {
+    ...(openPort && {
+      async openPort(portOptions: MicrophonePortOptions): Promise<MicrophonePortInput> {
+        const input = await openPort(portOptions);
+        if (!instanceId || !os.instances) return input;
+        const disown = os.instances.own(instanceId, () => input.close());
+        input.onStateChange((state) => {
+          if (state === "closed") disown();
+        });
+        return input;
+      },
+    }),
     async open(inputOptions) {
       const input = await microphone.open(inputOptions);
       if (!instanceId || !os.instances) return input;

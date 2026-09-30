@@ -40,6 +40,11 @@ export interface FileSystemOptions {
 
 export interface MkdirOptions {
   role?: NodeRole;
+  /**
+   * Create the folder with this id. An app process answers `mkdir` before the
+   * OS has run it, so it chooses the id the app already holds.
+   */
+  id?: NodeId;
 }
 
 interface CatalogState {
@@ -313,9 +318,12 @@ export class FileSystem {
       if (existing.kind === "directory") return this.adoptRole(existing, options.role);
       throw new FSError("exists", `A file named "${name}" already exists`);
     }
+    if (options.id !== undefined && this.state.nodes[options.id]) {
+      throw new FSError("exists", `Node ${options.id} already exists`);
+    }
     const now = this.now();
     const dir: FSDirectory = {
-      id: this.generateId(),
+      id: options.id ?? this.generateId(),
       name,
       kind: "directory",
       parentId: parent.id,

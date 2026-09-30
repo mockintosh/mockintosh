@@ -62,6 +62,10 @@ export interface ProcessStart {
   download: boolean;
   /** The host can decode video excerpts (`VideoService.excerpt`). */
   video: boolean;
+  /** The microphone can deliver to a port (`MicrophoneService.openPort`). */
+  microphone: boolean;
+  /** The speaker's mix can be read back (`AudioService.monitor`). */
+  monitor: boolean;
   /** Sprites the app may ask for by name that aren't its own (OS icons, other apps'). */
   sprites: Record<string, Sprite>;
   /** Send `frameStats` for the Worker menu. */
@@ -105,6 +109,9 @@ export type HostToProcess =
   /** A font was installed or removed on the OS's side. */
   | { t: "font"; registration: FontRegistration }
   | { t: "audio"; streamId: number; state: "suspended" | "running" | "closed"; latencyFrames: number }
+  | { t: "microphone"; inputId: number; state: "suspended" | "running" | "closed" }
+  /** The speaker's latest mix, read as the OS's frame started. */
+  | { t: "monitor"; monitorId: number; left: Float32Array; right: Float32Array }
   | { t: "video"; event: VideoEvent }
   | { t: "reply"; id: number; ok: true; value: unknown }
   | { t: "reply"; id: number; ok: false; error: string };

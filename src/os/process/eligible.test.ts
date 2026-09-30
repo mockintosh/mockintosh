@@ -3,7 +3,7 @@ import type { AppProcesses } from "../../platform/types";
 import type { SolidApp } from "../apps";
 import { processBlocker } from "./eligible";
 
-const processes: AppProcesses = { canRun: (id) => id !== "unknown", spawn: () => { throw new Error("not in tests"); } };
+const processes: AppProcesses = { defaultRuntime: "main", canRun: (id) => id !== "unknown", spawn: () => { throw new Error("not in tests"); } };
 const app = (overrides: Partial<SolidApp> = {}): SolidApp =>
   ({ id: "app", title: "App", icon: "x", defaultSize: { width: 10, height: 10 }, Component: () => null, runtime: "worker", ...overrides }) as SolidApp;
 
@@ -14,6 +14,8 @@ describe("processBlocker", () => {
 
   it("keeps everything else on the OS's thread, and says why", () => {
     expect(processBlocker(app({ runtime: undefined }), processes)).toMatch(/OS's thread/);
+    expect(processBlocker(app({ runtime: undefined }), { ...processes, defaultRuntime: "worker" })).toBeNull();
+    expect(processBlocker(app({ runtime: "main" }), { ...processes, defaultRuntime: "worker" })).toMatch(/OS's thread/);
     expect(processBlocker(app(), undefined)).toMatch(/no app processes/);
     expect(processBlocker(app({ id: "unknown" }), processes)).toMatch(/can't load/);
     expect(processBlocker(app({ permissions: ["kernel:*"] }), processes)).toMatch(/kernel/);

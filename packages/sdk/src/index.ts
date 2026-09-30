@@ -127,7 +127,7 @@ export type {
   DecodedWav,
 } from "./audio";
 export { midiToFrequency, noteName, encodeWav, decodeWav } from "./audio";
-export type { MicrophoneService, MicrophoneInput, MicrophoneOptions, AudioCaptureBlock } from "./microphone";
+export type { MicrophoneService, MicrophoneInput, MicrophoneOptions, MicrophonePortInput, MicrophonePortOptions, AudioCaptureBlock } from "./microphone";
 export type {
   AgentRuntime,
   AgentSession,

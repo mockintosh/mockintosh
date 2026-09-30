@@ -51,4 +51,28 @@ export interface MicrophoneService {
    * prompt); the promise rejects if they refuse or there is no input device.
    */
   open(options: MicrophoneOptions): Promise<MicrophoneInput>;
+  /**
+   * Host-only: open an input whose blocks are delivered to another thread. The
+   * OS hands the returned `port` to a worker-hosted app, which receives the
+   * captured audio there directly. Absent where the input can't take a port.
+   */
+  openPort?(options: MicrophonePortOptions): Promise<MicrophonePortInput>;
+}
+
+export interface MicrophonePortOptions {
+  channels?: 1 | 2;
+}
+
+/**
+ * A microphone input that posts its blocks on `port`: each message is an
+ * interleaved `Float32Array` of `channels` channels. `port` is a
+ * `MessagePort`; transfer it.
+ */
+export interface MicrophonePortInput {
+  readonly sampleRate: number;
+  readonly channels: 1 | 2;
+  readonly port: unknown;
+  state(): AudioStreamState;
+  onStateChange(listener: (state: AudioStreamState) => void): () => void;
+  close(): void;
 }

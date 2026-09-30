@@ -265,6 +265,11 @@ export type ModuleLoader = (url: string) => Promise<unknown>;
 
 /** Starts app processes: on the web, a module Worker that runs `runProcess`. */
 export interface AppProcesses {
+  /**
+   * Where an app that doesn't say (`SolidApp.runtime` unset) runs. The web
+   * host says `"main"` unless the page is opened with `?processes=all`.
+   */
+  defaultRuntime: "main" | "worker";
   /** Whether a process can load this app's code: a bundled app in the process's module table. */
   canRun(appId: string): boolean;
   /** Start a process for `appId`; the name shows in the host's debugger. */

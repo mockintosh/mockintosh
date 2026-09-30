@@ -39,6 +39,7 @@ import { wireMenus, type MenuActions } from "../../../os/process/menus";
 import { publishSharedFrame, sharedFrameBytes } from "../../../os/process/sharedFrame";
 import type { AppSource, HostToProcess, ProcessStart, ProcessToHost, WindowState, WireWindowSpec } from "../../../os/process/protocol";
 import { createWorkerAudio } from "./audio";
+import { createWorkerMicrophone } from "./microphone";
 import { createFsMirror } from "./fsMirror";
 import { createWorkerVideo } from "./video";
 
@@ -97,12 +98,16 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
   };
   const notify = (method: string, ...args: unknown[]): void => post({ t: "call", id: 0, method, args });
 
-  const mirror = createFsMirror(async (method, args) => {
-    const result = await call(method, args);
-    if (isNode(result)) mirror.upsert(result);
-    return result;
-  });
-  const audio = createWorkerAudio(call, notify);
+  const mirror = createFsMirror(
+    async (method, args) => {
+      const result = await call(method, args);
+      if (isNode(result)) mirror.upsert(result);
+      return result;
+    },
+    notify,
+  );
+  let audio = createWorkerAudio(call, notify, { monitor: false });
+  const microphone = createWorkerMicrophone(call, notify);
   const video = createWorkerVideo(call, notify);
   const menuActions: MenuActions = new Map();
   let nextMenuId = 0;
@@ -267,6 +272,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       download: start.download ? { save: (file) => call("download.save", [file]) as Promise<void> } : undefined,
       audio: start.audio ? audio.service : undefined,
       video: start.video ? video.service : undefined,
+      microphone: start.microphone ? microphone.service : undefined,
       fonts: {
         // Registered here for this app straight away, and with the OS for every other app.
         register: (name, data, size) => {
@@ -384,6 +390,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     }
     app = loaded;
     sendStats = startMessage.stats;
+    audio = createWorkerAudio(call, notify, { monitor: startMessage.monitor });
     // The OS's fonts before any text is measured.
     for (const registration of startMessage.fonts) replayFontRegistration(registration);
     screenWidth = startMessage.screen.width;
@@ -519,6 +526,12 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
         return;
       case "audio":
         audio.update(msg.streamId, msg.state, msg.latencyFrames);
+        return;
+      case "microphone":
+        microphone.update(msg.inputId, msg.state);
+        return;
+      case "monitor":
+        audio.monitorSnapshot(msg.monitorId, msg.left, msg.right);
         return;
       case "video":
         video.event(msg.event);
