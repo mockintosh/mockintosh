@@ -5,7 +5,8 @@ import { registerApp } from "@/src/os/apps";
 import { getWindows } from "@/src/os/state";
 import { createHeadlessPlatform, type HeadlessPlatform } from "@/src/platform/headless";
 import Safari from "../Safari";
-import { ABOUT_BOX_TITLE, SOURCE_REPO_URL, openAboutBox } from "./AboutBox";
+import { ABOUT_BOX_TITLE, SOURCE_REPO_URL, contributorUrl, openAboutBox } from "./AboutBox";
+import { contributors } from "./contributors.generated";
 
 describe("About This Computer", () => {
   let platform: HeadlessPlatform;
@@ -42,9 +43,9 @@ describe("About This Computer", () => {
     return (await os.kernel.invoke(session(), "inspect", {})) as InspectionNode[];
   }
 
-  async function clickLink(): Promise<void> {
+  async function clickLink(name = "about-github"): Promise<void> {
     // Zoom holds the kernel render barrier until its timers finish.
-    const clicking = os.kernel.invoke(session(), "click", { name: "about-github" });
+    const clicking = os.kernel.invoke(session(), "click", { name });
     await vi.advanceTimersByTimeAsync(1000);
     platform.tick();
     await clicking;
@@ -78,5 +79,16 @@ describe("About This Computer", () => {
     const repo = getWindows().find((w) => w.appId === "safari" && w.props.url === SOURCE_REPO_URL);
     expect(repo).toBeDefined();
     expect(repo?.openedFromRect).toBeUndefined();
+  });
+
+  it("opens a contributor's GitHub profile in Safari", async () => {
+    const [first] = contributors;
+    expect(first).toBeDefined();
+    openAboutBox(os.services);
+    await settle();
+    await clickLink(`about-contributor-${first!.username}`);
+    const safari = getWindows().find((w) => w.appId === "safari");
+    expect(safari?.props.url).toBe(contributorUrl(first!.username));
+    expect(safari!.openedFromRect!.width).toBeGreaterThan(0);
   });
 });

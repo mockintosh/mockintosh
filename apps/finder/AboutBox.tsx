@@ -14,6 +14,11 @@ import { contributors } from "./contributors.generated";
 export const ABOUT_BOX_TITLE = "About This Computer";
 export const SOURCE_REPO_URL = "https://github.com/mockintosh/mockintosh";
 
+/** A contributor's GitHub profile, which Safari draws through its GitHub site adapter. */
+export function contributorUrl(username: string): string {
+  return `https://github.com/${encodeURIComponent(username)}`;
+}
+
 export function AboutBox(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
   const os = useOS();
@@ -21,9 +26,24 @@ export function AboutBox(_props: Record<string, unknown>): JSX.Element {
   const user = app.getSprite("user2");
   const [linkRect, setLinkRect] = createSignal<IconScreenRect | undefined>(undefined);
 
-  function openRepo(): void {
+  /** Open `url` in Safari, zooming from the link when Safari isn't running yet. */
+  function openInSafari(url: string, fromRect: IconScreenRect | undefined): void {
     const running = getWindows().some((w) => w.appId === "safari");
-    os.openApp("safari", { url: SOURCE_REPO_URL }, running ? undefined : linkRect());
+    os.openApp("safari", { url }, running ? undefined : fromRect);
+  }
+
+  function ContributorLink(props: { username: string }): JSX.Element {
+    const [rect, setRect] = createSignal<IconScreenRect | undefined>(undefined);
+    return (
+      <box
+        cursor="pointer"
+        semantic={{ name: `about-contributor-${props.username}`, role: "link" }}
+        onLayout={({ x, y, width, height }) => setRect({ x, y, width, height })}
+        onClick={() => openInSafari(contributorUrl(props.username), rect())}
+      >
+        <text font="body" nowrap underline>{`@${props.username}`}</text>
+      </box>
+    );
   }
 
   return (
@@ -43,7 +63,7 @@ export function AboutBox(_props: Record<string, unknown>): JSX.Element {
             cursor="pointer"
             semantic={{ name: "about-github", role: "link" }}
             onLayout={({ x, y, width, height }) => setLinkRect({ x, y, width, height })}
-            onClick={openRepo}
+            onClick={() => openInSafari(SOURCE_REPO_URL, linkRect())}
           >
             <text font="body" nowrap underline>
               github.com/mockintosh/mockintosh
@@ -64,7 +84,7 @@ export function AboutBox(_props: Record<string, unknown>): JSX.Element {
                   src={{ width: user.width, height: user.height, data: user.data, mask: user.mask }}
                 />
               )}
-              <text font="body" nowrap>{`@${c.username}`}</text>
+              <ContributorLink username={c.username} />
               <box flexGrow={1} />
               <text font="body" nowrap>{`${c.commits} commits`}</text>
             </box>
