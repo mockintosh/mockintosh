@@ -9,6 +9,7 @@
  * registry. A platform without `loadModule` can still install bundled apps.
  */
 import { MIME, type FileSystem, type FSFile } from "@mockintosh/fs";
+import { setAppSource } from "./process/sources";
 import type { AppManifest, Capability } from "@mockintosh/sdk";
 import type { Sprite } from "@mockintosh/ui";
 import type { ModuleLoader } from "../platform/types";
@@ -62,6 +63,8 @@ export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
     }
 
     const module = validateModule(manifest.id, await loadEntry(manifest, loadModule));
+    const bundledId = bundledIdFromEntry(manifest.entry);
+    setAppSource(manifest.id, bundledId !== undefined ? { kind: "bundled", id: bundledId } : { kind: "url", url: manifest.entry });
     if (module.sprites) sprites.registerAll(module.sprites);
     registerApp(module.default);
     loaded.add(manifest.id);

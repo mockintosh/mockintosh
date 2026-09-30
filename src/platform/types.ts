@@ -270,8 +270,8 @@ export interface AppProcesses {
    * host says `"main"` unless the page is opened with `?processes=all`.
    */
   defaultRuntime: "main" | "worker";
-  /** Whether a process can load this app's code: a bundled app in the process's module table. */
-  canRun(appId: string): boolean;
+  /** Whether a process can load this code: a bundled app in its module table, a bundle URL, or a build. */
+  canRun(source: import("../os/process/protocol").AppSource): boolean;
   /** Start a process for `appId`; the name shows in the host's debugger. */
   spawn(appId: string): import("../os/process/protocol").ProcessPort;
 }

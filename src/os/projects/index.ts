@@ -1,4 +1,5 @@
 import { sourceForTemplate, type ProjectTemplate } from "./templates";
+import { setAppSource } from "../process/sources";
 export { counterSource, blankSource, canvasSource, type ProjectTemplate } from "./templates";
 import {diskPath} from "./paths";
 import {MIME} from "@mockintosh/fs";
@@ -88,7 +89,10 @@ export class ProjectService {
     if (sourceRevision !== undefined && record.sourceRevision !== sourceRevision) throw new ServiceError("conflict", "Sources changed after this build; rebuild before installing");
     const code = await disk.stat(path + "/index.js");
     if (record.id !== selection.build || code.revision !== record.codeRevision) throw new ServiceError("conflict", "Build artifact was edited; rebuild from source");
-    const module = validateModule(selection.app, await this.platform.loadArtifact(decoder.decode(await disk.read(code.path)), record.id));
+    const source = decoder.decode(await disk.read(code.path));
+    const module = validateModule(selection.app, await this.platform.loadArtifact(source, record.id));
+    // A process loads the same build.
+    setAppSource(selection.app, { kind: "code", code: source, identity: record.id });
     if (missingCapabilities(module.default.requires, this.os.capabilities).length) throw new ServiceError("unsupported-operation", "Build needs unavailable host capabilities");
     // Sprites are registered only after module validation; names belong to the app's bundle.
     return {...module.default, sprites: {...module.default.sprites, ...module.sprites}};

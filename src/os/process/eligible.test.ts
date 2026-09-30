@@ -3,7 +3,7 @@ import type { AppProcesses } from "../../platform/types";
 import type { SolidApp } from "../apps";
 import { processBlocker } from "./eligible";
 
-const processes: AppProcesses = { defaultRuntime: "main", canRun: (id) => id !== "unknown", spawn: () => { throw new Error("not in tests"); } };
+const processes: AppProcesses = { defaultRuntime: "main", canRun: (source) => source.kind !== "bundled" || source.id !== "unknown", spawn: () => { throw new Error("not in tests"); } };
 const app = (overrides: Partial<SolidApp> = {}): SolidApp =>
   ({ id: "app", title: "App", icon: "x", defaultSize: { width: 10, height: 10 }, Component: () => null, runtime: "worker", ...overrides }) as SolidApp;
 

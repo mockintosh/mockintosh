@@ -71,7 +71,7 @@ A platform without `processes` runs every app on the main thread, as today. That
 - **Built in the OS (`src/os/projects`):** the host sends the artifact's code, and the worker imports it from a Blob URL.
 - **App Store bundles:** the worker imports the bundle URL.
 
-Module workers don't read the page's import map. So in the worker, bare `solid-js`, `@mockintosh/ui`, `@mockintosh/sdk` and `@mockintosh/quickdraw` imports must be rewritten to shim modules that re-export the worker's own copies. That is step 6. Until then, installed and built apps run on the main thread.
+Module workers don't read the page's import map. So in the worker, the shared imports (`solid-js`, `@mockintosh/ui`, `@mockintosh/ui/renderer`, `@mockintosh/sdk`, `@mockintosh/quickdraw`, `@mockintosh/agent`) are rewritten to shim modules that re-export the worker's own copies (`loader.ts`). The OS records each app's source as it loads it (`src/os/process/sources.ts`), so the process loads the same code. A bundle split into chunks that import shared modules themselves isn't supported. The OS's builder emits one file. Tested in Chrome with the builder's output for the Counter template.
 
 ## Steps
 
@@ -85,7 +85,7 @@ Each step is a commit (or a few) on `worker-apps`, with tests and a browser chec
 | 3 | Input latency: render on input, not on the next tick after it; present the frame the same main-thread frame | done: pictures in shared memory (see below) |
 | 4 | Measure memory and start-up per worker; decide whether small apps stay on the main thread | done: every app can have a process (see below) |
 | 5 | Close the gaps, app by app: installed fonts, full sprite registry, microphone port, `printPage`, live video frames, `busy`, `keepAlive`, errors into the instance journal | done (see below) |
-| 6 | Third-party and built apps: import shims in the worker | |
+| 6 | Third-party and built apps: import shims in the worker | done: `src/platform/web/process/loader.ts` |
 | 7 | Make `worker` the default; retire the Webworker twins; Force Quit (⌘⌥Esc) | |
 
 The prototype twins stay until step 7, so each step can be compared with the main-thread app.

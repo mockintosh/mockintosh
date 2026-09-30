@@ -1,8 +1,37 @@
 /**
  * An app process on the web: a module Worker running one app instance. The
- * OS starts it (`createWebAppProcesses`) and sends `start` naming the app.
+ * OS starts it (`createWebAppProcesses`) and sends `start` naming the app's
+ * code. Installed bundles and OS builds share this worker's Solid, UI kit,
+ * QuickDraw and SDK through `loader.ts`.
  */
+import * as solid from "solid-js";
+import * as sdk from "@mockintosh/sdk";
+import * as ui from "@mockintosh/ui";
+import * as renderer from "@mockintosh/ui/renderer";
+import * as quickdraw from "@mockintosh/quickdraw";
+import * as agent from "@mockintosh/agent";
+import type { SolidApp } from "@mockintosh/sdk";
 import { APP_MODULES } from "../../../appModules";
+import { createAppLoader } from "./loader";
 import { runProcess, type ProcessScope } from "./runtime";
 
-runProcess(self as unknown as ProcessScope, async (source) => (await APP_MODULES[source.id]?.())?.default);
+const load = createAppLoader({
+  shared: {
+    "solid-js": solid,
+    "@mockintosh/sdk": sdk,
+    "@mockintosh/ui": ui,
+    "@mockintosh/ui/renderer": renderer,
+    "@mockintosh/quickdraw": quickdraw,
+    "@mockintosh/agent": agent,
+  },
+  bundled: async (id) => APP_MODULES[id]?.(),
+  fetchText: async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Couldn't load ${url} (${response.status})`);
+    return response.text();
+  },
+  importUrl: (url) => import(/* @vite-ignore */ url),
+  blobUrl: (code) => URL.createObjectURL(new Blob([code], { type: "text/javascript" })),
+});
+
+runProcess(self as unknown as ProcessScope, async (source) => (await load(source)) as SolidApp | undefined);

@@ -53,6 +53,7 @@ import { bundledApps } from "./bundledApps";
 import { createAppContext } from "./appContext";
 import { AppProcess } from "./process/host";
 import { processBlocker } from "./process/eligible";
+import { appSource } from "./process/sources";
 import { processWindowComponent } from "./components/ProcessWindow.solid";
 import { buildAppWindow } from "./appWindow";
 import { DialogApp } from "./components/Dialog.solid";
@@ -286,7 +287,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
           port: platform.processes.spawn(appId),
           appId,
           instanceId,
-          source: { kind: "bundled", id: appId },
+          source: appSource(appId),
           props,
           context,
           os: osServices,

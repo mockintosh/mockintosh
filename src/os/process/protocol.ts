@@ -45,7 +45,13 @@ export interface WireMenu {
 export type WireWindowSpec = Omit<WindowSpec, "Component" | "onGoAway"> & { hasGoAway: boolean };
 
 /** Where the app's code comes from. */
-export type AppSource = { kind: "bundled"; id: string };
+export type AppSource =
+  /** A bundled app, in the process's module table. */
+  | { kind: "bundled"; id: string }
+  /** An installed app bundle (`Platform.loadModule`). */
+  | { kind: "url"; url: string }
+  /** A build made in the OS (`Platform.loadArtifact`). */
+  | { kind: "code"; code: string; identity: string };
 
 export interface ProcessStart {
   appId: string;
