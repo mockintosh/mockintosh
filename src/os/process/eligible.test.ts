@@ -19,7 +19,6 @@ describe("processBlocker", () => {
     expect(processBlocker(app(), undefined)).toMatch(/no app processes/);
     expect(processBlocker(app({ id: "unknown" }), processes)).toMatch(/can't load/);
     expect(processBlocker(app({ permissions: ["kernel:*"] }), processes)).toMatch(/kernel/);
-    expect(processBlocker(app({ scrollable: true }), processes)).toMatch(/scrolling/);
     expect(processBlocker(app({ requires: ["camera"] }), processes)).toBe("camera isn't served to processes yet");
   });
 });

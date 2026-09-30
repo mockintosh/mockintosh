@@ -9,7 +9,7 @@ import type { AppProcesses } from "../../platform/types";
 import type { SolidApp } from "../apps";
 
 /** Capabilities a process serves today. */
-const SERVED: ReadonlySet<Capability> = new Set<Capability>(["audio", "microphone", "printer", "download", "network", "clipboard", "fonts"]);
+const SERVED: ReadonlySet<Capability> = new Set<Capability>(["audio", "microphone", "printer", "download", "network", "clipboard", "fonts", "images"]);
 
 /** Why `app` can't run in a process, or `null` when it can. */
 export function processBlocker(app: SolidApp, processes: AppProcesses | undefined): string | null {
@@ -18,8 +18,6 @@ export function processBlocker(app: SolidApp, processes: AppProcesses | undefine
   if (!processes.canRun(app.id)) return "a process can't load this app's code";
   if (app.permissions?.length) return "kernel sessions aren't served to processes yet";
   if (app.signIn) return "sign-in isn't served to processes yet";
-  if (app.scrollable) return "scrolling windows aren't served to processes yet";
-  if (app.about?.Component) return "custom About boxes aren't served to processes yet";
   const missing = (app.requires ?? []).filter((c) => !SERVED.has(c));
   if (missing.length) return `${missing.join(", ")} ${missing.length === 1 ? "isn't" : "aren't"} served to processes yet`;
   return null;

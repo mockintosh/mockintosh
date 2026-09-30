@@ -17,7 +17,7 @@ import { registerFileOperations } from "./kernel/files";
 
 import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd, type Rect } from "@mockintosh/quickdraw";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
-import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers } from "@mockintosh/ui";
+import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
 import { FileSystem } from "@mockintosh/fs";
 import type { AppContext } from "@mockintosh/sdk";
 import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEvent } from "../platform/types";
@@ -146,6 +146,27 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
 
   const instances = new AppInstances(id => closeOSWindow(id));
 
+  /** The host's image decoder as `<image>` sources want it: bytes, or a URL fetched first. Processes get it too. */
+  const uiImages: UIImageService | undefined = platform.images
+    ? {
+        async decode(source, options) {
+          const images = platform.images!;
+          if (typeof source !== "string") {
+            return images.decode(source, options?.type, options);
+          }
+          if (!platform.fetch) throw new Error("This Macintosh cannot fetch images.");
+          const response = await platform.fetch(source);
+          if (!response.ok) throw new Error(`Could not fetch image (${response.status})`);
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          return images.decode(
+            bytes,
+            options?.type ?? response.headers.get("content-type") ?? undefined,
+            options,
+          );
+        },
+      }
+    : undefined;
+
   // --- UI instance (full-screen Solid renderer) ---
   bootTrace("ui");
   const ui = createUI({
@@ -153,25 +174,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     scheduleRender: scheduleRepaint,
     services: {
       clipboard: platform.clipboard,
-      images: platform.images
-        ? {
-            async decode(source, options) {
-              const images = platform.images!;
-              if (typeof source !== "string") {
-                return images.decode(source, options?.type, options);
-              }
-              if (!platform.fetch) throw new Error("This Macintosh cannot fetch images.");
-              const response = await platform.fetch(source);
-              if (!response.ok) throw new Error(`Could not fetch image (${response.status})`);
-              const bytes = new Uint8Array(await response.arrayBuffer());
-              return images.decode(
-                bytes,
-                options?.type ?? response.headers.get("content-type") ?? undefined,
-                options,
-              );
-            },
-          }
-        : undefined,
+      images: uiImages,
       onError(error) {
         const active = getWindows().find((window) => window.id === getActiveWindowId());
         if (active?.instanceId) instances.note(active.instanceId, error, "handler");
@@ -288,6 +291,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
           context,
           os: osServices,
           clipboard: platform.clipboard,
+          images: uiImages,
           titleSuffix: app.processStats ? " (Worker)" : "",
           stats: !!app.processStats,
           windowComponent: (process, key) => processWindowComponent(process, key, !!app.processStats),

@@ -31,6 +31,7 @@ const START: Omit<ProcessStart, "appId" | "source"> = {
   fontInstall: false,
   microphone: false,
   monitor: false,
+  images: false,
 };
 
 describe("an app process", () => {
@@ -60,7 +61,7 @@ describe("an app process", () => {
     expect(posted.some((m) => m.t === "started")).toBe(true);
     const [black, white] = opens.map((m) => m.args[0] as string);
 
-    const state = { width: 24, height: 10, active: false, kind: "document" as const };
+    const state = { width: 24, height: 10, active: false, kind: "document" as const, scrollY: 0 };
     send({ t: "window.attach", key: black!, state: { ...state, active: true } });
     send({ t: "window.attach", key: white!, state });
     await settle();

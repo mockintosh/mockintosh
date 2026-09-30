@@ -21,9 +21,13 @@ import {
   type CursorSpec,
   type JSX,
   type UIInstance,
+  type UIServices,
 } from "@mockintosh/ui";
 import {
   AppServicesContext,
+  WindowSlotsContext,
+  type WindowBandView,
+  type WindowSlots,
   type AppContext,
   type AppServices,
   type AppWindow,
@@ -62,7 +66,12 @@ interface ProcessWindow {
   height: Accessor<number>;
   active: Accessor<boolean>;
   kind: Accessor<WindowKind>;
+  scrollY: Accessor<number>;
   setState(state: WindowState): void;
+  /** `WindowHeader` / `WindowFooter` content, drawn here in the window's band: the OS never sees it. */
+  header: Accessor<{ view: WindowBandView; height: number }>;
+  footer: Accessor<{ view: WindowBandView; height: number }>;
+  slots: WindowSlots;
   services: AppServices;
   node: CanvasNode | null;
   /** The picture last sent, to skip frames where this window didn't change. */
@@ -272,6 +281,9 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       download: start.download ? { save: (file) => call("download.save", [file]) as Promise<void> } : undefined,
       audio: start.audio ? audio.service : undefined,
       video: start.video ? video.service : undefined,
+      images: start.images
+        ? { decode: (bytes, type, options) => call("images.decode", [bytes, type, options]) as ReturnType<NonNullable<AppContext["images"]>["decode"]> }
+        : undefined,
       microphone: start.microphone ? microphone.service : undefined,
       fonts: {
         // Registered here for this app straight away, and with the OS for every other app.
@@ -313,6 +325,16 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     const [height, setHeight] = createSignal(state.height, { ownedWrite: true });
     const [active, setActive] = createSignal(state.active, { ownedWrite: true });
     const [kind, setKind] = createSignal(state.kind, { ownedWrite: true });
+    const [scrollY, setScrollY] = createSignal(state.scrollY, { ownedWrite: true });
+    const [header, setHeader] = createSignal<{ view: WindowBandView; height: number }>({ view: null, height: 0 }, { ownedWrite: true });
+    const [footer, setFooter] = createSignal<{ view: WindowBandView; height: number }>({ view: null, height: 0 }, { ownedWrite: true });
+    /** The app's document height, before the bands are added for the OS's scrollbar. */
+    let documentSize: { width: number; height: number } | null = null;
+    const reportContentSize = () => {
+      if (!documentSize) return;
+      const bands = untrack(header).height + untrack(footer).height;
+      notify("window.setContentSize", key, documentSize.width, documentSize.height + bands);
+    };
     const w: ProcessWindow = {
       key,
       slot: freeSlot(),
@@ -321,11 +343,25 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       height,
       active,
       kind,
+      scrollY,
       setState(next) {
         setWidth(next.width);
         setHeight(next.height);
         setActive(next.active);
         setKind(next.kind);
+        setScrollY(next.scrollY);
+      },
+      header,
+      footer,
+      slots: {
+        setHeader(view, bandHeight) {
+          setHeader({ view, height: view ? bandHeight : 0 });
+          reportContentSize();
+        },
+        setFooter(view, bandHeight) {
+          setFooter({ view, height: view ? bandHeight : 0 });
+          reportContentSize();
+        },
       },
       services: null as unknown as AppServices,
       node: null,
@@ -340,9 +376,12 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       height,
       isActive: active,
       kind,
-      scrollY: () => 0,
-      scrollTo: () => {},
-      setContentSize: (cw, ch) => notify("window.setContentSize", key, cw, ch),
+      scrollY,
+      scrollTo: (y) => notify("window.scrollTo", key, y),
+      setContentSize: (cw, ch) => {
+        documentSize = { width: cw, height: ch };
+        reportContentSize();
+      },
       setTitle: (title) => notify("window.setTitle", key, title),
       setFullScreen: (on) => notify("window.setFullScreen", key, on),
       close: () => notify("window.close", key),
@@ -405,6 +444,9 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
           readText: () => call("clipboard.readText", []) as Promise<string>,
           writeText: (text) => call("clipboard.writeText", [text]) as Promise<void>,
         },
+        images: startMessage.images
+          ? { decode: (source, options) => call("images.decodeSource", [source, options]) as ReturnType<NonNullable<UIServices["images"]>["decode"]> }
+          : undefined,
         onError: (error) => {
           console.error(error);
           notify("error", error instanceof Error ? error.stack ?? error.message : String(error));
@@ -429,16 +471,38 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
               }}
             >
               <AppServicesContext value={w.services}>
-                <Errored
-                  fallback={(error) => {
-                    notify("instance.fail", String(error()));
-                    return <text wrap>{`Application failed: ${String(error())}`}</text>;
-                  }}
-                >
-                  <Loading fallback={<box width="100%" height="100%" background={0} />}>
-                    {createComponent(w.Component, w.props)}
-                  </Loading>
-                </Errored>
+                <WindowSlotsContext value={w.slots}>
+                  <box width={w.width()} height={w.height()} flexDirection="column">
+                    {w.header().view && <box width={w.width()} height={w.header().height}>{w.header().view!()}</box>}
+                    <box
+                      width={w.width()}
+                      height={Math.max(0, w.height() - w.header().height - w.footer().height)}
+                      overflow="hidden"
+                      position="relative"
+                    >
+                      {/* A scrollable window's document, moved to what the OS has scrolled to. */}
+                      <box
+                        position="absolute"
+                        left={0}
+                        top={-w.scrollY()}
+                        width={w.width()}
+                        height={Math.max(0, w.height() - w.header().height - w.footer().height)}
+                      >
+                        <Errored
+                          fallback={(error) => {
+                            notify("instance.fail", String(error()));
+                            return <text wrap>{`Application failed: ${String(error())}`}</text>;
+                          }}
+                        >
+                          <Loading fallback={<box width="100%" height="100%" background={0} />}>
+                            {createComponent(w.Component, w.props)}
+                          </Loading>
+                        </Errored>
+                      </box>
+                    </box>
+                    {w.footer().view && <box width={w.width()} height={w.footer().height}>{w.footer().view!()}</box>}
+                  </box>
+                </WindowSlotsContext>
               </AppServicesContext>
             </box>
           )}

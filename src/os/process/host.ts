@@ -7,7 +7,7 @@
  */
 import { createEffect, createRoot, untrack } from "solid-js";
 import type { BitMap } from "@mockintosh/quickdraw";
-import { fontRegistrations, onFontRegistration, type CursorSpec, type UIClipboard } from "@mockintosh/ui";
+import { fontRegistrations, onFontRegistration, type CursorSpec, type UIClipboard, type UIImageService } from "@mockintosh/ui";
 import type {
   AppContext,
   AppServices,
@@ -38,6 +38,8 @@ export interface AppProcessOptions {
   context: AppContext;
   os: OSServices;
   clipboard?: UIClipboard;
+  /** Decodes `<image>` sources: bytes, or a URL it fetches. */
+  images?: UIImageService;
   /** Appended to every title the app sets (the Webworker twins' " (Worker)"). */
   titleSuffix?: string;
   /** Collect the worker's timings for the Worker menu. */
@@ -177,6 +179,7 @@ export class AppProcess {
         video: typeof this.context.video?.excerpt === "function",
         microphone: typeof this.context.microphone?.openPort === "function",
         monitor: typeof this.context.audio?.monitor === "function",
+        images: this.context.images !== undefined,
         sprites: this.os.sprites.all(),
         stats: !!options.stats,
         fonts: [...fontRegistrations()],
@@ -385,6 +388,14 @@ export class AppProcess {
       case "print":
         if (!ctx.print) throw new Error("This Macintosh has no printer");
         return name === "connect" ? ctx.print.connect() : ctx.print.printPicture(args[0] as never, args[1] as never);
+      case "images": {
+        const frame = name === "decodeSource"
+          ? this.options.images?.decode(args[0] as never, args[1] as never)
+          : ctx.images?.decode(args[0] as Uint8Array, args[1] as string | undefined, args[2] as never);
+        if (!frame) throw new Error("This Macintosh can't decode images");
+        // The pixels move to the worker rather than being copied.
+        return frame.then((f) => new Transfer({ width: f.width, height: f.height, rgba: f.rgba }, [f.rgba.buffer]));
+      }
       case "fonts":
         if (name === "register") return ctx.fonts.register(args[0] as string, args[1] as string, args[2] as number | undefined);
         if (name === "install") {
@@ -453,6 +464,7 @@ export class AppProcess {
       return;
     }
     if (name === "setTitle") return this.withWindow(key, (s) => s.window.setTitle(`${args[1] as string}${this.options.titleSuffix ?? ""}`));
+    if (name === "scrollTo") return this.withWindow(key, (s) => s.window.scrollTo(args[1] as number));
     if (name === "setContentSize") return this.withWindow(key, (s) => s.window.setContentSize(args[1] as number, args[2] as number));
     if (name === "setFullScreen") return this.withWindow(key, (s) => s.window.setFullScreen(args[1] as boolean));
     throw new Error(`Unknown call window.${name}`);

@@ -66,6 +66,8 @@ export interface ProcessStart {
   microphone: boolean;
   /** The speaker's mix can be read back (`AudioService.monitor`). */
   monitor: boolean;
+  /** The host can decode PNG/JPEG/GIF (`AppContext.images`, and `<image>` sources). */
+  images: boolean;
   /** Sprites the app may ask for by name that aren't its own (OS icons, other apps'). */
   sprites: Record<string, Sprite>;
   /** Send `frameStats` for the Worker menu. */
@@ -89,6 +91,8 @@ export interface WindowState {
   height: number;
   active: boolean;
   kind: WindowKind;
+  /** How far the OS has scrolled a scrollable window's document. */
+  scrollY: number;
 }
 
 export type HostToProcess =

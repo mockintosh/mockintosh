@@ -8,6 +8,7 @@ import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { CopyBits, srcCopy } from "@mockintosh/quickdraw";
 import { heldModifiers, type CursorSpec, type JSX, type Modifiers } from "@mockintosh/ui";
 import { useApp, type MenubarDefinition } from "@mockintosh/sdk";
+import { useWindow } from "../windowContext";
 import type { AppProcess } from "../process/host";
 import type { KeyKind, PointerKind, WindowState } from "../process/protocol";
 import type { WindowComponent } from "../state";
@@ -15,6 +16,8 @@ import type { WindowComponent } from "../state";
 export function ProcessWindow(props: { process: AppProcess; windowKey: string; stats?: boolean }): JSX.Element {
   const app = useApp();
   const win = app.window;
+  /** The window record: a scrollable window's document height lives there. */
+  const osWin = useWindow().win;
   const proc = props.process;
   const key = props.windowKey;
   const host = proc.windows.get(key);
@@ -32,7 +35,15 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
     };
   }
 
-  const state = (): WindowState => ({ width: win.width(), height: win.height(), active: win.isActive(), kind: win.kind() });
+  const state = (): WindowState => ({
+    width: win.width(),
+    height: win.height(),
+    active: win.isActive(),
+    kind: win.kind(),
+    scrollY: win.scrollY(),
+  });
+  /** Where the visible part of a scrollable window's document starts; the worker draws only that part. */
+  const viewTop = () => (osWin.scrollable ? Math.min(win.scrollY(), Math.max(0, osWin.contentHeight - win.height())) : 0);
   proc.attach(key, app, untrack(state));
   onCleanup(() => proc.detach(key));
   createEffect(state, (next) => proc.send({ t: "window.state", key, state: next }));
@@ -80,8 +91,11 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
     proc.input({ t: "key", key, kind, value, modifiers });
   }
 
-  return (
+  const picture = (
     <raster
+      position={osWin.scrollable ? "absolute" : undefined}
+      left={0}
+      top={viewTop()}
       width={win.width()}
       height={win.height()}
       revision={revision()}
@@ -114,11 +128,20 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       onMouseMove={(x, y) => pointer("mousemove", x, y)}
       onDrag={(x, y) => pointer("mousemove", x, y)}
       onMouseUp={(x, y) => pointer("mouseup", x, y)}
-      onScroll={(deltaY) => pointer("scroll", lastX, lastY, deltaY)}
+      // A scrollable window's wheel scrolls the window, as the OS does for any app.
+      onScroll={osWin.scrollable ? undefined : (deltaY) => pointer("scroll", lastX, lastY, deltaY)}
       onKeyDown={(k, mods) => keyEvent("keydown", k, mods)}
       onKeyUp={(k, mods) => keyEvent("keyup", k, mods)}
       onKeyPress={(ch) => keyEvent("keypress", ch, heldModifiers())}
     />
+  );
+  // The OS scrolls the window's body over the whole document; the picture rides at the visible part.
+  return osWin.scrollable ? (
+    <box width={win.width()} height={Math.max(osWin.contentHeight, win.height())} position="relative">
+      {picture}
+    </box>
+  ) : (
+    picture
   );
 }
 
