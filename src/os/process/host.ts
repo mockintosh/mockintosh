@@ -19,6 +19,8 @@ import type {
   MenubarDefinition,
   VideoExcerpt,
   VideoExcerptRequest,
+  VideoSource,
+  CameraSource,
   WindowSpec,
 } from "@mockintosh/sdk";
 import type { FSNode } from "@mockintosh/fs";
@@ -146,6 +148,9 @@ export class AppProcess {
   private readonly monitors = new Map<number, AudioMonitor>();
   private readonly videoLoads = new Map<number, { abort(): void }>();
   private readonly kernelCalls = new Map<number, AbortController>();
+  /** Live video and camera sources the app opened, and those it wants a picture of. */
+  private readonly media = new Map<number, VideoSource | CameraSource>();
+  private readonly mediaWanted = new Set<number>();
   private disposeRoot: () => void = () => {};
   private releaseLaunch: (() => void) | null;
   private latencyTimer: ReturnType<typeof setInterval> | null = null;
@@ -179,6 +184,8 @@ export class AppProcess {
         audio: typeof this.context.audio?.openPort === "function",
         download: this.context.download !== undefined,
         video: typeof this.context.video?.excerpt === "function",
+        videoPlayback: this.context.video !== undefined,
+        camera: this.context.camera !== undefined,
         microphone: typeof this.context.microphone?.openPort === "function",
         monitor: typeof this.context.audio?.monitor === "function",
         images: this.context.images !== undefined,
@@ -244,6 +251,8 @@ export class AppProcess {
     if (this.latencyTimer) clearInterval(this.latencyTimer);
     for (const load of this.videoLoads.values()) load.abort();
     for (const call of this.kernelCalls.values()) call.abort();
+    for (const source of this.media.values()) source.close();
+    this.media.clear();
     for (const stream of this.audioStreams.values()) stream.close();
     this.audioStreams.clear();
     for (const input of this.microphones.values()) input.close();
@@ -271,6 +280,16 @@ export class AppProcess {
 
   /** At the start of the OS's frame: take any picture the worker published since the last one. */
   private takeSharedFrames(): void {
+    // A picture for each live source the app asked about since the last one.
+    for (const id of this.mediaWanted) {
+      const source = this.media.get(id);
+      const frame = source?.frame();
+      if (!source || !frame) continue;
+      this.mediaWanted.delete(id);
+      const rgba = frame.rgba.slice();
+      const timing = "currentTime" in source ? { currentTime: source.currentTime, duration: source.duration } : { currentTime: 0, duration: 0 };
+      this.send({ t: "mediaFrame", id, frame: { width: frame.width, height: frame.height, rgba }, ...timing }, [rgba.buffer]);
+    }
     // The speaker's mix for any monitor the app has open, as fresh as a main-thread app would read it.
     for (const [monitorId, monitor] of this.monitors) {
       const left = new Float32Array(monitor.capacity);
@@ -433,6 +452,10 @@ export class AppProcess {
       case "audio":
         return this.audioCall(name, args);
       case "video":
+        if (name === "open") {
+          if (!ctx.video) throw new Error("This Macintosh can't play video");
+          return ctx.video.open(args[0] as string, args[1] as never).then((source) => this.adoptMedia(source, source.duration));
+        }
         return this.videoCall(name, args);
       case "microphone":
         return this.microphoneCall(name, args);
@@ -447,6 +470,12 @@ export class AppProcess {
         return;
       case "quit":
         return ctx.quit();
+      case "media":
+        return this.mediaCall(name, args);
+      case "camera": {
+        if (!ctx.camera) throw new Error("This Macintosh has no camera");
+        return ctx.camera.open(args[0] as never).then((source) => this.adoptMedia(source, 0));
+      }
       case "kernel":
         if (name === "abort") this.kernelCalls.get(args[0] as number)?.abort();
         return;
@@ -459,6 +488,42 @@ export class AppProcess {
         return;
     }
     throw new Error(`Unknown call ${method}`);
+  }
+
+  private mediaIds = 0;
+
+  /** Keep a source the app opened; the reply carries its current picture, as `open` gives a main-thread app one. */
+  private adoptMedia(source: VideoSource | CameraSource, duration: number): Transfer {
+    const id = ++this.mediaIds;
+    this.media.set(id, source);
+    const frame = source.frame();
+    const first = frame && { width: frame.width, height: frame.height, rgba: frame.rgba.slice() };
+    return new Transfer({ id, width: source.width, height: source.height, duration, first }, first ? [first.rgba.buffer] : []);
+  }
+
+  private mediaCall(name: string, args: unknown[]): unknown {
+    const id = args[0] as number;
+    const source = this.media.get(id);
+    if (!source) return;
+    switch (name) {
+      case "want":
+        this.mediaWanted.add(id);
+        return;
+      case "play":
+        return "play" in source ? source.play() : undefined;
+      case "pause":
+        if ("pause" in source) source.pause();
+        return;
+      case "seek":
+        if ("seek" in source) source.seek(args[1] as number);
+        return;
+      case "close":
+        source.close();
+        this.media.delete(id);
+        this.mediaWanted.delete(id);
+        return;
+    }
+    throw new Error(`Unknown call media.${name}`);
   }
 
   /** A trap the app invokes, with its output streamed back while it runs. */

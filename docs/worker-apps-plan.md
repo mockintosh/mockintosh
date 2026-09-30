@@ -84,7 +84,7 @@ Each step is a commit (or a few) on `worker-apps`, with tests and a browser chec
 | 2 | One worker per instance: `onOpen` and `openWindow` in the worker, several windows per process, About box | done, except custom About boxes (those apps stay on the OS's thread) |
 | 3 | Input latency: render on input, not on the next tick after it; present the frame the same main-thread frame | done: pictures in shared memory (see below) |
 | 4 | Measure memory and start-up per worker; decide whether small apps stay on the main thread | done: every app can have a process (see below) |
-| 5 | Close the gaps, app by app: installed fonts, full sprite registry, microphone port, `printPage`, live video frames, `busy`, `keepAlive`, errors into the instance journal | |
+| 5 | Close the gaps, app by app: installed fonts, full sprite registry, microphone port, `printPage`, live video frames, `busy`, `keepAlive`, errors into the instance journal | done (see below) |
 | 6 | Third-party and built apps: import shims in the worker | |
 | 7 | Make `worker` the default; retire the Webworker twins; Force Quit (⌘⌥Esc) | |
 
@@ -115,6 +115,32 @@ Production build (`vite build` + `vite preview`), headless Chrome, `performance.
 | OP-1 in a process | 7.0 MB | 34.0 MB (its tapes) | 46.0 MB | 157 ms |
 
 A process costs about 3–5 MB beyond the app's own memory (its runtime, fonts, and a second copy of the app's code) and 50–160 ms to its first picture. Ten open apps would cost about 40 MB. That's affordable, so no app stays on the OS's thread to save memory. The page still loads each process app's module to read its declaration. Loading only a manifest would save that copy (step 7).
+
+## What a process serves (step 5)
+
+Everything an app declares or reaches for through `useApp()` works in a process, except for the items listed under "Still on the OS's thread".
+
+- **Files:** reads come from a catalog mirror. `mkdir`, `rename` and `move` are applied at once in the process; `mkdir` takes the id the process chose.
+- **Storage, dialogs, clipboard, download, `openApp`.**
+- **Sound:** the speaker through a port. The speaker monitor sends a snapshot as each OS frame starts, so it can be a frame older than on the OS's thread. A meter can't see the difference. OP-1's sampling from the speaker can occasionally repeat a few milliseconds.
+- **Microphone:** through a port from the capture worklet.
+- **Printing:** `printPicture`. `printPage` is drawn in the process and printed as a finished page. `layoutPicture` is computed in the process.
+- **Images:** `images.decode` and `<image>` sources.
+- **Video and camera:** excerpts, filled in as they decode. Live video and camera pictures are sent at the OS's frame, on request.
+- **Fonts:** installed fonts, replayed from a journal of registrations. `fonts.install`, `fontRaster`.
+- **Sprites:** the whole registry.
+- **Kernel sessions:** traps with streamed output and cancellation.
+- **Windows:** scrolling windows, `WindowHeader` / `WindowFooter` bands (drawn in the process's band), full screen, custom About boxes (drawn by the OS from its copy of the module).
+
+### Still on the OS's thread
+
+| App | Why |
+| --- | --- |
+| Finder, App Store, Icon Gallery | Shell apps (see above) |
+| Spotify | `browser.loadScript` hands the app a live object from a script in the page (the Web Playback SDK); it can't cross into a worker |
+| fx | Its agent runtime is a WebAssembly core the web host loads for the page |
+
+`os.openersFor` and `signIn` aren't served yet; no app that can move needs them.
 
 ## Risks
 

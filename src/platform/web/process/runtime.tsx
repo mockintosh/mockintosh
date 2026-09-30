@@ -46,6 +46,7 @@ import { publishSharedFrame, sharedFrameBytes } from "../../../os/process/shared
 import type { AppSource, HostToProcess, ProcessStart, ProcessToHost, WindowState, WireWindowSpec } from "../../../os/process/protocol";
 import { createWorkerAudio } from "./audio";
 import { createWorkerMicrophone } from "./microphone";
+import { createWorkerMedia } from "./media";
 import { createFsMirror } from "./fsMirror";
 import { createWorkerVideo } from "./video";
 
@@ -122,6 +123,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
   );
   let audio = createWorkerAudio(call, notify, { monitor: false });
   const microphone = createWorkerMicrophone(call, notify);
+  const media = createWorkerMedia(call, notify);
   const video = createWorkerVideo(call, notify);
   const menuActions: MenuActions = new Map();
   let nextMenuId = 0;
@@ -306,7 +308,11 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       },
       download: start.download ? { save: (file) => call("download.save", [file]) as Promise<void> } : undefined,
       audio: start.audio ? audio.service : undefined,
-      video: start.video ? video.service : undefined,
+      video:
+        start.video || start.videoPlayback
+          ? { open: start.videoPlayback ? media.video.open : () => Promise.reject(new Error("This Macintosh can't play video")), excerpt: start.video ? video.service.excerpt : undefined }
+          : undefined,
+      camera: start.camera ? media.camera : undefined,
       images: start.images
         ? { decode: (bytes, type, options) => call("images.decode", [bytes, type, options]) as ReturnType<NonNullable<AppContext["images"]>["decode"]> }
         : undefined,
@@ -625,6 +631,11 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
         return;
       case "video":
         video.event(msg.event);
+        flush();
+        scheduleFrame();
+        return;
+      case "mediaFrame":
+        media.frame({ id: msg.id, frame: msg.frame, currentTime: msg.currentTime, duration: msg.duration });
         flush();
         scheduleFrame();
         return;

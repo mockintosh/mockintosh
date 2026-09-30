@@ -62,6 +62,10 @@ export interface ProcessStart {
   download: boolean;
   /** The host can decode video excerpts (`VideoService.excerpt`). */
   video: boolean;
+  /** The host can play video live (`VideoService.open`). */
+  videoPlayback: boolean;
+  /** The host has a camera (`CameraService`). */
+  camera: boolean;
   /** The microphone can deliver to a port (`MicrophoneService.openPort`). */
   microphone: boolean;
   /** The speaker's mix can be read back (`AudioService.monitor`). */
@@ -119,6 +123,8 @@ export type HostToProcess =
   /** The speaker's latest mix, read as the OS's frame started. */
   | { t: "monitor"; monitorId: number; left: Float32Array; right: Float32Array }
   | { t: "video"; event: VideoEvent }
+  /** The latest picture of a live video or camera source the worker asked for. */
+  | { t: "mediaFrame"; id: number; frame: { width: number; height: number; rgba: Uint8ClampedArray }; currentTime: number; duration: number }
   /** Output of the `kernel.invoke` call `id`, while it runs. */
   | { t: "kernelStream"; id: number; stream: "stdout" | "stderr"; bytes: Uint8Array }
   | { t: "reply"; id: number; ok: true; value: unknown }

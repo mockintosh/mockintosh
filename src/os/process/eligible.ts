@@ -9,7 +9,7 @@ import type { AppProcesses } from "../../platform/types";
 import type { SolidApp } from "../apps";
 
 /** Capabilities a process serves today. */
-const SERVED: ReadonlySet<Capability> = new Set<Capability>(["audio", "microphone", "printer", "download", "network", "clipboard", "fonts", "images"]);
+const SERVED: ReadonlySet<Capability> = new Set<Capability>(["audio", "microphone", "printer", "download", "network", "clipboard", "fonts", "images", "video", "camera"]);
 
 /** Why `app` can't run in a process, or `null` when it can. */
 export function processBlocker(app: SolidApp, processes: AppProcesses | undefined): string | null {
