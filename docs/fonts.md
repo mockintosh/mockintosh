@@ -14,7 +14,7 @@ Family keys are lowercase letters and digits (`familyKey("Futura PT")` → `"fut
 
 ### Where families come from
 
-- **Built in:** compiled into `@mockintosh/ui` (`fonts/families.ts`, `fonts/faces/`): Chicago, Geneva, Monaco, New York, the city fonts, Lisa, Geist Pixel.
+- **Built in:** compiled into `@mockintosh/ui` (`fonts/families.ts`, `fonts/faces/`): Chicago, Geneva, Monaco, New York, the city fonts, Lisa, Geist Pixel, Redaction (20, 35) and Jiskan (16). Redaction and Jiskan come from the AngelCode BMFont files in `public/fonts` via `npm run fonts:import-bmfont`; glyphs whose ink overhangs their advance keep it through an overhang table, and BMFont kerning pairs are dropped.
 - **System Folder › Fonts** (`src/os/fontFolder.ts`): every `.suit` suitcase, loose `.ttf` / `.otf` / `.ttc`, and `family-size.fnt` strike in it is installed at boot and again whenever the folder changes. Loose outlines join a family by their own family name and `OS/2` style bits. A folder named "Fonts" made before the role existed is adopted. Files that fail log `Fonts: couldn't install …`.
 - **Run time:** `app.fonts.register(name, data, size)` installs a strike for this boot only; `app.fonts.install(suitcase)` writes a suitcase into the Fonts folder.
 

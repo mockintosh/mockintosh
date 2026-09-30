@@ -73,9 +73,24 @@ function rememberInfo(family: string, size: number, info: RegisteredFontInfo | u
   infoMap().set(fontInfoKey(family, size), info);
 }
 
+let overhangsByKey: Map<string, Readonly<Record<number, readonly [number, number]>>> | undefined;
+function overhangMap(): Map<string, Readonly<Record<number, readonly [number, number]>>> {
+  return (overhangsByKey ??= new Map());
+}
+
 function loadStrike(family: string, size: number, data: string): DeckerFont {
   const font = decodeDeckerFont(data, family);
   font.size = size;
+  const overhangs = overhangMap().get(fontInfoKey(family, size));
+  if (overhangs) {
+    // The cell is the glyph's ink; these glyphs advance less than it (f, j, y).
+    font.advances = font.glyphWidths.slice();
+    font.originX = new Uint8Array(256);
+    for (const [ordinal, [advance, originX]] of Object.entries(overhangs)) {
+      font.advances[Number(ordinal)] = advance;
+      font.originX[Number(ordinal)] = originX;
+    }
+  }
   return applyExtraGlyphs(font);
 }
 
@@ -171,6 +186,7 @@ export function initBuiltinFonts(): void {
     }
     bySize.set(strike.size, strike.data);
     rememberInfo(strike.family, strike.size, strike.info);
+    if (strike.overhangs) overhangMap().set(fontInfoKey(strike.family, strike.size), strike.overhangs);
   }
   for (const [name, alias] of Object.entries(BAKED_STYLE_ALIASES)) {
     pendingBakedMap().set(name, alias);

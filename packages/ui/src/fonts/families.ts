@@ -4,6 +4,15 @@ import { BUILTIN_FONT_GENEVA_12 } from "./faces/geneva12";
 import { BUILTIN_FONT_GENEVA_12_BOLD } from "./faces/genevaTwelveBold";
 import { BUILTIN_FONT_LISA } from "./faces/lisa";
 import { BUILTIN_FONT_PIXEL } from "./faces/pixel";
+import {
+  BUILTIN_FONT_REDACTION_20,
+  BUILTIN_FONT_REDACTION_20_INFO,
+  BUILTIN_FONT_REDACTION_20_OVERHANGS,
+  BUILTIN_FONT_REDACTION_35,
+  BUILTIN_FONT_REDACTION_35_INFO,
+  BUILTIN_FONT_REDACTION_35_OVERHANGS,
+} from "./faces/redaction";
+import { BUILTIN_FONT_JISKAN_16, BUILTIN_FONT_JISKAN_16_INFO } from "./faces/jiskan";
 import { CITY_GENERATED } from "./faces/city/generated";
 
 export interface FontFamilyInfo {
@@ -24,6 +33,11 @@ export interface FontStrikeSpec {
   size: number;
   data: string;
   info?: { ascent: number; descent: number; leading: number };
+  /**
+   * Ordinal → [advance, originX] for glyphs whose ink overhangs their
+   * advance (`%%FNT1` stores one width per glyph, used as the cell).
+   */
+  overhangs?: Readonly<Record<number, readonly [number, number]>>;
 }
 
 /** Role names keep existing `<text font="body">` call sites. */
@@ -54,6 +68,8 @@ export const FAMILY_DEFAULTS: Readonly<Record<string, number>> = {
   losAngeles: 12,
   lisa: 12,
   pixel: 24,
+  redaction: 20,
+  jiskan: 16,
 };
 
 /** Menu names for built-in families whose key isn't just the name lowercased. */
@@ -90,6 +106,21 @@ const VENDORED_STRIKES: readonly FontStrikeSpec[] = [
   { family: "monaco", size: 9, data: BUILTIN_FONT_MONO, info: { ascent: 9, descent: 2, leading: 0 } },
   { family: "lisa", size: 12, data: BUILTIN_FONT_LISA, info: { ascent: 10, descent: 2, leading: 0 } },
   { family: "pixel", size: 24, data: BUILTIN_FONT_PIXEL },
+  {
+    family: "redaction",
+    size: 20,
+    data: BUILTIN_FONT_REDACTION_20,
+    info: BUILTIN_FONT_REDACTION_20_INFO,
+    overhangs: BUILTIN_FONT_REDACTION_20_OVERHANGS,
+  },
+  {
+    family: "redaction",
+    size: 35,
+    data: BUILTIN_FONT_REDACTION_35,
+    info: BUILTIN_FONT_REDACTION_35_INFO,
+    overhangs: BUILTIN_FONT_REDACTION_35_OVERHANGS,
+  },
+  { family: "jiskan", size: 16, data: BUILTIN_FONT_JISKAN_16, info: BUILTIN_FONT_JISKAN_16_INFO },
 ];
 
 export const BUILTIN_STRIKES: readonly FontStrikeSpec[] = [...VENDORED_STRIKES, ...CITY_GENERATED];
@@ -101,4 +132,6 @@ export const LISTED_FONT_NAMES: readonly string[] = [
   ...CITY_FAMILY_ORDER,
   "lisa",
   "pixel",
+  "redaction",
+  "jiskan",
 ];
