@@ -493,6 +493,8 @@ A small terminal can keep UI/input local and use remote builds/agents. A device 
 
 - [Server infrastructure plan](server-infrastructure-plan.md) — hosting, deployment, data ownership, and H1 delivery.
 - [Server data-layer research](server-data-research.md) — traditional, local-first, and multiplayer options.
+- [Apps in Web Workers](worker-apps-plan.md) — one worker per app instance; the isolated execution §5 asks for, inside the browser.
+- [Browsix research](browsix-research.md) — what to borrow from a Unix kernel in the browser.
 
 - [Plan 9 research and earlier kernel review](plan9-research.md) — primary sources and fuller discussion of namespaces, service protocols, Acme, plumbing, and pitfalls.
 - [Plan 9 from Bell Labs](https://9p.io/sys/doc/9.html) — file interfaces, private namespaces, and terminal/compute/storage separation.

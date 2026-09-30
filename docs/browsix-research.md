@@ -45,6 +45,8 @@ This fits kernel plan principle 1 (one operation implementation) and makes the n
 
 ### 2. Untrusted apps in Workers
 
+Now planned for every app except the Finder: see [Apps in Web Workers](worker-apps-plan.md).
+
 Browsix splits trusted kernel from untrusted process along the Worker boundary. Do the same for App Store and other third-party apps. First-party apps stay in the main realm.
 
 - A worker runs its own Solid, `@mockintosh/ui` and QuickDraw. This matches the kernel plan's "one UI runtime per realm": each worker is another realm. The global singletons (`thePort`, Font Manager, cursor) are then per worker instead of a blocker.
