@@ -73,6 +73,8 @@ export interface ProfileInfo {
   followers: number;
   following: number;
   publicRepos: number;
+  /** `avatars.githubusercontent.com` URL; empty when the API gave none. */
+  avatarUrl: string;
 }
 
 export interface ProfileRepo {
@@ -81,6 +83,7 @@ export interface ProfileRepo {
   description: string;
   language: string;
   stars: number;
+  forks: number;
   fork: boolean;
 }
 
@@ -185,6 +188,7 @@ async function getProfile(fetch: FetchFunction, token: string, login: string): P
     followers: numberField(record, "followers"),
     following: numberField(record, "following"),
     publicRepos: numberField(record, "public_repos"),
+    avatarUrl: stringField(record, "avatar_url"),
   };
 }
 
@@ -203,6 +207,7 @@ function profileRepo(item: unknown): ProfileRepo {
     description: stringField(record, "description"),
     language: stringField(record, "language"),
     stars: numberField(record, "stargazers_count"),
+    forks: numberField(record, "forks_count"),
     fork: record.fork === true,
   };
 }

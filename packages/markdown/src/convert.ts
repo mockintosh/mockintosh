@@ -223,6 +223,8 @@ export function extractImageUrls(nodes: LayoutNode[]): string[] {
   const urls: string[] = [];
   for (const node of nodes) {
     if (node.type === "image" && node.src) urls.push(node.src);
+    else if (node.type === "box") urls.push(...extractImageUrls(node.nodes));
+    else if (node.type === "columns") for (const column of node.columns) urls.push(...extractImageUrls(column.nodes));
   }
   return urls;
 }

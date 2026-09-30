@@ -46,6 +46,13 @@ export interface WebForm {
   controls: FormControl[];
 }
 
+/** One column of a `columns` block. */
+export interface LayoutColumn {
+  /** Fixed width in pixels; omitted columns share the rest. */
+  width?: number;
+  nodes: LayoutNode[];
+}
+
 // Block-level nodes passed to the renderer.
 export type LayoutNode =
   | { type: "heading"; level: 1 | 2 | 3; text: string; align: Align; href?: string }
@@ -55,6 +62,21 @@ export type LayoutNode =
   | { type: "table"; rows: TableRow[] }
   | { type: "form"; form: WebForm }
   | { type: "hr" }
-  | { type: "image"; src: string; alt: string; align: Align; href?: string }
+  | {
+      type: "image";
+      src: string;
+      alt: string;
+      align: Align;
+      href?: string;
+      /** Draw at this size (scaled down to fit) instead of the picture's own. */
+      width?: number;
+      height?: number;
+      /** CSS-style corner radius the picture is clipped to (half its size for a circle). */
+      borderRadius?: number;
+    }
+  /** Columns side by side, stacked instead when the page is narrower than `minWidth`. */
+  | { type: "columns"; columns: LayoutColumn[]; gap: number; minWidth: number }
+  /** A bordered card around its nodes. */
+  | { type: "box"; nodes: LayoutNode[] }
   | { type: "spacer"; height: number }
   | { type: "br" };

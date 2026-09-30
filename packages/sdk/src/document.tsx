@@ -1,7 +1,7 @@
 import { Errored, For, Loading, Show, createMemo, createSignal, useContext } from "solid-js";
 import type { ImageFrame, JSX, TextRun } from "@mockintosh/ui";
 import { Button, Dithered, TextInput } from "@mockintosh/ui";
-import type { FormControl, InlineSegment, LayoutNode, TableRow, WebForm } from "@mockintosh/markdown";
+import type { FormControl, InlineSegment, LayoutColumn, LayoutNode, TableRow, WebForm } from "@mockintosh/markdown";
 import { AppServicesContext } from "./index";
 
 /** One `name=value` pair a submitted form sends, in document order. */
@@ -25,6 +25,9 @@ export interface DocumentViewProps {
 
 const FALLBACK_WIDTH = 320;
 const BUTTON_WIDTH = 64;
+/** Border plus padding on each side of a `box` card. */
+const CARD_INSET = 7;
+const BLOCK_GAP = 4;
 
 function inlineRuns(segments: readonly InlineSegment[], onLink: ((href: string) => void) | undefined): TextRun[] {
   return segments.map((segment) => {
@@ -91,7 +94,63 @@ function Block(props: BlockProps): JSX.Element {
   if (node.type === "spacer") {
     return <box height={node.height} />;
   }
+  if (node.type === "box") {
+    return (
+      <box borderColor={1} padding={CARD_INSET - 1} flexDirection="column" gap={BLOCK_GAP}>
+        <Blocks nodes={node.nodes} width={props.width - CARD_INSET * 2} view={props.view} />
+      </box>
+    );
+  }
+  if (node.type === "columns") {
+    return <ColumnsView columns={node.columns} gap={node.gap} minWidth={node.minWidth} width={props.width} view={props.view} />;
+  }
   return <box height={6} />;
+}
+
+function Blocks(props: { nodes: readonly LayoutNode[]; width: number; view: DocumentViewProps }): JSX.Element {
+  return <For each={props.nodes}>{(node) => <Block node={node} width={props.width} view={props.view} />}</For>;
+}
+
+/** Fixed-width columns keep their width; the others share what is left. */
+function columnWidths(columns: readonly LayoutColumn[], gap: number, width: number): number[] {
+  const fixed = columns.reduce((sum, column) => sum + (column.width ?? 0), 0);
+  const flexible = columns.filter((column) => column.width === undefined).length;
+  const room = Math.max(0, width - fixed - gap * Math.max(0, columns.length - 1));
+  return columns.map((column) => column.width ?? Math.floor(room / Math.max(1, flexible)));
+}
+
+function ColumnsView(props: {
+  columns: readonly LayoutColumn[];
+  gap: number;
+  minWidth: number;
+  width: number;
+  view: DocumentViewProps;
+}): JSX.Element {
+  const widths = () => columnWidths(props.columns, props.gap, props.width);
+  const stacked = (
+    <box flexDirection="column" gap={props.gap}>
+      <For each={props.columns}>
+        {(column) => (
+          <box flexDirection="column" gap={BLOCK_GAP}>
+            <Blocks nodes={column.nodes} width={Math.min(props.width, column.width ?? props.width)} view={props.view} />
+          </box>
+        )}
+      </For>
+    </box>
+  );
+  return (
+    <Show when={props.width >= props.minWidth} fallback={stacked}>
+      <box flexDirection="row" gap={props.gap} alignItems="flex-start">
+        <For each={props.columns.map((column, index) => ({ column, index }))}>
+          {(entry) => (
+            <box flexDirection="column" gap={BLOCK_GAP} width={widths()[entry.index]} flexShrink={0} minWidth={0}>
+              <Blocks nodes={entry.column.nodes} width={widths()[entry.index] ?? 0} view={props.view} />
+            </box>
+          )}
+        </For>
+      </box>
+    </Show>
+  );
 }
 
 function TableView(props: { rows: readonly TableRow[]; onLink?: (href: string) => void }): JSX.Element {
@@ -210,14 +269,24 @@ function ImageView(props: { node: Extract<LayoutNode, { type: "image" }>; width:
   const size = () => {
     const loaded = frame();
     if (!loaded || loaded.width <= 0 || loaded.height <= 0) return null;
-    const width = Math.max(1, Math.min(loaded.width, props.width));
-    return { frame: loaded, width, height: Math.max(1, Math.round((loaded.height * width) / loaded.width)) };
+    const natural = { width: node.width ?? loaded.width, height: node.height ?? (loaded.height * (node.width ?? loaded.width)) / loaded.width };
+    const width = Math.max(1, Math.min(natural.width, props.width));
+    return { frame: loaded, width, height: Math.max(1, Math.round((natural.height * width) / natural.width)) };
   };
+  // A sized picture holds its place while it loads, so the page doesn't jump.
+  const pending = () => (node.width && node.height ? <box width={Math.min(node.width, props.width)} height={node.height} /> : alt());
   return linked(
-    <Loading fallback={alt()}>
+    <Loading fallback={pending()}>
       <Errored fallback={() => alt()}>
         <Show when={size()} fallback={alt()}>
-          {(fit) => <Dithered src={fit().frame} width={fit().width} height={fit().height} />}
+          {(fit) =>
+            node.borderRadius ? (
+              <box width={fit().width} height={fit().height} borderRadius={node.borderRadius} overflow="hidden">
+                <Dithered src={fit().frame} width={fit().width} height={fit().height} />
+              </box>
+            ) : (
+              <Dithered src={fit().frame} width={fit().width} height={fit().height} />
+            )}
         </Show>
       </Errored>
     </Loading>,

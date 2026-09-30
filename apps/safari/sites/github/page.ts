@@ -124,45 +124,114 @@ function repoList(repos: readonly ProfileRepo[], empty: string): LayoutNode[] {
   });
 }
 
-function profilePage(page: Extract<GithubPage, { view: "profile" }>): DocumentPage {
+/** Sidebar width, as on github.com; the avatar fills it. */
+const SIDEBAR = 200;
+/** Narrower than this, the sidebar goes above the repositories. */
+const TWO_COLUMNS = SIDEBAR + 16 + 220;
+
+/** A repository as a card: name, description, and language / stars / forks. */
+function repoCard(repo: ProfileRepo, owner: string): LayoutNode {
+  const location: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
+  const name = repo.owner.toLowerCase() === owner.toLowerCase() ? repo.name : `${repo.owner}/${repo.name}`;
+  const facts = [repo.language, `${formatCount(repo.stars)} stars`, repo.forks ? `${formatCount(repo.forks)} forks` : ""]
+    .filter(Boolean)
+    .join("  •  ");
+  return {
+    type: "box",
+    nodes: [
+      paragraph({ kind: "link", text: name, href: githubUrl(location) }, text(repo.fork ? "  Fork" : "  Public")),
+      ...(repo.description ? [paragraph(text(repo.description))] : []),
+      paragraph(text(facts)),
+    ],
+  };
+}
+
+/** `gustav.io` → `https://gustav.io`, as github.com links a profile's website. */
+function websiteHref(blog: string): string {
+  return /^https?:\/\//i.test(blog) ? blog : `https://${blog}`;
+}
+
+function profileSidebar(page: Extract<GithubPage, { view: "profile" }>): LayoutNode[] {
   const profile = page.profile;
-  const location: GithubLocation = { kind: "profile", login: profile.login, tab: page.tab };
   const isOrg = profile.kind === "Organization";
-  const counts = isOrg
-    ? `${formatCount(profile.followers)} followers  •  ${formatCount(profile.publicRepos)} repositories`
-    : `${formatCount(profile.followers)} followers  •  ${formatCount(profile.following)} following  •  ${formatCount(profile.publicRepos)} repositories`;
-  const details = [profile.company, profile.location, profile.blog, profile.twitter ? `@${profile.twitter}` : ""].filter(Boolean).join("  •  ");
-  const nodes: LayoutNode[] = [
-    heading(1, isOrg ? `${profile.login} (organization)` : profile.login),
-    ...(profile.name ? [paragraph(bold(profile.name))] : []),
-    ...(profile.bio ? [paragraph(text(profile.bio))] : []),
-    paragraph(text(counts)),
-    ...(details ? [paragraph(text(details))] : []),
-  ];
+  const avatar = avatarSrc(profile.avatarUrl);
+  const nodes: LayoutNode[] = [];
+  if (avatar) {
+    nodes.push({ type: "image", src: avatar, alt: profile.login, align: "left", width: SIDEBAR, height: SIDEBAR, borderRadius: SIDEBAR / 2 });
+  }
+  nodes.push(heading(1, profile.name || profile.login));
+  if (profile.name) nodes.push(paragraph(text(profile.login)));
+  if (profile.bio) nodes.push(paragraph(text(profile.bio)));
+  nodes.push(
+    isOrg
+      ? paragraph(bold(formatCount(profile.followers)), text(" followers"))
+      : paragraph(bold(formatCount(profile.followers)), text(" followers · "), bold(formatCount(profile.following)), text(" following")),
+  );
+  if (profile.company) nodes.push(paragraph(text(profile.company)));
+  if (profile.location) nodes.push(paragraph(text(profile.location)));
+  if (profile.blog) nodes.push(paragraph({ kind: "link", text: profile.blog, href: websiteHref(profile.blog) }));
+  if (profile.twitter) nodes.push(paragraph({ kind: "link", text: `@${profile.twitter}`, href: `https://x.com/${profile.twitter}` }));
   if (page.orgs.length > 0) {
-    const segments: InlineSegment[] = [text("Organizations: ")];
+    nodes.push({ type: "hr" }, heading(3, "Organizations"));
+    const segments: InlineSegment[] = [];
     page.orgs.forEach((login, index) => {
       if (index > 0) segments.push(text(", "));
       segments.push(link(login, { kind: "profile", login, tab: "repos" }));
     });
     nodes.push(paragraph(...segments));
   }
+  return nodes;
+}
+
+function profileMain(page: Extract<GithubPage, { view: "profile" }>): LayoutNode[] {
+  const login = page.profile.login;
+  if (page.tab === "people") {
+    const nodes: LayoutNode[] = [heading(2, "People")];
+    if (page.people.length === 0) nodes.push(paragraph(text("No public members.")));
+    for (const person of page.people) {
+      nodes.push({ type: "listItem", indent: 0, segments: [link(person, { kind: "profile", login: person, tab: "repos" })] });
+    }
+    return nodes;
+  }
+  const title = page.tab === "stars" ? "Starred repositories" : "Repositories";
+  const empty = page.tab === "stars" ? "No starred repositories." : "No public repositories.";
+  if (page.repos.length === 0) return [heading(2, title), paragraph(text(empty))];
+  return [heading(2, title), ...page.repos.map((repo) => repoCard(repo, login))];
+}
+
+function profilePage(page: Extract<GithubPage, { view: "profile" }>): DocumentPage {
+  const profile = page.profile;
+  const location: GithubLocation = { kind: "profile", login: profile.login, tab: page.tab };
   const tab = (label: string, name: "repos" | "stars" | "people") => ({
     label,
     location: { kind: "profile", login: profile.login, tab: name } as GithubLocation,
     current: page.tab === name,
   });
-  nodes.push(tabs(isOrg ? [tab("Repositories", "repos"), tab("People", "people")] : [tab("Repositories", "repos"), tab("Stars", "stars")]));
-  nodes.push({ type: "hr" });
-  if (page.tab === "people") {
-    if (page.people.length === 0) nodes.push(paragraph(text("No public members.")));
-    for (const login of page.people) {
-      nodes.push({ type: "listItem", indent: 0, segments: [link(login, { kind: "profile", login, tab: "repos" })] });
-    }
-  } else {
-    nodes.push(...repoList(page.repos, page.tab === "stars" ? "No starred repositories." : "No public repositories."));
-  }
+  const repositories = `Repositories ${formatCount(profile.publicRepos)}`;
+  const nodes: LayoutNode[] = [
+    tabs(profile.kind === "Organization"
+      ? [tab(repositories, "repos"), tab("People", "people")]
+      : [tab(repositories, "repos"), tab("Stars", "stars")]),
+    { type: "hr" },
+    {
+      type: "columns",
+      gap: 16,
+      minWidth: TWO_COLUMNS,
+      columns: [{ width: SIDEBAR, nodes: profileSidebar(page) }, { nodes: profileMain(page) }],
+    },
+  ];
   return { kind: "document", url: githubUrl(location), title: profile.login, nodes };
+}
+
+/** Avatar size asked of GitHub, in pixels; Safari dithers what comes back. */
+const AVATAR_SIZE = SIDEBAR;
+
+/** The avatar at {@link AVATAR_SIZE} (`s=`), or "" when there is none to load. */
+export function avatarSrc(avatarUrl: string): string {
+  const url = parseUrl(avatarUrl);
+  if (!url || url.scheme !== "https") return "";
+  const query = [...url.query.split("&").filter((pair) => pair && !pair.startsWith("s=")), `s=${AVATAR_SIZE}`].join("&");
+  return formatUrl({ ...url, query });
 }
 
 type RepoPage = Exclude<GithubPage, { view: "profile" } | { view: "search" }>;

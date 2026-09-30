@@ -3,7 +3,7 @@ import { parseUrl, type LayoutNode } from "@mockintosh/sdk";
 import { hnText, parseHackerNewsUrl } from "./hackernews";
 import { scaled } from "../icons";
 import { microDesktopError, mockintoshSite } from "./mockintosh";
-import { githubPage, githubUrl, resolveRelative } from "./github/page";
+import { avatarSrc, githubPage, githubUrl, resolveRelative } from "./github/page";
 import type { RepoInfo } from "./github/api";
 
 const REPO: RepoInfo = {
@@ -62,6 +62,56 @@ describe("GitHub pages", () => {
   it("points relative README images at raw files in the README's folder", () => {
     const nodes = resolveRelative([{ type: "image", src: "img/a.png", alt: "", align: "left" }], REPO, "main", "docs");
     expect(nodes[0]).toMatchObject({ src: "https://raw.githubusercontent.com/octocat/Hello-World/main/docs/img/a.png" });
+  });
+
+  it("lays a profile out like github.com: a round avatar sidebar beside repository cards", () => {
+    const page = githubPage(
+      {
+        view: "profile",
+        profile: {
+          login: "octocat",
+          name: "The Octocat",
+          kind: "User",
+          bio: "",
+          company: "",
+          location: "San Francisco",
+          blog: "github.blog",
+          twitter: "",
+          followers: 1,
+          following: 0,
+          publicRepos: 8,
+          avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4",
+        },
+        tab: "repos",
+        repos: [{ owner: "octocat", name: "Spoon-Knife", description: "", language: "HTML", stars: 13000, forks: 150000, fork: false }],
+        orgs: [],
+        people: [],
+      },
+      0,
+    );
+    const columns = page.nodes.find((node) => node.type === "columns");
+    if (columns?.type !== "columns") throw new Error("no columns");
+    const [sidebar, main] = columns.columns;
+    expect(sidebar!.width).toBe(200);
+    expect(sidebar!.nodes[0]).toEqual({
+      type: "image",
+      src: "https://avatars.githubusercontent.com/u/583231?v=4&s=200",
+      alt: "octocat",
+      align: "left",
+      width: 200,
+      height: 200,
+      borderRadius: 100,
+    });
+    expect(sidebar!.nodes[1]).toMatchObject({ type: "heading", text: "The Octocat" });
+    expect(links(sidebar!.nodes)).toContain("https://github.blog");
+    expect(main!.nodes[1]).toMatchObject({ type: "box" });
+    expect(links((main!.nodes[1] as { nodes: LayoutNode[] }).nodes)).toEqual(["https://github.com/octocat/Spoon-Knife"]);
+  });
+
+  it("leaves out avatars it can't load", () => {
+    expect(avatarSrc("")).toBe("");
+    expect(avatarSrc("http://avatars.githubusercontent.com/u/1")).toBe("");
+    expect(avatarSrc("https://avatars.githubusercontent.com/u/1?s=460&v=4")).toBe("https://avatars.githubusercontent.com/u/1?v=4&s=200");
   });
 
   it("round-trips search URLs", () => {
