@@ -203,6 +203,7 @@ export function initBuiltinFonts(): void {
  */
 export function registerFont(name: string, data: string, size?: number): DeckerFont {
   initBuiltinFonts();
+  record({ op: "font", name, data, size });
   const alias = aliasMap().get(name);
   const family = alias?.family ?? name;
   const point = size ?? alias?.size ?? defaultMap().get(family) ?? 12;
@@ -475,6 +476,7 @@ export function registerOutlineFace(
   const bold = options.bold ?? face.font.bold;
   const italic = options.italic ?? face.font.italic;
   const bits = (bold ? STYLE_BOLD : 0) | (italic ? STYLE_ITALIC : 0);
+  record({ op: "outline", bytes: face.bytes, options: { family, bold, italic, settings: options.settings } });
   let entry = outlineFamilyMap().get(family);
   if (!entry) {
     entry = { displayName: face.familyName, faces: new Map(), settings: { ...DEFAULT_FAMILY_SETTINGS } };
@@ -492,6 +494,7 @@ export function registerOutlineFace(
 export function registerStyledStrike(family: string, size: number, data: string, bits: number): DeckerFont {
   if (!bits) return registerFont(family, data, size);
   initBuiltinFonts();
+  record({ op: "styled", family, size, data, bits });
   const key = strikeKey(family, bits);
   const font = loadStrike(key, size, data);
   font.name = family;
@@ -504,6 +507,7 @@ export function registerStyledStrike(family: string, size: number, data: string,
 export function setFamilySettings(family: string, settings: Partial<FamilyScalerSettings>): void {
   const entry = outlineFamilyMap().get(family);
   if (!entry) return;
+  record({ op: "settings", family, settings });
   entry.settings = { ...entry.settings, ...settings };
   dropScaled(family);
   fontsChanged();
@@ -519,6 +523,7 @@ export function familySettings(family: string): FamilyScalerSettings | undefined
  * only drops what was registered.
  */
 export function unregisterFamily(family: string): void {
+  forget(family);
   outlineFamilyMap().delete(family);
   dropScaled(family);
   for (const key of [...strikeMap().keys()]) {
@@ -538,4 +543,76 @@ export function unregisterFamily(family: string): void {
   }
   if (builtin.length === 0) defaultMap().delete(family);
   fontsChanged();
+}
+
+// ---------------------------------------------------------------------------
+// Journal: every registration since this registry started, as plain data, so
+// a second registry (an app process's) can hold the same fonts.
+// ---------------------------------------------------------------------------
+
+/** One registration, replayable with {@link replayFontRegistration}. */
+export type FontRegistration =
+  | { op: "font"; name: string; data: string; size?: number }
+  | { op: "styled"; family: string; size: number; data: string; bits: number }
+  | { op: "outline"; bytes: Uint8Array; options: OutlineFaceRegistration }
+  | { op: "settings"; family: string; settings: Partial<FamilyScalerSettings> }
+  | { op: "unregister"; family: string };
+
+let journal: FontRegistration[] = [];
+const journalListeners = new Set<(registration: FontRegistration) => void>();
+
+function record(registration: FontRegistration): void {
+  journal.push(registration);
+  for (const listener of journalListeners) listener(registration);
+}
+
+function familyOf(registration: FontRegistration): string | undefined {
+  switch (registration.op) {
+    case "font":
+      return registration.name;
+    case "outline":
+      return registration.options.family;
+    case "unregister":
+      return undefined;
+    default:
+      return registration.family;
+  }
+}
+
+/** Drop `family`'s registrations from the journal: replaying them would only undo them again. */
+function forget(family: string): void {
+  journal = journal.filter((r) => familyOf(r) !== family);
+  for (const listener of journalListeners) listener({ op: "unregister", family });
+}
+
+/** Every registration still in effect, oldest first. */
+export function fontRegistrations(): readonly FontRegistration[] {
+  return journal;
+}
+
+/** Call `listener` with each registration from now on; returns an unsubscribe. */
+export function onFontRegistration(listener: (registration: FontRegistration) => void): () => void {
+  journalListeners.add(listener);
+  return () => journalListeners.delete(listener);
+}
+
+/** Apply a registration another registry recorded. */
+export function replayFontRegistration(registration: FontRegistration): void {
+  switch (registration.op) {
+    case "font":
+      registerFont(registration.name, registration.data, registration.size);
+      return;
+    case "styled":
+      registerStyledStrike(registration.family, registration.size, registration.data, registration.bits);
+      return;
+    case "outline":
+      registerOutlineFace(registration.bytes, registration.options);
+      return;
+    case "settings":
+      setFamilySettings(registration.family, registration.settings);
+      return;
+    case "unregister":
+      unregisterFamily(registration.family);
+      return;
+  }
 }

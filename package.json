@@ -29,6 +29,7 @@
     "mcp": "tsx scripts/companion/mcp.ts",
     "test:m1": "tsx scripts/companion/demo.ts",
     "test:browser-build": "npm run build && tsx scripts/builder/browser-demo.ts",
+    "apps:declarations": "UPDATE_DECLARATIONS=1 vitest run apps/declarations.test.ts",
     "icons:find": "tsx scripts/find-icons.ts",
     "icons:import": "tsx scripts/import-icon.ts",
     "icons:refresh-catalog": "tsx scripts/refresh-icon-catalog.ts",

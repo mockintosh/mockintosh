@@ -8,8 +8,12 @@ import type {
   AgentRuntime,
   AppContext,
   AudioMonitor,
+  AudioPortOptions,
+  AudioPortStream,
   AudioService,
   KernelClient,
+  MicrophonePortInput,
+  MicrophonePortOptions,
   MicrophoneService,
   SignInService,
   WindowSpec,
@@ -73,7 +77,19 @@ function kernelClientFor(os: OSServices, appId: string, instanceId?: string): Ke
 /** The speaker as one launch sees it: its streams and monitors close when the launch ends. */
 function instanceAudio(os: OSServices, audio: AudioService, instanceId?: string): AudioService {
   const monitor = audio.monitor?.bind(audio);
+  const openPort = audio.openPort?.bind(audio);
   return {
+    ...(openPort && {
+      async openPort(portOptions: AudioPortOptions): Promise<AudioPortStream> {
+        const stream = await openPort(portOptions);
+        if (!instanceId || !os.instances) return stream;
+        const disown = os.instances.own(instanceId, () => stream.close());
+        stream.onStateChange((state) => {
+          if (state === "closed") disown();
+        });
+        return stream;
+      },
+    }),
     async open(streamOptions) {
       const stream = await audio.open(streamOptions);
       if (!instanceId || !os.instances) return stream;
@@ -104,7 +120,19 @@ function instanceAudio(os: OSServices, audio: AudioService, instanceId?: string)
 
 /** The microphone as one launch sees it: its inputs close when the launch ends, so no app keeps listening after it quits. */
 function instanceMicrophone(os: OSServices, microphone: MicrophoneService, instanceId?: string): MicrophoneService {
+  const openPort = microphone.openPort?.bind(microphone);
   return {
+    ...(openPort && {
+      async openPort(portOptions: MicrophonePortOptions): Promise<MicrophonePortInput> {
+        const input = await openPort(portOptions);
+        if (!instanceId || !os.instances) return input;
+        const disown = os.instances.own(instanceId, () => input.close());
+        input.onStateChange((state) => {
+          if (state === "closed") disown();
+        });
+        return input;
+      },
+    }),
     async open(inputOptions) {
       const input = await microphone.open(inputOptions);
       if (!instanceId || !os.instances) return input;

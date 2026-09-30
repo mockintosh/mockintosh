@@ -3,6 +3,8 @@ import type {
   AudioStreamState,
   MicrophoneInput,
   MicrophoneOptions,
+  MicrophonePortInput,
+  MicrophonePortOptions,
   MicrophoneService,
 } from "@mockintosh/sdk";
 
@@ -24,7 +26,13 @@ class PcmCapture extends AudioWorkletProcessor {
     this.buffer = new Float32Array(this.chunk * this.channels);
     this.filled = 0;
     this.open = true;
-    this.port.onmessage = (event) => { if (event.data === "close") this.open = false; };
+    // Chunks go out through \`io\`: this node's port, or one a worker-hosted
+    // app receives them on directly (\`openPort\`).
+    this.io = this.port;
+    this.port.onmessage = (event) => {
+      if (event.data === "close") this.open = false;
+      else if (event.data && event.data.type === "port") this.io = event.data.port;
+    };
   }
   process(inputs) {
     if (!this.open) return false;
@@ -43,7 +51,7 @@ class PcmCapture extends AudioWorkletProcessor {
         this.buffer[at + 1] = input.length > 1 ? input[1][i] : left;
       }
       if (++this.filled === this.chunk) {
-        this.port.postMessage(this.buffer, [this.buffer.buffer]);
+        this.io.postMessage(this.buffer, [this.buffer.buffer]);
         this.buffer = new Float32Array(this.chunk * channels);
         this.filled = 0;
       }
@@ -95,39 +103,83 @@ export function createWebMicrophoneService(): MicrophoneService | undefined {
     return shared;
   }
 
+  /** The microphone's media stream into a capture node, as far as `open` and `openPort` share it. */
+  async function captureNode(channels: 1 | 2) {
+    const media = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: { ideal: channels },
+        // A recorder wants what the room sounds like, not a call's cleanup.
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+      video: false,
+    });
+    let ctx: AudioContext;
+    try {
+      ctx = await context();
+    } catch (error) {
+      media.getTracks().forEach((track) => track.stop());
+      throw error;
+    }
+    const source = ctx.createMediaStreamSource(media);
+    const node = new AudioWorkletNode(ctx, PROCESSOR, {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+      processorOptions: { channels, chunk: CHUNK },
+    });
+    source.connect(node);
+    // The node writes silence; reaching the destination is what keeps the graph pulling it.
+    node.connect(ctx.destination);
+    openInputs++;
+    if (ctx.state === "suspended") void ctx.resume().catch(() => {});
+    return { media, ctx, source, node };
+  }
+
   return {
+    async openPort(options: MicrophonePortOptions): Promise<MicrophonePortInput> {
+      const channels = options.channels ?? 1;
+      const { media, ctx, source, node } = await captureNode(channels);
+      // The receiver gets one end; the audio thread the other. Nothing on this thread relays samples.
+      const channel = new MessageChannel();
+      node.port.postMessage({ type: "port", port: channel.port2 }, [channel.port2]);
+      const listeners = new Set<(state: AudioStreamState) => void>();
+      let closed = false;
+      const onState = () => {
+        const state = closed ? "closed" : inputState(ctx);
+        listeners.forEach((listener) => listener(state));
+      };
+      ctx.addEventListener("statechange", onState);
+      function close(): void {
+        if (closed) return;
+        closed = true;
+        node.port.postMessage("close");
+        source.disconnect();
+        node.disconnect();
+        media.getTracks().forEach((track) => track.stop());
+        ctx.removeEventListener("statechange", onState);
+        openInputs--;
+        if (openInputs === 0 && ctx.state === "running") void ctx.suspend();
+        listeners.forEach((listener) => listener("closed"));
+        listeners.clear();
+      }
+      for (const track of media.getAudioTracks()) track.addEventListener("ended", close);
+      return {
+        sampleRate: ctx.sampleRate,
+        channels,
+        port: channel.port1,
+        state: () => (closed ? "closed" : inputState(ctx)),
+        onStateChange(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        close,
+      };
+    },
     async open(options: MicrophoneOptions): Promise<MicrophoneInput> {
       const channels = options.channels ?? 1;
-      const media = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: { ideal: channels },
-          // A recorder wants what the room sounds like, not a call's cleanup.
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-        video: false,
-      });
-      let ctx: AudioContext;
-      try {
-        ctx = await context();
-      } catch (error) {
-        media.getTracks().forEach((track) => track.stop());
-        throw error;
-      }
-
-      const source = ctx.createMediaStreamSource(media);
-      const node = new AudioWorkletNode(ctx, PROCESSOR, {
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
-        outputChannelCount: [1],
-        processorOptions: { channels, chunk: CHUNK },
-      });
-      source.connect(node);
-      // The node writes silence; reaching the destination is what keeps the graph pulling it.
-      node.connect(ctx.destination);
-      openInputs++;
-      if (ctx.state === "suspended") void ctx.resume().catch(() => {});
+      const { media, ctx, source, node } = await captureNode(channels);
 
       const listeners = new Set<(state: AudioStreamState) => void>();
       const planar = Array.from({ length: channels }, () => new Float32Array(CHUNK));

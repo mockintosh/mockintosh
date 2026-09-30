@@ -10,6 +10,7 @@ import { createElement, setProp } from "@mockintosh/ui/renderer";
 import { bootOS, type BootedOS } from "./boot";
 import { createHeadlessPlatform, type HeadlessPlatform } from "../platform/headless";
 import { registerApp } from "./apps";
+import { declaredApp } from "./appDeclaration";
 import { MIME } from "@mockintosh/fs";
 import { getActiveAppId, getActiveWindowId, getWindows, isMenubarHidden, setWindowFullScreen } from "./state";
 import { TITLE_BAR_H, titleBarOuterHeight } from "./windowGeometry";
@@ -136,6 +137,27 @@ describe("bootOS on the headless platform", () => {
     const desktopAgain = inkCoverage(closed, 0, MENUBAR_HEIGHT + 2, 120, 40);
     expect(desktopAgain).toBeGreaterThan(0.45);
     expect(desktopAgain).toBeLessThan(0.55);
+  });
+
+  it("loads an app registered from its declaration before running it on its own thread", async () => {
+    const module = {
+      default: {
+        id: "declared-test",
+        title: "Declared",
+        icon: "x",
+        defaultSize: { width: 60, height: 40 },
+        Component: blackBox,
+      },
+    };
+    const load = vi.fn(async () => module);
+    registerApp(declaredApp({ id: "declared-test", title: "Declared", icon: "x", defaultSize: { width: 60, height: 40 } }, load));
+    os.services.openApp("declared-test");
+    expect(getWindows().some((w) => w.appId === "declared-test")).toBe(false);
+    await vi.waitFor(() => expect(getWindows().some((w) => w.appId === "declared-test")).toBe(true));
+    expect(load).toHaveBeenCalledTimes(1);
+    // Loaded once: opening again doesn't load it again.
+    os.services.openApp("declared-test");
+    expect(load).toHaveBeenCalledTimes(1);
   });
 
   it("eraseDisk formats the volume and restores the first-boot desktop", async () => {

@@ -51,6 +51,31 @@ function sharedRuntimeImportMap(): Plugin {
   };
 }
 
+/**
+ * Only transform files in packages/ui and apps that use Solid JSX.
+ * Must use "universal" generate mode so JSX compiles to the custom
+ * CanvasNode renderer instead of the DOM. The page and the app-process
+ * worker both need it; Vite bundles workers with their own plugin list.
+ */
+function solidJsx(): Plugin[] {
+  return [
+    solid({
+      include: [
+        /packages\/ui\/(?!src\/primitives\/).*\.[tj]sx?$/,
+        /packages\/sdk\/.*\.[tj]sx?$/,
+        /apps\/.*\.[tj]sx?$/,
+        /src\/os\/.*\.[tj]sx?$/,
+        // The app-process runtime: the worker half of an app, which mounts it with JSX.
+        /src\/platform\/web\/process\/.*\.[tj]sx?$/,
+      ],
+      solid: {
+        generate: "universal",
+        moduleName: "@mockintosh/ui/renderer",
+      },
+    }),
+  ];
+}
+
 export default defineConfig({
   optimizeDeps: {
     exclude: ["@rollup/browser", "@solidjs/compiler-wasm32-wasi", "libfx"],
@@ -61,23 +86,10 @@ export default defineConfig({
   // 5.8 MB .wasm stays out of the desktop entry.
   worker: {
     format: "es",
+    plugins: () => solidJsx(),
   },
   plugins: [
-    // Only transform files in packages/ui and apps that use Solid JSX.
-    // Must use "universal" generate mode so JSX compiles to the custom
-    // CanvasNode renderer instead of the DOM.
-    solid({
-      include: [
-        /packages\/ui\/(?!src\/primitives\/).*\.[tj]sx?$/,
-        /packages\/sdk\/.*\.[tj]sx?$/,
-        /apps\/.*\.[tj]sx?$/,
-        /src\/os\/.*\.[tj]sx?$/,
-      ],
-      solid: {
-        generate: "universal",
-        moduleName: "@mockintosh/ui/renderer",
-      },
-    }),
+    solidJsx(),
     sharedRuntimeImportMap(),
   ],
   resolve: {
@@ -132,6 +144,7 @@ export default defineConfig({
       "packages/sdk/tests/**/*.test.ts",
       "src/os/**/*.test.ts",
       "src/platform/**/*.test.ts",
+      "src/platform/**/*.test.tsx",
       "src/runtime/**/*.test.ts",
       "src/shared/**/*.test.ts",
       "scripts/**/*.test.ts",

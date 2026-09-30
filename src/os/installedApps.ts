@@ -9,6 +9,9 @@
  * registry. A platform without `loadModule` can still install bundled apps.
  */
 import { MIME, type FileSystem, type FSFile } from "@mockintosh/fs";
+import { setAppSource } from "./process/sources";
+import type { AppSource } from "./process/protocol";
+import { declaredApp, type AppDeclaration } from "./appDeclaration";
 import type { AppManifest, Capability } from "@mockintosh/sdk";
 import type { Sprite } from "@mockintosh/ui";
 import type { ModuleLoader } from "../platform/types";
@@ -39,6 +42,14 @@ export interface AppInstallerOptions {
   capabilities: CapabilitySet;
   /** Absent on hosts that cannot fetch a bundle URL. Bundled apps still install. */
   loadModule?: ModuleLoader;
+  /**
+   * Read an installed bundle's declaration in a process, so the OS's thread
+   * never evaluates it. Absent: the bundle is loaded here, as on a host
+   * without processes.
+   */
+  describe?: (appId: string, source: AppSource) => Promise<AppDeclaration>;
+  /** Fetch a publisher's `manifest.json` beside a bundle. Absent: the declaration comes from `describe`. */
+  fetchJSON?: (url: string) => Promise<unknown>;
 }
 
 function sdkMajor(sdk: string | undefined): number {
@@ -47,10 +58,41 @@ function sdkMajor(sdk: string | undefined): number {
 }
 
 export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
-  const { fs, sprites, capabilities, loadModule } = options;
+  const { fs, sprites, capabilities, loadModule, describe, fetchJSON } = options;
+
+  /**
+   * What an app declares, without running it here: a bundled app's from the
+   * build, an installed one's from its `.app`, else the publisher's
+   * `manifest.json` beside the bundle, else a process's reading of it.
+   */
+  async function declarationFor(manifest: AppManifest): Promise<AppDeclaration | undefined> {
+    const bundledId = bundledIdFromEntry(manifest.entry);
+    if (bundledId !== undefined) return getBundledApp(bundledId)?.declaration;
+    if (manifest.declaration) return manifest.declaration;
+    if (fetchJSON) {
+      try {
+        const published = (await fetchJSON(siblingUrl(manifest.entry, "manifest.json"))) as Partial<AppManifest> | null;
+        if (published?.declaration?.id === manifest.id) return published.declaration;
+      } catch {
+        // No manifest.json beside the bundle: read it in a process instead.
+      }
+    }
+    return describe?.(manifest.id, { kind: "url", url: manifest.entry });
+  }
+
+  /** Register an app from its declaration; its code loads only if it ever runs on the OS's thread. */
+  function registerDeclared(manifest: AppManifest, declaration: AppDeclaration, source: AppSource): SolidApp<any> {
+    const app = declaredApp(declaration, async () => validateModule(manifest.id, await loadEntry(manifest, loadModule)));
+    setAppSource(manifest.id, source);
+    if (app.sprites) sprites.registerAll(app.sprites);
+    registerApp(app);
+    loaded.add(manifest.id);
+    return app;
+  }
   const loaded = new Set<string>();
 
-  async function load(manifest: AppManifest): Promise<SolidApp<any>> {
+  /** Load and register an app; with the declaration it was registered from, when it came from one. */
+  async function load(manifest: AppManifest): Promise<{ app: SolidApp<any>; declaration?: AppDeclaration }> {
     if (sdkMajor(manifest.sdk) < 3) {
       throw new Error(
         `"${manifest.title}" was built for SDK ${manifest.sdk || "2"}. Rebuild the project for SDK 3.`,
@@ -58,20 +100,34 @@ export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
     }
     if (loaded.has(manifest.id)) {
       const existing = getApp(manifest.id);
-      if (existing) return existing;
+      if (existing) return { app: existing };
+    }
+
+    const bundledId = bundledIdFromEntry(manifest.entry);
+    const source: AppSource = bundledId !== undefined ? { kind: "bundled", id: bundledId } : { kind: "url", url: manifest.entry };
+    const declaration = await declarationFor(manifest);
+    if (declaration) {
+      if (declaration.id !== manifest.id) throw new Error(`The bundle is "${declaration.id}", not "${manifest.id}"`);
+      return { app: registerDeclared(manifest, declaration, source), declaration };
     }
 
     const module = validateModule(manifest.id, await loadEntry(manifest, loadModule));
+    setAppSource(manifest.id, bundledId !== undefined ? { kind: "bundled", id: bundledId } : { kind: "url", url: manifest.entry });
     if (module.sprites) sprites.registerAll(module.sprites);
     registerApp(module.default);
     loaded.add(manifest.id);
-    return module.default;
+    return { app: module.default };
+  }
+
+  /** An installed bundle's `.app` keeps its declaration, so the next boot reads it from there. A bundled app's comes from the build. */
+  function withDeclaration(manifest: AppManifest, declaration: AppDeclaration | undefined): AppManifest {
+    return declaration && bundledIdFromEntry(manifest.entry) === undefined ? { ...manifest, declaration } : manifest;
   }
 
   return {
     async install(manifest) {
-      await load(manifest);
-      await writeManifest(fs, manifest);
+      const { declaration } = await load(manifest);
+      await writeManifest(fs, withDeclaration(manifest, declaration));
       await ensureDesktopShortcut(fs, manifest);
     },
 
@@ -87,13 +143,26 @@ export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
         else registerUnavailableApp({ id: manifest.id, title: manifest.title, missing });
       }
       const results = await Promise.allSettled(loadable.map(load));
-      results.forEach((result, i) => {
-        if (result.status === "rejected") {
-          console.error(`Failed to load installed app "${loadable[i].id}":`, result.reason);
-        }
-      });
+      await Promise.all(
+        results.map(async (result, i) => {
+          const manifest = loadable[i]!;
+          if (result.status === "rejected") {
+            console.error(`Failed to load installed app "${manifest.id}":`, result.reason);
+            return;
+          }
+          // Installed before `.app` files kept declarations: keep this one, so it's read only once.
+          const updated = withDeclaration(manifest, result.value.declaration);
+          if (updated !== manifest && !manifest.declaration) await writeManifest(fs, updated).catch(() => {});
+        }),
+      );
     },
   };
+}
+
+/** `name` in the same folder as the file at `url` (`…/app/index.js` → `…/app/manifest.json`). */
+export function siblingUrl(url: string, name: string): string {
+  const path = url.split(/[?#]/, 1)[0]!;
+  return path.slice(0, path.lastIndexOf("/") + 1) + name;
 }
 
 async function loadEntry(manifest: AppManifest, loadModule: ModuleLoader | undefined): Promise<unknown> {

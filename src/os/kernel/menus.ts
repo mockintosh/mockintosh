@@ -3,7 +3,6 @@ import type { MenubarActionItem, MenubarDefinition, MenubarItemDef, MenubarRadio
 import type { OSServices } from "../context";
 import { FINDER_APP_ID, getActiveAppId, getMenubarMenus, setOpenMenuIndex, setHighlightedMenuItem } from "../state";
 import { getApp } from "../apps";
-import { openAppAboutBox } from "../components/AppAboutBox.solid";
 import { openAboutBox } from "../../../apps/finder/AboutBox";
 import { openControlPanel } from "../../../apps/finder/ControlPanel";
 import { CHOOSER_TITLE, openChooser } from "../../../apps/finder/Chooser";
@@ -30,7 +29,7 @@ export function aboutMenuItem(os: OSServices): MenubarActionItem {
   const app = getApp(appId);
   return {
     label: `About ${app?.title ?? appId}…`,
-    onClick: () => { if (app) openAppAboutBox(os, app); },
+    onClick: () => { if (app) os.openAbout(app.id); },
   };
 }
 
@@ -78,6 +77,11 @@ export function appleMenu(os: OSServices): MenubarDefinition {
     }, {
       label: "Puzzle",
       disabled: true
+    }, {
+      type: "separator"
+    }, {
+      label: "Force Quit…",
+      onClick: () => os.forceQuit()
     }]
   };
 }

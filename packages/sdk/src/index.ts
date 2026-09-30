@@ -117,6 +117,8 @@ export type {
 export type {
   AudioService,
   AudioMonitor,
+  AudioPortOptions,
+  AudioPortStream,
   AudioStream,
   AudioStreamOptions,
   AudioStreamState,
@@ -125,7 +127,7 @@ export type {
   DecodedWav,
 } from "./audio";
 export { midiToFrequency, noteName, encodeWav, decodeWav } from "./audio";
-export type { MicrophoneService, MicrophoneInput, MicrophoneOptions, AudioCaptureBlock } from "./microphone";
+export type { MicrophoneService, MicrophoneInput, MicrophoneOptions, MicrophonePortInput, MicrophonePortOptions, AudioCaptureBlock } from "./microphone";
 export type {
   AgentRuntime,
   AgentSession,
@@ -180,6 +182,8 @@ export type {
   FamilyScalerSettings,
 } from "@mockintosh/ui";
 export type { KernelClient, KernelInvokeOptions, KernelPermission, OperationContract } from "./kernel";
+export { appDeclaration, type AppDeclaration, type EncodedSprite } from "./declaration";
+import type { AppDeclaration } from "./declaration";
 export type { AppCrypto } from "./crypto";
 export type { BrowserService } from "./browser";
 export type { SignInService, SignInDeclaration } from "./signIn";
@@ -612,6 +616,14 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
    * when the app cannot work signed out.
    */
   signIn?: SignInDeclaration;
+  /**
+   * Where the app's code runs. `"worker"`: in a process of its own (a Web
+   * Worker on the web), when the platform has processes and can give the app
+   * everything it declares; otherwise on the OS's thread. `"main"`: always on
+   * the OS's thread. Unset: the platform decides (the web runs apps in
+   * processes). Declare `"main"` only for something a process can't serve.
+   */
+  runtime?: "worker" | "main";
   /** Content size of the main window. */
   defaultSize: { width: number; height: number };
   /** Kind of the main window (default `document`). */
@@ -863,4 +875,10 @@ export interface AppManifest {
   entry: string;
   /** Same as `SolidApp.requires`; lets the OS skip loading a bundle it cannot run. */
   requires?: Capability[];
+  /**
+   * The app's declaration: its icon, window defaults and the files it opens,
+   * so the OS can draw, list and launch it without running it first.
+   * `mockintoshManifest()` (`@mockintosh/sdk/vite`) fills it in.
+   */
+  declaration?: AppDeclaration;
 }

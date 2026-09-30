@@ -192,6 +192,11 @@ export interface Platform {
   loadModule?: ModuleLoader;
   /** Load persisted bundled ESM through this host's shared runtime. */
   loadArtifact?: (code: string, identity: string) => Promise<unknown>;
+  /**
+   * Run apps in processes of their own (docs/worker-apps-plan.md). Absent =
+   * every app runs on the OS's thread, as on the headless platform.
+   */
+  processes?: AppProcesses;
   builder?: import("../shared/buildContract").BuildProvider;
   /** Read-only OS source volume (`/system/source`). Absent = no source volume. */
   source?: SourceProvider;
@@ -257,3 +262,19 @@ export interface SourceProvider {
 
 /** `import(url)` as a service — see {@link Platform.loadModule}. */
 export type ModuleLoader = (url: string) => Promise<unknown>;
+
+/** Starts app processes: on the web, a module Worker that runs `runProcess`. */
+export interface AppProcesses {
+  /**
+   * Where an app that doesn't say (`SolidApp.runtime` unset) runs. The web
+   * host says `"worker"`; `?processes=main` puts every app back on the OS's
+   * thread, to compare.
+   */
+  defaultRuntime: "main" | "worker";
+  /** Give each process's windows the Worker menu (frame, input and audio timings): `?processes=stats`. */
+  stats?: boolean;
+  /** Whether a process can load this code: a bundled app in its module table, a bundle URL, or a build. */
+  canRun(source: import("../os/process/protocol").AppSource): boolean;
+  /** Start a process for `appId`; the name shows in the host's debugger. */
+  spawn(appId: string): import("../os/process/protocol").ProcessPort;
+}

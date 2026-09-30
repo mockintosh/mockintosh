@@ -1,6 +1,8 @@
 import type {
   AudioLatency,
   AudioMonitor,
+  AudioPortOptions,
+  AudioPortStream,
   AudioRenderBlock,
   AudioService,
   AudioStream,
@@ -41,11 +43,16 @@ class PcmStream extends AudioWorkletProcessor {
     this.played = 0;
     this.sinceReport = 0;
     this.open = true;
-    this.port.onmessage = (event) => {
+    // Chunks and played reports go through \`io\`: this node's port, or one a
+    // worker-hosted app renders into directly (\`openPort\`).
+    this.io = this.port;
+    const receive = (event) => {
       const message = event.data;
       if (message.type === "chunk") this.queue.push(message.data);
       else if (message.type === "close") { this.open = false; this.queue.length = 0; }
+      else if (message.type === "port") { this.io = message.port; this.io.onmessage = receive; }
     };
+    this.port.onmessage = receive;
   }
   process(_inputs, outputs) {
     const out = outputs[0];
@@ -68,7 +75,7 @@ class PcmStream extends AudioWorkletProcessor {
     this.sinceReport += frames;
     if (this.sinceReport >= this.report) {
       this.sinceReport = 0;
-      this.port.postMessage({ played: this.played });
+      this.io.postMessage({ played: this.played });
     }
     return this.open;
   }
@@ -181,6 +188,58 @@ export function createWebAudioService(): AudioService | undefined {
   return {
     async monitor(): Promise<AudioMonitor> {
       return openMonitor(await speaker());
+    },
+    async openPort(options: AudioPortOptions): Promise<AudioPortStream> {
+      const { ctx, bus } = await speaker();
+      const channels = options.channels ?? 2;
+      const sampleRate = ctx.sampleRate;
+      const target =
+        Math.ceil((TARGET_FRAMES[options.latency ?? "interactive"] * sampleRate) / 48000 / QUANTUM) * QUANTUM;
+      const node = new AudioWorkletNode(ctx, PROCESSOR, {
+        numberOfInputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [channels],
+        processorOptions: { channels, report: REPORT_FRAMES },
+      });
+      node.connect(bus);
+      openStreams++;
+      if (ctx.state === "suspended") void ctx.resume().catch(() => {});
+
+      // The renderer gets one end; the audio thread the other. Nothing on this thread relays samples.
+      const channel = new MessageChannel();
+      node.port.postMessage({ type: "port", port: channel.port2 }, [channel.port2]);
+
+      const listeners = new Set<(state: AudioStreamState) => void>();
+      let closed = false;
+      const onState = () => {
+        const state = closed ? "closed" : streamState(ctx);
+        listeners.forEach((listener) => listener(state));
+      };
+      ctx.addEventListener("statechange", onState);
+
+      return {
+        sampleRate,
+        channels,
+        target,
+        port: channel.port1,
+        outputLatencyFrames: () => outputLatencyFrames(ctx),
+        state: () => (closed ? "closed" : streamState(ctx)),
+        onStateChange(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        close() {
+          if (closed) return;
+          closed = true;
+          node.port.postMessage({ type: "close" });
+          node.disconnect();
+          ctx.removeEventListener("statechange", onState);
+          openStreams--;
+          if (openStreams === 0 && ctx.state === "running") void ctx.suspend();
+          listeners.forEach((listener) => listener("closed"));
+          listeners.clear();
+        },
+      };
     },
     async open(options: AudioStreamOptions): Promise<AudioStream> {
       const { ctx, bus } = await speaker();

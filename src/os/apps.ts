@@ -14,6 +14,14 @@ import { setAppMenus, type OSWindowKind } from "./state";
 export interface SolidApp<P extends Record<string, unknown> = Record<string, unknown>>
   extends Omit<SDKSolidApp<P>, "windowKind"> {
   windowKind?: OSWindowKind;
+  /**
+   * Set when the app was registered from its declaration (`appDeclaration.ts`)
+   * and its code isn't loaded: the OS calls it before running the app on its
+   * own thread. A process loads the code itself.
+   */
+  load?: () => Promise<{ default: SolidApp<any> }>;
+  /** The app draws its own About box, in its own code (so, when registered from a declaration, in its process). */
+  customAbout?: boolean;
 }
 
 let apps: Map<string, SolidApp<any>> | undefined;

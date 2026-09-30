@@ -77,6 +77,7 @@ interface Platform {
   clipboard?, printerLinks?, printer?, download?, fetch?  // peripherals; absent = feature hidden
   images?, video?, camera?, audio?, microphone?           // media; capabilities follow presence
   agentRuntime?                                           // language-model agents with app-supplied tools
+  processes?                                              // app processes (web: module Workers); absent = apps share the OS thread
   crypto                                                  // randomBytes + sha256
   browser?                                                // openExternal, authorize, loadScript
 }
@@ -127,6 +128,17 @@ Windows are opened through **`AppContext.openWindow(spec)`** (`OSServices.openWi
 `AppContext` (`appContext.ts`) is everything an app can do without a window — sprites, storage, `fs`, `os.openApp/closeWindow/showDialog`, `openWindow`, `fetch`, `print`, `images`/`video`/`camera`, `scheduler`, `crypto`, `browser`, granted `kernel`, `capabilities`, `env`. `AppServices`, what `useApp()` returns inside a window, is `AppContext` plus `window` and `setMenus`. The OS supplies one `AppServices` per window. `useWindow()` (shell-internal) exposes `{ id, width, height, isActive, scrollY, kind, setTitle, setContentSize, setInfoBar, setMenus, setFullScreen, close }`. Apps fill a non-scrolling band above the body with `WindowHeader` (Finder folder “N items”, Icon Gallery search) and below it with `WindowFooter`; the window scrollbar thumbs only the body. `win.height` is that body. `setContentSize` is the document height that drives the thumb.
 
 Finder is registered like any other app (`FINDER_APP_ID`): the desktop is its window-less surface and folder windows are its windows (`kind: "finder-folder"`, `props: { directoryId }`). A live 1-bit buffer the app owns is a `<bitmap pixels>` node (unpacked `Uint8Array`; replacing the array repaints). Apps that paint from an external source (video frames, dithered photos) use `<raster onPaint>`, which hands them a `RasterSurface` (`setPixel` / `blitPixels` / `fill` in raster-local coordinates, plus the clipped QuickDraw port) and an explicit `revision` to dirty the frame. The framebuffer's memory layout never reaches app code. There is no other rendering path.
+
+### App processes
+
+On the web, every app runs in a process of its own when a process can give it everything it declares (`processBlocker` in `src/os/process/eligible.ts`). The exceptions are the shell apps (Finder, App Store, Icon Gallery), apps that need something a process can't serve (Spotify's `browser.loadScript`, fx's agent runtime), and apps that declare `runtime: "main"`. A platform without `processes` (headless, tests) runs every app on the OS's thread. `?processes=main` does the same on the web, and `?processes=stats` adds timing menus ([plan](docs/worker-apps-plan.md)). Force Quit is in the Apple menu.
+
+- **The worker** (`src/platform/web/process/`) loads the app from `src/appModules.ts` and runs its `onOpen`. It lays every window the app opens out in its own band of one offscreen bitmap, in its own focus scope, and draws them with the worker's own Solid, `@mockintosh/ui` and QuickDraw.
+- **`AppProcess`** (`src/os/process/host.ts`) is on the OS's side. It opens a real OS window for each window the app opens; the window's content (`ProcessWindow`) shows that window's latest picture and sends its input back. `AppProcess` answers the app's calls (`src/os/process/protocol.ts`) with the instance's real `AppContext`.
+- **Synchronous reads:** window size, catalog, fonts and sprites are answered in the worker from state the OS keeps current.
+- **Sound:** a process feeds the speaker's audio thread directly through `AudioService.openPort`.
+- **Stopping:** ending the instance asks the worker to run its cleanups, then terminates it.
+- **The page doesn't load app code** for an app it won't run itself. It registers apps from their declarations (`src/os/appDeclaration.ts`): bundled apps from `apps/declarations.generated.json` (regenerate with `npm run apps:declarations`), installed bundles and OS builds from a process that reads them (`process/describe.ts`). An app that has to run on the OS's thread is loaded when it opens.
 
 ### Apps, windows, and the menubar
 

@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import solid from "@solidjs/vite-plugin";
+import { mockintoshManifest } from "@mockintosh/sdk/vite";
 
 export default defineConfig({
   plugins: [
@@ -9,6 +10,8 @@ export default defineConfig({
         moduleName: "@mockintosh/ui/renderer",
       },
     }),
+    // dist/manifest.json: mockintosh.json plus what the app declares, so the OS can show it before running it.
+    mockintoshManifest(),
   ],
   build: {
     lib: {

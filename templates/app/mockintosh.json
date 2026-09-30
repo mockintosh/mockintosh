@@ -5,7 +5,7 @@
   "icon": "myapp/icon",
   "author": "your-github-username",
   "version": "1.0.0",
-  "sdk": "^2.0.0",
+  "sdk": "^3.0.0",
   "permissions": [],
   "entry": "./dist/index.js"
 }

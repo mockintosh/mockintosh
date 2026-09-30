@@ -14,6 +14,7 @@ import {
   installedAppIds,
   migrateBundledDesktopShortcuts,
   readInstalledManifests,
+  siblingUrl,
 } from "./installedApps";
 import { SpriteRegistry } from "./sprites";
 
@@ -249,5 +250,82 @@ describe("App Store window", () => {
     expect(list).toContain("Mockintosh Apps");
     expect(list).toContain("Shelf");
     expect(list).not.toContain("Sits on a shelf.");
+  });
+});
+
+describe("AppInstaller without running a bundle on the OS's thread", () => {
+  const declaration = {
+    id: "remote",
+    title: "Remote",
+    icon: "remote/icon",
+    defaultSize: { width: 40, height: 30 },
+    fileTypes: ["text/x-remote"],
+    sprites: { "remote/icon": { width: 2, height: 1, data: "kA==" } },
+  };
+  const noLoad = async () => {
+    throw new Error("the bundle must not be loaded here");
+  };
+
+  it("registers from a declaration the manifest carries, and keeps it in the .app", async () => {
+    const fs = await disk();
+    const describe = vi.fn();
+    const sprites = new SpriteRegistry();
+    const installer = createAppInstaller({ fs, sprites, capabilities: new Set(), loadModule: noLoad, describe });
+    await installer.install({ ...remoteManifest, declaration });
+    expect(getApp("remote")?.fileTypes).toEqual(["text/x-remote"]);
+    expect(sprites.get("remote/icon")?.width).toBe(2);
+    expect(describe).not.toHaveBeenCalled();
+    expect((await readInstalledManifests(fs)).find((m) => m.id === "remote")?.declaration).toEqual(declaration);
+  });
+
+  it("reads the publisher's manifest.json beside the bundle", async () => {
+    const fs = await disk();
+    const fetchJSON = vi.fn(async (url: string) => ({ ...remoteManifest, declaration, fetched: url }));
+    const describe = vi.fn();
+    const installer = createAppInstaller({ fs, sprites: new SpriteRegistry(), capabilities: new Set(), loadModule: noLoad, describe, fetchJSON });
+    await installer.install(remoteManifest);
+    expect(fetchJSON).toHaveBeenCalledWith("https://example.com/manifest.json");
+    expect(describe).not.toHaveBeenCalled();
+    expect((await readInstalledManifests(fs)).find((m) => m.id === "remote")?.declaration).toEqual(declaration);
+  });
+
+  it("falls back to a process's reading once, then boots from the .app", async () => {
+    const fs = await disk();
+    const describe = vi.fn(async () => declaration);
+    const fetchJSON = vi.fn(async () => {
+      throw new Error("404");
+    });
+    const first = createAppInstaller({ fs, sprites: new SpriteRegistry(), capabilities: new Set(), loadModule: noLoad, describe, fetchJSON });
+    await first.install(remoteManifest);
+    expect(describe).toHaveBeenCalledTimes(1);
+
+    const nextBoot = createAppInstaller({ fs, sprites: new SpriteRegistry(), capabilities: new Set(), loadModule: noLoad, describe, fetchJSON });
+    await nextBoot.loadInstalled();
+    expect(describe).toHaveBeenCalledTimes(1);
+    expect(getApp("remote")?.defaultSize).toEqual({ width: 40, height: 30 });
+  });
+
+  it("gives an app installed before .app files kept declarations one, at its next boot", async () => {
+    const fs = await disk();
+    const legacy = createAppInstaller({
+      fs,
+      sprites: new SpriteRegistry(),
+      capabilities: new Set(),
+      loadModule: async () => ({ default: { id: "remote", title: "Remote", icon: "icon/computer", defaultSize: { width: 1, height: 1 }, Component: () => null } }),
+    });
+    await legacy.install(remoteManifest);
+    expect((await readInstalledManifests(fs)).find((m) => m.id === "remote")?.declaration).toBeUndefined();
+
+    const describe = vi.fn(async () => declaration);
+    await createAppInstaller({ fs, sprites: new SpriteRegistry(), capabilities: new Set(), loadModule: noLoad, describe }).loadInstalled();
+    expect(describe).toHaveBeenCalledTimes(1);
+    expect((await readInstalledManifests(fs)).find((m) => m.id === "remote")?.declaration).toEqual(declaration);
+  });
+});
+
+describe("siblingUrl", () => {
+  it("names a file in the bundle's folder", () => {
+    expect(siblingUrl("https://apps.example/counter/index.js", "manifest.json")).toBe("https://apps.example/counter/manifest.json");
+    expect(siblingUrl("https://apps.example/counter/index.js?v=2", "manifest.json")).toBe("https://apps.example/counter/manifest.json");
   });
 });

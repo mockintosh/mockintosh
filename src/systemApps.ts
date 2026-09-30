@@ -1,21 +1,20 @@
 /**
  * The apps bundled with the web build. Always-on apps are registered up front.
- * The rest are listings: the App Store installs them, and their modules load
- * then. Each module exports its app as a `defineApp` result, exactly as a
- * third-party bundle would. The Finder registers itself: it is part of the
- * shell and the boot sequence depends on it.
+ * The rest are listings: the App Store installs them. Each module exports its
+ * app as a `defineApp` result, exactly as a third-party bundle would. Apps
+ * are registered from their declarations (`apps/declarations.generated.json`),
+ * so the page loads an app's code only if it has to run it on the OS's
+ * thread; in a process the app loads it there. The Finder registers itself:
+ * it is part of the shell and the boot sequence depends on it. App Store and
+ * Icon Gallery are shell apps too and are loaded here.
  */
 import { registerApp } from "./os/apps";
 import { registerBundledApp } from "./os/bundledApps";
-import Testing from "@/apps/Testing";
-import FileViewer from "@/apps/FileViewer";
-import Preview from "@/apps/Preview";
-import VideoPlayer from "@/apps/VideoPlayer";
-import PhotoBooth from "@/apps/PhotoBooth";
+import { declaredApp, type AppDeclaration } from "./os/appDeclaration";
+import { APP_MODULES } from "./appModules";
+import declarations from "@/apps/declarations.generated.json";
 import AppStore from "@/apps/AppStore";
-import Safari from "@/apps/Safari";
 import IconGallery from "@/apps/IconGallery";
-import Showreel from "@/apps/Showreel";
 import { sprites as ditherSprites } from "@/apps/dither/icons";
 import { sprites as traceSprites } from "@/apps/trace/icons";
 import { spotifySprites } from "@/apps/sprites/spotify";
@@ -30,22 +29,17 @@ import { sprites as pchkraftSprites } from "@/apps/pchkraft/icons";
 import { sprites as visualizerSprites } from "@/apps/visualizer/icons";
 import { sprites as foundrySprites } from "@/apps/foundry/icons";
 
-for (const app of [
-  Testing,
-  FileViewer,
-  Preview,
-  VideoPlayer,
-  PhotoBooth,
-  AppStore,
-  Safari,
-  IconGallery,
-  Showreel,
-]) {
-  registerApp(app);
+const declared = declarations as Record<string, AppDeclaration>;
+
+for (const app of [AppStore, IconGallery]) registerApp(app);
+
+for (const id of ["testing", "file", "preview", "video", "photobooth", "safari", "showreel"]) {
+  registerApp(declaredApp(declared[id]!, APP_MODULES[id]!));
 }
 
 registerBundledApp({
   id: "dither",
+  declaration: declared["dither"],
   title: "Dither",
   description: "Turns a photograph into a 1-bit picture.",
   icon: "dither/icon",
@@ -56,6 +50,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "trace",
+  declaration: declared["trace"],
   title: "Trace",
   description: "Recovers a 1-bit bitmap from a screenshot of pixel art.",
   icon: "trace/icon",
@@ -66,6 +61,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "chatgippity",
+  declaration: declared["chatgippity"],
   title: "ChatGippity",
   description: "A chat window onto a language model that can use this Macintosh.",
   icon: "icon/computer",
@@ -76,6 +72,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "fx",
+  declaration: declared["fx"],
   title: "fx",
   description:
     "The fx coding agent from Vercel Labs, running on this Macintosh. It reads and edits files, builds apps, and clicks around to check its work. Bring your own Vercel AI Gateway key.",
@@ -87,6 +84,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "spotify",
+  declaration: declared["spotify"],
   title: "Spotify Player",
   description: "Plays your Spotify library.",
   icon: "icon/spotify",
@@ -97,6 +95,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "macpaint",
+  declaration: declared["macpaint"],
   title: "MacPaint",
   description: "Paint in one bit, with the brushes, patterns and tools of the original Macintosh.",
   icon: "macpaint/icon",
@@ -106,6 +105,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "canvas",
+  declaration: declared["canvas"],
   title: "Canvas",
   description: "Draw with objects — move, resize, and edit shapes and text without flattening to a bitmap.",
   icon: "canvas/icon",
@@ -115,6 +115,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "surface",
+  declaration: declared["surface"],
   title: "Surface",
   description: "Plots z = f(x, y, t) as a 3D mesh you can orbit.",
   icon: "surface/icon",
@@ -124,6 +125,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "foundry",
+  declaration: declared["foundry"],
   title: "Foundry",
   description: "Rasterizes TrueType and OpenType fonts into 1-bit bitmap strikes, which you can then tune pixel by pixel.",
   icon: "foundry/icon",
@@ -133,6 +135,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "synth",
+  declaration: declared["synth"],
   title: "Synthesizer",
   description:
     "A polyphonic analog-style synthesizer with a 16-step sequencer, arpeggiator and effects. Play it with the mouse or the keys A to K.",
@@ -144,6 +147,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "chord",
+  declaration: declared["chord"],
   title: "Pocket Chord",
   description:
     "A pocket chord instrument. Seven buttons play the chords of a key; the joystick adds sevenths, suspensions and more. Strum, arpeggiate or pulse over a built-in rhythm box.",
@@ -155,6 +159,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "op1",
+  declaration: declared["op1"],
   title: "OP-1",
   description:
     "A portable synthesizer workstation in the manner of the Teenage Engineering OP-1: seven synth engines including a sampler, a drum kit, a pattern sequencer for each, a four-track tape and a mixer, all on four encoders. Play the keys A to ' ; Space runs the tape, Q shows the pattern. It starts with the Sunday Tape on; File › Open Tape has the other demos and the tapes you've saved.",
@@ -166,6 +171,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "tp7",
+  declaration: declared["tp7"],
   title: "TP-7",
   description:
     "A field recorder in the manner of the Teenage Engineering TP-7. Record memos from the microphone, then hold the reel to stop the tape, spin it to scrub, or turn the ring around it to wind. Memos are WAV files in the TP-7 folder on your disk; marks are kept inside them.",
@@ -177,6 +183,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "pchkraft",
+  declaration: declared["pchkraft"],
   title: "pchkraft",
   description:
     "A pocket groovebox and looper in the manner of the Vorimo pchkraft. Hum a melody or play the four keys; each beat of a hum becomes the chord that fits it, and the loop starts at once. Keys A S D F play, M listens, R records, Space runs the tape.",
@@ -188,6 +195,7 @@ registerBundledApp({
 
 registerBundledApp({
   id: "visualizer",
+  declaration: declared["visualizer"],
   title: "Visualizer",
   description:
     "Listens to everything this Macintosh plays and draws it in one bit: scopes and meters, generative systems, the shots of Showreel's first reel, and Surface plots. Arrow keys change the picture.",

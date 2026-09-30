@@ -1,0 +1,628 @@
+{
+ "testing": {
+  "id": "testing",
+  "title": "Testing",
+  "icon": "icon/computer",
+  "defaultSize": {
+   "width": 280,
+   "height": 250
+  },
+  "scrollable": true
+ },
+ "file": {
+  "id": "file",
+  "title": "File",
+  "icon": "icon/file",
+  "defaultSize": {
+   "width": 350,
+   "height": 200
+  },
+  "scrollable": true,
+  "fileTypes": [
+   "text/plain",
+   "text/markdown",
+   "application/json"
+  ]
+ },
+ "preview": {
+  "id": "preview",
+  "title": "Preview",
+  "icon": "icon/camera",
+  "defaultSize": {
+   "width": 256,
+   "height": 256
+  },
+  "scrollable": true,
+  "resizable": true,
+  "minSize": {
+   "width": 160,
+   "height": 100
+  },
+  "fileTypes": [
+   "image/x-mockintosh-sprite",
+   "image/png",
+   "image/jpeg",
+   "image/gif",
+   "image/webp",
+   {
+    "type": "image/x-macpaint",
+    "rank": "alternate"
+   }
+  ],
+  "about": {
+   "version": "1.0",
+   "description": "Shows pictures. Open them in another app to change them."
+  }
+ },
+ "video": {
+  "id": "video",
+  "title": "1984.mp4",
+  "icon": "icon/MacFlim",
+  "defaultSize": {
+   "width": 340,
+   "height": 260
+  },
+  "requires": [
+   "video"
+  ],
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 220,
+   "height": 140
+  }
+ },
+ "photobooth": {
+  "id": "photobooth",
+  "title": "Photo Booth",
+  "icon": "icon/photobooth-smr-32",
+  "defaultSize": {
+   "width": 288,
+   "height": 328
+  },
+  "requires": [
+   "camera"
+  ],
+  "scrollable": false,
+  "resizable": false
+ },
+ "safari": {
+  "id": "safari",
+  "title": "Safari",
+  "icon": "icon/safari",
+  "defaultSize": {
+   "width": 480,
+   "height": 320
+  },
+  "requires": [
+   "network"
+  ],
+  "scrollable": true,
+  "resizable": true,
+  "minSize": {
+   "width": 300,
+   "height": 180
+  },
+  "about": {
+   "description": "Browses the web the way it looked in 1996: text, links, pictures and forms, without style sheets or scripts. GitHub and Hacker News are drawn from their APIs."
+  }
+ },
+ "showreel": {
+  "id": "showreel",
+  "title": "Showreel",
+  "icon": "showreel/icon",
+  "defaultSize": {
+   "width": 400,
+   "height": 248
+  },
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 224,
+   "height": 150
+  },
+  "about": {
+   "version": "4.0",
+   "description": "Four reels in one bit, each with its own score. One Bit: type, shape, depth, particles and the edit, to a 120 BPM groove. The Keeper: an engraved silent short, drawn on twos, with a waltz and a projector. Hello, Mockintosh: the machine introduces itself in its own pixels and sounds. A Lot Like 1984: the 1984 ad itself, re-cut and dithered, with Mockintosh taking over Big Brother's screens."
+  },
+  "sprites": {
+   "showreel/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAKoAAAAAAAAKaoAAAAAAAqWqgAAAAACpVqoAAAAACqVagAAAAAKqlqAAAAAAqapqAAAAAApWqoAAAAAApVqgAAAAAACVagAAAAAAAKqAAAAAAAAAIAAAAAAAAAAqqqqqqqqqACqVapVqlWoAKlWqVapVqgApVqlWqVaqACqqqqqqqqoAJVVVVVVVVgAlVVWqlVVWACVVVqqlVVYAJVValalVVgAlVVpVaVVWACVVWlVpVVYAJVVaVWlVVgAlVVqVqVVWACVVVqqlVVYAJVVVqpVVVgAlVVVVVVVWACqqqqqqqqoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "showreel/bomb": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAIAAAAAAAAAIiAAAAAAAAAKgAAAAAAAAKioAAAAAAAACoAAAAAAAACqIAAAAAAAAoIAAAAAAAAKAAAAAAAAACgAAAAAqqqCgAAAAAKqqqqgAAAAKlqqmqgAAACpWqqmqgAAAKVqqqmoAAACpaqqqmAAAAqWqqqqqAAACpaqqqqoAAAKmqqqqqgAAAqaqqqqqAAACqqqqqqoAAAKqqqqqqgAAAqqqqqqqAAACqqqqqqoAAAKqqqqqqgAAAKqqqqqoAAAAKqqqqqAAAAAqqqqqoAAAAAqqqqqAAAAAAKqqqAAAAAAAKqqgAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   }
+  }
+ },
+ "dither": {
+  "id": "dither",
+  "title": "Dither",
+  "icon": "dither/icon",
+  "defaultSize": {
+   "width": 288,
+   "height": 288
+  },
+  "requires": [
+   "images"
+  ],
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 120,
+   "height": 80
+  },
+  "fileTypes": [
+   {
+    "type": "image/x-mockintosh-sprite",
+    "rank": "alternate"
+   },
+   {
+    "type": "image/png",
+    "rank": "alternate"
+   },
+   {
+    "type": "image/jpeg",
+    "rank": "alternate"
+   },
+   {
+    "type": "image/gif",
+    "rank": "alternate"
+   },
+   {
+    "type": "image/webp",
+    "rank": "alternate"
+   }
+  ],
+  "sprites": {
+   "dither/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "qqqqqqqqqqqqqqqqmqVVVqqpqpqpqlVWqqqqqmqapVaqqqpqpqqpVqqqqqqqaqpaqpqpVqWppWqqqqllpVqlqqqqalVpVpWmqqqmlVVVlaqqmqlVVVVlmqqpqmVVWlWqqqqmlVVVlaaqqqpVVWVlaqqqWmlWWmWqpqmmlVallZqqmqqWWqWVaqmqWWVZqlVqqmpqZVqqqWaqpaZWWqqpqqmqqVVVqaqqqpqZZaWpqpqqqalqppaaqqaqqVaqVqqqqpqllVZqaaqpqqWaVWqqpqqqmlqpmqaqqmmlpqqpqqqqqqVVVqqqapqqmlVaamqmqmmpZVqqqqqqqqqqqqqqqg=="
+   }
+  }
+ },
+ "trace": {
+  "id": "trace",
+  "title": "Trace",
+  "icon": "trace/icon",
+  "defaultSize": {
+   "width": 300,
+   "height": 320
+  },
+  "requires": [
+   "images"
+  ],
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 240,
+   "height": 240
+  },
+  "fileTypes": [
+   {
+    "type": "image/x-mockintosh-sprite",
+    "rank": "alternate"
+   },
+   {
+    "type": "image/png",
+    "rank": "alternate"
+   },
+   {
+    "type": "image/jpeg",
+    "rank": "alternate"
+   },
+   {
+    "type": "image/gif",
+    "rank": "alternate"
+   },
+   {
+    "type": "image/webp",
+    "rank": "alternate"
+   }
+  ],
+  "about": {
+   "version": "1.1",
+   "description": "Recovers a 1-bit bitmap from a screenshot of pixel art."
+  },
+  "sprites": {
+   "trace/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAgAAAAAAAAAJgAAAAAAAACVgAAAAAAAAlVgAAAAAAAJVVgAAAAAACVVVgAAAAAAlVVVgAAAAAJVVVVgAAAACVVVVVgAAAAlVVVVVgAAAJVVVVVVgAACVVVVVVVgAAlVVVVVVVgAJVVVVVVVVgCVVVVVaqlVglVVVVWVVlVglVVVVlVVlVglVVVZaVVlYAlVVVqWVVmAAlVWpaqqVqgAlVVlaVVVqAAlVVlVVVWoAAlVVlVVVagAAlVVpVVVqAAAlVVaqqWoAAAlVVVgCqgAAAlVVYAAqAAAAlVWAAAAAAAAlVgAAAAAAAAlYAAAAAAAAAmAAAAAAAAAAgAAAAA=="
+   }
+  }
+ },
+ "spotify": {
+  "id": "spotify",
+  "title": "Spotify Player",
+  "icon": "icon/spotify",
+  "defaultSize": {
+   "width": 380,
+   "height": 280
+  },
+  "requires": [
+   "network",
+   "browser",
+   "sign-in"
+  ],
+  "signIn": {
+   "hosts": [
+    "accounts.spotify.com"
+   ]
+  },
+  "scrollable": false,
+  "sprites": {
+   "icon/spotify": {
+    "width": 32,
+    "height": 32,
+    "data": "AACqoAAAAAAAKqqqAAAAAACqqqqAAAAAAqgAKqAAAAAKgAACqAAAACoAKoCqAAAAKAKqqCoAAACoCqqqCoAAAKAqgCqCgAAAoKoACqKAAACgqAACooAAAKCoAAKigAAAoKoACqKAAACgKoAqgoAAAKgKqqoKgAAAKAKqqCoAAAAqACqAqgAAAAqAAAKoAAAAAqgAKqAAAAAAqqqqgAAAAAAqqqoAAAAAAACqoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "spotify/play": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAoAAAAKoAAACqoAAAqqoAAKqqoACqqqoAqqqqgKqqqoCqqqoAqqqgAKqqAACqoAAAqgAAAKAAAAAAAAAA=="
+   },
+   "spotify/pause": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAqgqgAKoKoACqCqAAqgqgAKoKoACqCqAAqgqgAKoKoACqCqAAqgqgAKoKoACqCqAAqgqgAKoKoAAAAAAA=="
+   },
+   "spotify/prev": {
+    "width": 12,
+    "height": 12,
+    "data": "AAAAIAgAKAoAKgqAKoqgKqqoKqqoKoqgKgqAKAoAIAgAAAAA"
+   },
+   "spotify/next": {
+    "width": 12,
+    "height": 12,
+    "data": "AAAAACAIAKAoAqCoCqKoKqqoKqqoCqKoAqCoAKAoACAIAAAA"
+   },
+   "spotify/volume": {
+    "width": 12,
+    "height": 12,
+    "data": "AAAAAAgAACgACKgAKKogKKoiKKoiKKogCKgAACgAAAgAAAAA"
+   }
+  }
+ },
+ "macpaint": {
+  "id": "macpaint",
+  "title": "MacPaint",
+  "icon": "macpaint/icon",
+  "defaultSize": {
+   "width": 416,
+   "height": 240
+  },
+  "scrollable": false,
+  "resizable": false,
+  "singleInstance": true,
+  "fileTypes": [
+   "image/x-macpaint"
+  ],
+  "about": {
+   "size": {
+    "width": 356,
+    "height": 94
+   },
+   "custom": true
+  },
+  "sprites": {
+   "macpaint/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAgAAAAAAAAAJgAAAAAAAACVgAAAAAAAAlVgAAAAAAAJVagAAAAAACVWqgAAAAAAlVqqgAAAAAJVaqpgAAAACVVmqVgAAAAlVZqlVgAAAJVWWpVVgAACVVVmVVVgAAlVVVlVVVgAJVVVZVVVVgCVVVVVaqlVglVVVlWVVlVglVVZVlVVlVglVWlZaVVlYAlValqWVVmAAlVapaqqVqgAlVVlaVVVqAAlVVlVVVWoAAlVVlVVVagAAlVVpVVVqAAAlVVaqqWoAAAlVVVgCqgAAAlVVYAAqAAAAlVWAAAAAAAAlVgAAAAAAAAlYAAAAAAAAAmAAAAAAAAAAgAAAAA=="
+   },
+   "macpaint/document": {
+    "width": 32,
+    "height": 32,
+    "data": "AKqqqqqoAAAAlVVVVVoAAACWplVVWYAAAJamVVVZYAAAlqZVVVlYAACWplVVWVYAAJamVVVaqoAAlqZVVVVVgACWplVVVVWAAJamVVVVVYAAlqZVVVVVgACWplVVVVWAAJaqVVVVVYAAllZVVVVVgACWVlVVVVWAAJZWVVVVVYAAllZVVVVVgACWVlVVVVWAAJWpVVVVVYAAlqpVVVVVgACWqlVVVVWAAJaqlVVVVYAAlqqVVVVVgACWqZVmqqmAAJaqlVWaqYAAlaZVWqqpgACVqlWqqqmAAJVqVVqqqYAAlVaWqqqpgACVVVVVVVWAAJVVVVVVVYAAqqqqqqqqgA=="
+   }
+  }
+ },
+ "canvas": {
+  "id": "canvas",
+  "title": "Canvas",
+  "icon": "canvas/icon",
+  "defaultSize": {
+   "width": 480,
+   "height": 276
+  },
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 280,
+   "height": 140
+  },
+  "fileTypes": [
+   "application/x-mockintosh-canvas"
+  ],
+  "about": {
+   "version": "1.0",
+   "description": "Draw with objects — move, resize, and edit shapes and text without flattening to a bitmap."
+  },
+  "sprites": {
+   "canvas/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAACqqqqqAAAAAJVVVVqgAAAAlVVVWWgAAACVVVVZWAAAAJVVVVqoAAAAlVVVVVVgAACVqqqlVWAAAJWVVWVVYAAAlZVVZalgAACVlVVlmWAAAJWVVWWpYAAAlaqqpWVgAACVVVVVZWAAAJVaqlVlYAAAlWlWlVVgAACVlVVlVWAAAJWVVWVVYAAAlWlWlVVgAACVWqpVVWAAAJVVVVVVYAAAlVVVVWqgAACVVVVVoAAAAJVVVVaAAAAAlVVVWgAAAACVVVVoAAAAAKqqqqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   }
+  }
+ },
+ "surface": {
+  "id": "surface",
+  "title": "Surface",
+  "icon": "surface/icon",
+  "defaultSize": {
+   "width": 320,
+   "height": 300
+  },
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 200,
+   "height": 180
+  },
+  "about": {
+   "version": "0.1",
+   "description": "Plots z = f(x, y, t) as a 3D mesh you can orbit."
+  },
+  "sprites": {
+   "surface/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAqAAAAAAAAAKaAAAAAAAACZYAAAAAAAAmVoAAAAAAAKZVoAAAAAAAllWgAAAAAAKZVWgAAAAABZlVqgAAAAAJqlWaoAAAABZlllmoAAAAaWVmWmaAAAKZZVlWZWAACWVlWlZZaAAlZZVmVZqaAKmVlWWVppYClqqlZWaVloJVlZqVZmWlilZWVZVZZWWaVlZVqapZaWZWVlZWVllZWVZZVlaWllqZWVlWWZWWUipZWVlZpaWoAKlZWVllZIAAAqVZWWlqAAAAKGVlWUgAAAACqWVaoAAAAAACpVYAAAAAAAAJUgAAAAAAAAJYAAAAAAAAAkgAAAAAAAAAoAAAA=="
+   }
+  }
+ },
+ "foundry": {
+  "id": "foundry",
+  "title": "Foundry",
+  "icon": "foundry/icon",
+  "defaultSize": {
+   "width": 420,
+   "height": 300
+  },
+  "resizable": true,
+  "minSize": {
+   "width": 300,
+   "height": 220
+  },
+  "fileTypes": [
+   "font/ttf",
+   "font/otf",
+   "font/sfnt",
+   "application/font-sfnt",
+   "application/x-font-ttf",
+   "application/x-font-otf",
+   "font/collection",
+   "application/x-mockintosh-font",
+   "application/x-mockintosh-suitcase"
+  ],
+  "about": {
+   "version": "2.0",
+   "description": "Turns TrueType and OpenType fonts into Mac font suitcases. Auto-Hinted uses the Font Manager’s own scaler, so the preview is exactly what apps draw. Keep a size as a bitmap to hand-tune its pixels; installed suitcases work in every app at any size."
+  },
+  "sprites": {
+   "foundry/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "VVVVVVVVVVWqqqqqqqqqqlVVVVVVVVVVqqqqqqqqqqpVVVVVVVWVlaqqqqqqqlWqVVVVVVVZVZWqqqqqqqVVqlVVVVVVlVWVqqqqqqpVVapVVVVVWVVVlaqqqqqlVVWqVVVVVZVVVZWqqqqqVVVVqlVVVVlVWVWVqqqqpVVpVapVVVWVVZlVlaqqqlVWqVWqVVVZVVlZVZWqqqVVaqlVqlVVlVVVVVWVqqpVVVVVVapVWVVVVVVVlaqlVWqqqVWqVZVVlVVZVZWqVVaqqqlVqllVWVVVWVWVpVVqqqqpVaqVVZVVVVlVlaqqqqqqqqqqVVVVVVVVVVWqqqqqqqqqqg=="
+   }
+  }
+ },
+ "synth": {
+  "id": "synth",
+  "title": "Synthesizer",
+  "icon": "synth/icon",
+  "defaultSize": {
+   "width": 500,
+   "height": 296
+  },
+  "requires": [
+   "audio"
+  ],
+  "scrollable": false,
+  "resizable": false,
+  "about": {
+   "version": "1.0",
+   "description": "A polyphonic analog-style synthesizer with a 16-step sequencer, arpeggiator and effects. Play it with the mouse or the keys A to K."
+  },
+  "sprites": {
+   "synth/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACqqqqqqqqqAlVVVVVVVVWiaqqqpVVVVaJqWqqlqWpqommmqqZqpqmiaqqqpqqqqqJmqapmqqqqomqqaaWpamqiaqqWpVVVVaJqqqqlVVVVolVVVVVVVVWiqqqqqqqqqqKaqmaqqmamopqqZqqqZqaimqpmqqpmpqKaqmaqqmamopqqZqqqZqailllllllllqKWWWWWWWWWopZZZZZZZZailllllllllqCqqqqqqqqqoKqqqqqqqqqgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   }
+  }
+ },
+ "chord": {
+  "id": "chord",
+  "title": "Pocket Chord",
+  "icon": "chord/icon",
+  "defaultSize": {
+   "width": 392,
+   "height": 172
+  },
+  "requires": [
+   "audio"
+  ],
+  "scrollable": false,
+  "resizable": false,
+  "about": {
+   "version": "1.0",
+   "description": "A pocket chord instrument. Seven buttons play the chords of a key; the joystick adds sevenths, suspensions and more. Strum, arpeggiate or pulse over a built-in rhythm box."
+  },
+  "sprites": {
+   "chord/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqqqqqqqqqgJVVVVVVVVVomqqqpVpVmaiaqqqlpaVVaJqqpaWVZZmomqlqplpZVWiaqWqmWlmZqJpaqqWVZVVomlqqpaWlmaiaqqqlWlVVaJVVVVVVVVVolVVVVVVVVWiVVVVVVVVVaJqampqampqompqZmpqamqiampmampqaqJqamZqampqompqZmpqamqiampmampqaqJqampqampqolVVVVVVVVWiVVVVVVVVVaCqqqqqqqqqIKqqqqqqqqqgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   }
+  }
+ },
+ "op1": {
+  "id": "op1",
+  "title": "OP-1",
+  "icon": "op1/icon",
+  "defaultSize": {
+   "width": 496,
+   "height": 178
+  },
+  "requires": [
+   "audio"
+  ],
+  "scrollable": false,
+  "resizable": false,
+  "about": {
+   "version": "1.2",
+   "description": "A portable synthesizer workstation in the manner of the Teenage Engineering OP-1: seven synth engines including a sampler, a drum kit, a pattern sequencer for each, a four-track tape and a mixer, all on four encoders. Play the keys A to ' ; Space runs the tape, Q shows the pattern. It starts with the Sunday Tape on; File › Open Tape has the other demos and the tapes you've saved."
+  },
+  "sprites": {
+   "op1/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACqqqqqqqqqglVVVVVVVVVqZmqqqVVVVWpVaqqpqqqqallpapmqqaZqVWaaaaqqqmpmaqWpVVVValVqqqlVVVVqVVVVVVVVVWpaaaVaaVaaalpppVppVppqVVVVVVVVVWppppppppppqmmmmmmmmmmqVVVVVVVVVWiqqqqqqqqqiKqqqqqqqqqoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   }
+  }
+ },
+ "tp7": {
+  "id": "tp7",
+  "title": "TP-7",
+  "icon": "tp7/icon",
+  "defaultSize": {
+   "width": 466,
+   "height": 236
+  },
+  "requires": [
+   "audio"
+  ],
+  "scrollable": false,
+  "resizable": false,
+  "fileTypes": [
+   "audio/wav"
+  ],
+  "about": {
+   "version": "1.0",
+   "description": "A field recorder in the manner of the Teenage Engineering TP-7. Record memos from the microphone, then hold the reel to stop the tape, spin it to scrub, or turn the ring around it to wind. Memos are WAV files in the TP-7 folder on your disk; marks are kept inside them."
+  },
+  "sprites": {
+   "tp7/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKqqqqqqqqECVVVVVVVVWgJVVVVVVVVaqlqqqlVVVVqqWmaaVWqlWqpZVlZWlVpaqllVVlpZVpqqWVZWWWZVmgJaqqplmZlqqlVVVWZlZmqaVVVVZZZZappVVVVmZWZqmlZmZmWZmWqqVVVVWWZlmgJZmZlaWZaaqlVVVVaVWlqaVmZmVWqlWppVVVVVVVVamlVVVVVVVVqoqqqqqqqqogGqqqqqqqqqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "tp7/memo": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAKqqqqgAAAAAlVVVWgAAAACVVVVZgAAAAJVVVVlgAAAAlVVVWVgAAACVVVVZVgAAAJVVVVlVgAAAlVVVWqqgAACVVVVVVWAAAJVVVVVVYAAAlVZVVVVgAACVVmVVVWAAAJVmZVlVYAAAlWalmVVgAACVpqmaVWAAAJWqqaplYAAAlqqqqqVgAACWqqqqpWAAAJaqqqqlYAAAlaqpqmVgAACVpqmaVWAAAJVmpZlVYAAAlWZlWVVgAACVVmVVVWAAAJVWVVVVYAAAlVVVVVVgAACWZmZmZWAAAJVVVVVVYAAAlVVVVVVgAACqqqqqqqAAAAAAAAAAAAA=="
+   }
+  }
+ },
+ "pchkraft": {
+  "id": "pchkraft",
+  "title": "pchkraft",
+  "icon": "pchkraft/icon",
+  "defaultSize": {
+   "width": 468,
+   "height": 260
+  },
+  "requires": [
+   "audio"
+  ],
+  "scrollable": false,
+  "resizable": false,
+  "about": {
+   "version": "1.0",
+   "description": "A pocket groovebox and looper in the manner of the Vorimo pchkraft. Hum a melody or play the four keys; each beat of a hum becomes the chord that fits it, and the loop starts at once. Keys A S D F play, M listens, R records, Space runs the tape."
+  },
+  "sprites": {
+   "pchkraft/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKqqqqqqqqoSVVVVVVVVVaJpVVVVVVVpolVVVVVVVVWiVVVVVVVVVaJVaqVVWqlVolWVWqqlVlWiVlZWqpWVlaJWVVZVlVWVolZmZqqZmZWiVlVWVZVVlaJWVlaqlZWVolWVWqqlVlWiVWqlVVqpVaJVVVVVVVVVolVVVVVVVVWiVapqmqapVaJVqmqapqlVolWqapqmqVWiVapqmqapVaJVqmqapqlVomlVVVVVVWmiVVVVVVVVVaJVVVVVVVVVoKqqqqqqqqogAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   }
+  }
+ },
+ "visualizer": {
+  "id": "visualizer",
+  "title": "Visualizer",
+  "icon": "visualizer/icon",
+  "defaultSize": {
+   "width": 400,
+   "height": 262
+  },
+  "requires": [
+   "audio"
+  ],
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 220,
+   "height": 150
+  },
+  "about": {
+   "version": "1.0",
+   "description": "Listens to everything this Macintosh plays and draws it in one bit: scopes and meters, generative systems, the shots of Showreel's first reel, and Surface plots. Arrow keys change the picture."
+  },
+  "sprites": {
+   "visualizer/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAKqqqqqqqqACVVVVVVVVWgJqqqaqqqqaAmqqqqqmqpoCaqamqqqqmgJqqqZqpqqaAmqmZqqmqpoCaqamamaqmgJqZmZqpmqaAmqmZmZmqpoCamZmamZmmgJmZmZmZmqaAmpmZmZmZpoCZmZmZmZmmgJmZmZmZmaaAmZmZmZmZpoCZmZmZmZmmgJqqqqqqqqaAlVVVVVVVVoCVVVVVVVVWgJWqqlVVVZaAKqqqqqqqqoAqqqqqqqqqgAAABaqUAAAAAAAFqpQAAAAAACqqqkAAAAAAJVVWQAAAAAAqqqpAAAAAABqqqoAAAAAAAAAAAAAA=="
+   }
+  }
+ },
+ "terminal": {
+  "id": "terminal",
+  "title": "Terminal",
+  "icon": "icon/computer",
+  "defaultSize": {
+   "width": 460,
+   "height": 260
+  },
+  "permissions": [
+   "kernel:run_shell",
+   "kernel:shell_close"
+  ],
+  "scrollable": false,
+  "singleInstance": false
+ },
+ "source_editor": {
+  "id": "source_editor",
+  "title": "Source Editor",
+  "icon": "icon/computer",
+  "defaultSize": {
+   "width": 480,
+   "height": 260
+  },
+  "permissions": [
+   "kernel:stat",
+   "kernel:read",
+   "kernel:write",
+   "kernel:build_submit",
+   "kernel:build_status",
+   "kernel:app_install",
+   "kernel:project_create",
+   "kernel:app_restore"
+  ],
+  "singleInstance": false
+ },
+ "chatgippity": {
+  "id": "chatgippity",
+  "title": "ChatGippity",
+  "icon": "icon/computer",
+  "defaultSize": {
+   "width": 360,
+   "height": 260
+  },
+  "requires": [
+   "network"
+  ],
+  "permissions": [
+   "kernel:*"
+  ]
+ }
+}

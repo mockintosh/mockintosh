@@ -1,4 +1,7 @@
 import { sourceForTemplate, type ProjectTemplate } from "./templates";
+import { setAppSource } from "../process/sources";
+import { describeApp } from "../process/describe";
+import { declaredApp, type AppDeclaration } from "../appDeclaration";
 export { counterSource, blankSource, canvasSource, type ProjectTemplate } from "./templates";
 import {diskPath} from "./paths";
 import {MIME} from "@mockintosh/fs";
@@ -81,6 +84,23 @@ export class ProjectService {
       } catch (error) { this.loadErrors.set(selection.app, errorText(error)); }
     }
   }
+  /**
+   * The build's declaration, kept beside `build.json` in `declaration.json`
+   * the first time a process reads it, for the code revision it was read from.
+   */
+  private async buildDeclaration(disk: Disk, path: string, codeRevision: number, read: () => Promise<AppDeclaration>): Promise<AppDeclaration> {
+    try {
+      const kept = JSON.parse(decoder.decode(await disk.read(path + "/declaration.json"))) as { codeRevision?: number; declaration?: AppDeclaration };
+      if (kept.codeRevision === codeRevision && kept.declaration) return kept.declaration;
+    } catch {
+      // Not read yet.
+    }
+    const declaration = await read();
+    await disk.write(path + "/declaration.json", encoder.encode(JSON.stringify({ codeRevision, declaration }))).catch((error: unknown) => {
+      console.error("Couldn't keep the build's declaration", error);
+    });
+    return declaration;
+  }
   private async load(selection: Selection, disk: Disk, sourceRevision?: string) {
     if (!this.platform.loadArtifact) throw new ServiceError("unsupported-operation", "This host cannot load app artifacts");
     const path = `${this.pathFor(selection.projectId)}/dist/${selection.build}`;
@@ -88,7 +108,21 @@ export class ProjectService {
     if (sourceRevision !== undefined && record.sourceRevision !== sourceRevision) throw new ServiceError("conflict", "Sources changed after this build; rebuild before installing");
     const code = await disk.stat(path + "/index.js");
     if (record.id !== selection.build || code.revision !== record.codeRevision) throw new ServiceError("conflict", "Build artifact was edited; rebuild from source");
-    const module = validateModule(selection.app, await this.platform.loadArtifact(decoder.decode(await disk.read(code.path)), record.id));
+    const source = decoder.decode(await disk.read(code.path));
+    const loadArtifact = this.platform.loadArtifact;
+    const loadHere = async () => validateModule(selection.app, await loadArtifact(source, record.id));
+    const appSource = { kind: "code" as const, code: source, identity: record.id };
+    if (this.platform.processes) {
+      // A process reads the build, once, so its code never runs on the OS's thread unless it has to.
+      const declaration = await this.buildDeclaration(disk, path, code.revision, () => describeApp(this.platform.processes!, selection.app, appSource));
+      if (declaration.id !== selection.app) throw new ServiceError("conflict", `The build is "${declaration.id}", not "${selection.app}"`);
+      if (missingCapabilities(declaration.requires, this.os.capabilities).length) throw new ServiceError("unsupported-operation", "Build needs unavailable host capabilities");
+      setAppSource(selection.app, appSource);
+      return declaredApp(declaration, loadHere);
+    }
+    const module = await loadHere();
+    // A process loads the same build.
+    setAppSource(selection.app, appSource);
     if (missingCapabilities(module.default.requires, this.os.capabilities).length) throw new ServiceError("unsupported-operation", "Build needs unavailable host capabilities");
     // Sprites are registered only after module validation; names belong to the app's bundle.
     return {...module.default, sprites: {...module.default.sprites, ...module.sprites}};

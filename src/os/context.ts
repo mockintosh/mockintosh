@@ -115,6 +115,20 @@ export interface OSServices {
   /** Remove the drag/resize outline and call the stored commit callback. */
   hideWindowOutline: () => void;
   scheduleRepaint: () => void;
+  /**
+   * Offer to end the frontmost app at once, without its cleanups. An app in a
+   * process stops even while it's stuck; one on the OS's thread has had its
+   * cleanups skipped only if it's still answering.
+   */
+  forceQuit: () => void;
+  /** "About <app>…": the OS's box, or the app's own (drawn by the app, wherever it runs). */
+  openAbout: (appId: string) => void;
+  /**
+   * Run `hook` as each frame of the screen starts, before the OS decides
+   * whether to draw it: an app process looks for new pictures here. Returns
+   * a function that removes the hook.
+   */
+  beforeFrame: (hook: () => void) => () => void;
   /** Full-screen and selection captures, saved as PNGs on the desktop. */
   screenshots: ScreenshotCommands;
   /**

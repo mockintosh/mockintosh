@@ -3,6 +3,7 @@
  * `requestAnimationFrame` for the clock, OPFS for the disk, and WebUSB /
  * Web Bluetooth for printers. This is the only OS-level module that may use DOM APIs.
  */
+import { createWebAppProcesses } from "./process";
 import type { BitMap } from "@mockintosh/quickdraw";
 import { InMemoryBackend } from "@mockintosh/fs";
 import { OPFSBackend, isOPFSAvailable } from "./OPFSBackend";
@@ -147,6 +148,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     audio: createWebAudioService(),
     microphone: createWebMicrophoneService(),
     agentRuntime: createWebAgentRuntime(),
+    processes: createWebAppProcesses(),
     fonts: createWebFontRasterService(),
     builder: browserBuilder,
     hostDisplay,

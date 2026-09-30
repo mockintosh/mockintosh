@@ -1,5 +1,4 @@
 import {createRoot, createStore, flush} from "solid-js";
-import SourceEditor from "../../apps/SourceEditor";
 import { registerProjects } from "./projects";
 import { AppInstances } from "./instances";
 import { registerFileOperations } from "./kernel/files";
@@ -17,7 +16,7 @@ import { registerFileOperations } from "./kernel/files";
 
 import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd, type Rect } from "@mockintosh/quickdraw";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
-import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers } from "@mockintosh/ui";
+import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
 import { FileSystem } from "@mockintosh/fs";
 import type { AppContext } from "@mockintosh/sdk";
 import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEvent } from "../platform/types";
@@ -46,11 +45,20 @@ import {
   getMenubarMenus,
   isMenubarHidden,
   setOpenMenuIndex,
+  FINDER_APP_ID,
 } from "./state";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
 import { bundledApps } from "./bundledApps";
 import { createAppContext } from "./appContext";
+import { AppProcess } from "./process/host";
+import { processBlocker } from "./process/eligible";
+import { appSource } from "./process/sources";
+import { processWindowComponent } from "./components/ProcessWindow.solid";
+import { describeApp } from "./process/describe";
+import { declaredApp, type AppDeclaration } from "./appDeclaration";
+import { openAppAboutBox, ABOUT_SIZE } from "./components/AppAboutBox.solid";
+import bundledDeclarations from "../../apps/declarations.generated.json";
 import { buildAppWindow } from "./appWindow";
 import { DialogApp } from "./components/Dialog.solid";
 import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
@@ -69,7 +77,6 @@ import { registerShell } from "./shell";
 import { registerUIOperations } from "./kernel/uiService";
 import { Cancellation } from "./kernel/cancellation";
 import { ServiceError } from "./kernel";
-import Terminal from "../../apps/Terminal";
 import { Kernel } from "./kernel";
 
 const MENUBAR_HEIGHT = 20;
@@ -142,6 +149,29 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   }
 
   const instances = new AppInstances(id => closeOSWindow(id));
+  /** App processes by instance, for Force Quit. */
+  const processes = new Map<string, AppProcess>();
+
+  /** The host's image decoder as `<image>` sources want it: bytes, or a URL fetched first. Processes get it too. */
+  const uiImages: UIImageService | undefined = platform.images
+    ? {
+        async decode(source, options) {
+          const images = platform.images!;
+          if (typeof source !== "string") {
+            return images.decode(source, options?.type, options);
+          }
+          if (!platform.fetch) throw new Error("This Macintosh cannot fetch images.");
+          const response = await platform.fetch(source);
+          if (!response.ok) throw new Error(`Could not fetch image (${response.status})`);
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          return images.decode(
+            bytes,
+            options?.type ?? response.headers.get("content-type") ?? undefined,
+            options,
+          );
+        },
+      }
+    : undefined;
 
   // --- UI instance (full-screen Solid renderer) ---
   bootTrace("ui");
@@ -150,25 +180,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     scheduleRender: scheduleRepaint,
     services: {
       clipboard: platform.clipboard,
-      images: platform.images
-        ? {
-            async decode(source, options) {
-              const images = platform.images!;
-              if (typeof source !== "string") {
-                return images.decode(source, options?.type, options);
-              }
-              if (!platform.fetch) throw new Error("This Macintosh cannot fetch images.");
-              const response = await platform.fetch(source);
-              if (!response.ok) throw new Error(`Could not fetch image (${response.status})`);
-              const bytes = new Uint8Array(await response.arrayBuffer());
-              return images.decode(
-                bytes,
-                options?.type ?? response.headers.get("content-type") ?? undefined,
-                options,
-              );
-            },
-          }
-        : undefined,
+      images: uiImages,
       onError(error) {
         const active = getWindows().find((window) => window.id === getActiveWindowId());
         if (active?.instanceId) instances.note(active.instanceId, error, "handler");
@@ -192,6 +204,12 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     sprites,
     capabilities,
     loadModule: platform.loadModule,
+    describe: platform.processes && ((appId, source) => describeApp(platform.processes!, appId, source)),
+    fetchJSON: platform.fetch && (async (url) => {
+      const response = await platform.fetch!(url);
+      if (!response.ok) throw new Error(`${url}: ${response.status}`);
+      return response.json();
+    }),
   });
   await migrateBundledDesktopShortcuts(fs, installer);
   await installer.loadInstalled();
@@ -271,9 +289,43 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         bringToFront(existing.id);
         return;
       }
+      if (app.load && (!platform.processes || processBlocker(app, platform.processes) !== null)) {
+        // Registered from its declaration, and it must run here: load its code first.
+        void app.load().then(({ default: loaded }) => {
+          if (getApp(appId) === app) registerApp({ ...loaded, sprites: app.sprites ?? loaded.sprites });
+          osServices.openApp(appId, props, fromRect);
+        }, (error: unknown) => {
+          void osServices.showDialog({ message: `"${app.title}" couldn't be loaded: ${error instanceof Error ? error.message : String(error)}` });
+        });
+        return;
+      }
       // The app's `main`: it decides which windows to open, if any.
       const instanceId = instances.create(appId, osServices.projects?.selectedBuild(appId));
       const context = createAppContext(osServices, appId, { fromRect, instanceId });
+      if (platform.processes && processBlocker(app, platform.processes) === null) {
+        // The app's `main` runs in its own process; it holds the launch until `onOpen` has run there.
+        const proc = new AppProcess({
+          port: platform.processes.spawn(appId),
+          appId,
+          instanceId,
+          source: appSource(appId),
+          props,
+          context,
+          os: osServices,
+          clipboard: platform.clipboard,
+          images: uiImages,
+          titleSuffix: platform.processes.stats ? " (Worker)" : "",
+          stats: !!platform.processes.stats,
+          windowComponent: (process, key) => processWindowComponent(process, key, !!platform.processes?.stats),
+        });
+        processes.set(instanceId, proc);
+        instances.own(instanceId, () => {
+          processes.delete(instanceId);
+          proc.stop();
+        });
+        instances.finishOpen(instanceId);
+        return;
+      }
       const onOpen = app.onOpen ?? defaultOnOpen;
       try { createRoot(dispose => { instances.own(instanceId, dispose); onOpen(context, props); }); instances.finishOpen(instanceId); } catch (error) { instances.stop(instanceId); throw error; }
     },
@@ -360,6 +412,48 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       setWindowOutline(null);
     },
     scheduleRepaint,
+    openAbout(appId) {
+      const app = getApp(appId);
+      if (!app) return;
+      if (!app.customAbout || app.about?.Component) {
+        openAppAboutBox(osServices, app);
+        return;
+      }
+      // The app draws its About box in its own code: in its process, or here once the code is loaded.
+      const proc = [...processes.values()].find((p) => p.appId === appId);
+      if (proc) {
+        proc.openAbout(`About ${app.title}`, app.about?.size ?? ABOUT_SIZE);
+        return;
+      }
+      void app.load?.().then(({ default: loaded }) => {
+        registerApp({ ...loaded, sprites: app.sprites ?? loaded.sprites });
+        openAppAboutBox(osServices, getApp(appId)!);
+      });
+    },
+    forceQuit() {
+      const active = getWindows().find((w) => w.id === getActiveWindowId());
+      const instanceId = active?.instanceId;
+      const app = active && getApp(active.appId);
+      if (!instanceId || !app || active.appId === FINDER_APP_ID) {
+        void osServices.showDialog({ message: "There's no application to force to quit.", variant: "note" });
+        return;
+      }
+      void osServices
+        .showDialog({
+          message: `Force "${app.title}" to quit? Unsaved work is lost.`,
+          buttons: ["Cancel", "Force Quit"],
+          variant: "caution",
+        })
+        .then((choice) => {
+          if (choice !== "Force Quit") return;
+          processes.get(instanceId)?.kill();
+          instances.stop(instanceId);
+        });
+    },
+    beforeFrame(hook) {
+      beforeFrameHooks.add(hook);
+      return () => beforeFrameHooks.delete(hook);
+    },
     screenshots: {
       captureEntireScreen: () => screenshotCapture.captureEntireScreen(),
       beginPortionCapture() {
@@ -473,8 +567,16 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     }
   }
 
-  registerApp(Terminal);
-  registerApp(SourceEditor);
+  // The kernel's own clients. With processes they run in one, so the page registers only what they declare.
+  const kernelClients = {
+    terminal: () => import("../../apps/Terminal"),
+    source_editor: () => import("../../apps/SourceEditor"),
+  };
+  for (const [id, load] of Object.entries(kernelClients)) {
+    const declaration = (bundledDeclarations as Record<string, AppDeclaration>)[id];
+    if (platform.processes && declaration) registerApp(declaredApp(declaration, load));
+    else registerApp((await load()).default);
+  }
 
   // --- Mount Solid tree ---
   bootTrace("root");
@@ -564,6 +666,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   }
 
   // --- Frame loop ---
+  const beforeFrameHooks = new Set<() => void>();
   function renderFrame() {
     if (stopped) return;
     ui.frame();
@@ -604,6 +707,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   function frameLoop() {
     if (stopped) return;
     scheduler.requestFrame(frameLoop);
+    for (const hook of beforeFrameHooks) hook();
     if (stepMenubarReveal(scheduler.now())) scheduleRepaint();
     if (!screenDirty || animating) return;
     screenDirty = false;
@@ -717,6 +821,12 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       return;
     }
     const command = mods.meta || mods.ctrl;
+    // ⌘⌥Esc, as on the Mac; the host keeps that one on a Mac, so ⌃⌥Esc too.
+    if (command && mods.alt && e.key === "Escape") {
+      osServices.forceQuit();
+      scheduleRepaint();
+      return;
+    }
     // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
     if (command && e.key.toLowerCase() === "v") {
       if (!(mods.meta && runMenuShortcut(e.key))) pasteFromClipboard();
