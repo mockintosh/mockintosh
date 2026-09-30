@@ -195,6 +195,7 @@ function runCharstring(code: Uint8Array, gsubrs: Index, lsubrs: Index | undefine
     y = y2 + dy3;
     contour.push({ x: x1, y: y1, on: false, cubic: true }, { x: x2, y: y2, on: false, cubic: true }, { x, y, on: true });
   };
+  /** Drop a leading width: `even` when the operator itself takes an even argument count. */
   const takeWidth = (even: boolean) => {
     if (!haveWidth && stack.length % 2 === (even ? 1 : 0)) stack.shift();
     haveWidth = true;
@@ -239,17 +240,17 @@ function runCharstring(code: Uint8Array, gsubrs: Index, lsubrs: Index | undefine
           p += (nStems + 7) >> 3;
           break;
         case 21:
-          takeWidth(false);
+          takeWidth(true);
           moveTo(stack[0] ?? 0, stack[1] ?? 0);
           stack.length = 0;
           break;
         case 22:
-          takeWidth(true);
+          takeWidth(false);
           moveTo(stack[0] ?? 0, 0);
           stack.length = 0;
           break;
         case 4:
-          takeWidth(true);
+          takeWidth(false);
           moveTo(0, stack[0] ?? 0);
           stack.length = 0;
           break;
