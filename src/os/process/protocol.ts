@@ -10,7 +10,7 @@
  */
 import type { CursorSpec, FontRegistration, Modifiers, Sprite } from "@mockintosh/ui";
 import type { FSNode } from "@mockintosh/fs";
-import type { VideoExcerpt, VideoPicture, WindowKind, WindowSpec } from "@mockintosh/sdk";
+import type { OperationContract, VideoExcerpt, VideoPicture, WindowKind, WindowSpec } from "@mockintosh/sdk";
 
 export type PointerKind = "mousemove" | "mousedown" | "mouseup" | "dblclick" | "scroll";
 export type KeyKind = "keydown" | "keyup" | "keypress";
@@ -68,6 +68,8 @@ export interface ProcessStart {
   monitor: boolean;
   /** The host can decode PNG/JPEG/GIF (`AppContext.images`, and `<image>` sources). */
   images: boolean;
+  /** The traps the instance's kernel session grants (`AppContext.kernel.describe()`); absent = no kernel. */
+  kernel?: OperationContract[];
   /** Sprites the app may ask for by name that aren't its own (OS icons, other apps'). */
   sprites: Record<string, Sprite>;
   /** Send `frameStats` for the Worker menu. */
@@ -117,6 +119,8 @@ export type HostToProcess =
   /** The speaker's latest mix, read as the OS's frame started. */
   | { t: "monitor"; monitorId: number; left: Float32Array; right: Float32Array }
   | { t: "video"; event: VideoEvent }
+  /** Output of the `kernel.invoke` call `id`, while it runs. */
+  | { t: "kernelStream"; id: number; stream: "stdout" | "stderr"; bytes: Uint8Array }
   | { t: "reply"; id: number; ok: true; value: unknown }
   | { t: "reply"; id: number; ok: false; error: string };
 

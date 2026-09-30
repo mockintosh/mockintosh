@@ -21,7 +21,15 @@ function setup() {
   const opened: WindowSpec[] = [];
   const release = vi.fn();
   const storage = { read: vi.fn(async (key: string) => `stored ${key}`) };
+  const kernel = {
+    describe: () => [{ name: "echo", description: "", inputSchema: {}, resultSchema: {} }],
+    invoke: vi.fn(async (_name: string, _args: unknown, options?: { stdout?: (b: Uint8Array) => void }) => {
+      options?.stdout?.(new Uint8Array([104, 105]));
+      return { ok: true };
+    }),
+  };
   const context = {
+    kernel,
     capabilities: new Set(),
     keepAlive: vi.fn(() => release),
     openWindow: vi.fn((spec: WindowSpec) => {
@@ -95,6 +103,16 @@ describe("AppProcess", () => {
     receive({ t: "call", id: 8, method: "nonsense", args: [] });
     await settle();
     expect(posted.at(-1)!.message).toEqual({ t: "reply", id: 8, ok: false, error: "Unknown call nonsense" });
+  });
+
+  it("runs a kernel trap for the app, streaming its output back", async () => {
+    const { posted, receive } = setup();
+    expect(posted[0]!.message.t === "start" && posted[0]!.message.start.kernel?.[0]?.name).toBe("echo");
+    receive({ t: "call", id: 9, method: "kernel.invoke", args: ["echo", { text: "hi" }] });
+    await settle();
+    const messages = posted.map((p) => p.message);
+    expect(messages).toContainEqual({ t: "kernelStream", id: 9, stream: "stdout", bytes: new Uint8Array([104, 105]) });
+    expect(messages.at(-1)).toEqual({ t: "reply", id: 9, ok: true, value: { ok: true } });
   });
 
   it("asks the worker to stop, then terminates it when it has", () => {

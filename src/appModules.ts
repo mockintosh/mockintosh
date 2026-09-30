@@ -47,6 +47,9 @@ export const APP_MODULES: Readonly<Record<string, AppModuleLoader>> = {
   tp7: () => import("@/apps/TP7"),
   pchkraft: () => import("@/apps/Pchkraft"),
   visualizer: () => import("@/apps/Visualizer"),
+  terminal: () => import("@/apps/Terminal"),
+  source_editor: () => import("@/apps/SourceEditor"),
+  chatgippity: () => import("@/apps/ChatGippity"),
   "canvas-worker": processTwin(canvas, {
     id: "canvas-worker",
     title: "Canvas Webworker",

@@ -24,6 +24,7 @@ import type {
 import type { FSNode } from "@mockintosh/fs";
 import type { OSServices } from "../context";
 import type { WindowComponent } from "../state";
+import { CopyBits, srcCopy } from "@mockintosh/quickdraw";
 import { unwireMenus } from "./menus";
 import { readSharedFrame, sharedFrameCount } from "./sharedFrame";
 import type { AppSource, FsSnapshot, HostToProcess, ProcessPort, ProcessToHost, WindowState, WireMenu, WireWindowSpec } from "./protocol";
@@ -144,6 +145,7 @@ export class AppProcess {
   private readonly microphones = new Map<number, MicrophonePortInput>();
   private readonly monitors = new Map<number, AudioMonitor>();
   private readonly videoLoads = new Map<number, { abort(): void }>();
+  private readonly kernelCalls = new Map<number, AbortController>();
   private disposeRoot: () => void = () => {};
   private releaseLaunch: (() => void) | null;
   private latencyTimer: ReturnType<typeof setInterval> | null = null;
@@ -180,6 +182,7 @@ export class AppProcess {
         microphone: typeof this.context.microphone?.openPort === "function",
         monitor: typeof this.context.audio?.monitor === "function",
         images: this.context.images !== undefined,
+        kernel: this.context.kernel ? JSON.parse(JSON.stringify(this.context.kernel.describe())) : undefined,
         sprites: this.os.sprites.all(),
         stats: !!options.stats,
         fonts: [...fontRegistrations()],
@@ -240,6 +243,7 @@ export class AppProcess {
     this.removeFontListener();
     if (this.latencyTimer) clearInterval(this.latencyTimer);
     for (const load of this.videoLoads.values()) load.abort();
+    for (const call of this.kernelCalls.values()) call.abort();
     for (const stream of this.audioStreams.values()) stream.close();
     this.audioStreams.clear();
     for (const input of this.microphones.values()) input.close();
@@ -351,7 +355,7 @@ export class AppProcess {
   private call(id: number, method: string, args: unknown[]): void {
     let result: Promise<unknown>;
     try {
-      result = Promise.resolve(this.dispatch(method, args));
+      result = Promise.resolve(method === "kernel.invoke" ? this.kernelInvoke(id, args) : this.dispatch(method, args));
     } catch (error) {
       result = Promise.reject(error);
     }
@@ -387,7 +391,18 @@ export class AppProcess {
       }
       case "print":
         if (!ctx.print) throw new Error("This Macintosh has no printer");
-        return name === "connect" ? ctx.print.connect() : ctx.print.printPicture(args[0] as never, args[1] as never);
+        if (name === "connect") return ctx.print.connect();
+        if (name === "printPage") {
+          // The worker drew the page; this copies its bits onto the page the printer lays out.
+          const [page, height, options] = args as [{ baseAddr: Uint8Array; rowBytes: number; width: number; height: number }, number, never];
+          const bits = { baseAddr: page.baseAddr, rowBytes: page.rowBytes, bounds: { top: 0, left: 0, bottom: page.height, right: page.width } };
+          return ctx.print.printPage(
+            height,
+            (port) => CopyBits(bits, port.portBits, bits.bounds, bits.bounds, srcCopy, null),
+            options,
+          );
+        }
+        return ctx.print.printPicture(args[0] as never, args[1] as never);
       case "images": {
         const frame = name === "decodeSource"
           ? this.options.images?.decode(args[0] as never, args[1] as never)
@@ -432,6 +447,9 @@ export class AppProcess {
         return;
       case "quit":
         return ctx.quit();
+      case "kernel":
+        if (name === "abort") this.kernelCalls.get(args[0] as number)?.abort();
+        return;
       case "instance":
         if (name === "fail") this.os.instances?.fail(this.options.instanceId, new Error(String(args[0])));
         return;
@@ -441,6 +459,24 @@ export class AppProcess {
         return;
     }
     throw new Error(`Unknown call ${method}`);
+  }
+
+  /** A trap the app invokes, with its output streamed back while it runs. */
+  private async kernelInvoke(id: number, args: unknown[]): Promise<unknown> {
+    const kernel = this.context.kernel;
+    if (!kernel) throw new Error("This app has no kernel session");
+    const [name, input] = args as [string, Record<string, unknown> | undefined];
+    const cancel = new AbortController();
+    this.kernelCalls.set(id, cancel);
+    try {
+      return await kernel.invoke(name, input, {
+        signal: cancel.signal,
+        stdout: (bytes) => this.send({ t: "kernelStream", id, stream: "stdout", bytes }),
+        stderr: (bytes) => this.send({ t: "kernelStream", id, stream: "stderr", bytes }),
+      });
+    } finally {
+      this.kernelCalls.delete(id);
+    }
   }
 
   private windowCall(name: string, args: unknown[]): unknown {

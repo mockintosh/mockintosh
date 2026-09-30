@@ -10,6 +10,8 @@
  */
 import { Errored, For, Loading, createComponent, createRoot, createSignal, flush, untrack, type Accessor, type Setter } from "solid-js";
 import { InitGraf, type BitMap } from "@mockintosh/quickdraw";
+import { createPrintPage, disposePrintPage, drawOnPage } from "@mockintosh/print";
+import { layoutPrintable } from "../../../os/printers/pictureLayout";
 import { newBitMap, rowBytesFor } from "@mockintosh/quickdraw/bits";
 import {
   createUI,
@@ -98,8 +100,11 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
 
   let nextCallId = 1;
   const pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
-  const call = (method: string, args: unknown[]): Promise<unknown> => {
+  /** Output of a running `kernel.invoke`, by call id. */
+  const kernelStreams = new Map<number, { stdout?: (bytes: Uint8Array) => void; stderr?: (bytes: Uint8Array) => void }>();
+  const call = (method: string, args: unknown[], onId?: (id: number) => void): Promise<unknown> => {
     const id = nextCallId++;
+    onId?.(id);
     return new Promise((resolve, reject) => {
       pending.set(id, { resolve, reject });
       post({ t: "call", id, method, args });
@@ -222,10 +227,19 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       connected: printerConnected,
       connect: () => call("print.connect", []) as Promise<void>,
       printPicture: (image, options) => call("print.printPicture", [image, options]) as Promise<void>,
-      layoutPicture: () => {
-        throw new Error("layoutPicture is not available to app processes yet");
+      layoutPicture: (image, options) => layoutPrintable(image, options ?? {}, start.print!.paperWidth),
+      // Drawn here, as the printer would, then printed by the OS as a finished page.
+      async printPage(height, draw, options) {
+        const scale = Math.max(1, Math.floor(options?.scale ?? 1));
+        const page = createPrintPage(Math.floor(start.print!.paperWidth / scale), height);
+        try {
+          drawOnPage(page, (port) => draw(port, { width: page.width, height: page.height }));
+          const bits = { baseAddr: page.bits.baseAddr, rowBytes: page.bits.rowBytes, width: page.width, height: page.height };
+          await call("print.printPage", [bits, height, options]);
+        } finally {
+          disposePrintPage(page);
+        }
       },
-      printPage: () => Promise.reject(new Error("printPage is not available to app processes yet")),
     };
     const storage = Object.fromEntries(
       ["read", "write", "readBytes", "writeBytes", "remove", "list"].map((m) => [m, (...args: unknown[]) => call(`storage.${m}`, args)]),
@@ -278,6 +292,18 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       },
       capabilities,
       print,
+      kernel: start.kernel && {
+        describe: () => start.kernel!,
+        invoke(name, args, options) {
+          let id = 0;
+          const done = call("kernel.invoke", [name, args], (callId) => {
+            id = callId;
+            kernelStreams.set(id, { stdout: options?.stdout, stderr: options?.stderr });
+          });
+          options?.signal?.addEventListener("abort", () => notify("kernel.abort", id), { once: true });
+          return done.finally(() => kernelStreams.delete(id));
+        },
+      },
       download: start.download ? { save: (file) => call("download.save", [file]) as Promise<void> } : undefined,
       audio: start.audio ? audio.service : undefined,
       video: start.video ? video.service : undefined,
@@ -601,6 +627,9 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
         video.event(msg.event);
         flush();
         scheduleFrame();
+        return;
+      case "kernelStream":
+        kernelStreams.get(msg.id)?.[msg.stream]?.(msg.bytes);
         return;
       case "reply": {
         const waiter = pending.get(msg.id);

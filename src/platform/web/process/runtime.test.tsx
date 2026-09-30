@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defineApp } from "@mockintosh/sdk";
-import { getBit } from "@mockintosh/quickdraw/bits";
+import { getBit, makeRect } from "@mockintosh/quickdraw/bits";
+import { PaintRect } from "@mockintosh/quickdraw";
 import type { HostToProcess, ProcessStart, ProcessToHost } from "../../../os/process/protocol";
 import { runProcess, type ProcessScope } from "./runtime";
 
@@ -84,6 +85,60 @@ describe("an app process", () => {
 
     send({ t: "stop" });
     expect(posted.at(-1)).toEqual({ t: "stopped" });
+  });
+
+  it("gives a kernel client its session: describe here, invoke on the OS with output streamed", async () => {
+    let invoked: Promise<unknown> | null = null;
+    const out: number[] = [];
+    const app = defineApp({
+      id: "kernel-client",
+      title: "K",
+      icon: "x",
+      defaultSize: { width: 8, height: 8 },
+      Component: () => null,
+      onOpen(ctx) {
+        expect(ctx.kernel!.describe().map((c) => c.name)).toEqual(["echo"]);
+        invoked = ctx.kernel!.invoke("echo", { text: "hi" }, { stdout: (bytes) => out.push(...bytes) });
+      },
+    });
+    const { scope, posted, send } = fakeScope();
+    runProcess(scope, async () => app);
+    const kernel = [{ name: "echo", description: "", inputSchema: {}, resultSchema: {} }];
+    send({ t: "start", start: { ...START, appId: app.id, source: { kind: "bundled", id: app.id }, kernel } });
+    await settle();
+    const request = posted.find((m) => m.t === "call" && m.method === "kernel.invoke") as Extract<ProcessToHost, { t: "call" }>;
+    expect(request.args).toEqual(["echo", { text: "hi" }]);
+    send({ t: "kernelStream", id: request.id, stream: "stdout", bytes: new Uint8Array([104, 105]) });
+    send({ t: "reply", id: request.id, ok: true, value: "done" });
+    await expect(invoked).resolves.toBe("done");
+    expect(out).toEqual([104, 105]);
+  });
+
+  it("draws a page for printPage here and hands the OS the finished bits", async () => {
+    const app = defineApp({
+      id: "page-printer",
+      title: "P",
+      icon: "x",
+      defaultSize: { width: 8, height: 8 },
+      Component: () => null,
+      onOpen(ctx) {
+        void ctx.print!.printPage(12, (_port, size) => {
+          expect(size).toEqual({ width: 64, height: 12 });
+          PaintRect(makeRect(0, 0, 4, 8));
+        });
+      },
+    });
+    const { scope, posted, send } = fakeScope();
+    runProcess(scope, async () => app);
+    send({ t: "start", start: { ...START, appId: app.id, source: { kind: "bundled", id: app.id }, print: { paperWidth: 64, connected: true } } });
+    await settle();
+    const request = posted.find((m) => m.t === "call" && m.method === "print.printPage") as Extract<ProcessToHost, { t: "call" }>;
+    const [page, height] = request.args as [{ baseAddr: Uint8Array; rowBytes: number; width: number; height: number }, number];
+    expect(height).toBe(12);
+    expect(page.width).toBe(64);
+    const bits = { baseAddr: page.baseAddr, rowBytes: page.rowBytes, bounds: { top: 0, left: 0, bottom: page.height, right: page.width } };
+    expect(getBit(bits, 2, 2)).toBe(1);
+    expect(getBit(bits, 20, 8)).toBe(0);
   });
 
   it("reports an app it can't load", async () => {
