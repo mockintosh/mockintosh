@@ -72,3 +72,70 @@ describe("paintBitMapRgba", () => {
     expect(Array.from(rgba.subarray((1 * 4 + 2) * 4, (1 * 4 + 3) * 4))).toEqual([9, 8, 7, 255]);
   });
 });
+
+describe("paintBitMapRgbaRect matches a pixel-by-pixel expansion", () => {
+  /** The obvious implementation: one bit test and four byte writes per pixel. */
+  function reference(
+    src: ReturnType<typeof newBitMap>,
+    rgba: Uint8ClampedArray,
+    width: number,
+    height: number,
+    left: number,
+    top: number,
+    w: number,
+    h: number,
+    palette: typeof DEFAULT_HOST_PALETTE,
+  ): void {
+    // As the original: the start clamps to 0 and the size counts from there.
+    const x0 = Math.max(0, left);
+    const y0 = Math.max(0, top);
+    for (let y = y0; y < Math.min(height, y0 + h); y++) {
+      for (let x = x0; x < Math.min(width, x0 + w); x++) {
+        const bit = (src.baseAddr[y * src.rowBytes + (x >> 3)]! >> (7 - (x & 7))) & 1;
+        const c = bit ? palette.foreground : palette.background;
+        rgba.set([c.r, c.g, c.b, 255], (y * width + x) * 4);
+      }
+    }
+  }
+
+  /** Deterministic, so a failure reproduces. */
+  function random(seed: number): () => number {
+    let s = seed >>> 0;
+    return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+  }
+
+  it("for random bitmaps, rects and palettes", () => {
+    const next = random(1984);
+    const int = (n: number) => Math.floor(next() * n);
+    for (let trial = 0; trial < 200; trial++) {
+      const width = 1 + int(70);
+      const height = 1 + int(12);
+      const src = newBitMap(width, height);
+      for (let i = 0; i < src.baseAddr.length; i++) src.baseAddr[i] = int(256);
+      const left = int(width + 4) - 2;
+      const top = int(height + 2) - 1;
+      const w = int(width + 10);
+      const h = int(height + 3);
+      const palette = {
+        foreground: { r: int(256), g: int(256), b: int(256) },
+        background: { r: int(256), g: int(256), b: int(256) },
+      };
+      const expected = new Uint8ClampedArray(width * height * 4).fill(7);
+      const actual = new Uint8ClampedArray(width * height * 4).fill(7);
+      reference(src, expected, width, height, left, top, w, h, palette);
+      paintBitMapRgbaRect(src, actual, width, height, left, top, w, h, palette);
+      expect(actual, `trial ${trial}: ${width}×${height} rect ${left},${top} ${w}×${h}`).toEqual(expected);
+    }
+  });
+
+  it("for an RGBA view a Uint32Array can't alias", () => {
+    const src = newBitMap(19, 3);
+    for (let i = 0; i < src.baseAddr.length; i++) src.baseAddr[i] = (i * 37) & 255;
+    const palette = { foreground: { r: 1, g: 2, b: 3 }, background: { r: 250, g: 240, b: 230 } };
+    const expected = new Uint8ClampedArray(19 * 3 * 4);
+    const actual = new Uint8ClampedArray(new ArrayBuffer(19 * 3 * 4 + 1), 1, 19 * 3 * 4);
+    reference(src, expected, 19, 3, 0, 0, 19, 3, palette);
+    paintBitMapRgbaRect(src, actual, 19, 3, 0, 0, 19, 3, palette);
+    expect(Array.from(actual)).toEqual(Array.from(expected));
+  });
+});
