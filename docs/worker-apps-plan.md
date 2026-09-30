@@ -100,7 +100,8 @@ Force Quit is in the Apple menu. ⌘⌥Esc and ⌃⌥Esc also open it; a Mac hos
 The OS needs an app's declaration before the app runs: title, icon, sprites, what it requires, the files it opens, its window's defaults. It no longer loads the app's code to get it (`src/os/appDeclaration.ts`):
 
 - **Bundled apps** are registered from `apps/declarations.generated.json`. `apps/declarations.test.ts` checks it against each app's `defineApp`, and `npm run apps:declarations` rewrites it.
-- **Installed bundles and OS builds** are read by a process that loads the code, reports the declaration and is terminated (`src/os/process/describe.ts`). The page never evaluates a third-party bundle.
+- **Installed bundles** carry their declaration: the publisher's `manifest.json` beside the bundle (written by `mockintoshManifest()` from `@mockintosh/sdk/vite`), or a catalog entry that inlines it. Installing keeps it in the app's `.app` file, and boot reads it from there. A bundle without one is read once, at install, by a process that loads the code, reports the declaration and is terminated (`src/os/process/describe.ts`). The page never evaluates a third-party bundle.
+- **OS builds** are read by a process the first time they're installed, and the declaration is kept in `declaration.json` beside `build.json`. The builder compiles without running project source, so it can't write the declaration itself.
 - **An app that must run on the OS's thread** has its code loaded when it's opened: `?processes=main`, an app a process can't serve, or a platform without processes.
 - **A custom About box** is drawn by the app's process.
 
@@ -109,7 +110,6 @@ The idle page went from 7.0 MB to 4.6 MB, and from 11.9 MB to 8.7 MB with Showre
 ## Next
 
 - **`os.openersFor` and `signIn`** in processes.
-- **Cache installed bundles' declarations** on disk, so boot doesn't start a process per installed bundle to read them.
 - **Bundles split into chunks** that import shared modules themselves.
 - **App-to-app drag and Apple Events**, then the Finder can move too.
 

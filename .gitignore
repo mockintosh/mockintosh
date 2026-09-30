@@ -46,3 +46,4 @@ yarn-error.log*
 
 # Local icon-find previews (not committed)
 /.icon-previews/
+.tmp-template-*

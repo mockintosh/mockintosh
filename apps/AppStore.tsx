@@ -1,7 +1,7 @@
 import { For, Show, createMemo, createSignal, Loading, Errored } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Button } from "@mockintosh/ui";
-import { useApp, type AppManifest, defineApp } from "@mockintosh/sdk";
+import { Button, defineSprite, type Sprite } from "@mockintosh/ui";
+import { useApp, type AppDeclaration, type AppManifest, defineApp } from "@mockintosh/sdk";
 import { useOS } from "../src/os/context";
 import { bundledApps, bundledManifest, type BundledAppListing } from "../src/os/bundledApps";
 import { installedAppIds } from "../src/os/installedApps";
@@ -16,6 +16,11 @@ interface RegistryEntry {
   icon?: string;
   permissions?: string[];
   entry: string | null;
+  /**
+   * The publisher's declaration (their `manifest.json`): the icon's pixels,
+   * so the listing shows the real icon, and what installing needs to know.
+   */
+  declaration?: AppDeclaration;
 }
 
 /** One catalog row, whether it ships in this build or comes from the registry. */
@@ -24,6 +29,8 @@ interface StoreApp {
   title: string;
   description: string;
   icon: string;
+  /** The icon's pixels when the app isn't installed and the OS doesn't have them. */
+  iconSprite?: Sprite;
   author: string;
   version: string;
   /** False when a registry entry has no bundle URL. */
@@ -50,9 +57,9 @@ function rowsOf<T>(items: readonly T[], columns: number): T[][] {
   return out;
 }
 
-function ListingIcon(props: { name: string }): JSX.Element {
+function ListingIcon(props: { name: string; sprite?: Sprite }): JSX.Element {
   const app = useApp();
-  const sprite = createMemo(() => app.getSprite(props.name));
+  const sprite = createMemo(() => props.sprite ?? app.getSprite(props.name));
   return (
     <Show when={sprite()} fallback={<box width={32} height={32} />}>
       {(icon) => <image width={32} height={32} src={icon()} />}
@@ -82,7 +89,7 @@ function AppShelf(props: {
                   semantic={{ name: `app-${item.id}`, role: "button" }}
                   onClick={() => props.onOpen(item)}
                 >
-                  <ListingIcon name={item.icon} />
+                  <ListingIcon name={item.icon} sprite={item.iconSprite} />
                   <text width={CELL_W} font="body" align="center">
                     {item.title}
                   </text>
@@ -107,7 +114,7 @@ function AppPage(props: {
     <box flexDirection="column" gap={8}>
       <Button name="app-back" label="Back" onClick={() => props.onBack()} />
       <box flexDirection="row" gap={8} alignItems="center">
-        <ListingIcon name={props.app.icon} />
+        <ListingIcon name={props.app.icon} sprite={props.app.iconSprite} />
         <box flexDirection="column" gap={4} flexGrow={1} flexShrink={1} minWidth={0}>
           <text font="menu">{props.app.title}</text>
           <text font="body">{`${props.app.author} · ${props.app.version}`}</text>
@@ -188,6 +195,7 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
       sdk: e.sdk,
       permissions: e.permissions ?? [],
       entry: e.entry,
+      declaration: e.declaration,
     });
   }
 
@@ -206,11 +214,14 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
   }
 
   function registryListing(e: RegistryEntry): StoreApp {
+    const icon = e.icon ?? "icon/computer";
+    const encoded = e.declaration?.sprites?.[icon];
     return {
       id: e.id,
       title: e.title,
       description: e.description,
-      icon: e.icon ?? "icon/computer",
+      icon,
+      iconSprite: encoded && defineSprite(encoded.width, encoded.height, encoded.data),
       author: e.author,
       version: e.version,
       installable: !!e.entry,

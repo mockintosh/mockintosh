@@ -4,7 +4,7 @@
 
 Mockintosh is a Macintosh-style simulator running in the browser. The entire UI is rendered on a single `<canvas>` element at **512×342 pixels** into a **1-bit** framebuffer (packed 8 pixels per byte, as on the original Macintosh): black, white, and dither patterns. There is no HTML/CSS inside the simulated screen.
 
-**SDK v3 is Solid 2-only.** Third-party apps are ES modules that `defineApp({ Component })` and optionally export `sprites`. They are loaded at runtime via dynamic `import()`. The OS shares one Solid runtime; externalize `solid-js`, `@mockintosh/ui`, `@mockintosh/sdk`, and (if you draw with it) `@mockintosh/quickdraw` in your Vite build and consume them through the OS import map.
+**SDK v3 is Solid 2-only.** Third-party apps are ES modules that `defineApp({ Component })` and optionally export `sprites`. They are loaded at runtime via dynamic `import()`. On the web each app runs in a process of its own (a Web Worker); the OS reads what it needs to show the app (its icon, window defaults, file types) from the bundle's `manifest.json`, without running it. Externalize `solid-js`, `@mockintosh/ui`, `@mockintosh/sdk`, and (if you draw with it) `@mockintosh/quickdraw` in your Vite build: the OS gives your app the process's own copies of them.
 
 v1 `App.render` / `WindowContext` apps are not loaded. SDK 2 bundles cannot share a realm with Solid 2; the App Store hides catalog entries with `sdk` major &lt; 3, and the installer refuses them with a rebuild prompt.
 
@@ -732,6 +732,7 @@ Allowed keys: `id`, `title`, `entry`, `sdkVersion` (`"3"` only). `entry` is the 
 ```ts
 import { defineConfig } from "vite";
 import solid from "@solidjs/vite-plugin";
+import { mockintoshManifest } from "@mockintosh/sdk/vite";
 
 export default defineConfig({
   plugins: [
@@ -741,6 +742,8 @@ export default defineConfig({
         moduleName: "@mockintosh/ui/renderer",
       },
     }),
+    // dist/manifest.json: mockintosh.json plus what your app declares.
+    mockintoshManifest(),
   ],
   build: {
     lib: { entry: "src/index.tsx", formats: ["es"], fileName: "index" },
@@ -755,7 +758,16 @@ export default defineConfig({
 
 The bundle's default export is the `defineApp({...})` object. Optional named export: `sprites`.
 
-Installing from the App Store writes the manifest to `Applications/<title>` as a `MIME.app` file; opening it launches the app and trashing it uninstalls.
+`mockintoshManifest()` writes `dist/manifest.json` beside `dist/index.js`: your `mockintosh.json`, the bundle's `entry`, and a `declaration`, which is what `defineApp` declares as data (`AppDeclaration` in `@mockintosh/sdk`):
+
+- your icon's pixels and other sprites
+- window defaults
+- `fileTypes`, `requires`, `permissions`
+- the About box's text
+
+Publish `manifest.json` next to the bundle. The OS reads it to put your icon on the desktop, open your documents, and place your window, all without running your code. A catalog entry may inline the same `declaration`, so the App Store shows your icon before anyone installs the app. A bundle without a `manifest.json` still installs: the OS reads the declaration by loading the bundle in a process once, at install.
+
+Installing from the App Store writes the manifest, declaration included, to `Applications/<title>` as a `MIME.app` file; opening it launches the app and trashing it uninstalls.
 
 ## Constraints
 

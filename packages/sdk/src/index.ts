@@ -182,6 +182,8 @@ export type {
   FamilyScalerSettings,
 } from "@mockintosh/ui";
 export type { KernelClient, KernelInvokeOptions, KernelPermission, OperationContract } from "./kernel";
+export { appDeclaration, type AppDeclaration, type EncodedSprite } from "./declaration";
+import type { AppDeclaration } from "./declaration";
 export type { AppCrypto } from "./crypto";
 export type { BrowserService } from "./browser";
 export type { SignInService, SignInDeclaration } from "./signIn";
@@ -873,4 +875,10 @@ export interface AppManifest {
   entry: string;
   /** Same as `SolidApp.requires`; lets the OS skip loading a bundle it cannot run. */
   requires?: Capability[];
+  /**
+   * The app's declaration: its icon, window defaults and the files it opens,
+   * so the OS can draw, list and launch it without running it first.
+   * `mockintoshManifest()` (`@mockintosh/sdk/vite`) fills it in.
+   */
+  declaration?: AppDeclaration;
 }

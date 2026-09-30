@@ -205,6 +205,11 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     capabilities,
     loadModule: platform.loadModule,
     describe: platform.processes && ((appId, source) => describeApp(platform.processes!, appId, source)),
+    fetchJSON: platform.fetch && (async (url) => {
+      const response = await platform.fetch!(url);
+      if (!response.ok) throw new Error(`${url}: ${response.status}`);
+      return response.json();
+    }),
   });
   await migrateBundledDesktopShortcuts(fs, installer);
   await installer.loadInstalled();
