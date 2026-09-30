@@ -7,7 +7,7 @@
 import { createSignal } from "solid-js";
 import type { AppFileSystem } from "@mockintosh/sdk";
 import type { FSDirectory, FSFile, FSNode, NodeRole } from "@mockintosh/fs";
-import type { FsSnapshot } from "./protocol";
+import type { FsSnapshot } from "../../../os/process/protocol";
 
 type Call = (method: string, args: unknown[]) => Promise<unknown>;
 

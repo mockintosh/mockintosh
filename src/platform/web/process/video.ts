@@ -6,7 +6,7 @@
  * `open` (live playback) isn't proxied.
  */
 import type { VideoExcerpt, VideoExcerptClip, VideoPicture, VideoService } from "@mockintosh/sdk";
-import type { VideoEvent } from "./protocol";
+import type { VideoEvent } from "../../../os/process/protocol";
 
 type Call = (method: string, args: unknown[]) => Promise<unknown>;
 

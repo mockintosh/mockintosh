@@ -7,6 +7,7 @@
  */
 import { registerApp } from "./os/apps";
 import { registerBundledApp } from "./os/bundledApps";
+import { APP_MODULES } from "./appModules";
 import Testing from "@/apps/Testing";
 import FileViewer from "@/apps/FileViewer";
 import Preview from "@/apps/Preview";
@@ -120,7 +121,7 @@ registerBundledApp({
   description: "Canvas running in a Web Worker, to compare with the main-thread Canvas. Its Worker menu shows timings.",
   icon: "canvas/icon",
   sprites: canvasSprites,
-  load: () => import("@/apps/CanvasWorker"),
+  load: APP_MODULES["canvas-worker"]!,
 });
 
 registerBundledApp({
@@ -180,7 +181,7 @@ registerBundledApp({
   description: "The Showreel running in a Web Worker, sound included, to compare with the main-thread Showreel. Its Worker menu shows timings.",
   icon: "showreel/icon",
   sprites: showreelSprites,
-  load: () => import("@/apps/ShowreelWorker"),
+  load: APP_MODULES["showreel-worker"]!,
 });
 
 registerBundledApp({
@@ -190,7 +191,7 @@ registerBundledApp({
   icon: "op1/icon",
   sprites: op1Sprites,
   requires: ["audio"],
-  load: () => import("@/apps/OP1Worker"),
+  load: APP_MODULES["op1-worker"]!,
 });
 
 registerBundledApp({

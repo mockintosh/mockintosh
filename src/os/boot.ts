@@ -51,6 +51,9 @@ import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
 import { bundledApps } from "./bundledApps";
 import { createAppContext } from "./appContext";
+import { AppProcess } from "./process/host";
+import { processBlocker } from "./process/eligible";
+import { processWindowComponent } from "./components/ProcessWindow.solid";
 import { buildAppWindow } from "./appWindow";
 import { DialogApp } from "./components/Dialog.solid";
 import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
@@ -274,6 +277,24 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       // The app's `main`: it decides which windows to open, if any.
       const instanceId = instances.create(appId, osServices.projects?.selectedBuild(appId));
       const context = createAppContext(osServices, appId, { fromRect, instanceId });
+      if (platform.processes && processBlocker(app, platform.processes) === null) {
+        // The app's `main` runs in its own process; it holds the launch until `onOpen` has run there.
+        const proc = new AppProcess({
+          port: platform.processes.spawn(appId),
+          appId,
+          instanceId,
+          source: { kind: "bundled", id: appId },
+          props,
+          context,
+          os: osServices,
+          clipboard: platform.clipboard,
+          titleSuffix: app.processStats ? " (Worker)" : "",
+          windowComponent: (process, key) => processWindowComponent(process, key, !!app.processStats),
+        });
+        instances.own(instanceId, () => proc.stop());
+        instances.finishOpen(instanceId);
+        return;
+      }
       const onOpen = app.onOpen ?? defaultOnOpen;
       try { createRoot(dispose => { instances.own(instanceId, dispose); onOpen(context, props); }); instances.finishOpen(instanceId); } catch (error) { instances.stop(instanceId); throw error; }
     },

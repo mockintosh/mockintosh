@@ -28,4 +28,9 @@ export class SpriteRegistry {
   registerAll(sprites: Record<string, Sprite>): void {
     for (const [key, sprite] of Object.entries(sprites)) this.sprites.set(key, sprite);
   }
+
+  /** Every sprite by key: what an app process gets, since it can't ask synchronously. */
+  all(): Record<string, Sprite> {
+    return Object.fromEntries(this.sprites);
+  }
 }

@@ -14,6 +14,8 @@ import { setAppMenus, type OSWindowKind } from "./state";
 export interface SolidApp<P extends Record<string, unknown> = Record<string, unknown>>
   extends Omit<SDKSolidApp<P>, "windowKind"> {
   windowKind?: OSWindowKind;
+  /** Add the Worker menu (frame, input and audio timings) to a process's windows. */
+  processStats?: boolean;
 }
 
 let apps: Map<string, SolidApp<any>> | undefined;

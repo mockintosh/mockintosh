@@ -614,6 +614,13 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
    * when the app cannot work signed out.
    */
   signIn?: SignInDeclaration;
+  /**
+   * Where the app's code runs. `"worker"`: in a process of its own (a Web
+   * Worker on the web), when the platform has processes and can give the app
+   * everything it declares; otherwise on the OS's thread. `"main"`: always on
+   * the OS's thread. Default `"main"` while processes are being brought up.
+   */
+  runtime?: "worker" | "main";
   /** Content size of the main window. */
   defaultSize: { width: number; height: number };
   /** Kind of the main window (default `document`). */

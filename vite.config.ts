@@ -72,6 +72,8 @@ export default defineConfig({
         /packages\/sdk\/.*\.[tj]sx?$/,
         /apps\/.*\.[tj]sx?$/,
         /src\/os\/.*\.[tj]sx?$/,
+        // The app-process runtime: the worker half of an app, which mounts it with JSX.
+        /src\/platform\/web\/process\/.*\.[tj]sx?$/,
       ],
       solid: {
         generate: "universal",
@@ -132,6 +134,7 @@ export default defineConfig({
       "packages/sdk/tests/**/*.test.ts",
       "src/os/**/*.test.ts",
       "src/platform/**/*.test.ts",
+      "src/platform/**/*.test.tsx",
       "src/runtime/**/*.test.ts",
       "src/shared/**/*.test.ts",
       "scripts/**/*.test.ts",

@@ -1,0 +1,127 @@
+/**
+ * The content of an OS window whose app runs in a process: the latest picture
+ * the worker drew for it, with the window's input sent back. The window's
+ * services (`useApp()`) are the OS's own for this window; the process answers
+ * the app's calls with them.
+ */
+import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
+import { CopyBits, srcCopy } from "@mockintosh/quickdraw";
+import { heldModifiers, type CursorSpec, type JSX, type Modifiers } from "@mockintosh/ui";
+import { useApp, type MenubarDefinition } from "@mockintosh/sdk";
+import type { AppProcess } from "../process/host";
+import type { KeyKind, PointerKind, WindowState } from "../process/protocol";
+import type { WindowComponent } from "../state";
+
+export function ProcessWindow(props: { process: AppProcess; windowKey: string; stats?: boolean }): JSX.Element {
+  const app = useApp();
+  const win = app.window;
+  const proc = props.process;
+  const key = props.windowKey;
+  const host = proc.windows.get(key);
+  const [revision, setRevision] = createSignal(0, { ownedWrite: true });
+  const [cursor, setCursor] = createSignal<CursorSpec | undefined>(host?.cursor, { ownedWrite: true });
+  const [menus, setMenus] = createSignal<MenubarDefinition[]>(host?.menus ?? [], { ownedWrite: true });
+  let lastX = 0;
+  let lastY = 0;
+
+  if (host) {
+    host.changed = (what) => {
+      if (what === "frame") setRevision((r) => r + 1);
+      else if (what === "cursor") setCursor(() => host.cursor);
+      else setMenus(host.menus);
+    };
+  }
+
+  const state = (): WindowState => ({ width: win.width(), height: win.height(), active: win.isActive(), kind: win.kind() });
+  proc.attach(key, app, untrack(state));
+  onCleanup(() => proc.detach(key));
+  createEffect(state, (next) => proc.send({ t: "window.state", key, state: next }));
+
+  const statsMenu: MenubarDefinition = {
+    label: "Worker",
+    items: [
+      {
+        label: "Performance…",
+        onClick: () => {
+          const s = proc.stats;
+          const lines = [
+            `${s.frames} frames, ${((host?.frameBytes ?? 0) / 1024).toFixed(1)} KB each`,
+            `Worker draw: ${s.worker.summary()}`,
+            `Main blit: ${s.blit.summary()}`,
+            `Input to screen: ${s.latency.summary()}`,
+            ...(s.audio.count > 0 ? [`Audio chunk: ${s.audio.summary()}`] : []),
+          ];
+          void app.os.showDialog({ message: lines.join("\n"), variant: "note" });
+        },
+      },
+      {
+        label: "Reset Counters",
+        onClick: () => {
+          const s = proc.stats;
+          s.worker.reset();
+          s.blit.reset();
+          s.latency.reset();
+          s.audio.reset();
+          s.frames = 0;
+        },
+      },
+    ],
+  };
+  createEffect(menus, (list) => app.setMenus(props.stats ? [...list, statsMenu] : list));
+
+  function pointer(kind: PointerKind, x: number, y: number, deltaY?: number): void {
+    lastX = x;
+    lastY = y;
+    proc.input({ t: "pointer", key, kind, x, y, deltaY, modifiers: heldModifiers() });
+  }
+
+  function keyEvent(kind: KeyKind, value: string, modifiers: Modifiers): void {
+    proc.input({ t: "key", key, kind, value, modifiers });
+  }
+
+  return (
+    <raster
+      width={win.width()}
+      height={win.height()}
+      revision={revision()}
+      cursor={cursor()}
+      tabIndex={0}
+      autoFocus
+      semantic={{ name: "app-process", role: "canvas" }}
+      onPaint={(surface) => {
+        const start = app.scheduler.now();
+        const frame = host?.frame;
+        const { x, y, width, height } = surface.rect;
+        // Clearing goes pixel by pixel; only a picture that doesn't cover the raster (mid-resize) needs it.
+        if (!frame || frame.bounds.right < width || frame.bounds.bottom < height) surface.fill(0);
+        if (frame) {
+          const w = frame.bounds.right;
+          const h = frame.bounds.bottom;
+          CopyBits(frame, surface.port.portBits, frame.bounds, { top: y, left: x, bottom: y + h, right: x + w }, srcCopy, null);
+        }
+        const end = app.scheduler.now();
+        proc.stats.blit.add(end - start);
+        const painted = host?.frameSeq ?? 0;
+        for (const [seq, at] of proc.sentAt) {
+          if (seq > painted) continue;
+          proc.stats.latency.add(end - at);
+          proc.sentAt.delete(seq);
+        }
+      }}
+      onMouseDown={(x, y) => pointer("mousedown", x, y)}
+      onDoubleClick={(x, y) => pointer("dblclick", x, y)}
+      onMouseMove={(x, y) => pointer("mousemove", x, y)}
+      onDrag={(x, y) => pointer("mousemove", x, y)}
+      onMouseUp={(x, y) => pointer("mouseup", x, y)}
+      onScroll={(deltaY) => pointer("scroll", lastX, lastY, deltaY)}
+      onKeyDown={(k, mods) => keyEvent("keydown", k, mods)}
+      onKeyUp={(k, mods) => keyEvent("keyup", k, mods)}
+      onKeyPress={(ch) => keyEvent("keypress", ch, heldModifiers())}
+    />
+  );
+}
+
+/** The component the OS window for process window `key` mounts. */
+export function processWindowComponent(process: AppProcess, key: string, stats: boolean): WindowComponent {
+  return () => <ProcessWindow process={process} windowKey={key} stats={stats} />;
+}

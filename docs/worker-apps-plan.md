@@ -59,7 +59,7 @@ Synchronous reads have local answers in the worker:
 | --- | --- | --- |
 | Protocol | `src/os/process/protocol.ts` | DOM-free |
 | Host: process, calls, window content | `src/os/process/host.ts`, `WorkerWindowContent` in `components/` | DOM-free; talks to a `ProcessPort` |
-| Worker runtime | `src/os/process/runtime/` | DOM-free except `postMessage`; runs the app |
+| Worker runtime | `src/platform/web/process/` | Uses worker globals (`performance`, `crypto`, `MessagePort`), so it lives with the web host |
 | Starting a worker | `Platform.processes?.spawn()` | Web: `new Worker(...)`. Headless: absent |
 | Which module is an app | `src/appModules.ts` | One table the main thread and the worker share |
 
@@ -80,8 +80,8 @@ Each step is a commit (or a few) on `worker-apps`, with tests and a browser chec
 | # | Step | Status |
 | --- | --- | --- |
 | 0 | Prototypes, speaker port, faster RGBA expansion | done |
-| 1 | Move the prototype into the OS: protocol, host, runtime, `Platform.processes`, shared module table; `SolidApp.runtime` | |
-| 2 | One worker per instance: `onOpen` and `openWindow` in the worker, several windows per process, About box | |
+| 1 | Move the prototype into the OS: protocol, host, runtime, `Platform.processes`, shared module table; `SolidApp.runtime` | done |
+| 2 | One worker per instance: `onOpen` and `openWindow` in the worker, several windows per process, About box | done, except custom About boxes (those apps stay on the OS's thread) |
 | 3 | Input latency: render on input, not on the next tick after it; present the frame the same main-thread frame | |
 | 4 | Measure memory and start-up per worker; decide whether small apps stay on the main thread | |
 | 5 | Close the gaps, app by app: installed fonts, full sprite registry, microphone port, `printPage`, live video frames, `busy`, `keepAlive`, errors into the instance journal | |
