@@ -123,7 +123,11 @@ function wrapParagraph(
   paragraphStart: number,
   out: TextLine[]
 ): void {
-  const words = paragraph.split(" ");
+  // Leading spaces are indentation (code, a typed indent): they stay on the
+  // first word rather than splitting into empty words that vanish.
+  const indent = /^ */.exec(paragraph)![0];
+  const words = paragraph.slice(indent.length).split(" ");
+  words[0] = indent + words[0];
   let line = "";
   let lineStart = paragraphStart;
   let search = 0;

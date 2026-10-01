@@ -34,6 +34,12 @@ function monoFont(): DeckerFont {
 describe("layoutText — line breaking", () => {
   const font = monoFont();
 
+  it("keeps a wrapped paragraph's leading spaces", () => {
+    const b = layoutText(font, "if (x) {\n    run();\n}", 600);
+    expect(b.lines.map((l) => l.text)).toEqual(["if (x) {", "    run();", "}"]);
+    expect(b.lines[1]!.start).toBe(9);
+  });
+
   it("single line without maxWidth", () => {
     const b = layoutText(font, "hello");
     expect(b.lines.map((l) => l.text)).toEqual(["hello"]);
