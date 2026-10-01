@@ -4,6 +4,9 @@ import { hnText, parseHackerNewsUrl } from "./hackernews";
 import { scaled } from "../icons";
 import { microDesktopError, mockintoshSite } from "./mockintosh";
 import { avatarSrc, githubPage, githubUrl, resolveRelative } from "./github/page";
+import { adapterFor } from "./index";
+import { docsPage, docsSite } from "./docs/site";
+import { DOCS_PAGES } from "./docs/pages";
 import type { RepoInfo } from "./github/api";
 
 const REPO: RepoInfo = {
@@ -152,5 +155,42 @@ describe("mockintosh.com", () => {
       background: 1,
     });
     expect([microDesktopError.width, microDesktopError.height]).toEqual([51, 34]);
+  });
+});
+
+describe("docs.mockintosh.com", () => {
+  const url = (href: string) => parseUrl(href)!;
+  const context = { fetch: async () => { throw new Error("no network"); }, settings: { githubToken: "" } };
+  const columnsOf = (page: { nodes: readonly LayoutNode[] }) => {
+    const node = page.nodes[0];
+    if (node?.type !== "columns") throw new Error("no columns");
+    return node.columns;
+  };
+
+  it("is drawn without the network, contents beside the page", async () => {
+    expect(adapterFor(url("https://docs.mockintosh.com/"))?.id).toBe("docs");
+    expect(adapterFor(url("https://mockintosh.com/"))?.id).toBe("mockintosh");
+    const page = await docsSite.load(url("https://docs.mockintosh.com/fonts/"), context);
+    if (page.kind !== "document") throw new Error("not a document");
+    expect(page.url).toBe("https://docs.mockintosh.com/fonts");
+    expect(page.title).toBe("Fonts — Mockintosh Docs");
+    const [contents, body] = columnsOf(page);
+    expect(contents!.nodes).toContainEqual({ type: "paragraph", align: "left", segments: [{ kind: "bold", text: "Fonts" }] });
+    expect(body!.nodes[0]).toMatchObject({ type: "heading", level: 1, text: "Fonts" });
+  });
+
+  it("links every page to real pages, on the docs site", () => {
+    const paths = new Set(DOCS_PAGES.map((page) => page.path));
+    for (const page of DOCS_PAGES) {
+      for (const href of links(columnsOf(docsPage(page.path))[1]!.nodes)) {
+        const target = parseUrl(href)!;
+        if (target.hostname !== "docs.mockintosh.com") continue;
+        expect(paths, `${page.path} → ${href}`).toContain(target.path || "/");
+      }
+    }
+  });
+
+  it("says so for a page that doesn't exist", () => {
+    expect(docsPage("/nope").title).toBe("Page not found — Mockintosh Docs");
   });
 });

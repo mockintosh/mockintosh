@@ -9,6 +9,7 @@ export interface Bookmark {
 
 /** Sites that read well without CSS or JavaScript. The start page and the Bookmarks menu list them. */
 export const BOOKMARKS: readonly Bookmark[] = [
+  { title: "Mockintosh Docs", url: "https://docs.mockintosh.com/", note: "how this Macintosh works" },
   { title: "Hacker News", url: "https://news.ycombinator.com/", note: "front page and comment threads" },
   { title: "Wikipedia", url: "https://en.wikipedia.org/", note: "the free encyclopedia" },
   { title: "GitHub", url: "https://github.com/", note: "people, repositories, issues" },
