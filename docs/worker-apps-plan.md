@@ -109,7 +109,7 @@ The idle page went from 7.0 MB to 4.6 MB, and from 11.9 MB to 8.7 MB with Showre
 
 ## Next
 
-- **`os.openersFor` and `signIn`** in processes.
+- **`signIn`** in processes. Only Spotify signs in, and it stays on the OS's thread for its player.
 - **Bundles split into chunks** that import shared modules themselves.
 - **App-to-app drag and Apple Events**, then the Finder can move too.
 
@@ -150,6 +150,7 @@ Everything an app declares or reaches for through `useApp()` works in a process,
 - **Printing:** `printPicture`. `printPage` is drawn in the process and printed as a finished page. `layoutPicture` is computed in the process.
 - **Images:** `images.decode` and `<image>` sources.
 - **Video and camera:** excerpts, filled in as they decode. Live video and camera pictures are sent at the OS's frame, on request.
+- **Openers:** `os.openersFor`, from a table of each app's file types that the OS resends when an app is installed or removed (`src/os/openerTable.ts`). Preview builds its "Open in" items from it.
 - **Fonts:** installed fonts, replayed from a journal of registrations. `fonts.install`, `fontRaster`.
 - **Sprites:** the whole registry.
 - **Kernel sessions:** traps with streamed output and cancellation.
@@ -163,11 +164,11 @@ Everything an app declares or reaches for through `useApp()` works in a process,
 | Spotify | `browser.loadScript` hands the app a live object from a script in the page (the Web Playback SDK); it can't cross into a worker |
 | fx | Its agent runtime is a WebAssembly core the web host loads for the page |
 
-`os.openersFor` and `signIn` aren't served yet; no app that can move needs them.
+`signIn` isn't served yet, so an app that signs in stays on the OS's thread.
 
 ## Risks
 
-- **Hidden synchronous APIs.** An app that calls something synchronous the worker can't answer locally (a new `fs` read, `openersFor`) breaks in the worker. The worker runtime throws a clear error naming the call. The app runs on the main thread (`runtime: "main"`) until the call is served.
+- **Hidden synchronous APIs.** An app that calls something synchronous the worker can't answer locally (a new `fs` read) breaks in the worker. The worker runtime throws a clear error naming the call. The app runs on the main thread (`runtime: "main"`) until the call is served.
 - **Memory.** Each worker carries a runtime and the fonts. If step 4 shows this matters, small apps stay on the main thread, or fonts load lazily.
 - **Latency.** Drawing apps (MacPaint, Canvas) feel an extra frame. Step 3 must remove it, or those apps stay on the main thread.
 - **Debugging.** A worker's errors and console output appear under a separate context in DevTools. Errors go to the instance journal (`instances.note`) as they do today.

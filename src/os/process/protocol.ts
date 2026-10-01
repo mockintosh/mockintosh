@@ -10,6 +10,7 @@
  */
 import type { CursorSpec, FontRegistration, Modifiers, Sprite } from "@mockintosh/ui";
 import type { FSNode } from "@mockintosh/fs";
+import type { OpenerEntry } from "../openerTable";
 import type { OperationContract, VideoExcerpt, VideoPicture, WindowKind, WindowSpec } from "@mockintosh/sdk";
 
 export type PointerKind = "mousemove" | "mousedown" | "mouseup" | "dblclick" | "scroll";
@@ -80,6 +81,8 @@ export interface ProcessStart {
   images: boolean;
   /** The traps the instance's kernel session grants (`AppContext.kernel.describe()`); absent = no kernel. */
   kernel?: OperationContract[];
+  /** The file types each registered app opens, for `os.openersFor`. */
+  openers: OpenerEntry[];
   /** Sprites the app may ask for by name that aren't its own (OS icons, other apps'). */
   sprites: Record<string, Sprite>;
   /** Send `frameStats` for the Worker menu. */
@@ -126,6 +129,8 @@ export type HostToProcess =
   | { t: "menu"; action: number; value?: string }
   | { t: "fs"; snapshot: FsSnapshot }
   | { t: "printer"; connected: boolean }
+  /** An app was installed or removed: the file types each app opens now. */
+  | { t: "openers"; openers: OpenerEntry[] }
   /** A font was installed or removed on the OS's side. */
   | { t: "font"; registration: FontRegistration }
   | { t: "audio"; streamId: number; state: "suspended" | "running" | "closed"; latencyFrames: number }

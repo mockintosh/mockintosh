@@ -27,6 +27,8 @@ import type { FSNode } from "@mockintosh/fs";
 import type { OSServices } from "../context";
 import type { WindowComponent } from "../state";
 import { CopyBits, srcCopy } from "@mockintosh/quickdraw";
+import { getAllApps, onAppsChanged } from "../apps";
+import { openerTable } from "../openerTable";
 import { unwireMenus } from "./menus";
 import { readSharedFrame, sharedFrameCount } from "./sharedFrame";
 import type { AppSource, FsSnapshot, HostToProcess, ProcessPort, ProcessToHost, WindowState, WireMenu, WireWindowSpec } from "./protocol";
@@ -159,6 +161,8 @@ export class AppProcess {
   private stopped = false;
   private removeBeforeFrame: () => void = () => {};
   private removeFontListener: () => void = () => {};
+  private removeAppsListener: () => void = () => {};
+  private openers = openerTable(getAllApps());
 
   constructor(private readonly options: AppProcessOptions) {
     this.spawnedAt = options.os.scheduler.now();
@@ -192,6 +196,7 @@ export class AppProcess {
         monitor: typeof this.context.audio?.monitor === "function",
         images: this.context.images !== undefined,
         kernel: this.context.kernel ? JSON.parse(JSON.stringify(this.context.kernel.describe())) : undefined,
+        openers: this.openers,
         sprites: this.os.sprites.all(),
         stats: !!options.stats,
         fonts: [...fontRegistrations()],
@@ -200,6 +205,12 @@ export class AppProcess {
       },
     });
     this.removeFontListener = onFontRegistration((registration) => this.send({ t: "font", registration }));
+    this.removeAppsListener = onAppsChanged(() => {
+      // Loading an app's code re-registers it with the same claims; send only a change.
+      const sent = JSON.stringify(this.openers);
+      this.openers = openerTable(getAllApps());
+      if (JSON.stringify(this.openers) !== sent) this.send({ t: "openers", openers: this.openers });
+    });
     this.removeBeforeFrame = this.os.beforeFrame(() => this.takeSharedFrames());
     createRoot((dispose) => {
       this.disposeRoot = dispose;
@@ -265,6 +276,7 @@ export class AppProcess {
     this.disposeRoot();
     this.removeBeforeFrame();
     this.removeFontListener();
+    this.removeAppsListener();
     if (this.latencyTimer) clearInterval(this.latencyTimer);
     for (const load of this.videoLoads.values()) load.abort();
     for (const call of this.kernelCalls.values()) call.abort();

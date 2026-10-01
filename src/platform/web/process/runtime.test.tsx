@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WindowHeader, defineApp } from "@mockintosh/sdk";
+import { WindowHeader, defineApp, type AppContext } from "@mockintosh/sdk";
 import { getBit, makeRect } from "@mockintosh/quickdraw/bits";
 import { PaintRect } from "@mockintosh/quickdraw";
 import type { HostToProcess, ProcessStart, ProcessToHost } from "../../../os/process/protocol";
@@ -26,6 +26,7 @@ const START: Omit<ProcessStart, "appId" | "source"> = {
   audio: false,
   download: false,
   video: false,
+  openers: [],
   sprites: {},
   stats: false,
   fonts: [],
@@ -120,6 +121,37 @@ describe("an app process", () => {
     const bits = { baseAddr: new Uint8Array(frame.buffer), rowBytes: frame.rowBytes, bounds: { top: 0, left: 0, bottom: frame.height, right: frame.width } };
     expect(getBit(bits, 4, 2)).toBe(1);
     expect(getBit(bits, 4, 10)).toBe(0);
+  });
+
+  it("answers openersFor from the OS's table, defaults first, and follows the OS's changes", async () => {
+    let os: AppContext["os"] | null = null;
+    const app = defineApp({
+      id: "viewer",
+      title: "Viewer",
+      icon: "x",
+      defaultSize: { width: 8, height: 8 },
+      Component: () => null,
+      onOpen(ctx) {
+        os = ctx.os;
+      },
+    });
+    const { scope, send } = fakeScope();
+    runProcess(scope, async () => app);
+    const openers = [
+      { appId: "paint", title: "Paint", claims: [{ type: "image/png", rank: "alternate" as const }] },
+      { appId: "viewer", title: "Viewer", claims: [{ type: "image/png", rank: "default" as const }] },
+    ];
+    send({ t: "start", start: { ...START, openers, appId: app.id, source: { kind: "bundled", id: app.id } } });
+    await settle();
+
+    expect(os!.openersFor("image/png")).toEqual([
+      { appId: "viewer", title: "Viewer", rank: "default" },
+      { appId: "paint", title: "Paint", rank: "alternate" },
+    ]);
+    expect(os!.openersFor("text/plain")).toEqual([]);
+
+    send({ t: "openers", openers: openers.slice(1) });
+    expect(os!.openersFor("image/png").map((o) => o.appId)).toEqual(["viewer"]);
   });
 
   it("gives a kernel client its session: describe here, invoke on the OS with output streamed", async () => {

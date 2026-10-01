@@ -8,8 +8,9 @@ import {diskPath} from "./projects/paths";
  * OS itself.
  */
 import { MIME, type FSNode, type FileSystem } from "@mockintosh/fs";
-import type { Capability, FileDocumentProps, FileOpener, FileTypeClaim, FileTypeRank, SolidApp } from "@mockintosh/sdk";
+import type { Capability, FileDocumentProps, FileOpener } from "@mockintosh/sdk";
 import { getAllApps, getApp, getUnavailableApp } from "./apps";
+import { openerTable, openersAmong } from "./openerTable";
 
 export type OpenAction =
   | { kind: "folder"; directoryId: string; title: string }
@@ -20,24 +21,9 @@ export type OpenAction =
   /** The app is installed but needs capabilities this platform lacks. */
   | { kind: "none"; reason: "unavailable"; appId: string; title: string; missing: Capability[] };
 
-function rankFor(fileTypes: SolidApp["fileTypes"], type: string): FileTypeRank | undefined {
-  for (const entry of fileTypes ?? []) {
-    const claim: FileTypeClaim = typeof entry === "string" ? { type: entry, rank: "default" } : entry;
-    if (claim.type === type) return claim.rank;
-  }
-  return undefined;
-}
-
 /** Every app that opens `type`: defaults first, then alternates, each in registration order. */
 export function openersForFileType(type: string): FileOpener[] {
-  const defaults: FileOpener[] = [];
-  const alternates: FileOpener[] = [];
-  for (const app of getAllApps()) {
-    const rank = rankFor(app.fileTypes, type);
-    if (!rank) continue;
-    (rank === "default" ? defaults : alternates).push({ appId: app.id, title: app.title, rank });
-  }
-  return [...defaults, ...alternates];
+  return openersAmong(openerTable(getAllApps()), type);
 }
 
 /** The app a double-click opens `type` in, if any. */

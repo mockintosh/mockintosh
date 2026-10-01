@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppContext, WindowSpec } from "@mockintosh/sdk";
 import type { OSServices } from "../context";
+import { registerApp, unregisterApp } from "../apps";
 import { AppProcess } from "./host";
 import type { HostToProcess, ProcessPort, ProcessToHost } from "./protocol";
 
@@ -113,6 +114,34 @@ describe("AppProcess", () => {
     const messages = posted.map((p) => p.message);
     expect(messages).toContainEqual({ t: "kernelStream", id: 9, stream: "stdout", bytes: new Uint8Array([104, 105]) });
     expect(messages.at(-1)).toEqual({ t: "reply", id: 9, ok: true, value: { ok: true } });
+  });
+
+  it("sends the worker which app opens which file type, again when an app is installed", () => {
+    const { proc, posted } = setup();
+    const start = posted[0]!.message;
+    expect(start.t === "start" && start.start.openers.some((o) => o.appId === "pictures")).toBe(false);
+
+    registerApp({ id: "pictures", title: "Pictures", icon: "x", defaultSize: { width: 8, height: 8 }, fileTypes: ["image/png"], Component: () => null });
+    try {
+      const update = posted.at(-1)!.message;
+      expect(update.t === "openers" && update.openers.find((o) => o.appId === "pictures")).toEqual({
+        appId: "pictures",
+        title: "Pictures",
+        claims: [{ type: "image/png", rank: "default" }],
+      });
+      const sent = posted.length;
+      registerApp({ id: "pictures", title: "Pictures", icon: "x", defaultSize: { width: 8, height: 8 }, fileTypes: ["image/png"], Component: () => null });
+      expect(posted).toHaveLength(sent);
+    } finally {
+      unregisterApp("pictures");
+    }
+    expect(posted.at(-1)!.message.t === "openers").toBe(true);
+
+    proc.stop();
+    const stopped = posted.length;
+    registerApp({ id: "pictures", title: "Pictures", icon: "x", defaultSize: { width: 8, height: 8 }, fileTypes: ["image/png"], Component: () => null });
+    unregisterApp("pictures");
+    expect(posted).toHaveLength(stopped);
   });
 
   it("asks the worker to stop, then terminates it when it has", () => {

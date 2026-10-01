@@ -29,9 +29,22 @@ function appMap(): Map<string, SolidApp<any>> {
   return (apps ??= new Map());
 }
 
+const changeListeners = new Set<() => void>();
+
+/** Call `listener` after an app is registered or removed; returns a function that stops it. */
+export function onAppsChanged(listener: () => void): () => void {
+  changeListeners.add(listener);
+  return () => void changeListeners.delete(listener);
+}
+
+function appsChanged(): void {
+  for (const listener of [...changeListeners]) listener();
+}
+
 export function registerApp<P extends Record<string, unknown>>(app: SolidApp<P>): void {
   appMap().set(app.id, app);
   setAppMenus(app.id, app.menus ?? []);
+  appsChanged();
 }
 
 export function getApp(id: string): SolidApp<any> | undefined {
@@ -62,4 +75,8 @@ export function getUnavailableApp(id: string): UnavailableApp | undefined {
   return unavailableMap().get(id);
 }
 
-export function unregisterApp(id: string): void { appMap().delete(id); setAppMenus(id, []); }
+export function unregisterApp(id: string): void {
+  appMap().delete(id);
+  setAppMenus(id, []);
+  appsChanged();
+}

@@ -13,6 +13,7 @@ import { InitGraf, type BitMap } from "@mockintosh/quickdraw";
 import { createPrintPage, disposePrintPage, drawOnPage } from "@mockintosh/print";
 import { layoutPrintable } from "../../../os/printers/pictureLayout";
 import { declarationOf } from "../../../os/appDeclaration";
+import { openersAmong, type OpenerEntry } from "../../../os/openerTable";
 import type { SolidApp as OSSolidApp } from "../../../os/apps";
 import { newBitMap, rowBytesFor } from "@mockintosh/quickdraw/bits";
 import {
@@ -146,6 +147,8 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
   const opening = new Map<string, Pick<ProcessWindow, "Component" | "props" | "onGoAway">>();
   const cleanups: (() => void)[] = [];
   let [printerConnected, setPrinterConnected]: [Accessor<boolean>, Setter<boolean>] = createSignal(false, { ownedWrite: true });
+  /** Which app opens which file type, as the OS last sent it. */
+  let openers: OpenerEntry[] = [];
   let lastSeq = 0;
   let frameMs = 0;
   let frameScheduled = false;
@@ -237,6 +240,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
   function createContext(start: ProcessStart): AppContext {
     const capabilities = new Set(start.capabilities as Capability[]);
     [printerConnected, setPrinterConnected] = createSignal(start.print?.connected ?? false, { ownedWrite: true });
+    openers = start.openers;
     const print: PrintService | undefined = start.print && {
       paperWidth: start.print.paperWidth,
       connected: printerConnected,
@@ -279,9 +283,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       os: {
         openApp: (id, props) => notify("os.openApp", id, props),
         openWindow: (id, props) => notify("os.openApp", id, props),
-        openersFor: () => {
-          throw new Error("os.openersFor is not available to app processes yet");
-        },
+        openersFor: (type) => openersAmong(openers, type),
         closeWindow: (id) => (windows.has(id) || opening.has(id) ? notify("window.close", id) : notify("os.closeWindow", id)),
         showDialog: (options) => call("os.showDialog", [options]) as Promise<string | null>,
         // This thread is the app's own; blocking it blocks nobody else.
@@ -645,6 +647,9 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       case "printer":
         setPrinterConnected(msg.connected);
         flush();
+        return;
+      case "openers":
+        openers = msg.openers;
         return;
       case "font":
         replayFontRegistration(msg.registration);
