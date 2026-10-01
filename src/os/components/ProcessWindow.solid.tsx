@@ -4,10 +4,10 @@
  * services (`useApp()`) are the OS's own for this window; the process answers
  * the app's calls with them.
  */
-import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
+import { createEffect, createSignal, onCleanup, untrack, useContext } from "solid-js";
 import { CopyBits, srcCopy } from "@mockintosh/quickdraw";
 import { heldModifiers, type CursorSpec, type JSX, type Modifiers } from "@mockintosh/ui";
-import { useApp, type MenubarDefinition } from "@mockintosh/sdk";
+import { WindowSlotsContext, useApp, type MenubarDefinition } from "@mockintosh/sdk";
 import { useWindow } from "../windowContext";
 import type { AppProcess } from "../process/host";
 import type { KeyKind, PointerKind, WindowState } from "../process/protocol";
@@ -24,6 +24,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
   const [revision, setRevision] = createSignal(0, { ownedWrite: true });
   const [cursor, setCursor] = createSignal<CursorSpec | undefined>(host?.cursor, { ownedWrite: true });
   const [menus, setMenus] = createSignal<MenubarDefinition[]>(host?.menus ?? [], { ownedWrite: true });
+  const [bands, setBands] = createSignal(host?.bands ?? { header: 0, footer: 0 }, { ownedWrite: true });
+  const slots = useContext(WindowSlotsContext);
   let lastX = 0;
   let lastY = 0;
 
@@ -31,6 +33,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
     host.changed = (what) => {
       if (what === "frame") setRevision((r) => r + 1);
       else if (what === "cursor") setCursor(() => host.cursor);
+      else if (what === "bands") setBands(host.bands);
       else setMenus(host.menus);
     };
   }
@@ -91,29 +94,39 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
     proc.input({ t: "key", key, kind, value, modifiers });
   }
 
-  const picture = (
+  /**
+   * Rows `[top, top + height)` of the worker's picture, with input sent back
+   * at those rows. The picture is header, body and footer, top to bottom.
+   */
+  const slice = (
+    top: () => number,
+    height: () => number,
+    options: { body?: boolean; position?: "absolute"; y?: () => number } = {},
+  ) => (
     <raster
-      position={osWin.scrollable ? "absolute" : undefined}
+      position={options.position}
       left={0}
-      top={viewTop()}
+      top={options.y?.()}
       width={win.width()}
-      height={win.height()}
+      height={height()}
       revision={revision()}
       cursor={cursor()}
-      tabIndex={0}
-      autoFocus
-      semantic={{ name: "app-process", role: "canvas" }}
+      tabIndex={options.body ? 0 : undefined}
+      autoFocus={options.body}
+      semantic={options.body ? { name: "app-process", role: "canvas" } : undefined}
       onPaint={(surface) => {
         const start = app.scheduler.now();
         const frame = host?.frame;
-        const { x, y, width, height } = surface.rect;
+        const { x, y, width, height: rows } = surface.rect;
+        const from = top();
         // Clearing goes pixel by pixel; only a picture that doesn't cover the raster (mid-resize) needs it.
-        if (!frame || frame.bounds.right < width || frame.bounds.bottom < height) surface.fill(0);
+        if (!frame || frame.bounds.right < width || frame.bounds.bottom < from + rows) surface.fill(0);
         if (frame) {
           const w = frame.bounds.right;
-          const h = frame.bounds.bottom;
-          CopyBits(frame, surface.port.portBits, frame.bounds, { top: y, left: x, bottom: y + h, right: x + w }, srcCopy, null);
+          const h = Math.max(0, Math.min(rows, frame.bounds.bottom - from));
+          CopyBits(frame, surface.port.portBits, { top: from, left: 0, bottom: from + h, right: w }, { top: y, left: x, bottom: y + h, right: x + w }, srcCopy, null);
         }
+        if (!options.body) return;
         const end = app.scheduler.now();
         proc.stats.blit.add(end - start);
         const painted = host?.frameSeq ?? 0;
@@ -123,18 +136,39 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
           proc.sentAt.delete(seq);
         }
       }}
-      onMouseDown={(x, y) => pointer("mousedown", x, y)}
-      onDoubleClick={(x, y) => pointer("dblclick", x, y)}
-      onMouseMove={(x, y) => pointer("mousemove", x, y)}
-      onDrag={(x, y) => pointer("mousemove", x, y)}
-      onMouseUp={(x, y) => pointer("mouseup", x, y)}
+      onMouseDown={(x, y) => pointer("mousedown", x, top() + y)}
+      onDoubleClick={(x, y) => pointer("dblclick", x, top() + y)}
+      onMouseMove={(x, y) => pointer("mousemove", x, top() + y)}
+      onDrag={(x, y) => pointer("mousemove", x, top() + y)}
+      onMouseUp={(x, y) => pointer("mouseup", x, top() + y)}
       // A scrollable window's wheel scrolls the window, as the OS does for any app.
-      onScroll={osWin.scrollable ? undefined : (deltaY) => pointer("scroll", lastX, lastY, deltaY)}
-      onKeyDown={(k, mods) => keyEvent("keydown", k, mods)}
-      onKeyUp={(k, mods) => keyEvent("keyup", k, mods)}
-      onKeyPress={(ch) => keyEvent("keypress", ch, heldModifiers())}
+      onScroll={options.body && osWin.scrollable ? undefined : (deltaY) => pointer("scroll", lastX, lastY, deltaY)}
+      onKeyDown={options.body ? (k, mods) => keyEvent("keydown", k, mods) : undefined}
+      onKeyUp={options.body ? (k, mods) => keyEvent("keyup", k, mods) : undefined}
+      onKeyPress={options.body ? (ch) => keyEvent("keypress", ch, heldModifiers()) : undefined}
     />
   );
+
+  // The app's WindowHeader / WindowFooter become the window's own bands, so
+  // the OS's scrollbar starts below the header, as for any app.
+  createEffect(
+    () => bands(),
+    ({ header, footer }) => {
+      slots?.setHeader(header > 0 ? () => slice(() => 0, () => bands().header) : null, header);
+      slots?.setFooter(footer > 0 ? () => slice(() => bands().header + win.height(), () => bands().footer) : null, footer);
+    },
+  );
+
+  onCleanup(() => {
+    slots?.setHeader(null, 0);
+    slots?.setFooter(null, 0);
+  });
+
+  const picture = slice(() => bands().header, () => win.height(), {
+    body: true,
+    position: osWin.scrollable ? "absolute" : undefined,
+    y: viewTop,
+  });
   // The OS scrolls the window's body over the whole document; the picture rides at the visible part.
   return osWin.scrollable ? (
     <box width={win.width()} height={Math.max(osWin.contentHeight, win.height())} position="relative">

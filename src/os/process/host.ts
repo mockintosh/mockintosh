@@ -87,10 +87,12 @@ export interface ProcessWindowHost {
   frameBytes: number;
   cursor?: CursorSpec;
   menus: MenubarDefinition[];
+  /** Rows at the top and bottom of the picture that are the window's header and footer bands. */
+  bands: { header: number; footer: number };
   /** Shared memory the worker publishes this window's pictures in, and the last count seen. */
   shared?: { buffer: SharedArrayBuffer; count: number };
   /** Tells the window's content a new frame, cursor or menus arrived. */
-  changed?(what: "frame" | "cursor" | "menus"): void;
+  changed?(what: "frame" | "cursor" | "menus" | "bands"): void;
 }
 
 /** A call result that moves objects (a `MessagePort`) to the worker instead of copying them. */
@@ -564,7 +566,7 @@ export class AppProcess {
     if (name === "open") {
       const wire = args[1] as WireWindowSpec;
       const { hasGoAway, ...spec } = wire;
-      const w: ProcessWindowHost = { key, queued: [], frame: null, frameSeq: 0, frameBytes: 0, menus: [] };
+      const w: ProcessWindowHost = { key, queued: [], frame: null, frameSeq: 0, frameBytes: 0, menus: [], bands: { header: 0, footer: 0 } };
       this.windows.set(key, w);
       const full: WindowSpec = {
         ...spec,
@@ -582,6 +584,13 @@ export class AppProcess {
     if (name === "setTitle") return this.withWindow(key, (s) => s.window.setTitle(`${args[1] as string}${this.options.titleSuffix ?? ""}`));
     if (name === "scrollTo") return this.withWindow(key, (s) => s.window.scrollTo(args[1] as number));
     if (name === "setContentSize") return this.withWindow(key, (s) => s.window.setContentSize(args[1] as number, args[2] as number));
+    if (name === "setBands") {
+      const w = this.windows.get(key);
+      if (!w) return;
+      w.bands = { header: args[1] as number, footer: args[2] as number };
+      w.changed?.("bands");
+      return;
+    }
     if (name === "setFullScreen") return this.withWindow(key, (s) => s.window.setFullScreen(args[1] as boolean));
     throw new Error(`Unknown call window.${name}`);
   }

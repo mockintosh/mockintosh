@@ -73,7 +73,11 @@ interface ProcessWindow {
   kind: Accessor<WindowKind>;
   scrollY: Accessor<number>;
   setState(state: WindowState): void;
-  /** `WindowHeader` / `WindowFooter` content, drawn here in the window's band: the OS never sees it. */
+  /**
+   * `WindowHeader` / `WindowFooter` content, drawn here above and below the
+   * body. The OS is told their heights (`window.setBands`) and shows those
+   * rows of the picture in its own bands, so its scrollbar spans only the body.
+   */
   header: Accessor<{ view: WindowBandView; height: number }>;
   footer: Accessor<{ view: WindowBandView; height: number }>;
   slots: WindowSlots;
@@ -181,7 +185,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     if (sendStats) post({ t: "frameStats", frameMs, audioMs: audioMs.splice(0) });
     for (const w of attached()) {
       const width = untrack(w.width);
-      const height = untrack(w.height);
+      const height = Math.min(bandHeight, untrack(() => pictureHeight(w)));
       const rowBytes = rowBytesFor(width);
       const picture = new Uint8Array(rowBytes * height);
       const top = w.slot * bandHeight;
@@ -200,6 +204,11 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
         [picture.buffer],
       );
     }
+  }
+
+  /** Header, body and footer: the rows of a window's picture. */
+  function pictureHeight(w: Pick<ProcessWindow, "header" | "height" | "footer">): number {
+    return w.header().height + w.height() + w.footer().height;
   }
 
   function setWindowMenus(w: Pick<ProcessWindow, "key" | "menuIds">, menus: MenubarDefinition[]): void {
@@ -364,13 +373,13 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     const [scrollY, setScrollY] = createSignal(state.scrollY, { ownedWrite: true });
     const [header, setHeader] = createSignal<{ view: WindowBandView; height: number }>({ view: null, height: 0 }, { ownedWrite: true });
     const [footer, setFooter] = createSignal<{ view: WindowBandView; height: number }>({ view: null, height: 0 }, { ownedWrite: true });
-    /** The app's document height, before the bands are added for the OS's scrollbar. */
     let documentSize: { width: number; height: number } | null = null;
     const reportContentSize = () => {
-      if (!documentSize) return;
-      const bands = untrack(header).height + untrack(footer).height;
-      notify("window.setContentSize", key, documentSize.width, documentSize.height + bands);
+      if (documentSize) notify("window.setContentSize", key, documentSize.width, documentSize.height);
     };
+    // Kept here too: a signal write isn't readable until Solid flushes.
+    const bandHeights = { header: 0, footer: 0 };
+    const reportBands = () => notify("window.setBands", key, bandHeights.header, bandHeights.footer);
     const w: ProcessWindow = {
       key,
       slot: freeSlot(),
@@ -391,12 +400,14 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       footer,
       slots: {
         setHeader(view, bandHeight) {
-          setHeader({ view, height: view ? bandHeight : 0 });
-          reportContentSize();
+          bandHeights.header = view ? bandHeight : 0;
+          setHeader({ view, height: bandHeights.header });
+          reportBands();
         },
         setFooter(view, bandHeight) {
-          setFooter({ view, height: view ? bandHeight : 0 });
-          reportContentSize();
+          bandHeights.footer = view ? bandHeight : 0;
+          setFooter({ view, height: bandHeights.footer });
+          reportBands();
         },
       },
       services: null as unknown as AppServices,
@@ -513,7 +524,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
               left={0}
               top={w.slot * bandHeight}
               width={w.width()}
-              height={w.height()}
+              height={pictureHeight(w)}
               overflow="hidden"
               focusScope
               ref={(node: CanvasNode) => {
@@ -522,21 +533,16 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
             >
               <AppServicesContext value={w.services}>
                 <WindowSlotsContext value={w.slots}>
-                  <box width={w.width()} height={w.height()} flexDirection="column">
+                  <box width={w.width()} height={pictureHeight(w)} flexDirection="column">
                     {w.header().view && <box width={w.width()} height={w.header().height}>{w.header().view!()}</box>}
-                    <box
-                      width={w.width()}
-                      height={Math.max(0, w.height() - w.header().height - w.footer().height)}
-                      overflow="hidden"
-                      position="relative"
-                    >
+                    <box width={w.width()} height={w.height()} overflow="hidden" position="relative">
                       {/* A scrollable window's document, moved to what the OS has scrolled to. */}
                       <box
                         position="absolute"
                         left={0}
                         top={-w.scrollY()}
                         width={w.width()}
-                        height={Math.max(0, w.height() - w.header().height - w.footer().height)}
+                        height={w.height()}
                       >
                         <Errored
                           fallback={(error) => {

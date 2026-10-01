@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defineApp } from "@mockintosh/sdk";
+import { WindowHeader, defineApp } from "@mockintosh/sdk";
 import { getBit, makeRect } from "@mockintosh/quickdraw/bits";
 import { PaintRect } from "@mockintosh/quickdraw";
 import type { HostToProcess, ProcessStart, ProcessToHost } from "../../../os/process/protocol";
@@ -87,6 +87,39 @@ describe("an app process", () => {
 
     send({ t: "stop" });
     expect(posted.at(-1)).toEqual({ t: "stopped" });
+  });
+
+  it("tells the OS its header's height and draws it above a body of the OS's height", async () => {
+    const app = defineApp({
+      id: "with-header",
+      title: "H",
+      icon: "x",
+      defaultSize: { width: 16, height: 20 },
+      Component: () => (
+        <>
+          <WindowHeader height={6}>
+            <box width={16} height={6} background={1} />
+          </WindowHeader>
+          <box width={16} height={20} background={0} />
+        </>
+      ),
+    });
+    const { scope, posted, send } = fakeScope();
+    runProcess(scope, async () => app);
+    send({ t: "start", start: { ...START, appId: app.id, source: { kind: "bundled", id: app.id } } });
+    await settle();
+    const open = posted.find((m) => m.t === "call" && m.method === "window.open") as Extract<ProcessToHost, { t: "call" }>;
+    const key = open.args[0] as string;
+    send({ t: "window.attach", key, state: { width: 16, height: 20, active: true, kind: "document", scrollY: 0 } });
+    await settle();
+
+    const bands = posted.filter((m) => m.t === "call" && m.method === "window.setBands") as Extract<ProcessToHost, { t: "call" }>[];
+    expect(bands.at(-1)!.args).toEqual([key, 6, 0]);
+    const frame = (posted.filter((m) => m.t === "frame") as Extract<ProcessToHost, { t: "frame" }>[]).at(-1)!;
+    expect(frame.height).toBe(26);
+    const bits = { baseAddr: new Uint8Array(frame.buffer), rowBytes: frame.rowBytes, bounds: { top: 0, left: 0, bottom: frame.height, right: frame.width } };
+    expect(getBit(bits, 4, 2)).toBe(1);
+    expect(getBit(bits, 4, 10)).toBe(0);
   });
 
   it("gives a kernel client its session: describe here, invoke on the OS with output streamed", async () => {
