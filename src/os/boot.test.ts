@@ -15,6 +15,7 @@ import { MIME } from "@mockintosh/fs";
 import { getActiveAppId, getActiveWindowId, getWindows, isMenubarHidden, setWindowFullScreen } from "./state";
 import { TITLE_BAR_H, titleBarOuterHeight } from "./windowGeometry";
 import { buildTinyTtf } from "../platform/fontRaster/tinyTtf";
+import type { HostToProcess, ProcessPort, ProcessToHost } from "./process/protocol";
 import Foundry from "@/apps/Foundry";
 
 const WIDTH = 512;
@@ -158,6 +159,45 @@ describe("bootOS on the headless platform", () => {
     // Loaded once: opening again doesn't load it again.
     os.services.openApp("declared-test");
     expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends keys typed after a click in a process window's header or footer band to its worker", async () => {
+    const toWorker: HostToProcess[] = [];
+    const port: ProcessPort = {
+      postMessage: (message) => void toWorker.push(message as HostToProcess),
+      onmessage: null,
+      onerror: null,
+      terminate: () => {},
+    };
+    const fromWorker = (data: ProcessToHost) => port.onmessage!({ data });
+    platform.processes = { defaultRuntime: "main", canRun: () => true, spawn: () => port };
+    registerApp({ id: "band-test", title: "Bands", icon: "x", runtime: "worker", defaultSize: { width: 120, height: 60 }, Component: () => null });
+    os.services.openApp("band-test");
+    fromWorker({ t: "call", id: 0, method: "window.open", args: ["window-1", { title: "Bands", position: { x: 40, y: 60 }, size: { width: 120, height: 60 }, hasGoAway: false }] });
+    fromWorker({ t: "started" });
+    platform.tick();
+    expect(toWorker.some((m) => m.t === "window.attach" && m.key === "window-1")).toBe(true);
+    fromWorker({ t: "call", id: 0, method: "window.setBands", args: ["window-1", 20, 16] });
+    await os.render();
+
+    const win = getWindows().find((w) => w.appId === "band-test")!;
+    expect(win.headerHeight).toBe(20);
+    const headerY = win.y + titleBarOuterHeight(win) + 8;
+    const footerY = win.y + titleBarOuterHeight(win) + 20 + win.height + 8;
+    const none = { shift: false, ctrl: false, alt: false, meta: false };
+    const keysSent = () => toWorker.filter((m) => m.t === "key" && m.key === "window-1" && m.kind !== "keyup").map((m) => m.t === "key" && `${m.kind}:${m.value}`);
+    for (const [y, row] of [[headerY, 8], [footerY, 20 + win.height + 8]]) {
+      toWorker.length = 0;
+      platform.click(win.x + 20, y);
+      platform.tick();
+      // The click lands on the band's rows of the worker's picture.
+      expect(toWorker.find((m) => m.t === "pointer" && m.kind === "mousedown")).toMatchObject({ y: row });
+      for (const key of ["a", "Enter", "Escape", "ArrowLeft"]) {
+        platform.key({ type: "down", key, modifiers: none });
+        platform.key({ type: "up", key, modifiers: none });
+      }
+      expect(keysSent()).toEqual(["keydown:a", "keypress:a", "keydown:Enter", "keydown:Escape", "keydown:ArrowLeft"]);
+    }
   });
 
   it("eraseDisk formats the volume and restores the first-boot desktop", async () => {

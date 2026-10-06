@@ -97,6 +97,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
   /**
    * Rows `[top, top + height)` of the worker's picture, with input sent back
    * at those rows. The picture is header, body and footer, top to bottom.
+   * Every slice takes focus when clicked, so typing reaches a field the app
+   * keeps in its header or footer; the worker decides which control gets it.
    */
   const slice = (
     top: () => number,
@@ -111,7 +113,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       height={height()}
       revision={revision()}
       cursor={cursor()}
-      tabIndex={options.body ? 0 : undefined}
+      tabIndex={0}
       autoFocus={options.body}
       semantic={options.body ? { name: "app-process", role: "canvas" } : undefined}
       onPaint={(surface) => {
@@ -143,9 +145,9 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       onMouseUp={(x, y) => pointer("mouseup", x, top() + y)}
       // A scrollable window's wheel scrolls the window, as the OS does for any app.
       onScroll={options.body && osWin.scrollable ? undefined : (deltaY) => pointer("scroll", lastX, lastY, deltaY)}
-      onKeyDown={options.body ? (k, mods) => keyEvent("keydown", k, mods) : undefined}
-      onKeyUp={options.body ? (k, mods) => keyEvent("keyup", k, mods) : undefined}
-      onKeyPress={options.body ? (ch) => keyEvent("keypress", ch, heldModifiers()) : undefined}
+      onKeyDown={(k, mods) => keyEvent("keydown", k, mods)}
+      onKeyUp={(k, mods) => keyEvent("keyup", k, mods)}
+      onKeyPress={(ch) => keyEvent("keypress", ch, heldModifiers())}
     />
   );
 
