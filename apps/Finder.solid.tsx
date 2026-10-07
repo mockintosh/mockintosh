@@ -700,7 +700,7 @@ export function FinderDesktop(): JSX.Element {
   // window without its own menus, is active). Folder windows override per window.
   // Signals used here must already be declared: compute runs synchronously.
   createEffect(
-    () => buildFinderMenus(os.fs, undefined, {os, selected: setToArray(selectedSet())}, () => layout.cleanUp()),
+    () => buildFinderMenus(os.fs, undefined, {os, selected: setToArray(selectedSet()), select: (id) => setSelectedSet(new Set([id]))}, () => layout.cleanUp()),
     (menus) => setAppMenus(FINDER_APP_ID, menus),
   );
   const { marquee, handlers: marqueeHandlers } = createMarquee({
@@ -1002,7 +1002,7 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
 
   // This window's menus reflect its folder (Clean Up) and the trash state.
   createEffect(
-    () => buildFinderMenus(os.fs, dirId(), {os, selected: setToArray(selectedSet())}, layout.cleanUp),
+    () => buildFinderMenus(os.fs, dirId(), {os, selected: setToArray(selectedSet()), select: (id) => setSelectedSet(new Set([id]))}, layout.cleanUp),
     (menus) => windowApi.setMenus(menus),
   );
 
@@ -1444,7 +1444,7 @@ function GrayOutlineImage(props: { outline: GrayOutline; left: number; top: numb
 export function buildFinderMenus(
   fs: FileSystem,
   activeDirId?: string,
-  selection?: {os: ReturnType<typeof useOS>; selected: readonly string[]},
+  selection?: {os: ReturnType<typeof useOS>; selected: readonly string[]; select: (id: string) => void},
   cleanUp?: () => void,
 ): MenubarDefinition[] {
   const selected = selection?.selected.length === 1 ? fs.node(selection.selected[0]) : undefined;
@@ -1466,7 +1466,7 @@ export function buildFinderMenus(
           disabled: !newFolderParent,
           onClick: () => {
             const parent = activeDirId ?? getDesktopFolderId(fs);
-            if (parent) fs.mkdir(parent, fs.availableName(parent, "untitled folder"));
+            if (parent) selection?.select(fs.mkdir(parent, fs.availableName(parent, "Empty folder")).id);
           },
         },
         { type: "separator" },

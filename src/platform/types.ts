@@ -226,7 +226,7 @@ export interface HostResolution {
   height?: number;
 }
 
-/** `"auto"` is the largest whole zoom that fits, or native pixels in viewport mode. */
+/** `"auto"` is the largest whole zoom that fits, or native pixels in viewport mode — at most 3. */
 export type HostScale = number | "auto";
 
 export interface HostDisplayState {

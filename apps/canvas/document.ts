@@ -15,7 +15,6 @@ export type CanvasFont = string;
 export type CanvasAlign = "left" | "center" | "right";
 export type FillStyle = "none" | "white" | "black" | "gray25" | "gray50" | "gray75";
 export type ShapeKind = "rect" | "roundrect" | "oval" | "line";
-export type ElementType = ShapeKind | "text";
 
 export interface Frame {
   x: number;

@@ -7,7 +7,7 @@ describe("fixed app compiler", () => {
     const result = await compile(request(counterSource("counter_test", "Counter")));
     expect(result.diagnostics).toEqual([]);
     expect(result.code).toContain("@mockintosh/ui/renderer");
-    expect(result.code).toContain("solid-js");
+    expect(result.code).toContain('from "@mockintosh/sdk"');
     expect(result.map).toContain("index.tsx");
   });
   it("reports type errors and rejects host dependencies", async () => {

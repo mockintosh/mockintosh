@@ -5,7 +5,7 @@ import { cssCursor, DEFAULT_CURSOR, type CursorCSSTable } from "../cursor";
 import { copyBitMapBytes, moveSoftwareCursor } from "../cursorComposite";
 import { cursorFromFaceCached, type CursorFaceTable } from "../cursorFace";
 import { resolveMacCursorFace } from "../cursors/mac";
-import type { UIServices } from "../services";
+import type { UIScheduler, UIServices } from "../services";
 import { createDoubleClickTracker } from "../pointer";
 import { createUI, type UIInstance } from "../ui";
 import type { UITheme } from "../theme";
@@ -100,6 +100,14 @@ function resolveSize(options: CanvasUIOptions): CanvasSize {
   throw new Error("mountCanvasUI requires size or width and height");
 }
 
+const browserScheduler: UIScheduler = {
+  now: () => performance.now(),
+  requestFrame(callback) {
+    const id = requestAnimationFrame(callback);
+    return () => cancelAnimationFrame(id);
+  },
+};
+
 function webClipboard(): UIServices["clipboard"] {
   return typeof navigator !== "undefined" && navigator.clipboard
     ? {
@@ -155,6 +163,7 @@ export function mountCanvasUI(options: CanvasUIOptions): CanvasUIHost {
     services: {
       images: createWebImageService(),
       clipboard: webClipboard(),
+      scheduler: browserScheduler,
       ...options.services,
     },
   });

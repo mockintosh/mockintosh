@@ -56,7 +56,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
   // Capture focus manager at init time — useContext only works during
   // component initialization, not inside event callbacks.
   const focusManager = getFocusManager();
-  const { clipboard } = useUIServices();
+  const { clipboard, scheduler } = useUIServices();
   const radius = useRadius("md");
 
   const initialLen = props.value.length;
@@ -110,6 +110,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
   /** Double-click selects a word (a password is one word, like the Mac); triple, everything. */
   const clicks = createTextClicks({
     word: (text, index) => (props.password ? { start: 0, end: text.length } : wordRangeAt(text, index)),
+    now: scheduler && (() => scheduler.now()),
   });
 
   function handleFocus(): void {

@@ -1,4 +1,5 @@
-import { RemoteError, fetchRemote } from "./_web/fetch";
+import { fromOwnSite } from "./_guard.js";
+import { RemoteError, fetchRemote } from "./_web/fetch.js";
 
 const MAX_IMAGE_BYTES = 8_000_000;
 /** Formats the Macintosh's image decoder reads. SVG and friends are refused. */
@@ -10,6 +11,7 @@ const DECODABLE = new Set(["image/png", "image/jpeg", "image/jpg", "image/gif", 
  */
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== "GET") return new Response("Method not allowed", { status: 405 });
+  if (!fromOwnSite(req)) return new Response("Forbidden", { status: 403 });
   const target = new URL(req.url).searchParams.get("url");
   if (!target) return new Response("Missing url", { status: 400 });
   try {

@@ -6,8 +6,6 @@
 import type { FontRasterMode } from "@mockintosh/sdk";
 import { bakeOutlineStrike, clampBakeSize, familyKey, type FontStrikeDraft } from "@mockintosh/ui";
 
-export const DEFAULT_THRESHOLD = 96;
-
 export const clampStrikeSize = clampBakeSize;
 export const sanitizeFamily = familyKey;
 

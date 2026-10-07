@@ -53,10 +53,11 @@ function kernelClientFor(os: OSServices, appId: string, instanceId?: string): Ke
     : permissions.filter((p) => p.startsWith("kernel:")).map((p) => p.slice("kernel:".length));
   let session = instanceId ? os.instances?.kernelCaller(instanceId) : undefined;
   if (!session) {
-    session = os.kernel.createSession({ operations });
+    const created = os.kernel.createSession({ operations });
+    session = created;
     if (instanceId && os.instances) {
-      os.instances.setKernelCaller(instanceId, session);
-      os.instances.own(instanceId, () => os.kernel?.revokeSession(session.id));
+      os.instances.setKernelCaller(instanceId, created);
+      os.instances.own(instanceId, () => os.kernel?.revokeSession(created.id));
     }
   }
   const kernel = os.kernel;

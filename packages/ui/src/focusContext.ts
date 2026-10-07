@@ -48,32 +48,6 @@ export function useFocus(nodeRef: { current: CanvasNode | null }): UseFocusResul
   };
 }
 
-/**
- * A simpler form: pass nodeId and look up in the focused signal.
- * Used internally when a component has direct access to its root node id.
- */
-export function useFocusById(nodeId: () => number | undefined): UseFocusResult {
-  const ctx = useContext(FocusContext);
-  if (!ctx) throw new Error("useFocus() must be called inside a UI tree");
-
-  const { manager } = ctx;
-  const focused = manager.getFocusedSignal();
-
-  return {
-    isFocused: () => {
-      const id = nodeId();
-      const f = focused();
-      return id !== undefined && f !== null && f.id === id;
-    },
-    focus: () => {
-      // Components call manager.focus(node) directly
-    },
-    blur: () => {
-      manager.blur();
-    },
-  };
-}
-
 export function getFocusManager(): FocusManager {
   const ctx = useContext(FocusContext);
   if (!ctx) throw new Error("getFocusManager() must be called inside a UI tree");

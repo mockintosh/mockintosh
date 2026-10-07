@@ -1,4 +1,4 @@
-import { UPSTREAM_ICON_URL } from "./types";
+import { UPSTREAM_CATALOG_ROOT } from "./types";
 
 const FETCH_HEADERS = {
   "User-Agent": "mockintosh-icon-archive",
@@ -7,7 +7,7 @@ const FETCH_HEADERS = {
 
 export function iconRawUrl(file: string): string {
   const encoded = file.split("/").map(encodeURIComponent).join("/");
-  return `${UPSTREAM_ICON_URL}/${encoded}`;
+  return `${UPSTREAM_CATALOG_ROOT}/${encoded}`;
 }
 
 export async function fetchIconPng(file: string): Promise<Buffer> {

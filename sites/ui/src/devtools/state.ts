@@ -47,22 +47,9 @@ export function setDevtoolsHost(next: CanvasUIHost): void {
   host = next;
 }
 
-export function devtoolsHost(): CanvasUIHost | null {
-  return host;
-}
-
 export function isDevtoolsChrome(node: CanvasNode): boolean {
   const semantic = node.props.semantic as SemanticMetadata | undefined;
   return semantic?.role === DEVTOOLS_ROLE || (semantic?.name?.startsWith("devtools") ?? false);
-}
-
-export function isDevtoolsNode(node: CanvasNode | null): boolean {
-  let current = node;
-  while (current) {
-    if (isDevtoolsChrome(current)) return true;
-    current = current.parent;
-  }
-  return false;
 }
 
 function isDevtoolsDebug(node: DebugNode): boolean {

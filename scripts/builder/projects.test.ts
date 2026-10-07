@@ -55,7 +55,7 @@ describe("complete M2 project workflow", () => {
       await os.kernel.invoke(caller, "click", {name: "counter-increment"});
       expect((await os.kernel.invoke(caller, "inspect", {}) as {name?: string; text: string}[]).find(n => n.name === "counter-value")?.text).toBe("5");
     }, storage);
-  }, 30000);
+  }, 90_000);
 
   it("preserves the working build on compile errors, stale sources, and initialization failure", async () => {
     await withHeadless(async os => {
@@ -86,7 +86,7 @@ describe("complete M2 project workflow", () => {
       expect(os.services.projects!.selectedBuild("recovery")).toBe(good.id);
       await invoke("click", {name: "counter-increment"});
     });
-  }, 30000);
+  }, 90_000);
 
   it("orders artifacts by creation time, then by trailing sequence, never lexically", () => {
     const id = (seq: number) => `build-os-abc-1-${seq}`;
@@ -127,5 +127,5 @@ describe("complete M2 project workflow", () => {
       await invoke("app_install", {path});
       expect(os.services.projects!.selectedBuild("latest_app")).toBe(job.id);
     });
-  }, 30000);
+  }, 90_000);
 });

@@ -6,7 +6,7 @@ export interface ScreenCanvas {
   zoom(): number;
   /** Switch fixed resolution or viewport mode. Logical-size changes fire `onLogicalSize`. */
   setLayout(size: ScreenCanvasSize): void;
-  toScreen(e: MouseEvent): { x: number; y: number };
+  toScreen(e: Pick<MouseEvent, "clientX" | "clientY">): { x: number; y: number };
   /**
    * The browser discarded the on-screen bitmap (pinch, DPR, tab restore)
    * without changing the logical size. Re-blit the framebuffer.
@@ -213,7 +213,7 @@ export function createScreenCanvas(
     },
     zoom: () => zoom,
     setLayout: applyLayout,
-    toScreen(e: MouseEvent) {
+    toScreen(e: Pick<MouseEvent, "clientX" | "clientY">) {
       const rect = canvas.getBoundingClientRect();
       return {
         x: Math.floor((e.clientX - rect.left) / zoom),

@@ -1,9 +1,10 @@
 import { parseHTML } from "linkedom";
 import { Defuddle } from "defuddle/node";
 import type { LayoutNode } from "@mockintosh/markdown";
-import { RemoteError, decodeText, fetchRemote } from "./_web/fetch";
-import { simplifyHtml } from "./_web/simplify";
-import { applySiteRule, siteRuleFor } from "./_web/sites";
+import { fromOwnSite } from "./_guard.js";
+import { RemoteError, decodeText, fetchRemote } from "./_web/fetch.js";
+import { simplifyHtml } from "./_web/simplify.js";
+import { applySiteRule, siteRuleFor } from "./_web/sites.js";
 
 const MAX_PAGE_BYTES = 5_000_000;
 const PAGE_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5";
@@ -80,6 +81,7 @@ function parseRequest(body: unknown): BrowseRequest | null {
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (!fromOwnSite(req)) return json({ error: "Forbidden" }, 403);
 
   let request: BrowseRequest | null;
   try {

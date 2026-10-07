@@ -22,6 +22,7 @@ import type {
   PointerButton,
 } from "../types";
 import { browserBuilder } from "./builder";
+import { webFetch } from "./fetch";
 import { CanvasPresenter, createScreenCanvas, wheelDeltaY, wheelIsPinchZoom } from "@mockintosh/ui/web";
 import { bitMapHeight, bitMapWidth } from "@mockintosh/quickdraw/bits";
 import { createHostDisplay, initialScreenSize } from "./hostDisplay";
@@ -138,11 +139,11 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     hostCapabilities,
     crypto: createWebCrypto(),
     browser: createWebBrowserService(),
-    signInRelay: createWebSignInRelay(fetch, location.origin),
+    signInRelay: createWebSignInRelay(webFetch, location.origin),
     clipboard,
     printerLinks: createWebPrinterLinks(),
     download: createWebDownloadService(),
-    fetch,
+    fetch: webFetch,
     images: createWebImageService(),
     video: createWebVideoService(),
     camera: createWebCameraService(),

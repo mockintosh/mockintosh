@@ -503,12 +503,6 @@ export function Keyboard(props: KeyboardProps): JSX.Element {
   );
 }
 
-/** Where a key sits in the keyboard raster, for tests that click it. */
-export function keyCenter(width: number, height: number, key: number): { x: number; y: number } {
-  const r = keyRect(keyGeometry(width, height), key);
-  return { x: r.x + Math.floor(r.w / 2), y: r.y + Math.floor(r.h / 2) };
-}
-
 // ---------------------------------------------------------------------------
 // Speaker
 // ---------------------------------------------------------------------------

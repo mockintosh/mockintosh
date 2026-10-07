@@ -563,10 +563,9 @@ function fakeClock(): PointerScheduler & { advance(ms: number): void } {
     now: () => now,
     requestFrame(cb) {
       frames.push(cb);
-      return frames.length;
-    },
-    cancelFrame() {
-      frames.length = 0;
+      return () => {
+        frames.length = 0;
+      };
     },
     advance(ms) {
       now += ms;

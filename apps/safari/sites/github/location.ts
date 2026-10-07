@@ -112,10 +112,6 @@ export function formatGithubLocation(location: GithubLocation): string {
   return `${root}/${location.kind}/${suffix}`;
 }
 
-export function repoOf(location: GithubLocation): { owner: string; repo: string } | null {
-  return "owner" in location ? { owner: location.owner, repo: location.repo } : null;
-}
-
 /** Only addresses on github.com come back from signing in. */
 function returnTo(raw: string | null): string {
   if (!raw) return "";

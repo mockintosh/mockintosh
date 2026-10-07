@@ -225,12 +225,6 @@ export function mainToAlt(p: Paint): void {
   }
 }
 
-/** `BorrowAlt`: stash the screen image in alt. */
-export function borrowAlt(p: Paint): void {
-  p.altBits.baseAddr.set(p.scrn.baseAddr);
-  p.scrnFlag = true;
-}
-
 export function invertCaret(p: Paint): void {
   const savePort = GetPort();
   SetPort(p.myWind.port);

@@ -25,12 +25,16 @@ const HEIGHT = 342;
 const MENUBAR_HEIGHT = 20;
 
 /** `<box width="100%" height="100%" background={ink} />` without JSX (this file is `.ts`). */
-function fillBox(ink: 0 | 1): JSX.Element {
+function fillNode(ink: 0 | 1) {
   const node = createElement("box");
   setProp(node, "width", "100%");
   setProp(node, "height", "100%");
   setProp(node, "background", ink);
-  return node as unknown as JSX.Element;
+  return node;
+}
+
+function fillBox(ink: 0 | 1): JSX.Element {
+  return fillNode(ink) as unknown as JSX.Element;
 }
 
 function blackBox(): JSX.Element {
@@ -390,6 +394,34 @@ describe("bootOS on the headless platform", () => {
     expect(changed).toBeGreaterThan(100); // a new folder icon + label appeared
   });
 
+  it("names new folders \"Empty folder\", \"Empty folder 2\", … and selects each one", async () => {
+    const meta = { shift: false, ctrl: false, alt: false, meta: true };
+    const fs = os.services.fs;
+    const desktop = fs.locate("desktop")!;
+    const newFolder = async (name: string) => {
+      platform.key({ type: "down", key: "n", modifiers: meta });
+      platform.key({ type: "up", key: "n", modifiers: meta });
+      platform.tick();
+      await Promise.resolve(); // the Finder saves a new icon's slot just after drawing it
+      platform.tick();
+      const folder = fs.children(desktop.id).find((n) => n.name === name);
+      expect(folder).toBeTruthy();
+      return desktopCellPos(fs, folder!.id)!;
+    };
+    // A selected label is white on black; an unselected one black on white.
+    const labelInk = (pos: { labelX: number; labelY: number }) =>
+      inkCoverage(platform.lastFrame()!, pos.labelX - 8, pos.labelY - 3, 16, 6);
+
+    const first = await newFolder("Empty folder");
+    expect(labelInk(first)).toBeGreaterThan(0.5);
+
+    const second = await newFolder("Empty folder 2");
+    expect(labelInk(second)).toBeGreaterThan(0.5);
+    expect(labelInk(first)).toBeLessThan(0.5);
+
+    await newFolder("Empty folder 3");
+  });
+
   // Regression: a z-order bump used to remount every IconCell mid-press, so the
   // pointer dispatcher never delivered the click that starts inline rename.
   it("renames a desktop icon after a second click on its selected label", async () => {
@@ -402,7 +434,7 @@ describe("bootOS on the headless platform", () => {
     const fs = os.services.fs;
     const desktop = fs.locate("desktop");
     expect(desktop).toBeTruthy();
-    const folder = fs.children(desktop!.id).find((n) => n.name === "untitled folder");
+    const folder = fs.children(desktop!.id).find((n) => n.name === "Empty folder");
     expect(folder).toBeTruthy();
 
     await Promise.resolve(); // the Finder saves a new icon's slot just after drawing it
@@ -462,6 +494,7 @@ describe("bootOS on the headless platform", () => {
     for (const hold of [false, true]) {
       let ready!: () => void;
       const loaded = new Promise<void>((resolve) => { ready = resolve; });
+      let opening!: Promise<unknown>;
       const id = `test-late-${hold}`;
       registerApp({
         id,
@@ -471,13 +504,13 @@ describe("bootOS on the headless platform", () => {
         Component: () => whiteBox(),
         onOpen(app, props) {
           const release = hold ? app.keepAlive?.() : undefined;
-          void loaded.then(() => app.openWindow({ props })).finally(() => release?.());
+          opening = loaded.then(() => app.openWindow({ props })).finally(() => release?.());
         },
       });
       os.services.openApp(id, { fileId: "f1", title: "Doc" });
       ready();
-      await loaded;
-      await Promise.resolve();
+      if (hold) await opening;
+      else await expect(opening).rejects.toThrow("App instance ended");
       platform.tick();
       expect(getWindows().some((w) => w.appId === id)).toBe(hold);
     }
@@ -698,11 +731,11 @@ describe("bootOS on the headless platform", () => {
       icon: "icon/computer",
       defaultSize: { width: 120, height: 80 },
       Component: () => {
-        const node = blackBox();
+        const node = fillNode(1);
         setProp(node, "onMouseDown", () => {
           presses++;
         });
-        return node;
+        return node as unknown as JSX.Element;
       },
     });
 

@@ -139,6 +139,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // CI runners are a few times slower than a dev machine; the scene renders take seconds here.
+    testTimeout: process.env.CI ? 30_000 : 5_000,
     server: {
       deps: {
         inline: ["solid-js", "@solidjs/universal", "@solidjs/signals"],

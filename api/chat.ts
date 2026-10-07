@@ -1,6 +1,6 @@
-import { MOCKINTOSH_CHAT_CONTEXT } from "./mockintosh-context";
-import { envLimit, guardRequest, type RouteLimits } from "./_guard";
-import { TYPE_DIGEST, SOURCE_MAP } from "./mockintosh-context.generated";
+import { MOCKINTOSH_CHAT_CONTEXT } from "./mockintosh-context.js";
+import { envLimit, guardRequest, type RouteLimits } from "./_guard.js";
+import { TYPE_DIGEST, SOURCE_MAP } from "./mockintosh-context.generated.js";
 import {
   AGENT_BRIEF,
   HTTP_TOOLS,
@@ -12,7 +12,7 @@ import {
   thinkingFromText,
   type ChatMessage,
   type OpenAITool,
-} from "../src/shared/chatProtocol";
+} from "../src/shared/chatProtocol.js";
 
 const LLM_API_URL =
   process.env.LLM_API_URL || "https://api.openai.com/v1/chat/completions";

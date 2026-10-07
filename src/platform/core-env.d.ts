@@ -16,6 +16,7 @@ declare const console: {
   debug(...args: unknown[]): void;
 };
 
+declare function queueMicrotask(callback: () => void): void;
 declare function setTimeout(callback: () => void, ms?: number): number;
 declare function clearTimeout(id: number | null | undefined): void;
 declare function setInterval(callback: () => void, ms?: number): number;

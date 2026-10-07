@@ -7,7 +7,7 @@
  * the assistant. Only the short "what is Mockintosh" preface below is written
  * by hand; keep it to facts that are not in the guide or ARCHITECTURE.md.
  */
-import { APP_DEV_GUIDE } from "./mockintosh-context.generated";
+import { APP_DEV_GUIDE } from "./mockintosh-context.generated.js";
 
 const PREFACE = `
 ## Your knowledge about Mockintosh

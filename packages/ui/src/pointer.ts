@@ -18,6 +18,7 @@ import {
 } from "./nodes";
 import { focusScopeOf, type FocusManager } from "./focus";
 import { scheduleRepaint } from "./renderer";
+import type { UIScheduler } from "./services";
 import { isScrollOwned, scrollOverflow, scrollPaintOffset, scrollPaintOffsetX } from "./scroll";
 import { createPanVelocity, stepFlick } from "./scrollInertia";
 
@@ -96,24 +97,8 @@ export interface PointerDispatcher {
   stopFlick(): void;
 }
 
-/** Injected clock so tests can tick a flick without `requestAnimationFrame`. */
-export interface PointerScheduler {
-  now(): number;
-  requestFrame(cb: (time: number) => void): unknown;
-  cancelFrame(id: unknown): void;
-}
-
-function defaultNow(): number {
-  return typeof performance !== "undefined" ? performance.now() : Date.now();
-}
-
-function defaultScheduler(): PointerScheduler {
-  return {
-    now: defaultNow,
-    requestFrame: (cb) => requestAnimationFrame(cb),
-    cancelFrame: (id) => cancelAnimationFrame(id as number),
-  };
-}
+/** The host's frame clock, which a flick coasts on. Without one, a flick stops where the finger lifts. */
+export type PointerScheduler = UIScheduler;
 
 interface ClipRect {
   x: number;
@@ -361,7 +346,7 @@ export function createPointerDispatcher(
   root: CanvasNode,
   focusManager: FocusManager,
   onError?: (error: unknown) => void,
-  scheduler: PointerScheduler = defaultScheduler(),
+  scheduler?: PointerScheduler,
 ): PointerDispatcher {
   let hovered: CanvasNode | null = null;
   let captured: CanvasNode | null = null;
@@ -374,7 +359,8 @@ export function createPointerDispatcher(
   let panning = false;
   let touchDecided = false;
   const velocity = createPanVelocity();
-  let flickId: unknown = null;
+  let cancelFlick: (() => void) | null = null;
+  const now = () => scheduler?.now() ?? Date.now();
   let flickV = 0;
   let flickX = 0;
   let flickY = 0;
@@ -399,16 +385,14 @@ export function createPointerDispatcher(
   }
 
   function stopFlick(): void {
-    if (flickId != null) {
-      scheduler.cancelFrame(flickId);
-      flickId = null;
-    }
+    cancelFlick?.();
+    cancelFlick = null;
     flickV = 0;
     flickRemain = 0;
   }
 
   function tickFlick(time: number): void {
-    flickId = null;
+    cancelFlick = null;
     const dt = Math.min(32, Math.max(0, time - flickT));
     flickT = time;
     const stepped = stepFlick(flickV, dt);
@@ -422,7 +406,7 @@ export function createPointerDispatcher(
     }
     flickV = stepped.velocity;
     if (flickV === 0) return;
-    flickId = scheduler.requestFrame(tickFlick);
+    cancelFlick = scheduler?.requestFrame(tickFlick) ?? null;
   }
 
   function startFlick(v: number, x: number, y: number): void {
@@ -430,8 +414,9 @@ export function createPointerDispatcher(
     flickV = v;
     flickX = x;
     flickY = y;
+    if (!scheduler) return;
     flickT = scheduler.now();
-    flickId = scheduler.requestFrame(tickFlick);
+    cancelFlick = scheduler.requestFrame(tickFlick);
   }
 
   function rememberPress(extras: PointerExtras | undefined, x: number, y: number): void {
@@ -443,7 +428,7 @@ export function createPointerDispatcher(
     pressing = true;
     panning = false;
     touchDecided = pressKind !== "touch";
-    velocity.reset(y, scheduler.now());
+    velocity.reset(y, now());
   }
 
   function endPress(): void {
@@ -491,7 +476,7 @@ export function createPointerDispatcher(
   function panBy(x: number, y: number, dy: number): void {
     if (dy === 0) return;
     applyScroll(x, y, dy);
-    velocity.sample(y, scheduler.now());
+    velocity.sample(y, now());
   }
 
   function canPanFrom(x: number, y: number, dy: number): boolean {
@@ -621,7 +606,7 @@ export function createPointerDispatcher(
 
       if (type === "mouseup") {
         const cancel = extras?.cancel === true;
-        const flick = panning && !cancel ? velocity.release(scheduler.now()) : 0;
+        const flick = panning && !cancel ? velocity.release(now()) : 0;
         if (cancel || panning) {
           setHovered(null);
           endPress();

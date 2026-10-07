@@ -77,7 +77,7 @@ describe("fx on the headless platform", () => {
     const fs = os.services.fs;
     const prefs = fs.child(fs.locate("preferences")!.id, "fx")!;
     const settings = fs.child(prefs.id, "settings.json")!;
-    expect(JSON.parse(await fs.readText(settings.id))).toEqual({ apiKey: "vck_test_1234" });
+    expect(JSON.parse((await fs.readText(settings.id))!)).toEqual({ apiKey: "vck_test_1234" });
 
     nodes = await screen();
     expect(nodes.some((node) => node.name === "fx-message")).toBe(true);

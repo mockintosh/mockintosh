@@ -280,7 +280,7 @@ export class ProjectService {
       e.cancellation.check();
       switched = true;
       this.os.instances!.stopApp(manifest.id);
-      this.os.sprites.registerAll(app.sprites);
+      if (app.sprites) this.os.sprites.registerAll(app.sprites);
       registerApp(app);
       this.selected.set(manifest.id, selection);
       this.os.openApp(manifest.id);
