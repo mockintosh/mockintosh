@@ -221,8 +221,9 @@ function FormView(props: { form: WebForm; width: number; onSubmit?: (form: WebFo
       </box>
     );
   }
+  const justify = form.align === "right" ? "flex-end" : form.align === "center" ? "center" : "flex-start";
   return (
-    <box flexDirection="row" gap={4} alignItems="center">
+    <box flexDirection="row" gap={4} alignItems="center" justifyContent={justify}>
       <For each={shown}>{(entry) => view(entry, inputWidth)}</For>
     </box>
   );

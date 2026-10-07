@@ -46,6 +46,8 @@ export interface WebForm {
   action: string;
   method: "get" | "post";
   controls: FormControl[];
+  /** Where a one-line form's controls sit across the page. Omitted is the left. */
+  align?: Align;
 }
 
 /** One column of a `columns` block. */

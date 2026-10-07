@@ -48,6 +48,12 @@ function fakeGithub(overrides: (call: Call) => FetchResponse | undefined = () =>
     if (path === "/repos/octocat/hello/issues/5") return reply(ISSUE);
     if (path.startsWith("/repos/octocat/hello/issues/5/comments")) return reply(call.method === "POST" ? {} : [], call.method === "POST" ? 201 : 200);
     if (path === "/user") return reply({ login: "octocat" });
+    if (path.startsWith("/repos/octocat/hello/contents") || path.startsWith("/repos/octocat/hello/commits")) return reply([]);
+    if (path.startsWith("/user/repos")) return reply([{ name: "hello", owner: { login: "octocat" }, stargazers_count: 3 }]);
+    if (path === "/repos/octocat/hello/pulls/8" || path === "/repos/octocat/hello/issues/8") {
+      return reply({ ...ISSUE, number: 8, state: "closed", pull_request: { merged_at: "2026-10-02T00:00:00Z" } });
+    }
+    if (path.startsWith("/repos/octocat/hello/issues/8/comments")) return reply([]);
     if (path === "/graphql") {
       const query = String(call.body?.query);
       if (query.includes("createDiscussion")) return reply({ data: { createDiscussion: { discussion: { number: 9 } } } });
@@ -77,6 +83,7 @@ function forms(nodes: readonly LayoutNode[]): WebForm[] {
   return nodes.flatMap((node) => {
     if (node.type === "form") return [node.form];
     if (node.type === "columns") return node.columns.flatMap((column) => forms(column.nodes));
+    if (node.type === "box") return forms(node.nodes);
     return [];
   });
 }
@@ -87,10 +94,32 @@ function texts(nodes: readonly LayoutNode[]): string {
       if (node.type === "heading") return node.text;
       if (node.type === "paragraph" || node.type === "listItem") return node.segments.map((segment) => segment.text).join("");
       if (node.type === "columns") return node.columns.map((column) => texts(column.nodes)).join("\n");
+      if (node.type === "box") return texts(node.nodes);
       return "";
     })
     .join("\n");
 }
+
+describe("GitHub pages", () => {
+  it("jumps from Search or jump to… straight to an owner/repo", async () => {
+    const { fetch } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/search?q=octocat%2Fhello"), context(fetch, "")));
+    expect(shown.url).toBe("https://github.com/octocat/hello/tree/main");
+  });
+
+  it("says a merged pull request is Merged, not Closed", async () => {
+    const { fetch } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello/pull/8"), context(fetch, "")));
+    expect(texts(shown.nodes)).toContain("Merged");
+  });
+
+  it("lists the signed-in user's top repositories on the home page", async () => {
+    const { fetch } = fakeGithub();
+    const home = await page(await loadPage(pageRequest("https://github.com/"), context(fetch, "home-token")));
+    expect(texts(home.nodes)).toContain("Top repositories");
+    expect(texts(home.nodes)).toContain("octocat / hello");
+  });
+});
 
 describe("GitHub forms", () => {
   it("opens an issue and lands on it, in place of the post", async () => {
@@ -133,9 +162,10 @@ describe("GitHub forms", () => {
     expect(forms(issue.nodes).at(-1)).toEqual({
       action: "https://github.com/login",
       method: "post",
+      align: "left",
       controls: [
         { kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/issues/5" },
-        { kind: "submit", name: "", value: "", label: "Sign In to Comment" },
+        { kind: "submit", name: "", value: "", label: "Sign In" },
       ],
     });
     const discussions = await page(await loadPage(pageRequest("https://github.com/octocat/hello/discussions"), context(fetch, "")));
@@ -145,7 +175,7 @@ describe("GitHub forms", () => {
   it("starts a discussion in the chosen category, and comments on one", async () => {
     const { fetch, calls } = fakeGithub();
     const form = await page(await loadPage(pageRequest("https://github.com/octocat/hello/discussions/new?category=ideas"), context(fetch, "tok")));
-    expect(forms(form.nodes)[0]).toMatchObject({ action: "https://github.com/octocat/hello/discussions", method: "post" });
+    expect(forms(form.nodes)).toContainEqual(expect.objectContaining({ action: "https://github.com/octocat/hello/discussions", method: "post" }));
 
     const started = await loadPage(post("https://github.com/octocat/hello/discussions", { category: "ideas", title: "Ideas", body: "Let's talk" }), context(fetch, "tok"));
     expect((await page(started)).url).toBe("https://github.com/octocat/hello/discussions/9");
@@ -179,9 +209,10 @@ describe("GitHub forms", () => {
     expect(texts(account.nodes)).toContain("signed in to GitHub as octocat");
     const home = await page(await loadPage(post("https://github.com/logout", { return_to: "" }), context(fetch, "tok", github)));
     expect(signedOut).toBe(true);
-    expect(forms(home.nodes)[0]).toEqual({
+    expect(forms(home.nodes)).toContainEqual({
       action: "https://github.com/login",
       method: "post",
+      align: "right",
       controls: [
         { kind: "hidden", name: "return_to", value: "https://github.com/" },
         { kind: "submit", name: "", value: "", label: "Sign In" },
@@ -193,13 +224,13 @@ describe("GitHub forms", () => {
     const { fetch, calls } = fakeGithub();
     const signedOut = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/5"), context(fetch, "")));
     const header = signedOut.nodes[0];
-    expect(header.type === "columns" && header.columns[1].nodes).toEqual([
+    expect(header.type === "columns" && header.columns[2].nodes).toEqual([
       expect.objectContaining({ form: expect.objectContaining({ controls: expect.arrayContaining([{ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/issues/5" }]) }) }),
     ]);
 
     const signedIn = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/5"), context(fetch, "header-token")));
     await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "header-token"));
-    const corner = signedIn.nodes[0].type === "columns" ? signedIn.nodes[0].columns[1].nodes[0] : null;
+    const corner = signedIn.nodes[0].type === "columns" ? signedIn.nodes[0].columns[2].nodes[0] : null;
     expect(corner).toMatchObject({
       type: "paragraph",
       align: "right",

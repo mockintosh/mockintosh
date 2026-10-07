@@ -105,7 +105,8 @@ export interface ProfileRepo {
 }
 
 export type GithubPage =
-  | { view: "search"; query: string; repos: ProfileRepo[] }
+  /** `total` counts every match; `repos` holds the first page of them. */
+  | { view: "search"; query: string; total: number; repos: ProfileRepo[] }
   | { view: "profile"; profile: ProfileInfo; tab: "repos" | "stars" | "people"; repos: ProfileRepo[]; orgs: string[]; people: string[] }
   | { view: "tree"; repo: RepoInfo; ref: string; path: string; entries: DirEntry[]; commit: CommitInfo | null; readme: string | null }
   | { view: "blob"; repo: RepoInfo; ref: string; file: FileBody }
@@ -129,7 +130,8 @@ const MAX_TEXT = 48_000;
 export async function loadPage(fetch: FetchFunction, token: string, location: ApiLocation): Promise<GithubPage> {
   if (location.kind === "search") {
     const data = asRecord(await gh(fetch, token, `/search/repositories?q=${encodeURIComponent(location.query)}&per_page=30`));
-    return { view: "search", query: location.query, repos: Array.isArray(data.items) ? data.items.map(profileRepo) : [] };
+    const repos = Array.isArray(data.items) ? data.items.map(profileRepo) : [];
+    return { view: "search", query: location.query, total: numberField(data, "total_count") || repos.length, repos };
   }
   if (location.kind === "profile") return loadProfile(fetch, token, location.login, location.tab);
   const repo = await getRepo(fetch, token, location.owner, location.repo);
@@ -295,7 +297,8 @@ async function getRepo(fetch: FetchFunction, token: string, owner: string, repo:
     forks: numberField(record, "forks_count"),
     watchers: numberField(record, "subscribers_count"),
     language: stringField(record, "language"),
-    license: stringField(license, "spdx_id") || stringField(license, "name"),
+    // NOASSERTION is GitHub's "a license it couldn't identify"; github.com shows nothing to name.
+    license: stringField(license, "spdx_id") === "NOASSERTION" ? "" : stringField(license, "spdx_id") || stringField(license, "name"),
     homepage: stringField(record, "homepage"),
     topics,
     hasDiscussions: record.has_discussions === true,
@@ -367,6 +370,11 @@ async function getComments(fetch: FetchFunction, token: string, repo: RepoInfo, 
       createdAt: stringField(record, "created_at"),
     };
   });
+}
+
+/** The signed-in user's most recently pushed repositories, as github.com's dashboard lists them. */
+export async function listViewerRepos(fetch: FetchFunction, token: string): Promise<ProfileRepo[]> {
+  return listProfileRepos(fetch, token, "/user/repos?sort=pushed&per_page=10");
 }
 
 /** The login the token belongs to. */
@@ -527,12 +535,14 @@ function commitInfo(record: Record<string, unknown>): CommitInfo {
 
 function issueInfo(record: Record<string, unknown>): IssueInfo {
   const user = asRecord(record.user);
+  // A merged pull request is "closed" to the API; github.com says Merged. The issue endpoint nests the date.
+  const merged = typeof record.merged_at === "string" || typeof asRecord(record.pull_request).merged_at === "string";
   return {
     number: numberField(record, "number"),
     title: stringField(record, "title"),
     user: stringField(user, "login") || "ghost",
     comments: numberField(record, "comments"),
-    state: stringField(record, "state") || "open",
+    state: merged ? "merged" : stringField(record, "state") || "open",
     body: stringField(record, "body"),
     createdAt: stringField(record, "created_at"),
   };

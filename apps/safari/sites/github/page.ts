@@ -7,6 +7,7 @@ import {
   createDiscussion,
   createIssue,
   getViewer,
+  listViewerRepos,
   loadPage,
   type ApiLocation,
   type CommentInfo,
@@ -94,15 +95,27 @@ async function loadLocation(location: GithubLocation, context: SiteContext, stat
 
 async function loadBody(location: Exclude<GithubLocation, { kind: "login" | "logout" }>, context: SiteContext, state: FormState): Promise<DocumentPage> {
   const token = context.settings.githubToken;
-  if (location.kind === "home") return homePage();
+  if (location.kind === "home") return homePage(token ? await topRepos(context) : null);
   if (!token && (location.kind === "discussions" || location.kind === "discussion" || location.kind === "newDiscussion")) {
     return signInFirstPage(location, "GitHub shows discussions only to people who are signed in.");
   }
+  // "Search or jump to…": an owner/repo goes straight to the repository.
+  const jump = location.kind === "search" ? /^\s*([\w.-]+)\/([\w.-]+)\s*$/.exec(location.query) : null;
+  const target: ApiLocation = jump ? { kind: "tree", owner: jump[1], repo: jump[2], ref: "", path: "" } : location;
   try {
-    return githubPage(await loadPage(context.fetch, token, location), Date.now(), { signedIn: token !== "", ...state });
+    return githubPage(await loadPage(context.fetch, token, target), Date.now(), { signedIn: token !== "", ...state });
   } catch (error) {
     if (error instanceof GithubError) throw new PageError(error.message);
     throw error;
+  }
+}
+
+/** The dashboard's repositories; none rather than a broken home page when GitHub won't list them. */
+async function topRepos(context: SiteContext): Promise<ProfileRepo[]> {
+  try {
+    return await listViewerRepos(context.fetch, context.settings.githubToken);
+  } catch {
+    return [];
   }
 }
 
@@ -123,15 +136,16 @@ function viewerOf(context: SiteContext): Promise<string> {
   return viewer;
 }
 
-/** Width of the header's account corner, signed in (the login, right-aligned) and out (the Sign In button). */
-const ACCOUNT_WIDTH = 140;
-const SIGN_IN_WIDTH = 48;
+/** Header columns: the site's name, and the account corner (a right-aligned button or login). */
+const SITE_WIDTH = 40;
+const ACCOUNT_WIDTH = 90;
 
 /**
  * The band across the top of every GitHub page, as on github.com: the home
- * link, and the account in the corner. `viewer` is the signed-in login
- * (empty when GitHub won't say whose the token is), or null when signed out.
- * The sign-in page leaves the corner empty: it is the account page.
+ * link, "Search or jump to…", and the account in the corner. `viewer` is
+ * the signed-in login (empty when GitHub won't say whose the token is), or
+ * null when signed out. The sign-in page leaves the corner empty: it is the
+ * account page.
  */
 function withHeader(page: DocumentPage, viewer: string | null, account = true): DocumentPage {
   const corner: LayoutNode[] = !account
@@ -139,13 +153,18 @@ function withHeader(page: DocumentPage, viewer: string | null, account = true): 
     : viewer === null
       ? [buttonForm({ kind: "login", returnTo: page.url }, "Sign In")]
       : [{ type: "paragraph", align: "right", segments: [link(viewer || "Account", { kind: "login", returnTo: page.url })] }];
+  const search: LayoutNode = {
+    type: "form",
+    form: { action: "https://github.com/search", method: "get", controls: [{ kind: "text", name: "q", value: "", placeholder: "Search or jump to…" }] },
+  };
   const header: LayoutNode = {
     type: "columns",
     gap: 8,
     minWidth: 0,
     columns: [
-      { nodes: [heading(3, "GitHub", githubUrl({ kind: "home" }))] },
-      { width: account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
+      { width: SITE_WIDTH, nodes: [heading(3, "GitHub", githubUrl({ kind: "home" }))] },
+      { nodes: [search] },
+      { width: ACCOUNT_WIDTH, nodes: corner },
     ],
   };
   return { ...page, nodes: [header, { type: "hr" }, ...page.nodes] };
@@ -209,6 +228,10 @@ function bold(value: string): InlineSegment {
   return { kind: "bold", text: value };
 }
 
+function italic(value: string): InlineSegment {
+  return { kind: "italic", text: value };
+}
+
 function link(value: string, location: GithubLocation): InlineSegment {
   return { kind: "link", text: value, href: githubUrl(location) };
 }
@@ -221,48 +244,70 @@ function heading(level: 1 | 2 | 3, value: string, href?: string): LayoutNode {
   return href ? { type: "heading", level, text: value, align: "left", href } : { type: "heading", level, text: value, align: "left" };
 }
 
-/** Links separated by dots; the current one is bold instead of a link. */
-function tabs(items: readonly { label: string; location: GithubLocation; current: boolean }[]): LayoutNode {
+/** Facts on one line, the way github.com runs them together. Empty ones drop out. */
+function facts(...items: Array<InlineSegment | string | false | undefined>): LayoutNode {
   const segments: InlineSegment[] = [];
-  items.forEach((item, index) => {
-    if (index > 0) segments.push(text("  •  "));
-    segments.push(item.current ? bold(item.label) : link(item.label, item.location));
-  });
+  for (const item of items) {
+    if (!item) continue;
+    if (segments.length > 0) segments.push(text("  •  "));
+    segments.push(typeof item === "string" ? text(item) : item);
+  }
   return paragraph(...segments);
 }
 
-function homePage(): DocumentPage {
-  return {
-    kind: "document",
-    url: githubUrl({ kind: "home" }),
-    title: "GitHub",
-    nodes: [
+const HR: LayoutNode = { type: "hr" };
+
+/**
+ * A bordered list, as github.com draws issues, files and results: one row
+ * per entry, ruled between unless the rows are single lines.
+ */
+function list(rows: readonly LayoutNode[][], empty: string, ruled = true): LayoutNode {
+  if (rows.length === 0) return { type: "box", nodes: [paragraph(text(empty))] };
+  return { type: "box", nodes: rows.flatMap((row, index) => (index > 0 && ruled ? [HR, ...row] : row)) };
+}
+
+/** A bordered card with a header line, as github.com draws each comment. */
+function card(header: InlineSegment[], body: readonly LayoutNode[]): LayoutNode {
+  return { type: "box", nodes: [paragraph(...header), HR, ...body] };
+}
+
+/** A heading on the left and a button on the right, as above github.com's lists. */
+function toolbar(title: string, button: LayoutNode | null): LayoutNode {
+  if (!button) return heading(2, title);
+  return { type: "columns", gap: 8, minWidth: 0, columns: [{ nodes: [heading(2, title)] }, { width: 120, nodes: [button] }] };
+}
+
+/** A button that goes to `location`, as github.com's "New issue" does. */
+function linkButton(label: string, location: GithubLocation): LayoutNode {
+  return { type: "form", form: { action: githubUrl(location), method: "get", align: "right", controls: [{ kind: "submit", name: "", value: "", label }] } };
+}
+
+const EXAMPLES: ReadonlyArray<readonly [string, GithubLocation]> = [
+  ["octocat", { kind: "profile", login: "octocat", tab: "repos" }],
+  ["torvalds/linux", { kind: "tree", owner: "torvalds", repo: "linux", ref: "", path: "" }],
+  ["mockintosh/mockintosh", { kind: "tree", owner: "mockintosh", repo: "mockintosh", ref: "", path: "" }],
+  ["apple", { kind: "profile", login: "apple", tab: "repos" }],
+];
+
+/** Signed out, a way in; signed in, `repos` holds the dashboard's top repositories. */
+function homePage(repos: readonly ProfileRepo[] | null): DocumentPage {
+  const nodes: LayoutNode[] = [];
+  if (repos && repos.length > 0) {
+    nodes.push(heading(2, "Top repositories"), repoList(repos, ""));
+  } else {
+    const examples: InlineSegment[] = [text("For example ")];
+    EXAMPLES.forEach(([label, location], index) => {
+      if (index > 0) examples.push(text(index === EXAMPLES.length - 1 ? " or " : ", "));
+      examples.push(link(label, location));
+    });
+    examples.push(text("."));
+    nodes.push(
       heading(1, "GitHub"),
-      paragraph(text("Look up a person, an organization or a repository, or type its github.com address in the address bar.")),
-      {
-        type: "form",
-        form: {
-          action: "https://github.com/search",
-          method: "get",
-          controls: [
-            { kind: "text", name: "q", value: "", placeholder: "Search repositories" },
-            { kind: "submit", name: "", value: "", label: "Search" },
-          ],
-        },
-      },
-      paragraph(
-        text("For example "),
-        link("octocat", { kind: "profile", login: "octocat", tab: "repos" }),
-        text(", "),
-        link("torvalds/linux", { kind: "tree", owner: "torvalds", repo: "linux", ref: "", path: "" }),
-        text(", "),
-        link("mockintosh/mockintosh", { kind: "tree", owner: "mockintosh", repo: "mockintosh", ref: "", path: "" }),
-        text(" or "),
-        link("apple", { kind: "profile", login: "apple", tab: "repos" }),
-        text("."),
-      ),
-    ],
-  };
+      paragraph(text("Search GitHub above, or type owner/repo there to go straight to a repository.")),
+      paragraph(...examples),
+    );
+  }
+  return { kind: "document", url: githubUrl({ kind: "home" }), title: "GitHub", nodes };
 }
 
 /**
@@ -285,11 +330,11 @@ function loginPage(returnTo: string, viewer: string | null, canSignIn: boolean):
   }
   const nodes: LayoutNode[] = [
     heading(1, "Sign in to GitHub"),
-    paragraph(text("Signed in, Safari can open issues and discussions and comment on them as you, on public repositories.")),
+    paragraph(text("Signed in, Safari can open issues and discussions and comment on them as you.")),
   ];
   if (canSignIn) {
     nodes.push(
-      paragraph(text("Safari shows a code. Scan it with your phone and sign in to GitHub there; nothing is typed on this Macintosh.")),
+      paragraph(text("Safari shows a code to scan with your phone, or signs you in with this computer's browser.")),
       buttonForm({ kind: "login", returnTo }, "Sign In"),
     );
   } else {
@@ -315,6 +360,7 @@ function buttonForm(location: Extract<GithubLocation, { kind: "login" | "logout"
     form: {
       action: `https://github.com/${location.kind}`,
       method: "post",
+      align: "right",
       controls: [
         { kind: "hidden", name: "return_to", value: location.returnTo },
         { kind: "submit", name: "", value: "", label },
@@ -325,7 +371,8 @@ function buttonForm(location: Extract<GithubLocation, { kind: "login" | "logout"
 
 /** Sign in, then come back to `location`. */
 function signInForm(location: GithubLocation, label: string): LayoutNode {
-  return buttonForm({ kind: "login", returnTo: githubUrl(location) }, label);
+  const form = buttonForm({ kind: "login", returnTo: githubUrl(location) }, label);
+  return form.type === "form" ? { ...form, form: { ...form.form, align: "left" } } : form;
 }
 
 /** A form that posts to `location`, with what was written put back and why GitHub refused it above. */
@@ -336,43 +383,51 @@ function postForm(location: GithubLocation, forms: PageForms, controls: FormCont
   return forms.error ? [paragraph(bold(forms.error)), form] : [form];
 }
 
-function commentForm(location: GithubLocation, forms: PageForms): LayoutNode[] {
-  if (!forms.signedIn) return [{ type: "hr" }, signInForm(location, "Sign In to Comment")];
-  return [
-    { type: "hr" },
-    heading(3, "Add a comment"),
-    ...postForm(location, forms, [
-      { kind: "textarea", name: "body", value: "", rows: 5 },
-      { kind: "submit", name: "", value: "", label: "Comment" },
-    ]),
-  ];
+/** The box at the foot of a conversation: write a comment, or sign in to. */
+function commentForm(location: GithubLocation, forms: PageForms): LayoutNode {
+  if (!forms.signedIn) {
+    return { type: "box", nodes: [paragraph(text("Sign in to join this conversation on GitHub.")), signInForm(location, "Sign In")] };
+  }
+  return {
+    type: "box",
+    nodes: [
+      paragraph(bold("Add a comment")),
+      ...postForm(location, forms, [
+        { kind: "textarea", name: "body", value: "", rows: 5 },
+        { kind: "submit", name: "", value: "", label: "Comment" },
+      ]),
+    ],
+  };
 }
 
 export function githubPage(page: GithubPage, now: number, forms: PageForms = { signedIn: false }): DocumentPage {
   if (page.view === "search") {
     const location: GithubLocation = { kind: "search", query: page.query };
+    const results = page.total === 1 ? "1 repository result" : `${formatCount(page.total)} repository results`;
     return {
       kind: "document",
       url: githubUrl(location),
       title: `Search: ${page.query}`,
-      nodes: [heading(1, `Repositories matching “${page.query}”`), ...repoList(page.repos, "No repositories matched.")],
+      nodes: [heading(2, results), repoList(page.repos, `No repositories matched “${page.query}”.`)],
     };
   }
   if (page.view === "profile") return profilePage(page);
   return repoPage(page, now, forms);
 }
 
-function repoList(repos: readonly ProfileRepo[], empty: string): LayoutNode[] {
-  if (repos.length === 0) return [paragraph(text(empty))];
-  return repos.flatMap((repo): LayoutNode[] => {
-    const location: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
-    const facts = [repo.language, `${formatCount(repo.stars)} stars`].filter(Boolean).join("  •  ");
-    return [
-      heading(3, `${repo.owner}/${repo.name}${repo.fork ? " (fork)" : ""}`, githubUrl(location)),
-      ...(repo.description ? [paragraph(text(repo.description))] : []),
-      paragraph(text(facts)),
-    ];
-  });
+/** Repositories by full name, as search results and the dashboard list them. */
+function repoList(repos: readonly ProfileRepo[], empty: string): LayoutNode {
+  return list(
+    repos.map((repo): LayoutNode[] => {
+      const location: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
+      return [
+        heading(3, `${repo.owner} / ${repo.name}`, githubUrl(location)),
+        ...(repo.description ? [paragraph(text(repo.description))] : []),
+        facts(repo.fork && "Fork", repo.language, `${formatCount(repo.stars)} stars`),
+      ];
+    }),
+    empty,
+  );
 }
 
 /** Sidebar width, as on github.com; the avatar fills it. */
@@ -384,15 +439,12 @@ const TWO_COLUMNS = SIDEBAR + 16 + 220;
 function repoCard(repo: ProfileRepo, owner: string): LayoutNode {
   const location: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
   const name = repo.owner.toLowerCase() === owner.toLowerCase() ? repo.name : `${repo.owner}/${repo.name}`;
-  const facts = [repo.language, `${formatCount(repo.stars)} stars`, repo.forks ? `${formatCount(repo.forks)} forks` : ""]
-    .filter(Boolean)
-    .join("  •  ");
   return {
     type: "box",
     nodes: [
       paragraph({ kind: "link", text: name, href: githubUrl(location) }, text(repo.fork ? "  Fork" : "  Public")),
       ...(repo.description ? [paragraph(text(repo.description))] : []),
-      paragraph(text(facts)),
+      facts(repo.language, `${formatCount(repo.stars)} stars`, repo.forks > 0 && `${formatCount(repo.forks)} forks`),
     ],
   };
 }
@@ -423,7 +475,7 @@ function profileSidebar(page: Extract<GithubPage, { view: "profile" }>): LayoutN
   if (profile.blog) nodes.push(paragraph({ kind: "link", text: profile.blog, href: websiteHref(profile.blog) }));
   if (profile.twitter) nodes.push(paragraph({ kind: "link", text: `@${profile.twitter}`, href: `https://x.com/${profile.twitter}` }));
   if (page.orgs.length > 0) {
-    nodes.push({ type: "hr" }, heading(3, "Organizations"));
+    nodes.push(HR, heading(3, "Organizations"));
     const segments: InlineSegment[] = [];
     page.orgs.forEach((login, index) => {
       if (index > 0) segments.push(text(", "));
@@ -437,17 +489,23 @@ function profileSidebar(page: Extract<GithubPage, { view: "profile" }>): LayoutN
 function profileMain(page: Extract<GithubPage, { view: "profile" }>): LayoutNode[] {
   const login = page.profile.login;
   if (page.tab === "people") {
-    const nodes: LayoutNode[] = [heading(2, "People")];
-    if (page.people.length === 0) nodes.push(paragraph(text("No public members.")));
-    for (const person of page.people) {
-      nodes.push({ type: "listItem", indent: 0, segments: [link(person, { kind: "profile", login: person, tab: "repos" })] });
-    }
-    return nodes;
+    const people = page.people.map((person) => [paragraph(link(person, { kind: "profile", login: person, tab: "repos" }))]);
+    return [heading(2, "People"), list(people, "No public members.", false)];
   }
   const title = page.tab === "stars" ? "Starred repositories" : "Repositories";
   const empty = page.tab === "stars" ? "No starred repositories." : "No public repositories.";
   if (page.repos.length === 0) return [heading(2, title), paragraph(text(empty))];
   return [heading(2, title), ...page.repos.map((repo) => repoCard(repo, login))];
+}
+
+/** A tab bar: links between dots (text collapses wider gaps), the current one bold instead of a link. */
+function tabs(items: readonly { label: string; location: GithubLocation; current: boolean }[]): LayoutNode {
+  const segments: InlineSegment[] = [];
+  items.forEach((item, index) => {
+    if (index > 0) segments.push(text("  •  "));
+    segments.push(item.current ? bold(item.label) : link(item.label, item.location));
+  });
+  return paragraph(...segments);
 }
 
 function profilePage(page: Extract<GithubPage, { view: "profile" }>): DocumentPage {
@@ -463,7 +521,7 @@ function profilePage(page: Extract<GithubPage, { view: "profile" }>): DocumentPa
     tabs(profile.kind === "Organization"
       ? [tab(repositories, "repos"), tab("People", "people")]
       : [tab(repositories, "repos"), tab("Stars", "stars")]),
-    { type: "hr" },
+    HR,
     {
       type: "columns",
       gap: 16,
@@ -510,17 +568,28 @@ function sectionOf(view: RepoPage["view"]): RepoSection {
   return "code";
 }
 
-function repoHeader(repo: RepoInfo, view: RepoPage["view"], ref: string): LayoutNode[] {
+/**
+ * "owner / repo", a line of facts, and the tabs. The About panel
+ * (description, website, topics) shows on the Code tab's front page only,
+ * as on github.com.
+ */
+function repoHeader(repo: RepoInfo, view: RepoPage["view"], ref: string, about: boolean): LayoutNode[] {
   const root: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
   const nodes: LayoutNode[] = [
-    heading(1, `${repo.owner}/${repo.name}`, githubUrl(root)),
-    paragraph(text(`${repo.visibility} repository by `), link(repo.owner, { kind: "profile", login: repo.owner, tab: "repos" })),
+    heading(1, `${repo.owner} / ${repo.name}`, githubUrl(root)),
+    facts(
+      repo.visibility,
+      link(repo.owner, { kind: "profile", login: repo.owner, tab: "repos" }),
+      `${formatCount(repo.stars)} stars`,
+      `${formatCount(repo.forks)} forks`,
+    ),
   ];
-  if (repo.description) nodes.push(paragraph(text(repo.description)));
-  nodes.push(paragraph(text(`${formatCount(repo.stars)} stars  •  ${formatCount(repo.forks)} forks  •  ${formatCount(repo.watchers)} watching`)));
-  const facts = [repo.language, repo.license, ...repo.topics].filter(Boolean).join("  •  ");
-  if (facts) nodes.push(paragraph(text(facts)));
-  if (repo.homepage) nodes.push(paragraph({ kind: "link", text: repo.homepage, href: repo.homepage }));
+  if (about) {
+    if (repo.description) nodes.push(paragraph(text(repo.description)));
+    if (repo.homepage) nodes.push(paragraph({ kind: "link", text: repo.homepage, href: repo.homepage }));
+    const topics = [repo.language, repo.license, ...repo.topics].filter(Boolean);
+    if (topics.length > 0) nodes.push(facts(...topics));
+  }
   const section = sectionOf(view);
   const sections = [
     { label: "Code", location: { kind: "tree", owner: repo.owner, repo: repo.name, ref, path: "" } as GithubLocation, current: section === "code" },
@@ -530,14 +599,15 @@ function repoHeader(repo: RepoInfo, view: RepoPage["view"], ref: string): Layout
   if (repo.hasDiscussions || section === "discussions") {
     sections.push({ label: "Discussions", location: { kind: "discussions", owner: repo.owner, repo: repo.name }, current: section === "discussions" });
   }
-  nodes.push(tabs(sections));
-  nodes.push({ type: "hr" });
+  nodes.push(tabs(sections), HR);
   return nodes;
 }
 
+/** The branch, then the path from the repository's root, each part a link up. */
 function pathBar(repo: RepoInfo, ref: string, path: string): LayoutNode {
   const parts = path.split("/").filter(Boolean);
-  const segments: InlineSegment[] = [link(repo.name, { kind: "tree", owner: repo.owner, repo: repo.name, ref, path: "" })];
+  if (parts.length === 0) return paragraph(text("Branch "), bold(ref));
+  const segments: InlineSegment[] = [bold(ref), text("  •  "), link(repo.name, { kind: "tree", owner: repo.owner, repo: repo.name, ref, path: "" })];
   parts.forEach((part, index) => {
     segments.push(text(" / "));
     const location: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref, path: parts.slice(0, index + 1).join("/") };
@@ -549,133 +619,162 @@ function pathBar(repo: RepoInfo, ref: string, path: string): LayoutNode {
 function repoPage(page: RepoPage, now: number, forms: PageForms): DocumentPage {
   const repo = page.repo;
   const ref = page.view === "tree" || page.view === "blob" ? page.ref : repo.defaultBranch;
-  const nodes = repoHeader(repo, page.view, ref);
+  const nodes = repoHeader(repo, page.view, ref, page.view === "tree" && page.path === "");
   const location = repoLocation(page);
-  let title = `${repo.owner}/${repo.name}`;
+  const name = `${repo.owner}/${repo.name}`;
+  const { title, body } = repoBody(page, location, now, forms);
+  return { kind: "document", url: githubUrl(location), title: title ? `${title} • ${name}` : name, nodes: [...nodes, ...body] };
+}
 
+/** What a repository page shows under its header, and its window title before the repository's name. */
+function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: PageForms): { title: string; body: LayoutNode[] } {
+  const repo = page.repo;
+  const { owner, name } = repo;
   if (page.view === "tree") {
-    nodes.push(paragraph(text("Branch "), bold(page.ref)));
-    if (page.commit) {
-      const commit = page.commit;
-      nodes.push(paragraph({ kind: "code", text: commit.sha }, text(`  ${commitSubject(commit.message)}  •  ${commit.author}  •  ${formatAge(commit.date, now)}`)));
-    }
-    if (page.path) nodes.push(pathBar(repo, page.ref, page.path));
-    for (const entry of page.entries) {
+    const rows: LayoutNode[][] = page.entries.map((entry) => {
       const target: GithubLocation = entry.type === "dir"
-        ? { kind: "tree", owner: repo.owner, repo: repo.name, ref: page.ref, path: entry.path }
-        : { kind: "blob", owner: repo.owner, repo: repo.name, ref: page.ref, path: entry.path };
-      nodes.push({ type: "listItem", indent: 0, segments: [link(entry.type === "dir" ? `${entry.name}/` : entry.name, target)] });
-    }
+        ? { kind: "tree", owner, repo: name, ref: page.ref, path: entry.path }
+        : { kind: "blob", owner, repo: name, ref: page.ref, path: entry.path };
+      return [paragraph(link(entry.type === "dir" ? `${entry.name}/` : entry.name, target))];
+    });
+    const files = list(rows, "This folder is empty.", false);
+    const commit = page.commit;
+    const box: LayoutNode = commit && files.type === "box"
+      ? { ...files, nodes: [facts(bold(commit.author), commitSubject(commit.message), commit.sha, formatAge(commit.date, now)), HR, ...files.nodes] }
+      : files;
+    const body: LayoutNode[] = [pathBar(repo, page.ref, page.path), box];
     if (page.readme) {
-      nodes.push({ type: "hr" }, heading(2, "README"));
-      nodes.push(...resolveRelative(parseMarkdown(page.readme), repo, page.ref, page.path));
+      body.push(card([bold("README")], resolveRelative(parseMarkdown(page.readme), repo, page.ref, page.path)));
     }
-  } else if (page.view === "blob") {
+    return { title: page.path, body };
+  }
+  if (page.view === "blob") {
     const file = page.file;
-    title = `${file.name} • ${title}`;
-    nodes.push(pathBar(repo, page.ref, file.path), paragraph(text(formatBytes(file.size))));
-    if (file.note) nodes.push(paragraph({ kind: "italic", text: file.note }));
+    const lines = file.text === null ? "" : `${formatCount(file.text.split("\n").length)} lines`;
+    const body: LayoutNode[] = [pathBar(repo, page.ref, file.path), facts(lines, formatBytes(file.size))];
+    if (file.note) body.push(paragraph(italic(file.note)));
     if (file.text !== null) {
       const dir = file.path.split("/").slice(0, -1).join("/");
-      nodes.push(...(/\.(md|markdown)$/i.test(file.name)
-        ? resolveRelative(parseMarkdown(file.text), repo, page.ref, dir)
-        : [{ type: "code", text: file.text } as LayoutNode]));
+      body.push(/\.(md|markdown)$/i.test(file.name)
+        ? { type: "box", nodes: resolveRelative(parseMarkdown(file.text), repo, page.ref, dir) }
+        : { type: "code", text: file.text });
     }
-  } else if (page.view === "issues" || page.view === "pulls") {
-    const items = page.view === "pulls" ? page.pulls : page.issues;
-    if (page.view === "issues") nodes.push(paragraph(link("New issue", { kind: "newIssue", owner: repo.owner, repo: repo.name })));
-    if (items.length === 0) nodes.push(paragraph(text(page.view === "pulls" ? "No open pull requests." : "No open issues.")));
-    for (const item of items) {
-      const target: GithubLocation = page.view === "pulls"
-        ? { kind: "pull", owner: repo.owner, repo: repo.name, number: item.number }
-        : { kind: "issue", owner: repo.owner, repo: repo.name, number: item.number };
-      nodes.push(heading(3, item.title, githubUrl(target)), paragraph(text(issueLine(item, now))));
-    }
-  } else if (page.view === "newIssue") {
-    title = `New issue • ${title}`;
-    nodes.push(heading(2, "New issue"));
-    if (!forms.signedIn) nodes.push(signInForm(location, "Sign In to Open an Issue"));
-    else {
-      nodes.push(...postForm({ kind: "issues", owner: repo.owner, repo: repo.name }, forms, [
-        { kind: "text", name: "title", value: "", placeholder: "Title" },
-        { kind: "textarea", name: "body", value: "", rows: 10 },
-        { kind: "submit", name: "", value: "", label: "Submit new issue" },
-      ]));
-    }
-  } else if (page.view === "discussions") {
-    title = `Discussions • ${title}`;
-    nodes.push(paragraph(link("New discussion", { kind: "newDiscussion", owner: repo.owner, repo: repo.name, category: "" })));
-    if (page.discussions.length === 0) nodes.push(paragraph(text("No discussions yet.")));
-    for (const item of page.discussions) {
-      const target: GithubLocation = { kind: "discussion", owner: repo.owner, repo: repo.name, number: item.number };
-      nodes.push(heading(3, item.title, githubUrl(target)), paragraph(text(discussionLine(item, now))));
-    }
-  } else if (page.view === "newDiscussion") {
-    title = `New discussion • ${title}`;
-    nodes.push(...newDiscussionNodes(page, forms));
-  } else if (page.view === "discussion") {
-    const item = page.discussion;
-    title = `${item.title} • Discussion #${item.number}`;
-    nodes.push(heading(2, item.title), paragraph(text(discussionLine(item, now))));
-    nodes.push(...markdownOr(item.body, repo, "No description."));
-    for (const comment of page.comments) nodes.push(...commentNodes(comment, repo, now));
-    nodes.push(...commentForm(location, forms));
-  } else {
-    const item = page.view === "pull" ? page.pull : page.issue;
-    title = `${item.title} • #${item.number}`;
-    nodes.push(heading(2, item.title), paragraph(text(issueLine(item, now))));
-    nodes.push(...markdownOr(item.body, repo, "No description."));
-    for (const comment of page.comments) nodes.push(...commentNodes(comment, repo, now));
-    nodes.push(...commentForm(location, forms));
+    return { title: file.name, body };
   }
-  return { kind: "document", url: githubUrl(location), title, nodes };
+  if (page.view === "issues" || page.view === "pulls") {
+    const pulls = page.view === "pulls";
+    const items = pulls ? page.pulls : page.issues;
+    const rows = items.map((item): LayoutNode[] => {
+      const target: GithubLocation = pulls ? { kind: "pull", owner, repo: name, number: item.number } : { kind: "issue", owner, repo: name, number: item.number };
+      return [heading(3, item.title, githubUrl(target)), facts(`#${item.number} opened ${formatAge(item.createdAt, now)} by ${item.user}`, commentCount(item.comments))];
+    });
+    return {
+      title: pulls ? "Pull requests" : "Issues",
+      body: [
+        toolbar(pulls ? "Open pull requests" : "Open issues", pulls ? null : linkButton("New issue", { kind: "newIssue", owner, repo: name })),
+        list(rows, pulls ? "There aren't any open pull requests." : "There aren't any open issues."),
+      ],
+    };
+  }
+  if (page.view === "discussions") {
+    const rows = page.discussions.map((item): LayoutNode[] => [
+      heading(3, item.title, githubUrl({ kind: "discussion", owner, repo: name, number: item.number })),
+      facts(item.category, `${item.user} started ${formatAge(item.createdAt, now)}`, commentCount(item.comments), item.answered && "✓ Answered"),
+    ]);
+    return {
+      title: "Discussions",
+      body: [
+        toolbar("Discussions", linkButton("New discussion", { kind: "newDiscussion", owner, repo: name, category: "" })),
+        list(rows, "There aren't any discussions yet."),
+      ],
+    };
+  }
+  if (page.view === "newIssue") {
+    const body: LayoutNode[] = [heading(2, "Create new issue")];
+    if (!forms.signedIn) {
+      body.push(paragraph(text("Sign in to open an issue.")), signInForm(location, "Sign In"));
+    } else {
+      body.push(
+        paragraph(text("Add a title, then describe the issue. Markdown works.")),
+        ...postForm({ kind: "issues", owner, repo: name }, forms, [
+          { kind: "text", name: "title", value: "", placeholder: "Title" },
+          { kind: "textarea", name: "body", value: "", rows: 10 },
+          { kind: "submit", name: "", value: "", label: "Create" },
+        ]),
+      );
+    }
+    return { title: "New issue", body };
+  }
+  if (page.view === "newDiscussion") return { title: "New discussion", body: newDiscussionNodes(page, forms) };
+  if (page.view === "discussion") {
+    const item = page.discussion;
+    return {
+      title: item.title,
+      body: [
+        heading(1, `${item.title} #${item.number}`),
+        facts(item.category, `${item.user} started this discussion ${formatAge(item.createdAt, now)}`, commentCount(item.comments), item.answered && "✓ Answered"),
+        ...conversation(item, page.comments, repo, now),
+        commentForm(location, forms),
+      ],
+    };
+  }
+  const item = page.view === "pull" ? page.pull : page.issue;
+  const kind = page.view === "pull" ? "pull request" : "issue";
+  return {
+    title: item.title,
+    body: [
+      heading(1, `${item.title} #${item.number}`),
+      facts(bold(stateLabel(item.state)), `${item.user} opened this ${kind} ${formatAge(item.createdAt, now)}`, commentCount(item.comments)),
+      ...conversation(item, page.comments, repo, now),
+      commentForm(location, forms),
+    ],
+  };
 }
 
-function issueLine(item: IssueInfo, now: number): string {
-  return `#${item.number} ${item.state}, opened ${formatAge(item.createdAt, now)} by ${item.user}  •  ${item.comments} comments`;
+function stateLabel(state: string): string {
+  return state === "merged" ? "Merged" : state === "closed" ? "Closed" : "Open";
 }
 
-function discussionLine(item: DiscussionInfo, now: number): string {
-  const facts = [item.category, `#${item.number} opened ${formatAge(item.createdAt, now)} by ${item.user}`, `${item.comments} comments`];
-  if (item.answered) facts.push("Answered");
-  return facts.filter(Boolean).join("  •  ");
+function commentCount(count: number): string {
+  return count === 1 ? "1 comment" : `${formatCount(count)} comments`;
+}
+
+/** The opening post and its comments as cards, saying when only the first of them are shown. */
+function conversation(item: IssueInfo, comments: readonly CommentInfo[], repo: RepoInfo, now: number): LayoutNode[] {
+  const opening: CommentInfo = { user: item.user, body: item.body, createdAt: item.createdAt };
+  const nodes = [commentCard(opening, repo, now, "No description provided."), ...comments.map((comment) => commentCard(comment, repo, now, ""))];
+  if (item.comments > comments.length) {
+    nodes.push(paragraph(italic(`Showing the first ${comments.length} of ${commentCount(item.comments)}.`)));
+  }
+  return nodes;
+}
+
+/** A comment as github.com draws it: "user commented 3d ago" over the text, a discussion's replies in cards inside. */
+function commentCard(comment: CommentInfo, repo: RepoInfo, now: number, empty: string): LayoutNode {
+  const header = [bold(comment.user), text(` commented ${formatAge(comment.createdAt, now)}`), ...(comment.answer ? [text("  •  "), bold("✓ Answer")] : [])];
+  const replies = (comment.replies ?? []).map((reply) => commentCard(reply, repo, now, ""));
+  return card(header, [...markdownOr(comment.body, repo, empty), ...replies]);
 }
 
 function markdownOr(body: string, repo: RepoInfo, empty: string): LayoutNode[] {
-  return body ? resolveRelative(parseMarkdown(body), repo, repo.defaultBranch, "") : [paragraph({ kind: "italic", text: empty })];
-}
-
-/** Indent of a reply under its discussion comment. */
-const REPLY_INDENT = 16;
-
-function commentNodes(comment: CommentInfo, repo: RepoInfo, now: number): LayoutNode[] {
-  const byline = (item: CommentInfo) => paragraph(bold(item.user), text(`  •  ${formatAge(item.createdAt, now)}${item.answer ? "  •  Answer" : ""}`));
-  const replies = (comment.replies ?? []).map((reply): LayoutNode => ({
-    type: "columns",
-    gap: 0,
-    minWidth: 0,
-    columns: [{ width: REPLY_INDENT, nodes: [] }, { nodes: [byline(reply), ...markdownOr(reply.body, repo, "")] }],
-  }));
-  return [{ type: "hr" }, byline(comment), ...markdownOr(comment.body, repo, ""), ...replies];
+  if (body) return resolveRelative(parseMarkdown(body), repo, repo.defaultBranch, "");
+  return empty ? [paragraph(italic(empty))] : [];
 }
 
 /** Choose a category, as github.com asks first; then the title and what to say. */
 function newDiscussionNodes(page: Extract<GithubPage, { view: "newDiscussion" }>, forms: PageForms): LayoutNode[] {
   const { repo, category } = page;
   if (!category) {
-    const nodes: LayoutNode[] = [heading(2, "Start a new discussion"), paragraph(text("Select a category:"))];
-    for (const item of page.categories) {
+    const rows = page.categories.map((item): LayoutNode[] => {
       const target: GithubLocation = { kind: "newDiscussion", owner: repo.owner, repo: repo.name, category: item.slug };
-      nodes.push(heading(3, item.name, githubUrl(target)));
-      if (item.description) nodes.push(paragraph(text(item.description)));
-    }
-    if (page.categories.length === 0) nodes.push(paragraph(text("This repository has no discussion categories.")));
-    return nodes;
+      return [heading(3, item.name, githubUrl(target)), ...(item.description ? [paragraph(text(item.description))] : [])];
+    });
+    return [heading(2, "Start a new discussion"), paragraph(text("Select a category:")), list(rows, "This repository has no discussion categories.")];
   }
   const here: GithubLocation = { kind: "newDiscussion", owner: repo.owner, repo: repo.name, category: category.slug };
-  const nodes: LayoutNode[] = [heading(2, `New discussion in ${category.name}`)];
+  const nodes: LayoutNode[] = [heading(2, `Start a new discussion in ${category.name}`)];
   if (category.description) nodes.push(paragraph(text(category.description)));
-  if (!forms.signedIn) return [...nodes, signInForm(here, "Sign In to Start a Discussion")];
+  if (!forms.signedIn) return [...nodes, paragraph(text("Sign in to start a discussion.")), signInForm(here, "Sign In")];
   return [
     ...nodes,
     ...postForm({ kind: "discussions", owner: repo.owner, repo: repo.name }, forms, [

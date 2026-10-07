@@ -31,6 +31,7 @@ function links(nodes: readonly LayoutNode[]): string[] {
     if (node.type === "paragraph" || node.type === "listItem") {
       return node.segments.flatMap((segment) => (segment.kind === "link" ? [segment.href] : []));
     }
+    if (node.type === "box") return links(node.nodes);
     return [];
   });
 }
