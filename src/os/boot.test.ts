@@ -286,6 +286,27 @@ describe("bootOS on the headless platform", () => {
     expect(inkMax).toBeGreaterThanOrEqual(13);
   });
 
+  it("wraps a long alert message inside the frame and grows the alert to fit it", () => {
+    void os.services.showDialog({
+      message:
+        '"showreel" stopped: Uncaught Error: [REACTIVE_WRITE_IN_OWNED_SCOPE] Writing to reactive state inside an owned scope (component, computation) is not allowed. Move the write outside or set the `ownedWrite` option if this is intentional.',
+    });
+    platform.tick();
+
+    const dialog = getWindows().find((w) => w.appId === "__dialog__")!;
+    expect(dialog.height).toBeGreaterThan(112);
+
+    const frame = platform.lastFrame()!;
+    const inset = 1 + 2 + 2;
+    const top = dialog.y + inset;
+    // No message ink in the right padding, inside the inner frame.
+    const right = dialog.x + dialog.width - inset - 16;
+    expect(inkCoverage(frame, right, top, 16, dialog.height)).toBe(0);
+    // The OK ring still starts below the last line of the message.
+    const btnTop = top + dialog.height - 16 - 28;
+    expect(inkCoverage(frame, dialog.x + inset + 16, btnTop - 8, 150, 6)).toBe(0);
+  });
+
   it("switches the front application from the menu at the right of the menubar", () => {
     registerApp({
       id: "switch-a",

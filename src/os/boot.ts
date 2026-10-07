@@ -60,7 +60,7 @@ import { declaredApp, type AppDeclaration } from "./appDeclaration";
 import { openAppAboutBox, ABOUT_SIZE } from "./components/AppAboutBox.solid";
 import bundledDeclarations from "../../apps/declarations.generated.json";
 import { buildAppWindow } from "./appWindow";
-import { DialogApp } from "./components/Dialog.solid";
+import { DialogApp, dialogSize } from "./components/Dialog.solid";
 import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
 import type { SystemSignIn } from "./signIn";
 import { createAppInstaller, migrateBundledDesktopShortcuts } from "./installedApps";
@@ -362,10 +362,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
             variant: options.variant ?? "stop",
             resolve,
           },
-          size: {
-            width: 376,
-            height: options.showInput ? 148 : 112,
-          },
+          size: dialogSize(options),
         });
       });
     },
