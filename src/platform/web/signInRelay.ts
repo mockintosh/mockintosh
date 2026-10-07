@@ -1,9 +1,13 @@
 import type { FetchFunction } from "@mockintosh/sdk";
 import type { SignInPollResult, SignInRelay } from "../types";
 
-/** The page's origin with `localhost` spelled as a loopback literal, which providers (Spotify) require for redirect URIs (RFC 8252 §7.3). */
+/**
+ * The page's origin with `localhost` spelled as a loopback literal, which
+ * providers (Spotify) require for redirect URIs (RFC 8252 §7.3). IPv4,
+ * because GitHub won't register an IPv6 one; the dev server listens there.
+ */
 function loopbackLiteral(origin: string): string {
-  return origin.replace("//localhost", "//[::1]").replace("//127.0.0.1", "//[::1]");
+  return origin.replace("//localhost", "//127.0.0.1").replace("//[::1]", "//127.0.0.1");
 }
 
 interface StartResponse {

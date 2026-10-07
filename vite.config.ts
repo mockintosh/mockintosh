@@ -192,6 +192,8 @@ export default defineConfig({
     },
   },
   server: {
+    // Where the sign-in relay's loopback redirect lands (src/platform/web/signInRelay.ts); localhost still reaches it.
+    host: "127.0.0.1",
     headers: isolationHeaders,
     proxy: {
       "/api": {
