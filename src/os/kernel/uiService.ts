@@ -146,8 +146,9 @@ export function registerUIOperations(kernel: Kernel, os: OSServices, host: UIHos
       });
       if (action === "drag") {
         t.check();
-        x = a.x;
-        y = a.y;
+        // The schema requires x and y for drag.
+        x = a.x as number;
+        y = a.y as number;
         host.pointer({
           type: "move",
           x,
@@ -266,8 +267,9 @@ export function registerUIOperations(kernel: Kernel, os: OSServices, host: UIHos
           y
         });
         if (a.gesture === "drag") {
-          x = a.toX;
-          y = a.toY;
+          // Checked above: a drag has toX and toY.
+          x = a.toX!;
+          y = a.toY!;
           host.pointer({
             type: "move",
             x,

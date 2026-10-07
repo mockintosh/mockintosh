@@ -9,6 +9,7 @@ import type { JSX } from "@mockintosh/ui";
 import { useOS, type OSServices } from "../context";
 import { getApp, type SolidApp } from "../apps";
 import { openSystemWindow } from "../systemWindows";
+import type { WindowComponent } from "../state";
 
 const ICON_SIZE = 32;
 export const ABOUT_SIZE = { width: 343, height: 120 };
@@ -60,7 +61,7 @@ export function openAppAboutBox(os: OSServices, app: SolidApp): string {
     title: `About ${app.title}`,
     kind: "dialog",
     size: app.about?.size ?? ABOUT_SIZE,
-    Component: custom ?? AppAboutBox,
+    Component: (custom ?? AppAboutBox) as WindowComponent,
     props,
   });
 }

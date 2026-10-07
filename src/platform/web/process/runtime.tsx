@@ -55,6 +55,7 @@ import { createWorkerMedia } from "./media";
 import { createWebGpuService } from "../media/gpu";
 import { createFsMirror } from "./fsMirror";
 import { createWorkerVideo } from "./video";
+import { webFetch } from "../fetch";
 
 /** The worker's global scope, as far as a process uses it. */
 export interface ProcessScope {
@@ -350,7 +351,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         notify("window.open", key, wire);
         return key;
       },
-      fetch: capabilities.has("network") ? globalThis.fetch.bind(globalThis) : undefined,
+      fetch: capabilities.has("network") ? webFetch : undefined,
       env: start.env,
       crypto: {
         randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),

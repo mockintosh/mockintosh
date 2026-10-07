@@ -137,8 +137,8 @@ describe("ChatGippity agent loop", () => {
       await os.kernel.invoke(caller, "project_create", { path: project, id: "check_me", title: "Check Me", template: "blank" });
       const check = await os.kernel.invoke(caller, "project_check", { path: project }) as { diagnostics: unknown[] };
       expect(check.diagnostics).toEqual([]);
-      const instance = os.services.instances.create("check_me");
-      os.services.instances.note(instance, new Error("handler blew up"), "handler");
+      const instance = os.services.instances!.create("check_me");
+      os.services.instances!.note(instance, new Error("handler blew up"), "handler");
       const logs = await os.kernel.invoke(caller, "logs", {}) as { message: string; source: string }[];
       expect(logs.some((row) => row.message === "handler blew up" && row.source === "handler")).toBe(true);
     });

@@ -119,7 +119,7 @@ export default defineApp({ id: ${JSON.stringify(useAppId)}, title: "UseApp Probe
   const production = await preview({preview: {port: 0}});
   try {
     const productionPage = await browser.newPage();
-    await productionPage.goto(production.resolvedUrls.local[0]);
+    await productionPage.goto(production.resolvedUrls!.local[0]);
     const workerFile = (await readdir("dist/assets")).find(file => /^worker-.*\.js$/.test(file));
     assert(workerFile, "Run npm run build before the browser test");
     const built = await productionPage.evaluate(async ({workerFile, source}) => {

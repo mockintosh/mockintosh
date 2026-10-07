@@ -187,8 +187,7 @@ export function Window(props: WindowProps): JSX.Element {
     updateOSWindow(windowId, { [field]: next, height: bodyHeight });
   }
 
-  function spriteSrc(s: ReturnType<typeof os.sprites.get>) {
-    if (!s) return undefined;
+  function spriteSrc(s: NonNullable<ReturnType<typeof os.sprites.get>>) {
     return { width: s.width, height: s.height, data: s.data, mask: s.mask };
   }
 

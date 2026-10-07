@@ -3,7 +3,7 @@
     "lib": ["dom", "dom.iterable", "esnext", "WebWorker"],
     "allowJs": true,
     "skipLibCheck": true,
-    "strict": false,
+    "strict": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "esModuleInterop": true,
