@@ -29,6 +29,18 @@ export function rsect(rects: Rect[]): Rect | null {
   return { top, left, bottom, right };
 }
 
+/**
+ * Test bit `h` in a SeekRgn/RgnBlt scan buffer (word 0 at `bufLeft`,
+ * bit 15 = leftmost pixel of the word). `SeekRgn.a:128-142` / `Util.a:266-269`.
+ */
+export function maskBit(buf: Uint16Array, bufLeft: number, h: number): boolean {
+  const rel = (h - bufLeft) | 0;
+  if (rel < 0) return false;
+  const word = rel >>> 4;
+  if (word >= buf.length) return false;
+  return ((buf[word]! >>> (15 - (rel & 15))) & 1) !== 0;
+}
+
 /** Apply one source pixel under `mode` (`mode & 4` inverts). */
 export function applyPixel(dst: BitMap, h: number, v: number, src: 0 | 1, mode: number): void {
   const x = h - dst.bounds.left;

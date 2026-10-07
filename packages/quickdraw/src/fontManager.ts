@@ -133,7 +133,7 @@ export function fallbackFMOutput(inRec: FMInput): FMOutput {
 let swapFont: SwapFont | null = null;
 
 /**
- * Install `_SwapFont`.
+ * Install `_SwapFont`. Replaces the deprecated `__injectFontFunctions` hook.
  */
 export function installFontManager(fn: SwapFont): void {
   swapFont = fn;
@@ -144,3 +144,6 @@ export function currentSwapFont(): SwapFont {
   return swapFont ?? fallbackFMOutput;
 }
 
+export function hasFontManager(): boolean {
+  return swapFont !== null;
+}

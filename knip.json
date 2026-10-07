@@ -1,9 +1,17 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["python3"],
+  "ignoreBinaries": [
+    "python3"
+  ],
   "ignoreIssues": {
-    "packages/ui/src/fonts/faces/redaction.ts": ["exports"]
+    "packages/ui/src/fonts/faces/redaction.ts": [
+      "exports"
+    ],
+    "packages/quickdraw/**": [
+      "exports",
+      "types"
+    ]
   },
   "workspaces": {
     ".": {
@@ -15,13 +23,19 @@
         "scripts/builder/demo.ts",
         "scripts/companion/headlessRuntime.ts"
       ],
-      "ignore": ["templates/**"]
+      "ignore": [
+        "templates/**"
+      ]
     },
     "packages/sdk": {
-      "entry": ["examples/**/*.tsx"]
+      "entry": [
+        "examples/**/*.tsx"
+      ]
     },
     "packages/ui": {
-      "entry": ["src/vite/dither-asset.d.ts"]
+      "entry": [
+        "src/vite/dither-asset.d.ts"
+      ]
     }
   }
 }

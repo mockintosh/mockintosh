@@ -3,7 +3,7 @@
  * terminated by `V=32767` (`PackRgn.a:13-19`).
  */
 
-import type { Point, Rect, Region } from "./types";
+import type { Point, Rect, Region, RgnHandle } from "./types";
 
 export const RGN_END = 32767;
 
@@ -15,6 +15,27 @@ export function isRectRgn(rgn: Region): boolean {
 
 export function rgnByteSize(data: Int16Array): number {
   return data.length === 0 ? 10 : 10 + data.length * 2;
+}
+
+/** Fake 18-byte expansion of a rectangle (`RgnOp.a:258-281`). */
+export function expandRectData(bbox: Rect): Int16Array {
+  return Int16Array.from([
+    bbox.top,
+    bbox.left,
+    bbox.right,
+    RGN_END,
+    bbox.bottom,
+    bbox.left,
+    bbox.right,
+    RGN_END,
+    RGN_END,
+  ]);
+}
+
+/** Region data pointer: rectangular regions expand; complex ones use `data`. */
+export function regionStream(rgn: Region): Int16Array {
+  if (isRectRgn(rgn)) return expandRectData(rgn.rgnBBox);
+  return rgn.data;
 }
 
 export function emptyRegion(): Region {
@@ -77,3 +98,6 @@ export function cloneRegionInto(src: Region, dst: Region): void {
   dst.data = src.data.length === 0 ? EMPTY_DATA : Int16Array.from(src.data);
 }
 
+export function ensureRegionData(rgn: RgnHandle): void {
+  if (!rgn.rgn.data) rgn.rgn.data = EMPTY_DATA;
+}
