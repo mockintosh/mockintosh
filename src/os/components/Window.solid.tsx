@@ -444,14 +444,15 @@ export function Window(props: WindowProps): JSX.Element {
             </Show>
           </Show>
 
-          {/* Title text — optical middle (cap box), not the full Decker cell. Untitled palettes omit it. */}
+          {/* Title text — optical middle (cap box), not the full Decker cell, centered
+              above the separator line. Untitled palettes omit it. */}
           <Show when={props.win.title}>
           <text
             position="absolute"
             left={0}
             top={0}
             width={innerW()}
-            height={barInner()}
+            height={barInner() - 1}
             font="menu"
             align="center"
             verticalAlign="middle"

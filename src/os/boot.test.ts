@@ -558,6 +558,35 @@ describe("bootOS on the headless platform", () => {
     expect(titleBarStripeLines(platform.lastFrame()!, even.x, even.y)).toBe(6);
   });
 
+  it("centers the title's caps on the close box, above the separator", () => {
+    registerApp({
+      id: "test-title-middle",
+      title: "HIH",
+      icon: "icon/computer",
+      defaultSize: { width: 180, height: 50 },
+      Component: () => null,
+      onOpen(app) {
+        app.openWindow({ position: { x: 40, y: 80 }, size: { width: 180, height: 50 }, title: "HIH" });
+      },
+    });
+    os.services.openApp("test-title-middle");
+    platform.tick();
+
+    const win = getWindows().find((w) => w.appId === "test-title-middle")!;
+    const frame = platform.lastFrame()!;
+    const inkRows = (x0: number, w: number) => {
+      const rows: number[] = [];
+      for (let y = win.y + 1; y < win.y + TITLE_BAR_H - 1; y++) {
+        if (inkCoverage(frame, x0, y, w, 1) > 0) rows.push(y);
+      }
+      return rows;
+    };
+    // Window center column holds only the title; the close box sits 7px in from the frame.
+    const caps = inkRows(win.x + win.width / 2 - 6, 12);
+    const box = inkRows(win.x + 1 + 7, 11);
+    expect(caps[0]! - box[0]!).toBe(box.at(-1)! - caps.at(-1)!);
+  });
+
   it("opens submenus on hover, runs their items, and binds their shortcuts", () => {
     const ran: string[] = [];
     registerApp({
