@@ -61,15 +61,6 @@ describe("fx in Terminal", () => {
     await until((l) => l.includes("1"));
   });
 
-  it("refuses the approval mode that freezes in the browser", async () => {
-    const { runtime, runs } = scriptedRuntime();
-    const { type, until } = await terminal(runtime);
-    await until((l) => l[0] === "~ $");
-    type("export AI_GATEWAY_API_KEY=k; FX_PERMISSION_MODE=ask fx\r");
-    await until((l) => l.some((x) => x.includes("freezes fx")));
-    expect(runs).toHaveLength(0);
-  });
-
   it("says so on a Macintosh without fx's engine", async () => {
     const { type, until } = await terminal(undefined);
     await until((l) => l[0] === "~ $");
@@ -88,7 +79,9 @@ describe("fx in Terminal", () => {
     type("cd proj && FX_MODEL=grok-5 fx --continue\r");
     await until(() => runs.length === 1);
     const run = runs[0]!;
-    expect(run.options).toMatchObject({ apiKey: "vck_from_bashrc", args: ["--continue"], env: { FX_MODEL: "grok-5", FX_PERMISSION_MODE: "full-access" } });
+    expect(run.options).toMatchObject({ apiKey: "vck_from_bashrc", args: ["--continue"], env: { FX_MODEL: "grok-5" } });
+    // The workspace is the sandbox: fx runs commands without review.
+    expect(run.options.workspace!.permission).toBe("allow");
     expect(run.options.instructions).toContain(SHELL_AGENT_BRIEF);
     expect(run.options.instructions).toContain("Project instructions from /disk/proj/AGENTS.md:\n\nUse tabs, not spaces.");
     expect(run.options.workspace!.root).toBe("/disk/proj");

@@ -27,18 +27,9 @@ const FX_MODE: Termios = { canonical: false, echo: false, signals: false, crToNl
 
 export const KEY_VARIABLE = "AI_GATEWAY_API_KEY";
 
-/**
- * How fx decides about running a command. In the browser build (libfx
- * 0.0.11 through 0.0.13) "auto" has no safety reviewer, so it holds every
- * command, and "ask" spins without yielding once it asks, which freezes the
- * window. Full access works, and fx's shell only reaches this Macintosh's
- * disk and windows, never the computer it runs on. See libfx-findings.md.
- */
-export const DEFAULT_PERMISSION_MODE = "full-access";
-
-/** fx's own variables (FX_MODEL, FX_PERMISSION_MODE, …) from the shell's environment, with the default mode. */
+/** fx's own variables (FX_MODEL, FX_PERMISSION_MODE, …) from the shell's environment. */
 export function fxEnvironment(env: Record<string, string>): Record<string, string> {
-  const out: Record<string, string> = { FX_PERMISSION_MODE: DEFAULT_PERMISSION_MODE };
+  const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(env)) if (name.startsWith("FX_")) out[name] = value;
   return out;
 }
@@ -59,13 +50,6 @@ export function fxProgram(options: FxProgramOptions): TtyProgram {
         return 1;
       }
       const fxEnv = fxEnvironment(env);
-      if (/^ask$/i.test(fxEnv.FX_PERMISSION_MODE!)) {
-        say("fx: FX_PERMISSION_MODE=ask freezes fx in the browser once it asks for approval (libfx 0.0.13).\nUse full-access (the default here) or unset it.\n");
-        return 1;
-      }
-      if (fxEnv.FX_PERMISSION_MODE === DEFAULT_PERMISSION_MODE && !env.FX_PERMISSION_MODE) {
-        say("fx runs commands without asking: its shell reaches only this Macintosh's disk and windows.\n");
-      }
       const tty = job.tty;
       const saved = tty.getAttr();
       tty.setAttr(FX_MODE);
@@ -106,6 +90,8 @@ export function fxProgram(options: FxProgramOptions): TtyProgram {
               return () => resizeHandlers.delete(handler);
             },
           },
+          // The workspace is the sandbox (bash on this Macintosh, never the host), so fx
+          // runs its commands without review; see libfx-findings.md.
           workspace: bashWorkspace(options.kernel, { root: cwd }),
           ...(options.storage ? { storage: options.storage } : {}),
           ...(options.openUrl ? { openUrl: options.openUrl } : {}),

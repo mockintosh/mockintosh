@@ -28,11 +28,18 @@ function limit(text: string, bytes: number): string {
   return new TextDecoder().decode(encoded.subarray(0, bytes)) + "\n[output truncated]\n";
 }
 
+/**
+ * `permission` "allow" (the default) tells the agent the workspace is its
+ * sandbox, so it runs commands without asking or review; access is limited
+ * here instead, to bash on this Macintosh. "prompt" has the agent apply its
+ * own permission mode, which in fx's browser build can't run a command
+ * (libfx-findings.md).
+ */
 export function bashWorkspace(kernel: KernelLike, options: { root?: string; permission?: "allow" | "prompt" } = {}): BashWorkspace {
   const root = options.root ?? HOME;
   return {
     root,
-    permission: options.permission ?? "prompt",
+    permission: options.permission ?? "allow",
     async exec(request) {
       // A fresh shell per command, as an agent's tool expects: no state leaks between calls.
       const session = new BashSession({ kernel, cwd: request.cwd || root });

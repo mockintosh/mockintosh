@@ -4,22 +4,24 @@ Mockintosh runs fx's terminal interface (`createFxTerminal` from [libfx](https:/
 
 - **Versions tested:** libfx 0.0.11, 0.0.13 and 0.0.13-dev.1415.g607b1632fff6. The results below are the same in all three unless noted.
 - **Backend:** `wasm-jspi`, the browser build's core. The terminal surface has no native addon (`LIBFX_NATIVE_SURFACE_MISSING`), so in Node 24 libfx runs the same WebAssembly core as in Chrome.
-- **Model:** a scripted gateway passed as `fetch`, so the runs are deterministic and need no key (see [Repro](#repro)). On 7 October 2026 we confirmed #1 against the live AI Gateway (0.0.13, model `grok-4.7`), and checked that full access works there end to end (see [Live check](#live-check)).
+- **Model:** a scripted gateway passed as `fetch`, so the runs are deterministic and need no key (see [Repro](#repro)). On 7 October 2026 we confirmed #1 against the live AI Gateway (0.0.13, model `grok-4.7`), and checked the working setup there end to end (see [Live check](#live-check)).
+
+**The working setup**, which Mockintosh uses: give `createFxTerminal` a workspace with `permission: "allow-sandboxed"`. The [Terminal docs](https://fx.sh/docs/lib/terminal.md) say that with it "fx runs commands without asking; your adapter enforces access restrictions". fx then runs workspace commands in its default mode, with no reviewer and no full access. Even `FX_PERMISSION_MODE=ask` doesn't prompt, so it doesn't freeze. Issues 1, 2 and 4 only arise with `permission: "prompt"`, which hands commands to fx's own permission mode. We first chose `"prompt"`, met #1 and #2, and worked around them with full access before finding this.
 
 ## Summary
 
 | # | Finding | Severity for an embedder |
 |---|---|---|
-| 1 | Auto permission mode, the default, holds every workspace command: no safety reviewer is configured and none is ever requested | High: the default mode can't run any command |
-| 2 | Ask mode busy-waits once it asks for approval: 100% CPU, the event loop never runs again, the approval key can't arrive | High: freezes the tab or worker |
+| 1 | With a `"prompt"` workspace, auto mode, the default, holds every command: no safety reviewer is configured and none is ever requested | High for `"prompt"` workspaces: the default mode can't run any command |
+| 2 | With a `"prompt"` workspace, ask mode busy-waits once it asks for approval: 100% CPU, the event loop never runs again, the approval key can't arrive | High for `"prompt"` workspaces: freezes the tab or worker |
 | 3 | The terminal surface takes no host context: `instructions`, `tools` and skills are ignored, `--system` refuses to start, and `AGENTS.md` is never read in the browser | Medium: the agent doesn't know where it is |
-| 4 | Full-access acknowledgment shows a ✗ notice at every start: it is written to a settings file the browser build can't open | Low: cosmetic |
+| 4 | In full access, an acknowledgment notice (✗) appears at every start: it is written to a settings file the browser build can't open | Low: cosmetic |
 | 5 | `FX_PERMISSION_MODE` takes undocumented values and silently ignores unknown ones (`full_access` falls back to auto) | Low |
 | 6 | Several host contracts are undocumented: the workspace `info` rules, store shapes, the gateway stream format | Low: documentation |
 
-## 1. Auto mode holds every workspace command
+## 1. With a `"prompt"` workspace, auto mode holds every command
 
-**What happens.** In the default permission mode the model's `shell` call never runs. fx shows `└ Review unavailable echo hello`, and the tool result sent back to the model is:
+**What happens.** With `workspace.permission: "prompt"` and the default permission mode, the model's `shell` call never runs. fx shows `└ Review unavailable echo hello`, and the tool result sent back to the model is:
 
 ```json
 {"type":"execution-denied","reason":"{\"error\":{\"type\":\"tool_review_held\",\"tool_name\":\"shell\",\"message\":\"Safety reviewer unavailable; action held\",\"reason\":\"review_unavailable\",\"review_cause\":\"reviewer_unconfigured\",\"held\":true,\"suggestion\":\"The action did not run because safety review was unavailable. Continue with a different safe action or retry later.\"}}"}
@@ -27,22 +29,17 @@ Mockintosh runs fx's terminal interface (`createFxTerminal` from [libfx](https:/
 
 Only two model requests are made: the turn, and its continuation with the denial. No reviewer request is ever sent, so this isn't the gateway failing; nothing is configured to review. The system prompt still says "permission mode is auto … fx sends each unresolved action to a narrow safety reviewer".
 
-**Expected.** One of:
-- the embedded build has a working reviewer (through the same gateway);
-- it defaults to a mode that can run commands;
-- the reviewer can be configured with a documented option or variable.
-
-`FX_REVIEW_MODEL` appears among the core's strings but isn't documented.
+**Expected.** fx's [permission docs](https://fx.sh/docs/configure-fx/permissions.md) say auto mode sends "unrecognized or dynamic shell commands" to a reviewer model (`openai/gpt-5.6-luna` on the AI Gateway by default), which `review_model` in `~/.fx/settings.json` or `FX_REVIEW_MODEL` can change. In the embedded build no reviewer is ever called. Setting `FX_REVIEW_MODEL=openai/gpt-5.6-luna` changes nothing: still two requests, still `reviewer_unconfigured`. Either the reviewer should work through the host's gateway (`fetch`), or the docs should say that a `"prompt"` workspace can't run commands in auto mode. Even `echo hello` was held, though the docs class "recognized project commands" as routine.
 
 The live gateway gives the same result. The command was held with `review_cause: "reviewer_unconfigured"`, there were two model requests and no reviewer request, and the model's reply was "Blocked."
 
-**Impact.** fx's default can't do anything with the workspace. An embedder has to discover the problem and set `FX_PERMISSION_MODE` themselves.
+**Impact.** With a `"prompt"` workspace, fx's default can't do anything with it.
 
-**Mockintosh today.** Sets `FX_PERMISSION_MODE=full-access` (`DEFAULT_PERMISSION_MODE` in `fx.ts`) and tells the user so when fx starts. Our workspace's shell only reaches the simulated machine.
+**Mockintosh today.** Uses `"allow-sandboxed"` (the working setup above). Our workspace is the sandbox: bash on the simulated machine, never the host.
 
-## 2. Ask mode freezes once it asks
+## 2. With a `"prompt"` workspace, ask mode freezes once it asks
 
-**What happens.** With `FX_PERMISSION_MODE=ask`, fx starts normally and its status line reads `ask · …`. When the model's `shell` call needs approval, the process goes to 100% CPU and never returns to the event loop:
+**What happens.** With `workspace.permission: "prompt"` and `FX_PERMISSION_MODE=ask`, fx starts normally and its status line reads `ask · …`. When the model's `shell` call needs approval, the process goes to 100% CPU and never returns to the event loop:
 - the repro's 10-second `setTimeout` watchdog never fires;
 - `fetch` and terminal input are never serviced;
 - the key that would answer the prompt can't be delivered.
@@ -55,7 +52,7 @@ Idle Ask mode, with no pending approval, doesn't spin.
 
 **Impact.** In a browser this freezes the tab, or the Web Worker running fx. We reproduced it in Node; we didn't try it in a browser, where it would freeze the window.
 
-**Mockintosh today.** `fx` refuses `FX_PERMISSION_MODE=ask` with this explanation instead of starting.
+**Mockintosh today.** Unaffected: with `"allow-sandboxed"`, fx never asks.
 
 ## 3. No host context on the terminal surface
 
@@ -73,7 +70,7 @@ Idle Ask mode, with no pending approval, doesn't spin.
 
 **Mockintosh today.** Every model request goes through the `fetch` the host supplies, so `fetchWithInstructions` (`src/platform/web/agentInstructions.ts`) inserts one more system message after fx's own: our brief plus any `AGENTS.md`. It works with 0.0.11 and 0.0.13, but it depends on the gateway request format (`{ prompt: [...] }`), which isn't a public contract.
 
-## 4. ✗ notice at every start in full access
+## 4. ✗ notice at every start in full access (`FX_PERMISSION_MODE=full-access`)
 
 **What happens.** Each start in full access prints `✗ full-access-acknowledgment: active for this process but not saved to user settings (FileNotFound)`, or `(HomeNotSet)` without `HOME` in `env`. The host supplies `configStore`, but the acknowledgment is saved to a settings file through WASI, which the browser build can't open.
 
@@ -93,14 +90,14 @@ The core has `InvalidPermissionMode` errors, but they aren't raised for these. *
 
 These work, but we found them by reading `fx-sdk.js` and the core's strings. Documenting them would help embedders:
 
-- **Workspace info.** `prepareWorkspaceAdapter` silently rejects a workspace unless `version` is 1, `cwd === root`, `gitAvailable === false`, `ephemeral === true`, and `permission` is `"allow-sandboxed"` or `"prompt"`. In our runs `"prompt"` didn't change the permission mode, which stayed auto.
+- **Workspace info.** `prepareWorkspaceAdapter` silently rejects a workspace unless `version` is 1, `cwd === root`, `gitAvailable === false`, `ephemeral === true`, and `permission` is `"allow-sandboxed"` or `"prompt"`. The Terminal docs describe `permission`, but not that `"prompt"` combined with the default mode runs nothing in the browser (#1).
 - **`sessionStore.list()`.** The record shape is unknown. The core's strings mention `updated_at_ms`, `created_at_ms` and `revision`. We return `[]`, so resuming from a picker isn't offered.
 - **Gateway stream.** The `fetch` response the core accepts is AI SDK stream parts as SSE (`data: {…}`). `finish` needs `finishReason: { unified, raw }` and nested `usage` (`inputTokens: { total, noCache, cacheRead, cacheWrite }`, `outputTokens: { total, text, reasoning }`). The older flat shapes fail with `InvalidProviderFinishReason`. This is what lets an embedder test fx without a key; see the repro.
 - **Types.** The package ships no TypeScript declarations (we keep our own in `src/platform/web/libfx.d.ts`).
 
 ## Repro
 
-Plain libfx, no Mockintosh code. Save as `repro.mjs` in a folder with `{ "type": "module" }` in its `package.json`, run `npm install libfx@0.0.13`, then:
+Plain libfx, no Mockintosh code. The script uses `permission: "prompt"`, the setting that triggers #1 and #2; change it to `"allow-sandboxed"` and every mode runs the command. Save as `repro.mjs` in a folder with `{ "type": "module" }` in its `package.json`, run `npm install libfx@0.0.13`, then:
 
 ```bash
 node repro.mjs               # 1: held, reviewCause "reviewer_unconfigured", shellCommandsRun []
@@ -203,7 +200,7 @@ In Mockintosh, `packages/terminal/tests/fx.test.ts` runs real fx the same way th
 FX_LIVE_KEY_FILE=/path/to/key FX_LIVE_LOG=/tmp/fx-live.log npx vitest run packages/terminal/tests/fx.live.test.ts
 ```
 
-Asked to "build and launch a small Mockintosh app titled Hello Fx … whose window shows the text Hello from fx", fx (0.0.13, `grok-4.7`, full access, with our brief) did it in about 25 seconds, and did it twice:
+Asked to "build and launch a small Mockintosh app titled Hello Fx … whose window shows the text Hello from fx", fx (0.0.13, `grok-4.7`, with our brief; this run used full access, before we found `"allow-sandboxed"`) did it in about 25 seconds, and did it twice:
 1. read examples under `/system/source/apps`;
 2. ran `project … blank`;
 3. wrote `src/index.tsx`;

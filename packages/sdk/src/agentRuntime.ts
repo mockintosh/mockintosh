@@ -111,7 +111,11 @@ export interface AgentWorkspace {
   /** The working directory, and the agent's home. */
   root: string;
   exec(request: AgentWorkspaceRequest): Promise<{ exitCode: number; stdout: string; stderr: string }>;
-  /** "allow" runs commands without asking; "prompt" (the default) has the agent ask first. */
+  /**
+   * "allow": the workspace is the agent's sandbox, so it runs commands
+   * without asking (libfx's "allow-sandboxed"). "prompt" (the default): the
+   * agent applies its own permission mode first.
+   */
   permission?: "allow" | "prompt";
 }
 
