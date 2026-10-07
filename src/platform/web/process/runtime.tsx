@@ -71,6 +71,7 @@ interface ProcessWindow {
   props: Record<string, unknown>;
   onGoAway?: () => void;
   width: Accessor<number>;
+  bandWidth: Accessor<number>;
   height: Accessor<number>;
   active: Accessor<boolean>;
   kind: Accessor<WindowKind>;
@@ -198,7 +199,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
     if (sendStats) post({ t: "frameStats", frameMs, audioMs: audioMs.splice(0) });
     reportRawKeys();
     for (const w of attached()) {
-      const width = untrack(w.width);
+      const width = untrack(() => pictureWidth(w));
       const height = Math.min(bandHeight, untrack(() => pictureHeight(w)));
       const rowBytes = rowBytesFor(width);
       const picture = new Uint8Array(rowBytes * height);
@@ -223,6 +224,11 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
   /** Header, body and footer: the rows of a window's picture. */
   function pictureHeight(w: Pick<ProcessWindow, "header" | "height" | "footer">): number {
     return w.header().height + w.height() + w.footer().height;
+  }
+
+  /** The bands run over the scroll bar column too, so a picture is as wide as the wider of them and the body. */
+  function pictureWidth(w: Pick<ProcessWindow, "width" | "bandWidth">): number {
+    return Math.max(w.width(), w.bandWidth());
   }
 
   function setWindowMenus(w: Pick<ProcessWindow, "key" | "menuIds">, menus: MenubarDefinition[]): void {
@@ -382,6 +388,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
     if (!opened || !ui) return;
     opening.delete(key);
     const [width, setWidth] = createSignal(state.width, { ownedWrite: true });
+    const [bandWidth, setBandWidth] = createSignal(state.bandWidth, { ownedWrite: true });
     const [height, setHeight] = createSignal(state.height, { ownedWrite: true });
     const [active, setActive] = createSignal(state.active, { ownedWrite: true });
     const [kind, setKind] = createSignal(state.kind, { ownedWrite: true });
@@ -400,12 +407,14 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
       slot: freeSlot(),
       ...opened,
       width,
+      bandWidth,
       height,
       active,
       kind,
       scrollY,
       setState(next) {
         setWidth(next.width);
+        setBandWidth(next.bandWidth);
         setHeight(next.height);
         setActive(next.active);
         setKind(next.kind);
@@ -553,7 +562,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
               position="absolute"
               left={0}
               top={w.slot * bandHeight}
-              width={w.width()}
+              width={pictureWidth(w)}
               height={pictureHeight(w)}
               overflow="hidden"
               focusScope
@@ -563,8 +572,8 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
             >
               <AppServicesContext value={w.services}>
                 <WindowSlotsContext value={w.slots}>
-                  <box width={w.width()} height={pictureHeight(w)} flexDirection="column">
-                    {w.header().view && <box width={w.width()} height={w.header().height}>{w.header().view!()}</box>}
+                  <box width={pictureWidth(w)} height={pictureHeight(w)} flexDirection="column">
+                    {w.header().view && <box width={w.bandWidth()} height={w.header().height}>{w.header().view!()}</box>}
                     <box width={w.width()} height={w.height()} overflow="hidden" position="relative">
                       {/* A scrollable window's document, moved to what the OS has scrolled to. */}
                       <box
@@ -586,7 +595,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
                         </Errored>
                       </box>
                     </box>
-                    {w.footer().view && <box width={w.width()} height={w.footer().height}>{w.footer().view!()}</box>}
+                    {w.footer().view && <box width={w.bandWidth()} height={w.footer().height}>{w.footer().view!()}</box>}
                   </box>
                 </WindowSlotsContext>
               </AppServicesContext>

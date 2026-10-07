@@ -66,7 +66,7 @@ describe("an app process", () => {
     expect(posted.some((m) => m.t === "started")).toBe(true);
     const [black, white] = opens.map((m) => m.args[0] as string);
 
-    const state = { width: 24, height: 10, active: false, kind: "document" as const, scrollY: 0 };
+    const state = { width: 24, bandWidth: 24, height: 10, active: false, kind: "document" as const, scrollY: 0 };
     send({ t: "window.attach", key: black!, state: { ...state, active: true } });
     send({ t: "window.attach", key: white!, state });
     await settle();
@@ -91,7 +91,8 @@ describe("an app process", () => {
     expect(posted.at(-1)).toEqual({ t: "stopped" });
   });
 
-  it("tells the OS its header's height and draws it above a body of the OS's height", async () => {
+  it("tells the OS its header's height and draws it above a body of the OS's height, as wide as the band", async () => {
+    let headerWidth = 0;
     const app = defineApp({
       id: "with-header",
       title: "H",
@@ -100,7 +101,7 @@ describe("an app process", () => {
       Component: () => (
         <>
           <WindowHeader height={6}>
-            <box width={16} height={6} background={1} />
+            <box width="100%" height={6} background={1} onLayout={({ width }) => (headerWidth = width)} />
           </WindowHeader>
           <box width={16} height={20} background={0} />
         </>
@@ -112,15 +113,19 @@ describe("an app process", () => {
     await settle();
     const open = posted.find((m) => m.t === "call" && m.method === "window.open") as Extract<ProcessToHost, { t: "call" }>;
     const key = open.args[0] as string;
-    send({ t: "window.attach", key, state: { width: 16, height: 20, active: true, kind: "document", scrollY: 0 } });
+    // The band runs over a 15px scroll bar column beside the body.
+    send({ t: "window.attach", key, state: { width: 16, bandWidth: 31, height: 20, active: true, kind: "document", scrollY: 0 } });
     await settle();
 
     const bands = posted.filter((m) => m.t === "call" && m.method === "window.setBands") as Extract<ProcessToHost, { t: "call" }>[];
     expect(bands.at(-1)!.args).toEqual([key, 6, 0]);
     const frame = (posted.filter((m) => m.t === "frame") as Extract<ProcessToHost, { t: "frame" }>[]).at(-1)!;
     expect(frame.height).toBe(26);
+    expect(frame.width).toBe(31);
+    expect(headerWidth).toBe(31);
     const bits = { baseAddr: new Uint8Array(frame.buffer), rowBytes: frame.rowBytes, bounds: { top: 0, left: 0, bottom: frame.height, right: frame.width } };
     expect(getBit(bits, 4, 2)).toBe(1);
+    expect(getBit(bits, 28, 2)).toBe(1);
     expect(getBit(bits, 4, 10)).toBe(0);
   });
 

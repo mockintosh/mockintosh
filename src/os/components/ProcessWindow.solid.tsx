@@ -9,6 +9,7 @@ import { CopyBits, srcCopy } from "@mockintosh/quickdraw";
 import { heldModifiers, type CursorSpec, type JSX, type Modifiers } from "@mockintosh/ui";
 import { WindowSlotsContext, useApp, type MenubarDefinition } from "@mockintosh/sdk";
 import { useWindow } from "../windowContext";
+import { windowInnerWidth } from "../windowGeometry";
 import type { AppProcess } from "../process/host";
 import type { KeyKind, PointerKind, WindowState } from "../process/protocol";
 import type { WindowComponent } from "../state";
@@ -27,8 +28,6 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
   const [bands, setBands] = createSignal(host?.bands ?? { header: 0, footer: 0 }, { ownedWrite: true });
   const [rawKeys, setRawKeys] = createSignal(host?.rawKeys ?? false, { ownedWrite: true });
   const slots = useContext(WindowSlotsContext);
-  let lastX = 0;
-  let lastY = 0;
 
   if (host) {
     host.changed = (what) => {
@@ -40,8 +39,11 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
     };
   }
 
+  /** Header and footer bands run over the scroll bar column, so they're wider than the body. */
+  const bandWidth = () => windowInnerWidth(osWin);
   const state = (): WindowState => ({
     width: win.width(),
+    bandWidth: bandWidth(),
     height: win.height(),
     active: win.isActive(),
     kind: win.kind(),
@@ -87,8 +89,6 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
   createEffect(menus, (list) => app.setMenus(props.stats ? [...list, statsMenu] : list));
 
   function pointer(kind: PointerKind, x: number, y: number, deltaY?: number): void {
-    lastX = x;
-    lastY = y;
     proc.input({ t: "pointer", key, kind, x, y, deltaY, modifiers: heldModifiers() });
   }
 
@@ -111,7 +111,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       position={options.position}
       left={0}
       top={options.y?.()}
-      width={win.width()}
+      width={options.body ? win.width() : bandWidth()}
       height={height()}
       revision={revision()}
       cursor={cursor()}
@@ -127,7 +127,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
         // Clearing goes pixel by pixel; only a picture that doesn't cover the raster (mid-resize) needs it.
         if (!frame || frame.bounds.right < width || frame.bounds.bottom < from + rows) surface.fill(0);
         if (frame) {
-          const w = frame.bounds.right;
+          // The picture is as wide as the bands, wider than the body's raster.
+          const w = Math.min(frame.bounds.right, width);
           const h = Math.max(0, Math.min(rows, frame.bounds.bottom - from));
           CopyBits(frame, surface.port.portBits, { top: from, left: 0, bottom: from + h, right: w }, { top: y, left: x, bottom: y + h, right: x + w }, srcCopy, null);
         }
@@ -147,7 +148,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       onDrag={(x, y) => pointer("mousemove", x, top() + y)}
       onMouseUp={(x, y) => pointer("mouseup", x, top() + y)}
       // A scrollable window's wheel scrolls the window, as the OS does for any app.
-      onScroll={options.body && osWin.scrollable ? undefined : (deltaY) => pointer("scroll", lastX, lastY, deltaY)}
+      onScroll={options.body && osWin.scrollable ? undefined : (deltaY, x, y) => pointer("scroll", x, top() + y, deltaY)}
       onKeyDown={(k, mods) => keyEvent("keydown", k, mods)}
       onKeyUp={(k, mods) => keyEvent("keyup", k, mods)}
       onKeyPress={(ch) => keyEvent("keypress", ch, heldModifiers())}

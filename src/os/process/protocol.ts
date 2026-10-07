@@ -104,7 +104,10 @@ export type VideoEvent =
 
 /** The state of an OS window the worker draws. */
 export interface WindowState {
+  /** The body's width. */
   width: number;
+  /** The header and footer bands' width: the body's, plus the scroll bar column beside it. */
+  bandWidth: number;
   height: number;
   active: boolean;
   kind: WindowKind;

@@ -128,6 +128,11 @@ export function hasGrowBand(win: OSWindow): boolean {
   return !win.scrollable && hasGrowBox(win) && win.growBox !== "overlay";
 }
 
+/** Width inside the outer hairline: what the title bar and the header and footer bands span. */
+export function windowInnerWidth(win: Pick<OSWindow, "kind" | "width">): number {
+  return win.width - 2 * windowOuterFrame(win);
+}
+
 /** Width available to the window's content component. */
 export function windowContentWidth(win: OSWindow): number {
   const reserved = win.scrollable || hasGrowBand(win) ? SB_INNER : 0;

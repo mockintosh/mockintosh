@@ -42,6 +42,7 @@ import {
   windowHeaderHeight,
   windowTotalHeight,
   windowContentWidth,
+  windowInnerWidth,
   titleBarOuterHeight,
   hasZoomBox,
 } from "../windowGeometry";
@@ -103,7 +104,7 @@ export function Window(props: WindowProps): JSX.Element {
   });
 
   // Interior geometry (inside the outer hairline) — all children use these.
-  const innerW = createMemo(() => props.win.width - 2 * outer());
+  const innerW = createMemo(() => windowInnerWidth(props.win));
   const innerH = createMemo(() => totalH() - 2 * outer());
   const barInner = createMemo(() => Math.max(0, titleBarOuterHeight(props.win) - FRAME));
   /** 11px close box fills an untitled drag bar; document bars keep the historical inset. */
