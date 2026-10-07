@@ -459,7 +459,7 @@ export function buildFolderWindow(fs: FileSystem, spec: FolderWindowSpec): OSWin
     scrollY: 0,
     scrollX: 0,
     contentHeight: 300,
-    contentWidth: spec.width,
+    contentWidth: 0,
     scrollable: true,
     resizable: true,
     headerHeight: INFO_BAR_H,
@@ -560,10 +560,15 @@ function createIconLayout<G extends IconGrid>(
   };
 }
 
-function computeFolderContentHeight(positions: Iterable<IconPosition>): number {
+/** How far a folder's icons reach, plus a margin, so its window scrolls to every one. */
+function computeFolderContentSize(positions: Iterable<IconPosition>): { width: number; height: number } {
+  let maxX = 0;
   let maxY = 0;
-  for (const pos of positions) maxY = Math.max(maxY, pos.y + FOLDER_ICON_CELL_H);
-  return maxY + FOLDER_PADDING;
+  for (const pos of positions) {
+    maxX = Math.max(maxX, pos.x + FOLDER_ICON_CELL_W);
+    maxY = Math.max(maxY, pos.y + FOLDER_ICON_CELL_H);
+  }
+  return { width: maxX + FOLDER_PADDING, height: maxY + FOLDER_PADDING };
 }
 
 // ---------------------------------------------------------------------------
@@ -908,11 +913,13 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
 
   createEffect(
     () => {
-      const h = computeFolderContentHeight(layout.positions().values());
-      return { h, current: win.contentHeight };
+      const size = computeFolderContentSize(layout.positions().values());
+      return { size, width: win.contentWidth, height: win.contentHeight };
     },
-    ({ h, current }) => {
-      if (h !== current) updateOSWindow(win.id, { contentHeight: h });
+    ({ size, width, height }) => {
+      if (size.width !== width || size.height !== height) {
+        updateOSWindow(win.id, { contentWidth: size.width, contentHeight: size.height });
+      }
     },
   );
 
@@ -986,13 +993,15 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
           <text font="menu" nowrap verticalAlign="middle">{itemCount()}</text>
         </box>
       </WindowHeader>
-      {/* Content drop zone (below icons in z-order = lower priority) */}
+      {/* Content drop zone (below icons in z-order = lower priority). It
+          covers all the content, so it's under the pointer however far the
+          window is scrolled, and its local coordinates are content's. */}
       <box
         position="absolute"
         left={0}
         top={0}
-        width={contentW()}
-        height={win.height}
+        width={Math.max(contentW(), win.contentWidth)}
+        height={Math.max(win.height, win.contentHeight)}
         {...marqueeHandlers}
         onScroll={handleScroll}
       />
@@ -1012,7 +1021,7 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
               const { icon, pos } = item();
               setSelectedSet(new Set([icon.nodeId]));
               const content = windowContentRect(win);
-              const screenX = content.x + pos.x;
+              const screenX = content.x + pos.x - win.scrollX;
               const screenY = content.y + pos.y - win.scrollY;
               if (icon.isDirectory && !os.fs.child(icon.nodeId, "mockintosh.json")) {
                 openNested(icon, screenX, screenY);

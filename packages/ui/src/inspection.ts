@@ -1,5 +1,5 @@
 import { resolveBorderWidth, type CanvasNode, type LayoutRect } from "./nodes";
-import { scrollPaintOffset } from "./scroll";
+import { scrollPaintOffset, scrollPaintOffsetX } from "./scroll";
 import type { FocusManager } from "./focus";
 export interface SemanticMetadata {
   name?: string;
@@ -31,17 +31,26 @@ const intersection = (a: LayoutRect, b: LayoutRect): LayoutRect => {
     height: Math.max(0, Math.min(a.y + a.height, b.y + b.height) - y)
   };
 };
+/** Where a node's children draw relative to it: its scroll offsets, undone. */
+function childOffset(node: CanvasNode, offset: { x: number; y: number }): { x: number; y: number } {
+  return {
+    x: offset.x - scrollPaintOffsetX(node),
+    y: offset.y - (node.style.overflow === "scroll" ? scrollPaintOffset(node) : 0),
+  };
+}
+
 /** A detached, immutable snapshot. No handlers or mutable node objects escape. */
 export function inspectTree(root: CanvasNode, focus: FocusManager): readonly InspectionNode[] {
   const out: InspectionNode[] = [];
-  function visit(node: CanvasNode, clip: LayoutRect, offset: number, enabled: boolean, windowId?: string, masked = false) {
+  function visit(node: CanvasNode, clip: LayoutRect, offset: { x: number; y: number }, enabled: boolean, windowId?: string, masked = false) {
     const metadata = (node.props.semantic ?? {}) as SemanticMetadata;
     windowId = metadata.windowId ?? windowId;
     enabled = enabled && node.props.inert !== true && metadata.enabled !== false;
     masked = masked || metadata.password === true;
     const rect = {
       ...node.layout,
-      y: node.layout.y + offset
+      x: node.layout.x + offset.x,
+      y: node.layout.y + offset.y
     };
     const bounds = Object.freeze(intersection(clip, rect));
     const h = node._eventHandlers;
@@ -74,8 +83,8 @@ export function inspectTree(root: CanvasNode, focus: FocusManager): readonly Ins
         height: Math.max(0, rect.height - 2 * border)
       });
     }
-    for (const child of node.children) visit(child, childClip, offset - (node.style.overflow === "scroll" ? scrollPaintOffset(node) : 0), enabled, windowId, masked);
+    for (const child of node.children) visit(child, childClip, childOffset(node, offset), enabled, windowId, masked);
   }
-  visit(root, root.layout, 0, true);
+  visit(root, root.layout, { x: 0, y: 0 }, true);
   return Object.freeze(out);
 }

@@ -1,5 +1,5 @@
 import { isDitherGradientFill, resolveBorderWidth, type CanvasNode, type LayoutRect, type NodeType } from "./nodes";
-import { scrollPaintOffset } from "./scroll";
+import { scrollPaintOffset, scrollPaintOffsetX } from "./scroll";
 import type { SemanticMetadata } from "./inspection";
 
 const OMIT_PROPS = new Set([
@@ -11,6 +11,7 @@ const OMIT_PROPS = new Set([
   "onLayout",
   "pixels",
   "scrollOffset",
+  "scrollOffsetX",
 ]);
 
 export interface DebugNode {
@@ -74,9 +75,9 @@ function leafText(node: CanvasNode): string {
 
 /** Hierarchical snapshot of the live tree, with clipped screen-space bounds. */
 export function debugInspectTree(root: CanvasNode): DebugNode {
-  function visit(node: CanvasNode, clip: LayoutRect, offset: number): DebugNode {
+  function visit(node: CanvasNode, clip: LayoutRect, offset: { x: number; y: number }): DebugNode {
     const metadata = (node.props.semantic ?? {}) as SemanticMetadata;
-    const rect = { ...node.layout, y: node.layout.y + offset };
+    const rect = { ...node.layout, x: node.layout.x + offset.x, y: node.layout.y + offset.y };
     const bounds = Object.freeze(intersection(clip, rect));
     let childClip = clip;
     if (node.style.overflow === "hidden" || node.style.overflow === "scroll") {
@@ -88,7 +89,10 @@ export function debugInspectTree(root: CanvasNode): DebugNode {
         height: Math.max(0, rect.height - 2 * border),
       });
     }
-    const childOffset = offset - (node.style.overflow === "scroll" ? scrollPaintOffset(node) : 0);
+    const childOffset = {
+      x: offset.x - scrollPaintOffsetX(node),
+      y: offset.y - (node.style.overflow === "scroll" ? scrollPaintOffset(node) : 0),
+    };
     const children = Object.freeze(node.children.map((child) => visit(child, childClip, childOffset)));
     return Object.freeze({
       id: node.id,
@@ -102,7 +106,7 @@ export function debugInspectTree(root: CanvasNode): DebugNode {
       children,
     });
   }
-  const tree = visit(root, root.layout, 0);
+  const tree = visit(root, root.layout, { x: 0, y: 0 });
   return tree;
 }
 

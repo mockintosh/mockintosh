@@ -88,7 +88,8 @@ export function buildAppWindow<P extends Record<string, unknown>>(
     scrollY: 0,
     scrollX: 0,
     contentHeight: scrollable ? Math.max(bounds.height, 200) : bounds.height,
-    contentWidth: bounds.width,
+    // Nothing overflows sideways until the content reports its size.
+    contentWidth: 0,
     scrollable,
     resizable,
     growBox: spec.growBox ?? app.growBox,

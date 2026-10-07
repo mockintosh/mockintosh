@@ -358,6 +358,11 @@ export interface BoxProps extends LayoutStyle, EventHandlers, SemanticProps {
    */
   scrollOffset?: number;
   /**
+   * Horizontal scroll offset in pixels (requires overflow="scroll"). The
+   * owner drives it entirely; the wheel never moves it.
+   */
+  scrollOffsetX?: number;
+  /**
    * When this value changes, `_scrollOffset` returns to 0.
    * Use a route path so a reused overflow pane does not stay scrolled
    * into empty space after navigation.
@@ -687,6 +692,10 @@ export function setNodeProperty(node: CanvasNode, name: string, value: unknown):
   if (name === "scrollOffset") {
     node.props["scrollOffset"] = value;
     node._scrollOffset = Math.round((value as number) || 0);
+    return;
+  }
+  if (name === "scrollOffsetX") {
+    node.props["scrollOffsetX"] = value;
     return;
   }
   if (name === "scrollKey") {

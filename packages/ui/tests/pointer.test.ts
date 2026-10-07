@@ -46,6 +46,32 @@ describe("hitTest", () => {
     expect(hitTest(root, 30, 30)).toBe(a);
   });
 
+  it("follows a pane's horizontal scroll offset, and tells handlers where in themselves they were hit", () => {
+    const root = createNode("_root");
+    root.style = { width: 100, height: 100 };
+    const pane = createNode("box");
+    pane.style = { position: "absolute", left: 0, top: 0, width: 50, height: 50, overflow: "scroll" };
+    const child = createNode("box");
+    child.style = { position: "absolute", left: 60, top: 0, width: 20, height: 20 };
+    const onMouseDown = vi.fn();
+    child._eventHandlers = { onMouseDown };
+    pane.parent = root;
+    child.parent = pane;
+    root.children = [pane];
+    pane.children = [child];
+    computeLayout(root, 100, 100, noMeasure);
+
+    expect(hitTest(root, 30, 10)).toBeNull();
+    setNodeProperty(pane, "scrollOffsetX", 40);
+    // Laid out at 60..80, it now draws at 20..40.
+    expect(hitTest(root, 30, 10)).toBe(child);
+    expect(hitTest(root, 45, 10)).toBeNull();
+
+    const dispatcher = createPointerDispatcher(root, createFocusManager());
+    dispatcher.dispatch("mousedown", 25, 5);
+    expect(onMouseDown).toHaveBeenCalledWith(5, 5);
+  });
+
   it("honors hit masks", () => {
     const { root, b } = tree();
     b._eventHandlers.onClick = () => {};

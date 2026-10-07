@@ -18,7 +18,7 @@ import {
 } from "./nodes";
 import { focusScopeOf, type FocusManager } from "./focus";
 import { scheduleRepaint } from "./renderer";
-import { isScrollOwned, scrollOverflow, scrollPaintOffset } from "./scroll";
+import { isScrollOwned, scrollOverflow, scrollPaintOffset, scrollPaintOffsetX } from "./scroll";
 import { createPanVelocity, stepFlick } from "./scrollInertia";
 
 export { scrollOverflow } from "./scroll";
@@ -160,7 +160,7 @@ function visualRect(node: CanvasNode, ox: number, oy: number): LayoutRect {
 function childPaintOffset(node: CanvasNode, ox: number, oy: number): { ox: number; oy: number } {
   const raise = shadowRaise(node);
   return {
-    ox: ox - raise,
+    ox: ox - scrollPaintOffsetX(node) - raise,
     oy: (node.style.overflow === "scroll" ? oy - scrollPaintOffset(node) : oy) - raise,
   };
 }
@@ -301,6 +301,7 @@ function localOf(node: CanvasNode, gx: number, gy: number): { lx: number; ly: nu
     ox -= shadowRaise(n);
     oy -= shadowRaise(n);
     if (n.style.overflow === "scroll") oy -= scrollPaintOffset(n);
+    ox -= scrollPaintOffsetX(n);
     n = n.parent;
   }
   return {

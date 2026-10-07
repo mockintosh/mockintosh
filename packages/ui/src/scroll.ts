@@ -17,6 +17,12 @@ export function scrollPaintOffset(node: CanvasNode): number {
   return Math.round(node._scrollOffset);
 }
 
+/** Paint/hit X for `overflow: scroll`: the owner's `scrollOffsetX`, on whole pixels. */
+export function scrollPaintOffsetX(node: CanvasNode): number {
+  if (node.style.overflow !== "scroll") return 0;
+  return Math.round((node.props["scrollOffsetX"] as number | undefined) ?? 0);
+}
+
 /** A pane whose owner sets `scrollOffset` and moves it from `onScroll`. */
 export function isScrollOwned(node: CanvasNode): boolean {
   return node.props["scrollOffset"] !== undefined && node._eventHandlers.onScroll !== undefined;

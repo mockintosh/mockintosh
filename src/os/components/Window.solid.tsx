@@ -129,24 +129,51 @@ export function Window(props: WindowProps): JSX.Element {
   const zoomX  = createMemo(() => innerW() - 7 - ZOOM_SIZE);
   const zoomY  = Math.floor((TITLE_BAR_H - ZOOM_SIZE) / 2) - FRAME;
 
-  // Scrollbar thumb geometry — the track is the scrollable body only.
-  const scrollableBodyH = createMemo(() =>
-    props.win.height + (props.win.scrollable ? SB_W : 0)
+  // The vertical scroll bar rises one row so its up arrow's top edge is the
+  // rule above it (title-bar separator or header band), not a second line.
+  const sbOverlap = createMemo(() => (hasTitleBar(props.win) ? FRAME : 0));
+  const sbTop = createMemo(() => headerInnerH() - sbOverlap());
+
+  // The bar runs beside the body only, its down arrow's bottom edge on the
+  // line below the body (the horizontal bar's, or a footer's).
+  const scrollableBodyH = createMemo(() => props.win.height + sbOverlap() + FRAME);
+  /** Top of the horizontal scroll bar, which is also its top line. */
+  const hBarTop = createMemo(() => headerInnerH() + props.win.height + footH());
+
+  // Scroll bar tracks: the gray between the arrows, inside the bar's lines
+  // and the frame. A thumb at either end sits against the arrow, so their
+  // borders make a double line, as in System 6.
+  const maxScrollY = createMemo(() => Math.max(0, props.win.contentHeight - props.win.height));
+  const vTrackTop = SB_W;
+  const vTrackH = createMemo(() => scrollableBodyH() - 2 * SB_W);
+  const thumbH = createMemo(() =>
+    Math.min(vTrackH(), Math.max(16, Math.floor(scrollableBodyH() * props.win.height / Math.max(1, props.win.contentHeight)))),
   );
-  const thumbH = createMemo(() => {
-    const viewH = props.win.height;
-    const contentH = props.win.contentHeight;
-    if (contentH <= viewH) return scrollableBodyH();
-    return Math.max(16, Math.floor(scrollableBodyH() * viewH / contentH));
-  });
   const thumbY = createMemo(() => {
-    const viewH = props.win.height;
-    const contentH = props.win.contentHeight;
-    if (contentH <= viewH) return SB_W;
-    const trackH = scrollableBodyH() - SB_W * 2 - thumbH();
-    const ratio = props.win.scrollY / Math.max(1, contentH - viewH);
-    return SB_W + Math.floor(trackH * ratio);
+    const ratio = Math.min(1, props.win.scrollY / Math.max(1, maxScrollY()));
+    return vTrackTop + Math.floor((vTrackH() - thumbH()) * ratio);
   });
+
+  // The left arrow starts one column into the frame, so the horizontal track
+  // starts one column nearer than the vertical one.
+  const maxScrollX = createMemo(() => Math.max(0, props.win.contentWidth - contentW()));
+  const scrollX = createMemo(() => Math.min(props.win.scrollX, maxScrollX()));
+  const hTrackLeft = SB_W - FRAME;
+  const hTrackW = createMemo(() => contentW() - SB_INNER - hTrackLeft);
+  const hThumbW = createMemo(() =>
+    Math.min(hTrackW(), Math.max(16, Math.floor(contentW() * contentW() / Math.max(1, props.win.contentWidth)))),
+  );
+  const hThumbX = createMemo(() =>
+    hTrackLeft + Math.floor((hTrackW() - hThumbW()) * scrollX() / Math.max(1, maxScrollX())),
+  );
+  function scrollXBy(dx: number): void {
+    updateOSWindow(props.win.id, { scrollX: Math.max(0, Math.min(maxScrollX(), scrollX() + dx)) });
+  }
+  function handleHThumbDrag(gx: number): void {
+    const trackX = props.win.x + outer() + hTrackLeft;
+    const ratio = Math.max(0, Math.min(1, (gx - trackX - hThumbW() / 2) / Math.max(1, hTrackW() - hThumbW())));
+    updateOSWindow(props.win.id, { scrollX: Math.round(ratio * maxScrollX()) });
+  }
 
   function applyBandHeight(field: "headerHeight" | "footerHeight", next: number): void {
     const prev = field === "headerHeight" ? bandHeader : bandFooter;
@@ -198,11 +225,10 @@ export function Window(props: WindowProps): JSX.Element {
   }
 
   function handleThumbDrag(gx: number, gy: number) {
-    const winY = props.win.y + headerH();
-    const trackH = scrollableBodyH() - SB_W * 2 - thumbH();
-    const relY   = gy - winY - SB_W - thumbH() / 2;
-    const ratio  = Math.max(0, Math.min(1, relY / Math.max(1, trackH)));
-    const maxScroll = Math.max(0, props.win.contentHeight - props.win.height);
+    const trackY = props.win.y + headerH() - sbOverlap() + vTrackTop;
+    const relY   = gy - trackY - thumbH() / 2;
+    const ratio  = Math.max(0, Math.min(1, relY / Math.max(1, vTrackH() - thumbH())));
+    const maxScroll = maxScrollY();
     updateOSWindow(props.win.id, { scrollY: Math.round(ratio * maxScroll) });
   }
 
@@ -474,10 +500,10 @@ export function Window(props: WindowProps): JSX.Element {
           width={contentW()}
           height={props.win.height}
           overflow="scroll"
-          scrollOffset={Math.min(props.win.scrollY, Math.max(0, props.win.contentHeight - props.win.height))}
+          scrollOffset={Math.min(props.win.scrollY, maxScrollY())}
+          scrollOffsetX={scrollX()}
           onScroll={(dy) => {
-            const maxY = Math.max(0, props.win.contentHeight - props.win.height);
-            updateOSWindow(props.win.id, { scrollY: Math.max(0, Math.min(maxY, props.win.scrollY + dy)) });
+            updateOSWindow(props.win.id, { scrollY: Math.max(0, Math.min(maxScrollY(), props.win.scrollY + dy)) });
           }}
         >
           <WindowContent
@@ -543,7 +569,7 @@ export function Window(props: WindowProps): JSX.Element {
           <box
             position="absolute"
             left={innerW() - SB_INNER}
-            top={headerInnerH()}
+            top={sbTop()}
             width={SB_W}
             height={scrollableBodyH()}
             background={0}
@@ -564,8 +590,16 @@ export function Window(props: WindowProps): JSX.Element {
               }
             />
 
-            {/* Thumb */}
-            <Show when={props.win.contentHeight > props.win.height}>
+            {/* Track and thumb */}
+            <Show when={maxScrollY() > 0}>
+              <box
+                position="absolute"
+                left={1}
+                top={vTrackTop}
+                width={SB_W - 2}
+                height={vTrackH()}
+                background="gray25"
+              />
               <box
                 position="absolute"
                 left={1}
@@ -585,28 +619,78 @@ export function Window(props: WindowProps): JSX.Element {
               left={0}
               top={scrollableBodyH() - SB_W}
               size={SB_W}
-              onClick={() => {
-                const maxY = Math.max(0, props.win.contentHeight - props.win.height);
+              onClick={() =>
                 updateOSWindow(props.win.id, {
-                  scrollY: Math.min(maxY, props.win.scrollY + 16),
-                });
-              }}
+                  scrollY: Math.min(maxScrollY(), props.win.scrollY + 16),
+                })
+              }
             />
           </box>
         </Show>
 
-        {/* ── Horizontal scrollbar placeholder ──────────────────── */}
+        {/* ── Horizontal scrollbar ──────────────────────────────── */}
+        {/* The left arrow's edge is the frame; the right arrow's is the
+            vertical bar's separator. */}
         <Show when={props.win.scrollable}>
           <box
             position="absolute"
             left={0}
-            top={headerInnerH() + props.win.height + footH()}
+            top={hBarTop()}
             width={contentW()}
             height={SB_W}
             background={0}
           >
             <box position="absolute" left={0} top={0} width={contentW()} height={1} background={1} />
+            <ChromeButton
+              sprite={os.sprites.get("chrome/left")}
+              left={-FRAME}
+              top={0}
+              size={SB_W}
+              onClick={() => scrollXBy(-16)}
+            />
+            <Show when={maxScrollX() > 0}>
+              <box
+                position="absolute"
+                left={hTrackLeft}
+                top={1}
+                width={hTrackW()}
+                height={SB_W - 2}
+                background="gray25"
+              />
+              <box
+                position="absolute"
+                left={hThumbX()}
+                top={1}
+                width={hThumbW()}
+                height={SB_W - 2}
+                background={0}
+                borderColor={1}
+                borderWidth={1}
+                onDrag={(_lx, _ly, gx) => handleHThumbDrag(gx)}
+              />
+            </Show>
+            <ChromeButton
+              sprite={os.sprites.get("chrome/right")}
+              left={contentW() - SB_INNER}
+              top={0}
+              size={SB_W}
+              onClick={() => scrollXBy(16)}
+            />
           </box>
+        </Show>
+
+        {/* ── Corner where the scroll bars meet, without a grow box ── */}
+        <Show when={props.win.scrollable && !hasGrowBox(props.win)}>
+          <box
+            position="absolute"
+            left={innerW() - SB_INNER}
+            top={hBarTop()}
+            width={SB_W}
+            height={SB_W}
+            background={0}
+            borderColor={1}
+            borderWidth={1}
+          />
         </Show>
 
         {/* ── Empty scroll-bar band for the grow box ─────────────── */}

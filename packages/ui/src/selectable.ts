@@ -10,7 +10,7 @@ import { useUIServices } from "./services";
 import { fontFromProps } from "./fonts/style";
 import { indexAtPoint, layoutNodeText } from "./fonts/textLayout";
 import { collectNodeText, setNodeProperty, textWraps, type CanvasNode, type TextAlign } from "./nodes";
-import { scrollPaintOffset } from "./scroll";
+import { scrollPaintOffset, scrollPaintOffsetX } from "./scroll";
 import { createTextClicks, paragraphRangeAt, type TextClickSelection } from "./textClicks";
 
 export interface TextSelection {
@@ -30,11 +30,13 @@ let anchor: Caret | undefined;
 let focus: Caret | undefined;
 
 function localPoint(node: CanvasNode, gx: number, gy: number): { lx: number; ly: number } {
+  let ox = 0;
   let oy = 0;
   for (let n = node.parent; n; n = n.parent) {
     if (n.style.overflow === "scroll") oy -= scrollPaintOffset(n);
+    ox -= scrollPaintOffsetX(n);
   }
-  return { lx: gx - node.layout.x, ly: gy - (node.layout.y + oy) };
+  return { lx: gx - (node.layout.x + ox), ly: gy - (node.layout.y + oy) };
 }
 
 function blockOf(node: CanvasNode) {
