@@ -1,9 +1,9 @@
 import { parseHTML } from "linkedom";
 import { Defuddle } from "defuddle/node";
 import type { LayoutNode } from "@mockintosh/markdown";
-import { RemoteError, decodeText, fetchRemote } from "./_web/fetch";
-import { simplifyHtml } from "./_web/simplify";
-import { applySiteRule, siteRuleFor } from "./_web/sites";
+import { RemoteError, decodeText, fetchRemote } from "./_web/fetch.js";
+import { simplifyHtml } from "./_web/simplify.js";
+import { applySiteRule, siteRuleFor } from "./_web/sites.js";
 
 const MAX_PAGE_BYTES = 5_000_000;
 const PAGE_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5";

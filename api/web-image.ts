@@ -1,4 +1,4 @@
-import { RemoteError, fetchRemote } from "./_web/fetch";
+import { RemoteError, fetchRemote } from "./_web/fetch.js";
 
 const MAX_IMAGE_BYTES = 8_000_000;
 /** Formats the Macintosh's image decoder reads. SVG and friends are refused. */
