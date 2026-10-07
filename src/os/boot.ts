@@ -184,6 +184,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     services: {
       clipboard: platform.clipboard,
       images: uiImages,
+      scheduler,
       onError(error) {
         const active = getWindows().find((window) => window.id === getActiveWindowId());
         if (active?.instanceId) instances.note(active.instanceId, error, "handler");

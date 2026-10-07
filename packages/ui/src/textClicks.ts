@@ -62,6 +62,8 @@ export function createTextClicks(options?: {
   word?: (text: string, index: number) => TextRange;
   /** Triple-click unit. Defaults to the whole text. */
   third?: (text: string, index: number) => TextRange;
+  /** Clock for the double-click window: the host scheduler's `now`. */
+  now?: () => number;
 }): TextClicks {
   const word = options?.word ?? wordRangeAt;
   const third = options?.third ?? wholeText;
@@ -71,7 +73,7 @@ export function createTextClicks(options?: {
   let lastY = 0;
   let anchor: TextRange = { start: 0, end: 0 };
 
-  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const now = options?.now ?? Date.now;
   const unitAt = (text: string, index: number): TextRange =>
     count === 2 ? word(text, index) : count >= 3 ? third(text, index) : { start: index, end: index };
   const press = (lx: number, ly: number, text: string, index: number): TextClickSelection => {
