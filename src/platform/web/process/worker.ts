@@ -23,6 +23,10 @@ const load = createAppLoader({
     "@mockintosh/ui/renderer": renderer,
     "@mockintosh/quickdraw": quickdraw,
     "@mockintosh/agent": agent,
+    "@mockintosh/terminal": () => import("@mockintosh/terminal"),
+    "@mockintosh/terminal/view": () => import("@mockintosh/terminal/view"),
+    "@mockintosh/terminal/bash": () => import("@mockintosh/terminal/bash"),
+    "@mockintosh/terminal/wasi": () => import("@mockintosh/terminal/wasi"),
   },
   bundled: async (id) => APP_MODULES[id]?.(),
   fetchText: async (url) => {

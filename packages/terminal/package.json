@@ -1,0 +1,27 @@
+{
+  "name": "@mockintosh/terminal",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./view": "./src/view/index.ts",
+    "./bash": "./src/bash/index.ts",
+    "./wasi": "./src/wasi/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "license": "MIT",
+  "description": "A VT/xterm terminal for Mockintosh: screen, keyboard, pseudo-terminal, shells and programs, drawn in 1 bit",
+  "dependencies": {
+    "@xterm/headless": "6.0.0",
+    "just-bash": "3.6.0"
+  },
+  "peerDependencies": {
+    "solid-js": "2.0.0-rc.8",
+    "@mockintosh/ui": "*",
+    "@mockintosh/sdk": "*"
+  }
+}

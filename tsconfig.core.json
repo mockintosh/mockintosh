@@ -20,7 +20,9 @@
     "packages/print/src/**/*.ts",
     "packages/markdown/src/**/*.ts",
     "packages/protocol/src/**/*.ts",
-    "packages/agent/src/**/*.ts"
+    "packages/agent/src/**/*.ts",
+    "packages/terminal/src/**/*.ts",
+    "packages/terminal/src/**/*.tsx"
   ],
   "exclude": [
     "**/*.test.ts",

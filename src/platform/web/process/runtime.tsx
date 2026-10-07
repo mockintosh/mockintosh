@@ -89,6 +89,8 @@ interface ProcessWindow {
   /** Where this window's pictures go when memory can be shared with the OS. */
   shared: SharedArrayBuffer | null;
   cursor?: CursorSpec;
+  /** Last `rawKeys` told to the OS: the focused control here takes raw keys. */
+  rawKeys?: boolean;
   /** Action ids of this window's current menus, dropped when it sets new ones. */
   menuIds: number[];
 }
@@ -186,6 +188,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     performance.measure("app-process:frame", { start });
     const audioMs = audio.renderMs.splice(0);
     if (sendStats) post({ t: "frameStats", frameMs, audioMs: audioMs.splice(0) });
+    reportRawKeys();
     for (const w of attached()) {
       const width = untrack(w.width);
       const height = Math.min(bandHeight, untrack(() => pictureHeight(w)));
@@ -454,6 +457,21 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     flush();
   }
 
+  /** Tell the OS which window's focused control takes raw keys, so it sends that window Tab and ⌃V. */
+  function reportRawKeys(): void {
+    if (!ui) return;
+    const focused = ui.focusManager.focused;
+    const raw = ui.focusedTakesRawKeys();
+    for (const w of windows.values()) {
+      let inside = false;
+      for (let n = focused; n && !inside; n = n.parent) inside = n === w.node;
+      const value = raw && inside;
+      if ((w.rawKeys ?? false) === value) continue;
+      w.rawKeys = value;
+      post({ t: "rawKeys", key: w.key, value });
+    }
+  }
+
   function focusWindow(w: ProcessWindow): void {
     if (w.node && ui && ui.focusManager.getActiveScope() !== w.node) ui.focusManager.setActiveScope(w.node);
   }
@@ -618,6 +636,15 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
           renderNow();
           return;
         }
+        case "paste": {
+          const w = windows.get(msg.key);
+          if (!w || !ui) return;
+          lastSeq = Math.max(lastSeq, msg.seq);
+          focusWindow(w);
+          ui.dispatchPaste(msg.text);
+          renderNow();
+          return;
+        }
         case "menu":
           menuActions.get(msg.action)?.(msg.value);
           flush();
@@ -682,7 +709,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
         const waiter = pending.get(msg.id);
         if (!waiter) return;
         pending.delete(msg.id);
-        if ("error" in msg) waiter.reject(new Error(msg.error));
+        if ("error" in msg) waiter.reject(Object.assign(new Error(msg.error), msg.code ? { code: msg.code } : {}));
         else waiter.resolve(msg.value);
         return;
       }

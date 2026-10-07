@@ -2,7 +2,10 @@ import ts from "typescript";
 import {buildRequest, projectPath, type BuildRequest} from "./buildContract";
 import {parse} from "./schema";
 
-export const sharedBuildImports = new Set(["solid-js", "@mockintosh/sdk", "@mockintosh/ui", "@mockintosh/ui/renderer", "@mockintosh/quickdraw", "@mockintosh/agent"]);
+export const sharedBuildImports = new Set([
+  "solid-js", "@mockintosh/sdk", "@mockintosh/ui", "@mockintosh/ui/renderer", "@mockintosh/quickdraw", "@mockintosh/agent",
+  "@mockintosh/terminal", "@mockintosh/terminal/view", "@mockintosh/terminal/bash", "@mockintosh/terminal/wasi",
+]);
 /** Browser globals that share the OS JavaScript realm. Apps must use the SDK. */
 export const bannedHostGlobals = new Set([
   "alert", "confirm", "prompt",

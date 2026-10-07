@@ -126,6 +126,8 @@ export type HostToProcess =
   | { t: "stop" }
   | { t: "pointer"; key: string; kind: PointerKind; x: number; y: number; deltaY?: number; modifiers: Modifiers; seq: number }
   | { t: "key"; key: string; kind: KeyKind; value: string; modifiers: Modifiers; seq: number }
+  /** Text pasted into window `key`, in one piece (`onPaste`). */
+  | { t: "paste"; key: string; text: string; seq: number }
   | { t: "menu"; action: number; value?: string }
   | { t: "fs"; snapshot: FsSnapshot }
   | { t: "printer"; connected: boolean }
@@ -143,7 +145,8 @@ export type HostToProcess =
   /** Output of the `kernel.invoke` call `id`, while it runs. */
   | { t: "kernelStream"; id: number; stream: "stdout" | "stderr"; bytes: Uint8Array }
   | { t: "reply"; id: number; ok: true; value: unknown }
-  | { t: "reply"; id: number; ok: false; error: string };
+  /** `code` is a kernel `ServiceError`'s code, so the app can tell "missing" from "conflict". */
+  | { t: "reply"; id: number; ok: false; error: string; code?: string };
 
 export type ProcessToHost =
   | { t: "described"; declaration: import("../appDeclaration").AppDeclaration }
@@ -176,6 +179,8 @@ export type ProcessToHost =
   /** Timings for the Worker menu, when the start asked for them. */
   | { t: "frameStats"; frameMs: number; audioMs: number[] }
   | { t: "cursor"; key: string; cursor: CursorSpec }
+  /** The focused control in window `key` takes raw keys (`rawKeys`), so the OS sends it Tab and ⌃V. */
+  | { t: "rawKeys"; key: string; value: boolean }
   /** `menus` for window `key`; `null` gives the window back the app's menus. */
   | { t: "menus"; key: string; menus: WireMenu[] }
   /** `id` 0 expects no reply. */

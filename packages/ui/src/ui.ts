@@ -92,6 +92,12 @@ export interface UIInstance {
     modifiers?: Partial<Modifiers>
   ): void;
 
+  /** Paste `text` into the focused element: its `onPaste`, else key-presses. */
+  dispatchPaste(text: string): void;
+
+  /** The focused element takes raw keys (`rawKeys`): the host sends it ⌃V and Tab as keys. */
+  focusedTakesRawKeys(): boolean;
+
   /**
    * Cursor name for the box under `(x, y)` — walk ancestors for `cursor`.
    * Hosts map the name to CSS or a 1-bit face; widgets only declare intent.
@@ -303,6 +309,21 @@ export function createUI(config: UIConfig): UIInstance {
       }
       uiFlush();
       scheduleRender();
+    },
+
+    dispatchPaste(text: string): void {
+      uiFlush();
+      try {
+        focusManager.dispatchPaste(text);
+      } catch (error) {
+        services.onError?.(error);
+      }
+      uiFlush();
+      scheduleRender();
+    },
+
+    focusedTakesRawKeys(): boolean {
+      return focusManager.takesRawKeys();
     },
 
     resize(next: BitMap): void {

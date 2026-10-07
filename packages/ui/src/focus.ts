@@ -27,6 +27,10 @@ export interface FocusManager {
     key: string,
     modifiers: Modifiers
   ): void;
+  /** Deliver pasted text to the focused node: `onPaste`, else one key-press per character. */
+  dispatchPaste(text: string): void;
+  /** The focused node takes raw keys (`rawKeys`): Tab and ⌃V are its own. */
+  takesRawKeys(): boolean;
   /** For use in useFocus() hook — returns reactive accessor for the focused node. */
   getFocusedSignal(): Accessor<CanvasNode | null>;
 }
@@ -127,8 +131,9 @@ export function createFocusManager(root: CanvasNode): FocusManager {
     ): void {
       const current = focusedNode();
 
-      // Tab / Shift+Tab are always handled by the focus system
-      if (type === "keydown" && key === "Tab") {
+      // Tab / Shift+Tab move focus, unless the focused node takes raw keys;
+      // ⌃Tab always moves it, so a keyboard user can leave a terminal.
+      if (type === "keydown" && key === "Tab" && (modifiers.ctrl || !current?._eventHandlers.rawKeys)) {
         if (modifiers.shift) {
           manager.focusPrev();
         } else {
@@ -147,6 +152,21 @@ export function createFocusManager(root: CanvasNode): FocusManager {
       } else if (type === "keypress") {
         handlers.onKeyPress?.(key);
       }
+    },
+
+    dispatchPaste(text: string): void {
+      const current = focusedNode();
+      if (!current) return;
+      const handlers = current._eventHandlers;
+      if (handlers.onPaste) {
+        handlers.onPaste(text);
+        return;
+      }
+      for (const ch of text) handlers.onKeyPress?.(ch);
+    },
+
+    takesRawKeys(): boolean {
+      return focusedNode()?._eventHandlers.rawKeys === true;
     },
 
     getFocusedSignal(): Accessor<CanvasNode | null> {

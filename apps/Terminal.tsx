@@ -1,83 +1,142 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import type { JSX } from "@mockintosh/ui";
-import { TextInput } from "@mockintosh/ui";
-import { defineApp, useApp } from "@mockintosh/sdk";
+import { useUIServices, type JSX } from "@mockintosh/ui";
+import { defineApp, useApp, type AppContext } from "@mockintosh/sdk";
+import { Pty, exitBuiltin, runShell } from "@mockintosh/terminal";
+import { BashRunner } from "@mockintosh/terminal/bash";
+import { TerminalView, type TerminalHandle } from "@mockintosh/terminal/view";
+import { terminalPrograms } from "./terminal/programs";
+
+const HISTORY_KEY = "bash_history";
+const HISTORY_SIZE = 500;
+
+/** 80×24 in Monaco 9 cells, plus the view's margins. */
+const DEFAULT_SIZE = { width: 80 * 6 + 4, height: 24 * 11 + 2 };
+
+function startShell(app: AppContext, pty: Pty): void {
+  const runner = new BashRunner({
+    kernel: app.kernel!,
+    programs: terminalPrograms(app),
+    banner: "Mockintosh bash. Your disk is ~ (/disk). Type help for commands, mac help for the Macintosh's own.\n",
+    loadHistory: async () => {
+      const saved = await app.storage.read(HISTORY_KEY);
+      return saved ? saved.split("\n").filter(Boolean) : [];
+    },
+    saveHistory: (lines) => app.storage.write(HISTORY_KEY, lines.slice(-HISTORY_SIZE).join("\n")),
+  });
+  void runShell(pty.slave, runner, { exitCommand: exitBuiltin }).then(
+    (code) => pty.exit(code),
+    (error) => {
+      pty.slave.write(`\r\nbash: ${error instanceof Error ? error.message : String(error)}\r\n`);
+      pty.exit(1);
+    },
+  );
+}
 
 function Terminal(): JSX.Element {
   const app = useApp();
-  const kernel = app.kernel!;
-  createEffect(() => true, () => {
-    app.setMenus([
-      { label: "File", items: [{ label: "Quit", shortcut: "Q", onClick: () => app.quit() }] },
-    ]);
-  });
+  const win = app.window;
+  const { clipboard } = useUIServices();
   const release = app.keepAlive?.();
-  let session: string | undefined;
-  let cwd = "/disk";
-  const [input, setInput] = createSignal(""),
-    [scrollback, setScrollback] = createSignal("Mockintosh shell S1. Type help.\n"),
-    [busy, setBusy] = createSignal(false);
-  const history: string[] = [];
-  let index = 0,
-    controller: AbortController | undefined,
-    closed = false;
-  const append = (text: string) => {
-    if (!closed) setScrollback(old => (old + text).slice(-16384));
-  };
-  async function submit(command: string) {
-    if (busy()) return;
-    history.push(command);
-    index = history.length;
-    setInput("");
-    setBusy(true);
-    append(`${cwd}> ${command}\n`);
-    controller = new AbortController();
-    try {
-      const result = await kernel.invoke("run_shell", {
-        command,
-        ...(session ? { session } : { keepAlive: true }),
-      }, {
-        signal: controller.signal,
-        stdout: bytes => append(new TextDecoder().decode(bytes)),
-        stderr: bytes => append(new TextDecoder().decode(bytes)),
-      }) as { session: string; cwd: string; truncated: { stdout: boolean; stderr: boolean } };
-      session = result.session;
-      cwd = result.cwd;
-      if (result.truncated.stdout || result.truncated.stderr) append("[output truncated]\n");
-    } finally {
-      if (!closed) setBusy(false);
-    }
-  }
+  const pty = new Pty();
+  let handle: TerminalHandle | undefined;
+  const [exited, setExited] = createSignal<number | null>(null, { ownedWrite: true });
+  const [title, setTitle] = createSignal("", { ownedWrite: true });
+  startShell(app, pty);
   onCleanup(() => {
-    closed = true;
-    controller?.abort();
-    if (session) void kernel.invoke("shell_close", { session }).catch(() => {});
+    pty.hangUp();
     release?.();
   });
-  return <box width={app.window.width()} height={app.window.height()} padding={6} gap={4} background={0}>
-    <box height={Math.max(0, app.window.height() - 32)} overflow="scroll" scrollOffset={Math.max(0, scrollback().split("\n").length * 14 - app.window.height() + 50)}>
-      <text font="mono" wrap>{scrollback()}</text>
-    </box>
-    <TextInput name="terminal-command" value={input()} onChange={value => {
-      if (!busy()) setInput(value);
-    }} onSubmit={value => {
-      void submit(value);
-    }} width={app.window.width() - 12} autoFocus onInterrupt={() => controller?.abort()} onHistory={direction => {
-      index = Math.max(0, Math.min(history.length, index + direction));
-      setInput(history[index] ?? "");
-    }} />
-  </box>;
+
+  createEffect(
+    () => [title(), exited()] as const,
+    ([programTitle, code]) => {
+      const cols = Math.floor((win.width() - 4) / 6), rows = Math.floor((win.height() - 2) / 11);
+      const name = programTitle || "bash";
+      win.setTitle(code === null ? `Terminal — ${name} — ${cols}×${rows}` : "Terminal — Completed");
+    },
+  );
+
+  createEffect(
+    () => exited(),
+    (code) => {
+      app.setMenus([
+        {
+          label: "File",
+          items: [
+            { label: "New Window", shortcut: "N", onClick: () => app.openWindow({ title: "Terminal" }) },
+            { label: "Close Window", shortcut: "W", onClick: () => win.close() },
+            { type: "separator" },
+            { label: "Quit", shortcut: "Q", onClick: () => app.quit() },
+          ],
+        },
+        {
+          label: "Edit",
+          items: [
+            {
+              label: "Copy",
+              shortcut: "C",
+              disabled: !clipboard,
+              onClick: () => {
+                const text = handle?.selection();
+                if (text) void clipboard?.writeText(text).catch(() => {});
+              },
+            },
+            {
+              label: "Paste",
+              shortcut: "V",
+              disabled: !clipboard || code !== null,
+              onClick: () => {
+                void clipboard?.readText().then((text) => handle?.paste(text)).catch(() => {});
+              },
+            },
+            { type: "separator" },
+            { label: "Select All", shortcut: "A", onClick: () => handle?.selectAll() },
+            { label: "Clear Scrollback", shortcut: "K", onClick: () => handle?.clearScrollback() },
+          ],
+        },
+        {
+          label: "Shell",
+          items: [
+            { label: "Send Interrupt (⌃C)", shortcut: ".", disabled: code !== null, onClick: () => handle?.type("\x03") },
+            { label: "Send End of Input (⌃D)", disabled: code !== null, onClick: () => handle?.type("\x04") },
+            { type: "separator" },
+            { label: "Reset Terminal", onClick: () => handle?.reset() },
+          ],
+        },
+      ]);
+    },
+  );
+
+  return (
+    <TerminalView
+      process={pty.master}
+      width={win.width()}
+      height={win.height()}
+      active={win.isActive()}
+      scheduler={app.scheduler}
+      name="terminal"
+      onReady={(h) => (handle = h)}
+      onTitle={setTitle}
+      onExit={(code) => {
+        setExited(code);
+        pty.slave.write("\n[Process completed]\n");
+      }}
+    />
+  );
 }
+
 export default defineApp({
   id: "terminal",
   title: "Terminal",
   icon: "icon/computer",
-  defaultSize: {
-    width: 460,
-    height: 260
-  },
+  defaultSize: DEFAULT_SIZE,
+  minSize: { width: 20 * 6 + 4, height: 5 * 11 + 2 },
   singleInstance: false,
   scrollable: false,
-  permissions: ["kernel:run_shell", "kernel:shell_close"],
-  Component: Terminal
+  permissions: [
+    "kernel:run_shell", "kernel:shell_close",
+    "kernel:stat", "kernel:list", "kernel:read_bytes", "kernel:write_bytes",
+    "kernel:mkdir", "kernel:remove", "kernel:move", "kernel:copy",
+  ],
+  Component: Terminal,
 });

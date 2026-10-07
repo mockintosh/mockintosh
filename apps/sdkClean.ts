@@ -95,6 +95,7 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "Visualizer.tsx": ["visualizer", "showreel", "surface", "synth"],
   "Earth.tsx": ["earth", "showreel"],
   "Fx.tsx": ["fx"],
+  "Terminal.tsx": ["terminal"],
 };
 
 export const APP_TITLES: Record<BundledAppEntry, string> = {

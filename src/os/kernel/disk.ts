@@ -9,6 +9,8 @@ export interface FileResource {
   readonly path: string;
   readonly kind: "file" | "directory";
   readonly contentType: string;
+  readonly size?: number;
+  readonly modified?: number;
 }
 
 /**
@@ -83,6 +85,8 @@ export class Disk {
       path: this.pathOf(node.id),
       kind: node.kind,
       contentType: node.kind === "file" ? node.type : "inode/directory",
+      size: node.kind === "file" ? node.size : 0,
+      modified: Math.round(node.modifiedAt),
     };
   }
 

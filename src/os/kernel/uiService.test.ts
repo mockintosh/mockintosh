@@ -200,23 +200,35 @@ describe("visible kernel UI operations", () => {
     expect(acknowledgedBeforeWrite).toBe(false);
     expect(os.services.desktopSettings!.pattern()).toBe("pat:dd77dd77dd77dd77");
   });
-  it("keeps the Terminal command field visible and accepts named typing", async () => {
+  /** The Terminal's screen as inspection reads it, once `predicate` holds (the shell runs between frames). */
+  async function terminalScreen(predicate: (text: string) => boolean): Promise<string> {
+    let text = "";
+    for (let i = 0; i < 200; i++) {
+      const node = ((await invoke("inspect")) as InspectionNode[]).find(n => n.role === "terminal");
+      text = node?.value ?? "";
+      if (predicate(text)) return text;
+      await vi.advanceTimersByTimeAsync(20);
+    }
+    throw new Error(`Terminal never showed what was expected:\n${text}`);
+  }
+  it("types into Terminal and reads its screen", async () => {
     await invoke("open", {
       app: "terminal"
     });
-    const field = ((await invoke("inspect")) as InspectionNode[]).find(n => n.name === "terminal-command")!;
-    expect(field.bounds.height).toBeGreaterThan(0);
+    const view = ((await invoke("inspect")) as InspectionNode[]).find(n => n.name === "terminal")!;
+    expect(view.bounds.height).toBeGreaterThan(0);
+    await terminalScreen(text => text.includes("~ $"));
     await invoke("click", {
-      id: field.id
+      id: view.id
     });
     await invoke("type", {
-      id: field.id,
-      text: "echo terminal-test"
+      id: view.id,
+      text: "echo terminal-test | tr a-z A-Z"
     });
     await invoke("key", {
       key: "Enter"
     });
-    expect(((await invoke("inspect")) as InspectionNode[]).some(n => n.text.includes("terminal-test\n"))).toBe(true);
+    expect(await terminalScreen(text => text.includes("\nTERMINAL-TEST\n"))).toContain("~ $ echo terminal-test | tr a-z A-Z");
   });
   it("rejects inactive and stale controls", async () => {
     await openControlPanel();
@@ -267,7 +279,7 @@ describe("visible kernel UI operations", () => {
       app: "terminal"
     });
     await expect(invoke("click", {
-      name: "terminal-command"
+      name: "terminal"
     })).rejects.toMatchObject({
       code: "ambiguity"
     });
@@ -347,13 +359,14 @@ describe("visible kernel UI operations", () => {
     await invoke("open", {
       app: "terminal"
     });
-    const field = ((await invoke("inspect")) as InspectionNode[]).find(n => n.name === "terminal-command")!;
+    const view = ((await invoke("inspect")) as InspectionNode[]).find(n => n.name === "terminal")!;
+    await terminalScreen(text => text.includes("~ $"));
     await invoke("click", {
-      id: field.id
+      id: view.id
     });
     const token = new Cancellation();
     const typing = os.kernel.invoke(caller, "type", {
-      id: field.id,
+      id: view.id,
       text: "x".repeat(200)
     }, token);
     const rejected = expect(typing).rejects.toMatchObject({
@@ -362,15 +375,17 @@ describe("visible kernel UI operations", () => {
     for (let i = 0; i < 100; i++) await Promise.resolve();
     token.cancel();
     await rejected;
+    // ⌃U clears the line the cancelled typing left behind.
     await invoke("key", {
-      key: "a",
-      meta: true
+      key: "u",
+      ctrl: true
     });
     await invoke("type", {
-      id: field.id,
+      id: view.id,
       text: "recovered"
     });
-    expect(((await invoke("inspect")) as InspectionNode[]).find(n => n.id === field.id)?.value).toBe("recovered");
+    const screen = await terminalScreen(text => text.endsWith("recovered"));
+    expect(screen.split("\n").pop()).toBe("~ $ recovered");
   });
   it("returns cancellation status and rejects work after shutdown", async () => {
     const token = new Cancellation();

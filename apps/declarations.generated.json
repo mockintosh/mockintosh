@@ -606,14 +606,26 @@
   "title": "Terminal",
   "icon": "icon/computer",
   "defaultSize": {
-   "width": 460,
-   "height": 260
+   "width": 484,
+   "height": 266
   },
   "permissions": [
    "kernel:run_shell",
-   "kernel:shell_close"
+   "kernel:shell_close",
+   "kernel:stat",
+   "kernel:list",
+   "kernel:read_bytes",
+   "kernel:write_bytes",
+   "kernel:mkdir",
+   "kernel:remove",
+   "kernel:move",
+   "kernel:copy"
   ],
   "scrollable": false,
+  "minSize": {
+   "width": 124,
+   "height": 57
+  },
   "singleInstance": false
  },
  "source_editor": {

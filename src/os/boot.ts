@@ -797,7 +797,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       ?.readText()
       .then((text) => {
         if (stopped) return;
-        for (const ch of text) ui.dispatchKeyboard("keypress", ch, {});
+        ui.dispatchPaste(text);
         scheduleRepaint();
       })
       .catch(() => {
@@ -825,7 +825,9 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       return;
     }
     // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
-    if (command && e.key.toLowerCase() === "v") {
+    // ⌃V is a key of its own for a terminal ("insert the next character literally").
+    const rawControlKey = mods.ctrl && !mods.meta && ui.focusedTakesRawKeys();
+    if (command && e.key.toLowerCase() === "v" && !rawControlKey) {
       if (!(mods.meta && runMenuShortcut(e.key))) pasteFromClipboard();
       scheduleRepaint();
       return;
