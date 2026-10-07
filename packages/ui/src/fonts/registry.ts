@@ -61,6 +61,45 @@ export interface RegisteredFontInfo {
 
 let builtInsInitialized = false;
 
+// ---------------------------------------------------------------------------
+// Character spacing — a face drawn with a different gap between glyphs.
+// `menu~s1` is the menu face with 1px between glyphs instead of its own.
+// ---------------------------------------------------------------------------
+
+const SPACING_MARK = "~s";
+
+/** The font name that draws `name` with `spacing` pixels between glyphs. */
+export function spacedFontName(name: string, spacing: number | undefined): string {
+  if (spacing === undefined) return name;
+  return `${parseSpacing(name).family}${SPACING_MARK}${Math.max(0, Math.round(spacing))}`;
+}
+
+function parseSpacing(name: string): { family: string; spacing?: number } {
+  const at = name.lastIndexOf(SPACING_MARK);
+  if (at < 0) return { family: name };
+  const spacing = Number(name.slice(at + SPACING_MARK.length));
+  return Number.isInteger(spacing) ? { family: name.slice(0, at), spacing } : { family: name };
+}
+
+let spacedCache: WeakMap<DeckerFont, Map<number, DeckerFont>> | undefined;
+
+function withSpacing(font: DeckerFont, spacing: number): DeckerFont {
+  if (font.spacing === spacing) return font;
+  spacedCache ??= new WeakMap();
+  let bySpacing = spacedCache.get(font);
+  if (!bySpacing) spacedCache.set(font, (bySpacing = new Map()));
+  let spaced = bySpacing.get(spacing);
+  if (!spaced) bySpacing.set(spacing, (spaced = { ...font, spacing }));
+  return spaced;
+}
+
+/** Look up `name` without its spacing suffix, then re-space the result. */
+function spaced<T extends DeckerFont | null>(name: string, lookup: (family: string) => T): T {
+  const { family, spacing } = parseSpacing(name);
+  const font = lookup(family);
+  return (font && spacing !== undefined ? withSpacing(font, spacing) : font) as T;
+}
+
 export function fontInfoKey(family: string, size: number): string {
   return `${family}/${size}`;
 }
@@ -202,6 +241,7 @@ function ensureBaked(name: string): DeckerFont | null {
 
 export function resolveFaceRef(name: string = "body", size?: number): { family: string; size: number } {
   initBuiltinFonts();
+  name = parseSpacing(name).family;
   if (bakedMap().has(name) || pendingBakedMap().has(name)) {
     const baked = ensureBaked(name);
     return { family: name, size: baked?.size ?? size ?? 0 };
@@ -276,6 +316,7 @@ export function registerFont(name: string, data: string, size?: number): DeckerF
 }
 
 export function getFont(name: string = "body", size?: number): DeckerFont | null {
+  if (parseSpacing(name).spacing !== undefined) return spaced(name, (family) => getFont(family, size));
   initBuiltinFonts();
   if (size === undefined && (bakedMap().has(name) || pendingBakedMap().has(name))) {
     return ensureBaked(name);
@@ -313,6 +354,10 @@ export function getRealFace(
   bits: number,
   size?: number,
 ): { font: DeckerFont; covered: number } | null {
+  if (parseSpacing(name).spacing !== undefined) {
+    const real = getRealFace(parseSpacing(name).family, bits, size);
+    return real && { ...real, font: withSpacing(real.font, parseSpacing(name).spacing!) };
+  }
   initBuiltinFonts();
   const want = bits & (STYLE_BOLD | STYLE_ITALIC);
   if (want) {
@@ -341,6 +386,7 @@ export function getRealFace(
  * come back unscaled.
  */
 export function getFontForScaling(name: string = "body", size?: number): DeckerFont | null {
+  if (parseSpacing(name).spacing !== undefined) return spaced(name, (family) => getFontForScaling(family, size));
   initBuiltinFonts();
   if (size === undefined || size <= 0) return getFont(name, size);
   const paged = parsePageFaceKey(name);

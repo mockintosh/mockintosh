@@ -183,7 +183,7 @@ function VideoPlayer(_props: Record<string, unknown>): JSX.Element {
           onChange={scrub}
         />
         <box width={CLOCK_W}>
-          <text font="menu" nowrap>
+          <text font="menu" spacing={1} nowrap>
             {`${formatTime(time())} / ${formatTime(duration())}`}
           </text>
         </box>

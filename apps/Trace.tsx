@@ -315,14 +315,14 @@ function Trace(props: TraceProps): JSX.Element {
         <Loading
           fallback={
             <box width={win.width()} height={win.height()} justifyContent="center" alignItems="center">
-              <text font="menu">Opening…</text>
+              <text font="menu" spacing={1}>Opening…</text>
             </box>
           }
         >
           <Errored
             fallback={(err) => (
               <box width={win.width()} height={win.height()} justifyContent="center" alignItems="center" padding={12}>
-                <text font="menu" align="center">{err instanceof Error ? err.message : String(err)}</text>
+                <text font="menu" spacing={1} align="center">{err instanceof Error ? err.message : String(err)}</text>
               </box>
             )}
           >
@@ -382,7 +382,7 @@ function Trace(props: TraceProps): JSX.Element {
                     <Show
                       when={shown}
                       fallback={
-                        <text font="menu" align="center">
+                        <text font="menu" spacing={1} align="center">
                           {tooBig && (tooBig.width > 256 || tooBig.height > 256)
                             ? `${tooBig.width}x${tooBig.height} is too big. Raise Block.`
                             : "Nothing lines up. Nudge Block, X, or Y."}
@@ -525,7 +525,7 @@ function Trace(props: TraceProps): JSX.Element {
                           format={(value) => String(Math.round(value))}
                           onChange={(value) => editFrame(found!, traced!, { cropY: Math.round(value) })}
                         />
-                        <text font="menu">{`${windowFrame!.width}x${windowFrame!.height}`}</text>
+                        <text font="menu" spacing={1}>{`${windowFrame!.width}x${windowFrame!.height}`}</text>
                       </box>
                     </box>
                   </Show>

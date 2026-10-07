@@ -151,8 +151,14 @@ const REDACTION_STRIKES: readonly FontStrikeSpec[] = REDACTION_SIZES.flatMap((si
   },
 ]);
 
+/**
+ * Decker's Chicago 12 draws 1px between glyphs; the Mac's draws 2 (an `i`
+ * advances 4, an `H` 8). Header byte 2 is the spacing: 16, 13, 1 → 16, 13, 2.
+ */
+const CHICAGO_12 = BUILTIN_FONT_MENU.replace(/^%%FNT1EA0B/, "%%FNT1EA0C");
+
 const VENDORED_STRIKES: readonly FontStrikeSpec[] = [
-  { family: "chicago", size: 12, data: BUILTIN_FONT_MENU, info: { ascent: 12, descent: 3, leading: 0 } },
+  { family: "chicago", size: 12, data: CHICAGO_12, info: { ascent: 12, descent: 3, leading: 0 } },
   { family: "geneva", size: 9, data: BUILTIN_FONT_BODY, info: { ascent: 10, descent: 2, leading: 0 } },
   { family: "geneva", size: 12, data: BUILTIN_FONT_GENEVA_12, info: { ascent: 12, descent: 3, leading: 1 } },
   { family: "monaco", size: 9, data: BUILTIN_FONT_MONO, info: { ascent: 9, descent: 2, leading: 0 } },

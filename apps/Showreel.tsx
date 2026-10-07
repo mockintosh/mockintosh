@@ -350,7 +350,7 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
               seek(value);
             }}
           />
-          <text font="menu" nowrap>
+          <text font="menu" spacing={1} nowrap>
             {`${timecode(time(), reel().fps)} ${statusText()}`}
           </text>
         </box>

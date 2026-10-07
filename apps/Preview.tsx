@@ -137,7 +137,7 @@ function Preview(props: PreviewProps): JSX.Element {
 
   const message = (text: string) => (
     <box width={win.width()} height={win.height()} justifyContent="center" alignItems="center" padding={12}>
-      <text font="menu" align="center" wrap>{text}</text>
+      <text font="menu" spacing={1} align="center" wrap>{text}</text>
     </box>
   );
 

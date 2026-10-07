@@ -24,7 +24,7 @@ import { importHostFile, isImportableHostFile, resolveImportTarget } from "./hos
 import { SpriteRegistry, registerBuiltinSprites } from "./sprites";
 import { liveCursor } from "./cursor";
 import { cursorForName, cursors } from "./cursors";
-import { animateZoomRect, type AnimRect } from "./zoomAnimation";
+import { animateZoomRect, type AnimRect, type ZoomPair } from "./zoomAnimation";
 import { buildFolderWindow, windowOuterRect } from "../../apps/Finder.solid";
 import { bootstrapFileSystem } from "./fsBootstrap";
 import { createFontFolder } from "./fontFolder";
@@ -46,6 +46,8 @@ import {
   isMenubarHidden,
   setOpenMenuIndex,
   FINDER_APP_ID,
+  hideApps as hideAppsInState,
+  isAppHidden,
 } from "./state";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
@@ -402,6 +404,15 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       renderFrame();
       playZoomAnimation(fromRect, toRect, onDone);
     },
+    hideApps(appIds, toRect) {
+      const froms = getWindows()
+        .filter((w) => appIds.includes(w.appId) && !isAppHidden(w.appId))
+        .map(windowOuterRect);
+      hideAppsInState(appIds);
+      if (froms.length === 0) return;
+      renderFrame(); // the screen without the hidden windows
+      playZoomAnimation(froms[0], toRect, undefined, froms.slice(1).map((from) => ({ from, to: toRect })));
+    },
     showWindowOutline(rect, _onCommit) {
       setWindowOutline(rect);
     },
@@ -684,13 +695,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
    *
    * @param onDone  called after the last frame is erased (screen is clean again)
    */
-  function playZoomAnimation(from: AnimRect, to: AnimRect, onDone?: () => void): void {
+  function playZoomAnimation(from: AnimRect, to: AnimRect, onDone?: () => void, more?: ZoomPair[]): void {
     animating = true;
     void animateZoomRect({
       port: ui.port,
       present: presentScreen,
       from,
       to,
+      more,
       cancelled: () => stopped,
       onEnd: () => {
         if (stopped) return;

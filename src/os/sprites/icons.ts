@@ -15,6 +15,11 @@ const ICON_APPSTORE_16X16 = defineSprite(
   16,
   "CqqqoCqqqqiqqWqqqqlqqqqlWqqqpVqqqpWWqqqWlqqlVWVapVVlWqqqpaqpaqlqqWqpaqqqqqoqqqqoCqqqoA=="
 );
+const ICON_FINDER_16X16 = defineSprite(
+  16,
+  16,
+  "CqqqoAlVVWAKqqqgCqqloAqqVaAKpVWgCqVVoAqpVaAKqqqgCVVVYAlVVWAJVapgCVVVYAqqqqAJVVVgCqqqoA=="
+);
 const ICON_APPSTORE_32X32 = defineSprite(
   32,
   32,
@@ -169,6 +174,7 @@ export const iconSprites: Record<string, Sprite> = {
   "icon/appstore-32x32": ICON_APPSTORE_32X32,
   "icon/appstore-smr-32x32": ICON_APPSTORE_SMR_32X32,
   "icon/appstore2": ICON_APPSTORE2,
+  "icon/finder-16x16": ICON_FINDER_16X16,
   "icon/camera-32": ICON_CAMERA_32,
   "icon/camera": ICON_CAMERA,
   "icon/camera3": ICON_CAMERA3,

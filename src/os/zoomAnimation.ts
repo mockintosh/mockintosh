@@ -24,14 +24,19 @@ function rectsEqual(a: AnimRect, b: AnimRect): boolean {
   );
 }
 
-export interface ZoomAnimationOptions {
+export interface ZoomPair {
+  from: AnimRect;
+  to: AnimRect;
+}
+
+export interface ZoomAnimationOptions extends ZoomPair {
   cancelled?: () => boolean;
   /** Port to draw the XOR frames into (the screen port). */
   port: GrafPort;
   /** Show the framebuffer after each frame. */
   present: () => void;
-  from: AnimRect;
-  to: AnimRect;
+  /** More rectangles to zoom in step with `from`→`to` (hiding an app zooms every window at once). */
+  more?: ZoomPair[];
   steps?: number;
   stepMs?: number;
   onStart?: () => void;
@@ -53,31 +58,40 @@ export interface ZoomAnimationOptions {
  * After the final frame the last rectangle is erased, leaving the screen
  * exactly as it was before the animation started.
  */
-export function animateZoomRect(options: ZoomAnimationOptions): Promise<void> {
-  const { port, present, from, to, steps = 4, stepMs = 30, onStart, onEnd } = options;
-  return new Promise((resolve) => {
-    const sequence: AnimRect[] = [];
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const r: AnimRect = {
-        x: Math.round(from.x + (to.x - from.x) * t),
-        y: Math.round(from.y + (to.y - from.y) * t),
-        width: Math.round(from.width + (to.width - from.width) * t),
-        height: Math.round(from.height + (to.height - from.height) * t),
-      };
-      if (r.width < 2 || r.height < 2) continue;
-      if (sequence.length > 0 && rectsEqual(r, sequence[sequence.length - 1]))
-        continue;
-      sequence.push(r);
-    }
+/** The rectangles one zoom steps through, skipping degenerate and repeated ones. */
+function zoomSequence({ from, to }: ZoomPair, steps: number): AnimRect[] {
+  const sequence: AnimRect[] = [];
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const r: AnimRect = {
+      x: Math.round(from.x + (to.x - from.x) * t),
+      y: Math.round(from.y + (to.y - from.y) * t),
+      width: Math.round(from.width + (to.width - from.width) * t),
+      height: Math.round(from.height + (to.height - from.height) * t),
+    };
+    if (r.width < 2 || r.height < 2) continue;
+    if (sequence.length > 0 && rectsEqual(r, sequence[sequence.length - 1]))
+      continue;
+    sequence.push(r);
+  }
+  return sequence;
+}
 
-    if (sequence.length === 0) {
+export function animateZoomRect(options: ZoomAnimationOptions): Promise<void> {
+  const { port, present, from, to, more = [], steps = 4, stepMs = 30, onStart, onEnd } = options;
+  return new Promise((resolve) => {
+    const sequences = [{ from, to }, ...more]
+      .map((pair) => zoomSequence(pair, steps))
+      .filter((sequence) => sequence.length > 0);
+    const frames = Math.max(0, ...sequences.map((sequence) => sequence.length));
+
+    if (frames === 0) {
       resolve();
       return;
     }
 
     let idx = 0;
-    let drawn: AnimRect | null = null;
+    let drawn: AnimRect[] = [];
 
     /** XOR-frame `r` with the drag pattern; drawing it twice restores the screen. */
     function xorRect(r: AnimRect) {
@@ -95,21 +109,23 @@ export function animateZoomRect(options: ZoomAnimationOptions): Promise<void> {
 
     function tick() {
       if (options.cancelled?.()) { resolve(); return; }
-      if (drawn) {
-        xorRect(drawn);
-        drawn = null;
-      }
+      for (const r of drawn) xorRect(r);
+      drawn = [];
 
-      if (idx >= sequence.length) {
+      if (idx >= frames) {
         present();
         onEnd?.();
         resolve();
         return;
       }
 
-      const r = sequence[idx++];
-      xorRect(r);
-      drawn = r;
+      for (const sequence of sequences) {
+        const r = sequence[idx];
+        if (!r) continue;
+        xorRect(r);
+        drawn.push(r);
+      }
+      idx++;
       present();
 
       setTimeout(tick, stepMs);

@@ -107,6 +107,12 @@ export interface OSServices {
    */
   playWindowOpenAnimation: (fromRect: AnimRect, toRect: AnimRect, onDone: () => void) => void;
   /**
+   * Hide applications (the application menu's Hide and Hide Others): each of
+   * their on-screen windows zooms closed into `toRect`, the menubar's
+   * application menu title.
+   */
+  hideApps: (appIds: readonly string[], toRect: AnimRect) => void;
+  /**
    * Show an XOR drag outline at the given visual rect while dragging or
    * resizing a window.  The outline is drawn every frame on top of the Solid
    * render.  `onCommit` is called on mouse-up to persist the change.

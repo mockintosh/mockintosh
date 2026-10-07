@@ -24,7 +24,7 @@ function Testing(_props: Record<string, unknown>): JSX.Element {
       overflow="scroll"
       background={0}
     >
-      <text font="menu">@mockintosh/ui gallery</text>
+      <text font="menu" spacing={1}>@mockintosh/ui gallery</text>
       <text font="pixel">Geist Pixel</text>
       <text font="body">{`Signals: ${count()}  ${checked() ? "on" : "off"}  ${name()}`}</text>
       <box flexDirection="row" gap={8}>

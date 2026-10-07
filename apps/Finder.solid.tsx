@@ -1558,6 +1558,7 @@ registerApp<{ directoryId: string }>({
   id: FINDER_APP_ID,
   title: "Finder",
   icon: "icon/folder",
+  smallIcon: "icon/finder-16x16",
   defaultSize: { width: 400, height: 200 },
   windowKind: "finder-folder",
   scrollable: true,

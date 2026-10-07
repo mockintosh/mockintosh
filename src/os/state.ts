@@ -239,6 +239,49 @@ export function isMenubarHidden(): boolean {
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Hidden applications — the application menu's Hide and Show All. A hidden
+// app keeps running and keeps its windows; they are just not on screen until
+// the app comes forward again.
+// ---------------------------------------------------------------------------
+
+const [getHiddenAppIds, setHiddenAppIds] = lazySignal<readonly string[]>([]);
+
+export function isAppHidden(appId: string): boolean {
+  return getHiddenAppIds().includes(appId);
+}
+
+function unhideApp(appId: string): void {
+  if (isAppHidden(appId)) setHiddenAppIds((ids) => ids.filter((id) => id !== appId));
+}
+
+/** The app that comes forward when the front one is hidden: the owner of the frontmost visible window, else the Finder. */
+function nextVisibleAppId(hidden: readonly string[]): string {
+  const stack = sortWindowsForPaint(windowStore().list as OSWindow[]);
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const win = stack[i];
+    if (!hidden.includes(win.appId) && !isModalWindow(win) && !win.appId.startsWith("__")) return win.appId;
+  }
+  return FINDER_APP_ID;
+}
+
+/** Hide each of `appIds`; if the front app is among them, the next visible app comes forward. */
+export function hideApps(appIds: readonly string[]): void {
+  const hidden = [...new Set([...getHiddenAppIds(), ...appIds])];
+  setHiddenAppIds(hidden);
+  if (hidden.includes(getActiveAppId())) {
+    const next = nextVisibleAppId(hidden);
+    setActiveWindowId(keyWindowId(windowStore().list as OSWindow[], next));
+    unhideApp(next);
+  }
+  flushIfIdle();
+}
+
+export function showAllApps(): void {
+  setHiddenAppIds([]);
+  flushIfIdle();
+}
+
 export const [getOpenMenuIndex, setOpenMenuIndex] = lazySignal<number | null>(null);
 export const [getHighlightedMenuItem, setHighlightedMenuItem] = lazySignal<number | null>(null);
 
@@ -275,6 +318,7 @@ export function openOSWindow(win: OSWindow): void {
     if (firstOwn >= 0) s.list.splice(firstOwn, 0, win);
     else s.list.push(win);
   });
+  unhideApp(win.appId);
   // A palette or desk joins an already-front app without taking the key window,
   // so the document keeps its stripes while the palette's drag bar stays filled.
   const active = getActiveWindow();
@@ -294,7 +338,7 @@ export function closeOSWindow(id: string): void {
   });
   setActiveWindowId((prev) => {
     if (prev !== id) return prev;
-    const remaining = windowStore().list.filter((w) => w.id !== id) as OSWindow[];
+    const remaining = windowStore().list.filter((w) => w.id !== id && !isAppHidden(w.appId)) as OSWindow[];
     // The app stays front while it has windows left (a desk, a palette).
     const sameApp = closing ? keyWindowId(remaining, closing.appId) : null;
     return sameApp ?? (remaining.length > 0 ? remaining[remaining.length - 1].id : null);
@@ -314,6 +358,7 @@ export function closeAllWindows(): void {
 
 /** Bring an application's windows forward and make it the active app. */
 export function activateApp(appId: string): void {
+  unhideApp(appId);
   _setWindowStore((s) => {
     const next = orderWindowsForApp(s.list, appId);
     s.list.splice(0, s.list.length, ...next);
@@ -324,6 +369,7 @@ export function activateApp(appId: string): void {
 
 export function bringToFront(id: string): void {
   const desk = windowStore().list.find((w) => w.id === id);
+  if (desk) unhideApp(desk.appId);
   if (desk && windowDefinition(desk.kind).backdrop) {
     activateApp(desk.appId);
     return;

@@ -573,14 +573,14 @@ function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
         <Show when={loading()}>
           <box position="absolute" left={0} top={0} width={view().width} height={view().height} justifyContent="center" alignItems="center">
             <box background={0} padding={2}>
-              <text font="menu">Initializing camera...</text>
+              <text font="menu" spacing={1}>Initializing camera...</text>
             </box>
           </box>
         </Show>
         <Show when={!!errorText()}>
           <box position="absolute" left={0} top={0} width={view().width} height={view().height} justifyContent="center" alignItems="center">
             <box background={0} padding={2}>
-              <text font="menu">{errorText()}</text>
+              <text font="menu" spacing={1}>{errorText()}</text>
             </box>
           </box>
         </Show>
@@ -595,7 +595,7 @@ function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
               justifyContent="center"
               alignItems="center"
             >
-              <text font="menu" align="center">{String(countdown())}</text>
+              <text font="menu" spacing={1} align="center">{String(countdown())}</text>
             </box>
           </box>
         </Show>

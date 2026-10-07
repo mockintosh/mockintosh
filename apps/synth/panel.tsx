@@ -90,7 +90,7 @@ export function Display(props: { width: number; height: number; title: string; d
       flexDirection="column"
       semantic={{ name: "display", role: "status", value: `${props.title} | ${props.detail} | ${props.status}` }}
     >
-      <text font="menu" color={0} nowrap>
+      <text font="menu" spacing={1} color={0} nowrap>
         {props.title}
       </text>
       <text font="body" color={0} nowrap>

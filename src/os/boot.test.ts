@@ -12,7 +12,7 @@ import { createHeadlessPlatform, type HeadlessPlatform } from "../platform/headl
 import { registerApp } from "./apps";
 import { declaredApp } from "./appDeclaration";
 import { MIME } from "@mockintosh/fs";
-import { getActiveAppId, getActiveWindowId, getWindows, isMenubarHidden, setWindowFullScreen } from "./state";
+import { getActiveAppId, getActiveWindowId, getWindows, isAppHidden, isMenubarHidden, setWindowFullScreen } from "./state";
 import { TITLE_BAR_H, titleBarOuterHeight } from "./windowGeometry";
 import { buildTinyTtf } from "../platform/fontRaster/tinyTtf";
 import type { HostToProcess, ProcessPort, ProcessToHost } from "./process/protocol";
@@ -42,6 +42,23 @@ function whiteBox(): JSX.Element {
 }
 
 /** Fraction of black pixels in a rectangle of the last presented frame. */
+/**
+ * Use a menu as the Mac does: press at the first point (a title), slide
+ * through the rest with the button down, and let go at the last.
+ */
+function menuDrag(platform: HeadlessPlatform, ...points: [number, number][]): void {
+  const [[x0, y0], ...rest] = points;
+  platform.pointer({ type: "down", x: x0, y: y0, button: 0 });
+  platform.tick();
+  for (const [x, y] of rest) {
+    platform.pointer({ type: "move", x, y });
+    platform.tick();
+  }
+  const [x1, y1] = points.at(-1)!;
+  platform.pointer({ type: "up", x: x1, y: y1, button: 0 });
+  platform.tick();
+}
+
 function inkCoverage(frame: Uint8Array, x0: number, y0: number, w: number, h: number): number {
   let black = 0;
   for (let y = y0; y < y0 + h; y++) {
@@ -118,7 +135,7 @@ describe("bootOS on the headless platform", () => {
     }
   });
 
-  it("opens a menu when its title is clicked and closes it on the next click", () => {
+  it("pulls a menu down while the button is held and puts it away on release", () => {
     // Find the Apple menu: the first black pixels in the menubar row.
     const frame = platform.lastFrame()!;
     let appleX = -1;
@@ -127,14 +144,15 @@ describe("bootOS on the headless platform", () => {
     }
     expect(appleX).toBeGreaterThan(0);
 
-    platform.click(appleX + 3, 10);
+    platform.pointer({ type: "down", x: appleX + 3, y: 10, button: 0 });
     platform.tick();
     const open = platform.lastFrame()!;
     // A dropdown with a black frame now hangs below the menubar at the left.
     expect(inkCoverage(open, 0, MENUBAR_HEIGHT, 120, 40)).toBeGreaterThan(0.1);
     expect(inkCoverage(open, 0, MENUBAR_HEIGHT, 120, 40)).toBeLessThan(0.45); // not desktop pattern
 
-    platform.click(300, 200); // click on the desktop dismisses it
+    platform.pointer({ type: "move", x: 300, y: 200 });
+    platform.pointer({ type: "up", x: 300, y: 200, button: 0 }); // letting go off the menu chooses nothing
     platform.tick();
     const closed = platform.lastFrame()!;
     const desktopAgain = inkCoverage(closed, 0, MENUBAR_HEIGHT + 2, 120, 40);
@@ -330,13 +348,32 @@ describe("bootOS on the headless platform", () => {
     platform.tick();
     expect(getActiveAppId()).toBe("switch-b");
 
-    platform.click(WIDTH - 8, 10);
-    platform.tick();
-    // Finder, then Aaa, then Bee. Aaa is the second row of the dropdown.
-    platform.click(WIDTH - 30, 47);
-    platform.tick();
+    // Hide, Hide Others, Show All, a separator, then Finder, Aaa and Bee in 18px rows.
+    menuDrag(platform, [WIDTH - 20, 10], [WIDTH - 30, 20 + 3 * 16 + 16 + 18 + 9]);
     expect(getActiveAppId()).toBe("switch-a");
     expect(getWindows().filter((w) => w.appId === "switch-a").at(-1)?.id).toBe(getActiveWindowId());
+  });
+
+  it("hides the front application and shows it again from the application menu", () => {
+    registerApp({
+      id: "hide-a",
+      title: "Aaa",
+      icon: "icon/computer",
+      defaultSize: { width: 80, height: 40 },
+      Component: () => whiteBox(),
+    });
+    os.services.openApp("hide-a");
+    platform.tick();
+    expect(getActiveAppId()).toBe("hide-a");
+
+    // Hide Aaa: the first row.
+    menuDrag(platform, [WIDTH - 20, 10], [WIDTH - 30, 20 + 8]);
+    expect(isAppHidden("hide-a")).toBe(true);
+    expect(getActiveAppId()).toBe("finder");
+
+    // Show All: the third row.
+    menuDrag(platform, [WIDTH - 20, 10], [WIDTH - 30, 20 + 2 * 16 + 8]);
+    expect(isAppHidden("hide-a")).toBe(false);
   });
 
   it("runs ⌘-shortcuts from the active menubar (⌘N creates a folder on the desktop)", () => {
@@ -555,32 +592,24 @@ describe("bootOS on the headless platform", () => {
     }
     expect(ran).toEqual(["E"]);
 
-    // Short labels keep every panel at the 80px minimum width; rows are 16px
-    // below a 4px pad, and a submenu's first row lines up with its item.
-    const hover = (x: number, y: number) => {
-      platform.pointer({ type: "move", x, y });
-      platform.tick();
-    };
-    const openThings = () => {
-      platform.click(34, 10);
-      platform.tick();
-    };
-
-    openThings();
-    hover(50, 47); // B
-    hover(130, 47); // C, in B's submenu beside the first panel
-    platform.click(130, 47);
-    platform.tick();
+    // Titles start at x 33, past the Apple menu. Rows are 16px straight under
+    // the border at y 19, and a panel is only as wide as its rows (about 50px
+    // here), so B's submenu opens near x 83 and D's near x 133. A submenu's
+    // first row lines up with its item.
+    menuDrag(platform, [50, 10], [60, 44], [110, 44]); // B, then C in B's submenu beside it
     expect(ran).toEqual(["E", "C"]);
 
-    openThings();
-    hover(50, 47);
-    hover(130, 47);
-    hover(130, 63); // D
-    hover(200, 63); // E, a level deeper
-    platform.click(200, 63);
-    platform.tick();
+    menuDrag(platform, [50, 10], [60, 44], [110, 44], [110, 60], [170, 60]); // D, then E a level deeper
     expect(ran).toEqual(["E", "C", "E"]);
+
+    // Press the Apple menu and slide right onto Things: Things comes down in its place.
+    menuDrag(platform, [20, 10], [50, 10], [60, 28]);
+    expect(ran).toEqual(["E", "C", "E", "A"]);
+
+    // Letting go on the title, or on a submenu's own row, chooses nothing.
+    menuDrag(platform, [50, 10]);
+    menuDrag(platform, [50, 10], [60, 44]);
+    expect(ran).toEqual(["E", "C", "E", "A"]);
   });
 
   it("a window can go full screen — covering the menubar — and come back, by menu shortcut too", () => {

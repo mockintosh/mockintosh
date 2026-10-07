@@ -406,6 +406,11 @@ export interface TextProps extends LayoutStyle, EventHandlers, SemanticProps {
   shadow?: boolean;
   /** QuickDraw underline, 1px below the baseline. Does not change the advance. */
   underline?: boolean;
+  /**
+   * Pixels between glyphs, in place of the face's own (Chicago 12 has 2,
+   * as the real Mac draws it). App content sets 1 for the tighter look.
+   */
+  spacing?: number;
   color?: Ink;
   /** Solid background behind the text */
   background?: Ink;

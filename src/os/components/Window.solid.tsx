@@ -5,6 +5,7 @@ import { useOS } from "../context";
 import {
   getActiveAppId,
   getActiveWindowId,
+  isAppHidden,
   bringToFront,
   updateOSWindow,
   setWindowOutline,
@@ -44,6 +45,9 @@ import {
   hasZoomBox,
 } from "../windowGeometry";
 
+/** Where a hidden app's windows wait: far enough left that no frame or shadow reaches the screen. */
+const HIDDEN_LEFT = -100_000;
+
 /** Offsets of the six title-bar stripe lines within the 11px close-box band. */
 const TITLE_BAR_STRIPE_ROWS = [0, 2, 4, 6, 8, 10];
 
@@ -77,6 +81,11 @@ export function Window(props: WindowProps): JSX.Element {
   const appFront = () => getActiveAppId() === props.win.appId;
   const chromeOn = () => (def().toolPalette ? appFront() : isActive());
   const shown = () => !(def().toolPalette || def().backdrop) || appFront();
+  /**
+   * A hidden app's windows move off screen rather than unmount, so their
+   * content keeps its state until the app is shown again.
+   */
+  const left = () => (isAppHidden(props.win.appId) ? HIDDEN_LEFT : props.win.x);
 
   // Outer geometry
   const frame = createMemo(() => windowFrame(props.win));
@@ -199,7 +208,7 @@ export function Window(props: WindowProps): JSX.Element {
     <Show when={shown()}>
     <box
       position="absolute"
-      left={props.win.x}
+      left={left()}
       top={props.win.y}
       width={props.win.width + SHADOW}
       height={totalH() + SHADOW}

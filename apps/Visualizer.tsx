@@ -287,11 +287,11 @@ function Visualizer(_props: Record<string, unknown>): JSX.Element {
           gap={6}
           background={0}
         >
-          <text font="menu" nowrap>
+          <text font="menu" spacing={1} nowrap>
             {position()}
           </text>
           <box flexGrow={1} />
-          <text font="menu" nowrap>
+          <text font="menu" spacing={1} nowrap>
             {readout()}
           </text>
         </box>

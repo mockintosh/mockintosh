@@ -85,10 +85,10 @@ export default defineApp({
 
     return (
       <box padding={8} flexDirection="column" gap={8} background={0}>
-        <text font="menu" align="center">
+        <text font="menu" spacing={1} align="center">
           Counter
         </text>
-        <text font="menu" align="center">
+        <text font="menu" spacing={1} align="center">
           {String(count())}
         </text>
         <box flexDirection="row" gap={8} justifyContent="center">

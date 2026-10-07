@@ -867,7 +867,7 @@ function Tp7(props: Record<string, unknown>): JSX.Element {
               <MicHole listening={micStatus() === "listening"} />
             </box>
             <Knob def={VOLUME} value={volume()} onChange={setVolume} />
-            <text font="menu" color={1} nowrap>
+            <text font="menu" spacing={1} color={1} nowrap>
               TP-7
             </text>
           </box>

@@ -771,6 +771,7 @@ export function useApp(): AppServices {
 
 export {
   measureText,
+  spacedFontName,
   fontLineHeight,
   drawString,
   drawPixels,

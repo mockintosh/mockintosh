@@ -407,14 +407,14 @@ function Dither(props: DitherProps): JSX.Element {
         <Loading
           fallback={
             <box width={view().width} height={view().height} justifyContent="center" alignItems="center">
-              <text font="menu">Opening…</text>
+              <text font="menu" spacing={1}>Opening…</text>
             </box>
           }
         >
           <Errored
             fallback={(err) => (
               <box width={view().width} height={view().height} justifyContent="center" alignItems="center" padding={12}>
-                <text font="menu" align="center">{err instanceof Error ? err.message : String(err)}</text>
+                <text font="menu" spacing={1} align="center">{err instanceof Error ? err.message : String(err)}</text>
               </box>
             )}
           >

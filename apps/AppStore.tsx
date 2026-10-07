@@ -116,7 +116,7 @@ function AppPage(props: {
       <box flexDirection="row" gap={8} alignItems="center">
         <ListingIcon name={props.app.icon} sprite={props.app.iconSprite} />
         <box flexDirection="column" gap={4} flexGrow={1} flexShrink={1} minWidth={0}>
-          <text font="menu">{props.app.title}</text>
+          <text font="menu" spacing={1}>{props.app.title}</text>
           <text font="body">{`${props.app.author} · ${props.app.version}`}</text>
           <Show
             when={props.installed}
@@ -242,7 +242,7 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
   return (
     <box width={win.width()} height={win.height()} padding={8} flexDirection="column" gap={6} background={0}>
       <Show when={!page()}>
-        <text font="menu">App Store</text>
+        <text font="menu" spacing={1}>App Store</text>
       </Show>
       <Show when={status()}>
         <text font="body">{status()}</text>
@@ -252,10 +252,10 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
           when={page()}
           fallback={
             <box flexDirection="column" gap={8}>
-              <text font="menu">Mockintosh Apps</text>
+              <text font="menu" spacing={1}>Mockintosh Apps</text>
               <AppShelf apps={bundledApps().map(bundledListing)} columns={columns()} onOpen={openPage} />
               <Show when={fetch}>
-                <text font="menu">From the Registry</text>
+                <text font="menu" spacing={1}>From the Registry</text>
                 <text font="body">SDK v3 apps only</text>
                 <Loading fallback={<text font="body">Loading catalog…</text>}>
                   <Errored fallback={() => <text font="body">Failed to load catalog.</text>}>
