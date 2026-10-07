@@ -390,6 +390,34 @@ describe("bootOS on the headless platform", () => {
     expect(changed).toBeGreaterThan(100); // a new folder icon + label appeared
   });
 
+  it("names new folders \"Empty folder\", \"Empty folder 2\", … and selects each one", async () => {
+    const meta = { shift: false, ctrl: false, alt: false, meta: true };
+    const fs = os.services.fs;
+    const desktop = fs.locate("desktop")!;
+    const newFolder = async (name: string) => {
+      platform.key({ type: "down", key: "n", modifiers: meta });
+      platform.key({ type: "up", key: "n", modifiers: meta });
+      platform.tick();
+      await Promise.resolve(); // the Finder saves a new icon's slot just after drawing it
+      platform.tick();
+      const folder = fs.children(desktop.id).find((n) => n.name === name);
+      expect(folder).toBeTruthy();
+      return desktopCellPos(fs, folder!.id)!;
+    };
+    // A selected label is white on black; an unselected one black on white.
+    const labelInk = (pos: { labelX: number; labelY: number }) =>
+      inkCoverage(platform.lastFrame()!, pos.labelX - 8, pos.labelY - 3, 16, 6);
+
+    const first = await newFolder("Empty folder");
+    expect(labelInk(first)).toBeGreaterThan(0.5);
+
+    const second = await newFolder("Empty folder 2");
+    expect(labelInk(second)).toBeGreaterThan(0.5);
+    expect(labelInk(first)).toBeLessThan(0.5);
+
+    await newFolder("Empty folder 3");
+  });
+
   // Regression: a z-order bump used to remount every IconCell mid-press, so the
   // pointer dispatcher never delivered the click that starts inline rename.
   it("renames a desktop icon after a second click on its selected label", async () => {
@@ -402,7 +430,7 @@ describe("bootOS on the headless platform", () => {
     const fs = os.services.fs;
     const desktop = fs.locate("desktop");
     expect(desktop).toBeTruthy();
-    const folder = fs.children(desktop!.id).find((n) => n.name === "untitled folder");
+    const folder = fs.children(desktop!.id).find((n) => n.name === "Empty folder");
     expect(folder).toBeTruthy();
 
     await Promise.resolve(); // the Finder saves a new icon's slot just after drawing it
