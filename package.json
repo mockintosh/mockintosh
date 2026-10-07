@@ -31,6 +31,7 @@
     "test:browser-build": "npm run build && tsx scripts/builder/browser-demo.ts",
     "apps:declarations": "UPDATE_DECLARATIONS=1 vitest run apps/declarations.test.ts",
     "wasi:build": "sh scripts/wasi/build.sh",
+    "assets:unused": "tsx scripts/find-unused-assets.ts",
     "icons:find": "tsx scripts/find-icons.ts",
     "icons:import": "tsx scripts/import-icon.ts",
     "icons:refresh-catalog": "tsx scripts/refresh-icon-catalog.ts",
