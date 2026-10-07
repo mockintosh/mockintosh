@@ -4,7 +4,7 @@
  * program, fx) runs attached to the terminal instead, as the foreground job,
  * so it can read keys, switch to raw mode and draw full-screen.
  */
-import { defineCommand, type Command } from "just-bash/browser";
+import { defineCommand, type Command, type IFileSystem } from "just-bash/browser";
 import { BashSession, type BashSessionOptions } from "./session";
 import type { Completion } from "../lineEditor";
 import type { Job, ShellRunner } from "../shell";
@@ -16,6 +16,8 @@ export interface ProgramContext {
   cwd: string;
   env: Record<string, string>;
   job: Job;
+  /** The shell's file system: the disk, /tmp, and whatever is mounted. */
+  fs: IFileSystem;
 }
 
 /**
@@ -27,7 +29,7 @@ export interface TtyProgram {
   /** One line for `help`. */
   description?: string;
   attached(context: ProgramContext): Promise<number>;
-  batch?(context: { argv: string[]; cwd: string; env: Record<string, string>; stdin: string; signal?: AbortSignal }): Promise<{ stdout: string; stderr: string; exitCode: number }>;
+  batch?(context: { argv: string[]; cwd: string; env: Record<string, string>; stdin: string; signal?: AbortSignal; fs: IFileSystem }): Promise<{ stdout: string; stderr: string; exitCode: number }>;
 }
 
 interface AstNode {
@@ -62,7 +64,7 @@ export class BashRunner implements ShellRunner {
         }
         const env: Record<string, string> = {};
         for (const [k, v] of ctx.env) env[k] = v;
-        return program.batch({ argv: [program.name, ...args], cwd: ctx.cwd, env, stdin: decodeLatin1(ctx.stdin as unknown as string), signal: ctx.signal });
+        return program.batch({ argv: [program.name, ...args], cwd: ctx.cwd, env, stdin: decodeLatin1(ctx.stdin as unknown as string), signal: ctx.signal, fs: ctx.fs });
       }),
     );
     this.session = new BashSession({ ...options, commands: [...(options.commands ?? []), ...programCommands, capture] });
@@ -127,7 +129,7 @@ export class BashRunner implements ShellRunner {
       }
       env.COLUMNS = String(job.tty.size.cols);
       env.LINES = String(job.tty.size.rows);
-      const code = await attached.program.attached({ argv, cwd: this.session.cwd, env, job }).catch((error: unknown) => {
+      const code = await attached.program.attached({ argv, cwd: this.session.cwd, env, job, fs: this.session.bash.fs }).catch((error: unknown) => {
         if (job.stoppedBy) return 0;
         job.write(`${attached.program.name}: ${error instanceof Error ? error.message : String(error)}\n`);
         return 1;
