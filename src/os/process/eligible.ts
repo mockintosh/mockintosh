@@ -10,14 +10,13 @@ import type { SolidApp } from "../apps";
 import { appSource } from "./sources";
 
 /** Capabilities a process serves today. */
-const SERVED: ReadonlySet<Capability> = new Set<Capability>(["audio", "microphone", "printer", "download", "network", "clipboard", "fonts", "images", "video", "camera", "gpu", "agent-runtime"]);
+const SERVED: ReadonlySet<Capability> = new Set<Capability>(["audio", "microphone", "printer", "download", "network", "clipboard", "fonts", "images", "video", "camera", "gpu", "agent-runtime", "sign-in"]);
 
 /** Why `app` can't run in a process, or `null` when it can. */
 export function processBlocker(app: SolidApp, processes: AppProcesses | undefined): string | null {
   if (!processes) return "this Macintosh has no app processes";
   if ((app.runtime ?? processes.defaultRuntime) !== "worker") return "the app runs on the OS's thread";
   if (!processes.canRun(appSource(app.id))) return "a process can't load this app's code";
-  if (app.signIn) return "sign-in isn't served to processes yet";
   const missing = (app.requires ?? []).filter((c) => !SERVED.has(c));
   if (missing.length) return `${missing.join(", ")} ${missing.length === 1 ? "isn't" : "aren't"} served to processes yet`;
   return null;

@@ -354,6 +354,10 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         },
       },
       download: start.download ? { save: (file) => call("download.save", [file]) as Promise<void> } : undefined,
+      signIn: start.signIn && {
+        redirectUri: start.signIn.redirectUri,
+        authorize: (url) => call("signIn.authorize", [url]) as Promise<Record<string, string> | null>,
+      },
       audio: start.audio ? audio.service : undefined,
       video:
         start.video || start.videoPlayback

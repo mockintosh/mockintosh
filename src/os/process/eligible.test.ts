@@ -12,6 +12,8 @@ describe("processBlocker", () => {
     expect(processBlocker(app({ requires: ["audio", "network"] }), processes)).toBeNull();
     // A process runs fx's engine itself.
     expect(processBlocker(app({ requires: ["agent-runtime"] }), processes)).toBeNull();
+    // The sign-in sheet is the OS's; the process asks for it and waits.
+    expect(processBlocker(app({ requires: ["network", "sign-in"], signIn: { hosts: ["github.com"] } }), processes)).toBeNull();
   });
 
   it("keeps everything else on the OS's thread, and says why", () => {
@@ -20,6 +22,6 @@ describe("processBlocker", () => {
     expect(processBlocker(app({ runtime: "main" }), { ...processes, defaultRuntime: "worker" })).toMatch(/OS's thread/);
     expect(processBlocker(app(), undefined)).toMatch(/no app processes/);
     expect(processBlocker(app({ id: "unknown" }), processes)).toMatch(/can't load/);
-    expect(processBlocker(app({ requires: ["sign-in"] }), processes)).toBe("sign-in isn't served to processes yet");
+    expect(processBlocker(app({ requires: ["browser"] }), processes)).toBe("browser isn't served to processes yet");
   });
 });

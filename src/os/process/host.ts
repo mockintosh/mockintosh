@@ -191,6 +191,7 @@ export class AppProcess {
         print: printers && { paperWidth: printers.paperWidth, connected: untrack(() => printers.connected()) },
         audio: typeof this.context.audio?.openPort === "function",
         download: this.context.download !== undefined,
+        signIn: this.context.signIn && { redirectUri: this.context.signIn.redirectUri },
         video: typeof this.context.video?.excerpt === "function",
         videoPlayback: this.context.video !== undefined,
         camera: this.context.camera !== undefined,
@@ -487,6 +488,9 @@ export class AppProcess {
       case "download":
         if (!ctx.download) throw new Error("This Macintosh can't save files to the host");
         return ctx.download.save(args[0] as never);
+      case "signIn":
+        if (!ctx.signIn) throw new Error("This Macintosh can't sign in from a phone");
+        return ctx.signIn.authorize(args[0] as string);
       case "os":
         if (name === "showDialog") return ctx.os.showDialog(args[0] as never);
         if (name === "openApp") return ctx.os.openApp(args[0] as string, args[1] as Record<string, unknown>);

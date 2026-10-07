@@ -67,6 +67,8 @@ export interface ProcessStart {
   /** The speaker can take a port (`AudioService.openPort`). */
   audio: boolean;
   download: boolean;
+  /** Phone sign-in (`AppContext.signIn`); absent when the Macintosh has no relay. */
+  signIn?: { redirectUri: string };
   /** The host can decode video excerpts (`VideoService.excerpt`). */
   video: boolean;
   /** The host can play video live (`VideoService.open`). */
