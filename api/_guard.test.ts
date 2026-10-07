@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMemoryCounters, guardRequest, type GuardEnv, type RouteLimits } from "./_guard";
+import { createMemoryCounters, fromOwnSite, guardRequest, type GuardEnv, type RouteLimits } from "./_guard";
 
 const LIMITS: RouteLimits = {
   route: "test",
@@ -108,5 +108,30 @@ describe("guardRequest", () => {
     const env = { ...hostedEnv(), store: { hit: () => Promise.reject(new Error("down")) } };
     const result = await guardRequest(post(), LIMITS, env);
     expect(!result.ok && result.response.status).toBe(503);
+  });
+});
+
+describe("fromOwnSite", () => {
+  function get(headers: Record<string, string>): Request {
+    return new Request("https://app.vercel.app/api/web-image?url=x", { headers: { host: "app.vercel.app", ...headers } });
+  }
+
+  it("accepts a same-origin request, which carries no Origin when it is a GET", () => {
+    expect(fromOwnSite(get({ "sec-fetch-site": "same-origin" }), hostedEnv())).toBe(true);
+  });
+
+  it("accepts this deployment's origin and configured ones", () => {
+    expect(fromOwnSite(get({ origin: "https://app.vercel.app" }), hostedEnv())).toBe(true);
+    expect(fromOwnSite(get({ "sec-fetch-site": "cross-site", origin: "https://mockintosh.com" }), hostedEnv())).toBe(true);
+  });
+
+  it("refuses other sites and requests with neither header when hosted", () => {
+    expect(fromOwnSite(get({ "sec-fetch-site": "cross-site", origin: "https://evil.example" }), hostedEnv())).toBe(false);
+    expect(fromOwnSite(get({ "sec-fetch-site": "none" }), hostedEnv())).toBe(false);
+    expect(fromOwnSite(get({}), hostedEnv())).toBe(false);
+  });
+
+  it("accepts anything off a hosted deployment", () => {
+    expect(fromOwnSite(get({}), { ...hostedEnv(), hosted: false })).toBe(true);
   });
 });
