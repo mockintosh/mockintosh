@@ -50,7 +50,10 @@ export class ReelSound {
     this.transport = new Transport(stream.sampleRate, this.duration, this.looping);
     this.transport.muted = this.muted;
     this.transport.cue(this.cued.time, this.cued.playing);
-    stream.onStateChange((state) => this.onState(state));
+    // Closing the stream reports "closed" synchronously, from the app's cleanup.
+    stream.onStateChange((state) => {
+      if (!this.disposed) this.onState(state);
+    });
     this.onState(stream.state());
   }
 

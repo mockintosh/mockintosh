@@ -240,6 +240,8 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
     (title) => win.setTitle(title),
   );
 
+  // The menus show the chapter, not the time: rebuilding them every frame would shut an open menu.
+  const chapter = createMemo(() => chapterAt(reel(), time()).number);
   createEffect(
     () => ({
       reel: reel(),
@@ -248,7 +250,7 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
       muted: muted(),
       silent: soundState() === "unavailable",
       full: isFullScreen(),
-      chapter: chapterAt(reel(), time()).number,
+      chapter: chapter(),
     }),
     (state) => {
       const { chapters } = state.reel;
