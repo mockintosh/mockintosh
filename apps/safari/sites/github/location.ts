@@ -83,12 +83,6 @@ export function formatGithubLocation(location: GithubLocation): string {
   return `${root}/${location.kind}/${suffix}`;
 }
 
-export function repoOf(location: GithubLocation): { owner: string; repo: string } | null {
-  return location.kind === "home" || location.kind === "search" || location.kind === "profile"
-    ? null
-    : { owner: location.owner, repo: location.repo };
-}
-
 function profileTab(raw: string): ProfileTab {
   const tab = raw.match(/[?&]tab=([^&#]+)/i)?.[1] ?? "";
   if (tab === "stars") return "stars";

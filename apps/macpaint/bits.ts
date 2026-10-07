@@ -112,15 +112,6 @@ export function pixelTrue(h: number, v: number, bits: BitMap): boolean {
   return ((bits.baseAddr[(v - bounds.top) * bits.rowBytes + (x >> 3)]! >> (7 - (x & 7))) & 1) === 1;
 }
 
-export function setPixel(bits: BitMap, h: number, v: number, on: boolean): void {
-  const { bounds } = bits;
-  if (h < bounds.left || h >= bounds.right || v < bounds.top || v >= bounds.bottom) return;
-  const x = h - bounds.left;
-  const i = (v - bounds.top) * bits.rowBytes + (x >> 3);
-  const bit = 0x80 >> (x & 7);
-  bits.baseAddr[i] = on ? bits.baseAddr[i]! | bit : bits.baseAddr[i]! & ~bit;
-}
-
 export function zeroBuf(bits: BitMap): void {
   bits.baseAddr.fill(0);
 }
@@ -170,7 +161,6 @@ export function patternFromHex(hex: string): Pattern {
 }
 
 export const white: Pattern = patternFromHex("0000000000000000");
-export const black: Pattern = patternFromHex("ffffffffffffffff");
 export const gray: Pattern = patternFromHex("aa55aa55aa55aa55");
 export const ltGray: Pattern = patternFromHex("8822882288228822");
 

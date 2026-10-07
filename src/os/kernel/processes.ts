@@ -61,10 +61,6 @@ const processRow = s.object({
   started: s.integer, status: s.integer, instance: s.string,
 }, ["pid", "ppid", "name", "args", "kind", "state"]);
 
-export function signalNumber(signal: string): number {
-  return SIGNAL_NUMBERS[signal as SignalName] ?? 0;
-}
-
 /** "9", "KILL", "SIGKILL", "-9" → "SIGKILL". */
 export function parseSignal(value: string): SignalName {
   const v = value.replace(/^-/, "").toUpperCase();

@@ -57,7 +57,6 @@ export interface Tty {
   readonly closed: boolean;
 }
 
-const encoder = new TextEncoder();
 type StreamDecoder = { decode(input: Uint8Array, options: { stream: boolean }): string };
 
 export class Pty {
@@ -275,7 +274,3 @@ export class Pty {
   }
 }
 
-/** Bytes of `text` as the program sees them. */
-export function ttyBytes(text: string): Uint8Array {
-  return encoder.encode(text);
-}

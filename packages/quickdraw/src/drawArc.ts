@@ -524,17 +524,3 @@ export function DrawArc(
   }
 }
 
-/**
- * `StdRRect` / `StdOval` body: one `DrawArc` over 0..360
- * (`RRects.a:76-84`, `Ovals.a:68-78`).
- */
-export function DrawRRect(
-  r: Rect,
-  hollow: boolean,
-  ovWd: number,
-  ovHt: number,
-  mode: number,
-  pat: Pattern
-): void {
-  DrawArc(r, hollow, ovWd, ovHt, mode, pat, 0, 360);
-}

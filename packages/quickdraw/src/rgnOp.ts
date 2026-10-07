@@ -9,7 +9,6 @@
 
 import type { Point, Rect } from "./types";
 import { asInt16 } from "./fixmath";
-import { PackRgn } from "./packRgn";
 import { RGN_END, type RegionData } from "./regionTypes";
 
 /** `RgnOp.a:19-23`. */
@@ -344,16 +343,3 @@ export function TrimRect(rgn: RegionData, dstRect: Rect): number {
   return 0;
 }
 
-/**
- * RgnOp then PackRgn into `dst`. Used by DoRgnOp (`Regions.a:817-833`).
- */
-export function packOp(
-  rgnA: RegionData,
-  rgnB: RegionData,
-  dst: RegionData,
-  op: number,
-  dh = 0
-): void {
-  const pts = RgnOp(rgnA, rgnB, op, dh);
-  PackRgn(pts, dst);
-}

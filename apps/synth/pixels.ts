@@ -26,10 +26,6 @@ export function ensureFrame(frame: Frame | null, width: number, height: number):
   return createFrame(width, height);
 }
 
-export function fill(frame: Frame, ink: Ink): void {
-  frame.pixels.fill(ink);
-}
-
 export function plot(frame: Frame, x: number, y: number, ink: Ink): void {
   const px = Math.round(x);
   const py = Math.round(y);

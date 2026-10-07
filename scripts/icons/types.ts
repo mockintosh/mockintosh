@@ -64,7 +64,6 @@ export const CATALOG_FIELDS = [
 export const UPSTREAM_REPO = "ryokun6/ryos";
 export const UPSTREAM_REF = "main";
 export const UPSTREAM_CATALOG_ROOT = `https://raw.githubusercontent.com/${UPSTREAM_REPO}/${UPSTREAM_REF}/public/resources/classic-mac-icon-catalogs`;
-export const UPSTREAM_ICON_URL = UPSTREAM_CATALOG_ROOT;
 export const UPSTREAM_ERAS = ["system-7", "mac-os-8"] as const;
 
 /** Resource types that are native 1-bit (not icl8 / ics8 / cicn color). */

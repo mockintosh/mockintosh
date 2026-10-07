@@ -65,7 +65,6 @@ export const CORNER = 18;
 /** How many lines of type-in text. */
 export const MAX_LINES = 20;
 
-export const APPLE_MENU = 1;
 export const FILE_MENU = 2;
 export const EDIT_MENU = 3;
 export const AIDS_MENU = 4;

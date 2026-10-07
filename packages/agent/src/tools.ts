@@ -28,7 +28,6 @@ export const AGENT_TRAPS = [
   "logs",
 ] as const;
 
-export type AgentTrap = (typeof AGENT_TRAPS)[number];
 export const AGENT_TRAP_SET = new Set<string>(AGENT_TRAPS);
 export const HTTP_TOOL_NAMES = new Set(HTTP_TOOLS.map((tool) => tool.function.name));
 

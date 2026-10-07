@@ -22,6 +22,10 @@
   "peerDependencies": {
     "solid-js": "2.0.0-rc.8",
     "@mockintosh/ui": "*",
-    "@mockintosh/sdk": "*"
+    "@mockintosh/sdk": "*",
+    "@mockintosh/protocol": "*"
+  },
+  "devDependencies": {
+    "@mockintosh/fs": "*"
   }
 }

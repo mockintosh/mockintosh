@@ -9,9 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mockintosh/quickdraw": "*",
     "@mockintosh/ui": "*",
-    "@solidjs/universal": "2.0.0-rc.8",
     "solid-js": "2.0.0-rc.8"
   },
   "devDependencies": {

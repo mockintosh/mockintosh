@@ -117,18 +117,6 @@ export function drawStyledLine(
   }
 }
 
-export function drawOutlineLine(
-  text: string,
-  x: number,
-  y: number,
-  fontName: string,
-  style: FontStyle,
-  color: number,
-  size?: number
-): void {
-  drawStyledLine(text, x, y, fontName, { ...style, outline: true }, color, size);
-}
-
 /**
  * Draw one line on `port`. `(x, y)` is the **top-left** of the line — the
  * helper adds ascent so QuickDraw's baseline `pnLoc.v` sits at the cell bottom.

@@ -155,7 +155,7 @@ describe("PackBits / UnpackBits", () => {
 });
 
 describe("forMaskSpans", () => {
-  it("emits contiguous runs matching maskBit", () => {
+  it("emits contiguous runs of set mask bits", () => {
     const bufLeft = 0;
     const mask = new Uint16Array(2);
     mask[0] = 0b11110000_00001111;

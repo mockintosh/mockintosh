@@ -16,7 +16,6 @@ import { makeRect } from "./types";
 import { QDError } from "./errors";
 import { EMPTY_DATA } from "./regionData";
 import type { FMOutput } from "./fontManager";
-import { fallbackFMOutput, installFontManager } from "./fontManager";
 
 function wideOpenRgn(): RgnHandle {
   return {
@@ -129,21 +128,3 @@ export function requirePort(): GrafPort {
   return globals.thePort;
 }
 
-/**
- * @deprecated Phase 7 — use {@link installFontManager}. Builds a width table
- * from `measure` and ignores `draw` (glyphs come from the strike).
- */
-export function __injectFontFunctions(
-  measure: (text: string) => number,
-  _draw: (text: string, x: number, y: number, port: GrafPort) => void
-): void {
-  installFontManager((inRec) => {
-    const out = fallbackFMOutput(inRec);
-    const widths = new Int32Array(256);
-    for (let i = 0; i < 256; i++) {
-      widths[i] = (measure(String.fromCharCode(i)) | 0) << 16;
-    }
-    out.widthTable = widths;
-    return out;
-  });
-}

@@ -57,9 +57,3 @@ export function createWebSourceProvider(): SourceProvider {
   };
 }
 
-/** Paths the compiler worker embeds — the volume must cover these. */
-export function typecheckSourcePaths(): string[] {
-  return Object.keys(loaders)
-    .map(relPath)
-    .filter((path) => path.startsWith("packages/") && path.includes("/src/"));
-}

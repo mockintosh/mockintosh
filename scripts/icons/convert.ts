@@ -99,21 +99,3 @@ export async function pngBufferToSprite(
   return rgbaToSprite(data, info.width, info.height, info.channels, mode);
 }
 
-/** Write a 1-bit sprite as a pixelated PNG (black / white / transparent). */
-export async function spriteToPreviewPng(sprite: ConvertedSprite, dest: string): Promise<void> {
-  const rgba = Buffer.alloc(sprite.width * sprite.height * 4);
-  for (let i = 0; i < sprite.data.length; i++) {
-    const o = i * 4;
-    if (sprite.mask[i] === 0) continue;
-    const v = sprite.data[i] === BLACK ? 0 : 255;
-    rgba[o] = v;
-    rgba[o + 1] = v;
-    rgba[o + 2] = v;
-    rgba[o + 3] = 255;
-  }
-  await sharp(rgba, {
-    raw: { width: sprite.width, height: sprite.height, channels: 4 },
-  })
-    .png()
-    .toFile(dest);
-}
