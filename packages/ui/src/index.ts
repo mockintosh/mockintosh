@@ -176,6 +176,7 @@ export type { JSX, HostProps } from "./jsx-runtime";
 export { BLACK, WHITE, defineSprite, encodeSprite, fromGrid, smallIcon } from "./sprite";
 export type { Sprite } from "./sprite";
 export { toBits, createDitherer, coverFrame, rasterizeFrame, isImageFrame, isDitheredAsset } from "./dither";
+export { SHADE_PATTERNS, SHADE_LEVELS, shadeLevel, shadeInk } from "./shadePatterns";
 export { paintDitherDissolve, bayerThreshold } from "./ditherDissolve";
 export { rasterizeDitherGradient, gradientT, fillGradientT, gradientDegrees, gradientAt } from "./ditherGradient";
 export type { ImageFrame, DitherMode, DitherOptions, CoverFrameOptions, DitheredAsset } from "./dither";

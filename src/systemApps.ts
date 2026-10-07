@@ -27,8 +27,10 @@ import { sprites as op1Sprites } from "@/apps/op1/icons";
 import { sprites as tp7Sprites } from "@/apps/tp7/icons";
 import { sprites as pchkraftSprites } from "@/apps/pchkraft/icons";
 import { sprites as visualizerSprites } from "@/apps/visualizer/icons";
-import { sprites as earthSprites } from "@/apps/earth/icons";
 import { sprites as foundrySprites } from "@/apps/foundry/icons";
+import { sprites as depthSprites } from "@/apps/depth/icons";
+import { sprites as tankSprites } from "@/apps/tank/icons";
+import { sprites as earthSprites } from "@/apps/earth/icons";
 
 const declared = declarations as Record<string, AppDeclaration>;
 
@@ -204,6 +206,29 @@ registerBundledApp({
   sprites: visualizerSprites,
   requires: ["audio"],
   load: () => import("@/apps/Visualizer"),
+});
+
+registerBundledApp({
+  id: "depth",
+  declaration: declared["depth"],
+  title: "Depth",
+  description:
+    "Real-time 3D on the graphics processor, in one bit: raymarched scenes with soft shadows and ambient occlusion, dithered as they're drawn. Drag to turn the camera; [ and ] change the scene.",
+  icon: "depth/icon",
+  sprites: depthSprites,
+  requires: ["gpu"],
+  load: () => import("@/apps/Depth"),
+});
+
+registerBundledApp({
+  id: "tank",
+  declaration: declared["tank"],
+  title: "Tank",
+  description:
+    "A tank battle on a plain that wraps around, drawn by a little 1-bit polygon engine: flat faces stamped from a 33-step pattern ramp and outlined in black, as Playdate games do. Arrows drive, Space fires.",
+  icon: "tank/icon",
+  sprites: tankSprites,
+  load: () => import("@/apps/Tank"),
 });
 
 registerBundledApp({

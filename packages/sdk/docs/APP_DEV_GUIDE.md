@@ -34,6 +34,8 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | TP-7 | `TP7.tsx` | SDK-clean |
 | pchkraft | `Pchkraft.tsx` | SDK-clean |
 | Visualizer | `Visualizer.tsx` | SDK-clean |
+| Depth | `Depth.tsx` | SDK-clean |
+| Tank | `Tank.tsx` | SDK-clean |
 | Earth | `Earth.tsx` | SDK-clean |
 | Video Player | `VideoPlayer.tsx` | SDK-clean |
 | Photo Booth | `PhotoBooth.tsx` | SDK-clean |

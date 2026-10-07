@@ -776,6 +776,73 @@
    }
   }
  },
+ "depth": {
+  "id": "depth",
+  "title": "Depth",
+  "icon": "depth/icon",
+  "defaultSize": {
+   "width": 400,
+   "height": 280
+  },
+  "smallIcon": "depth/icon-16x16",
+  "requires": [
+   "gpu"
+  ],
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 200,
+   "height": 140
+  },
+  "about": {
+   "version": "1.0",
+   "description": "Real-time 3D on the graphics processor, in one bit: raymarched scenes with soft shadows and ambient occlusion, dithered as they're drawn. Drag to turn the camera; [ and ] change the scene."
+  },
+  "sprites": {
+   "depth/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAKqoAAAAAAAKlZqAAAAAAKVVVmgAAAACVVmZmgAAAAlVVVVmgAAACVVVmaqAAAAlVVVWZmAAACVVWZmaoAAAlVVVZmaoAACVlZmZqqgAAJVVVlZmaAAAmVmZmZqoAAClVWZmZqgAAJmZmaqqqAAAllZmZmpoAAApmZqaqqAAACZmZmamoAAACamqqqqAAAAKZmZqaoAAAAKqqqqqAAAAAKampqgAAAAACqqqgAAAAAAAqqgAAAAAAAAAAAAAAAAACZmZmZAAAAJmZmZmZkAACZmZmZmZkAACZmZmZmZAAAAJmZmZkAAAAAAAAAAAAA=="
+   },
+   "depth/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAqqAAClVaAAlVWgAlVVqAJVVagCVVWoAlVWqAJVWqgCVWqoAJaqoACqqqAACqoAAAAAAACqqqgACqqAA=="
+   }
+  }
+ },
+ "tank": {
+  "id": "tank",
+  "title": "Tank",
+  "icon": "tank/icon",
+  "defaultSize": {
+   "width": 440,
+   "height": 290
+  },
+  "smallIcon": "tank/icon-16x16",
+  "scrollable": false,
+  "resizable": true,
+  "minSize": {
+   "width": 240,
+   "height": 160
+  },
+  "about": {
+   "version": "1.0",
+   "description": "A tank battle on a plain that wraps around, drawn by a little 1-bit polygon engine: flat faces stamped from a 33-step pattern ramp and outlined in black, as Playdate games do. Arrows drive, Space fires."
+  },
+  "sprites": {
+   "tank/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACqAAAAAAAACqqgAAAAAAAJVWAAAAAAACVVWqqqoAAAJVVZVVVgAACVVVaqqqAAAJVVVgAAAAACqqqqgAAAAqqqqqqoAAAJlZWVlZYAAClZWVlZWYAAJZWVlZWVoAApWVlZWVlgACqqqqqqqqAAWqqqqqqqpQBlVVVVVVVZAJalqWpalqYAlmWZZlmWZgCWpalqWpamAGVVVVVVVVkAWqqqqqqqpQAAAAAAAAAAAiIiIiIiIiIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "tank/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAAAAAACqAAACVYAAAlWqoAlVYAAqqqgAqqqqAKqqqgKqqqqJVVVVaaaWmmmmlpppVVVVYqqqqoAAAAAA=="
+   }
+  }
+ },
  "earth": {
   "id": "earth",
   "title": "Earth",
@@ -787,6 +854,7 @@
   "smallIcon": "earth/icon-16x16",
   "scrollable": false,
   "resizable": true,
+  "growBox": "overlay",
   "minSize": {
    "width": 200,
    "height": 150

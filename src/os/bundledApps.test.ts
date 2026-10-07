@@ -22,6 +22,8 @@ describe("bundled app listings", () => {
       "tp7",
       "pchkraft",
       "visualizer",
+      "depth",
+      "tank",
       "earth",
     ]);
     const apps = await Promise.all(

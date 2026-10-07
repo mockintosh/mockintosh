@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { coverFrame, createDitherer, toBits, type ImageFrame } from "../src/dither";
+import { SHADE_LEVELS, SHADE_PATTERNS, shadeInk, shadeLevel } from "../src/shadePatterns";
 
 function frame(pixels: number[][]): ImageFrame {
   const height = pixels.length;
@@ -49,6 +50,18 @@ describe("toBits", () => {
     ]);
     expect([...toBits(flat(255), "thermal")]).toEqual(Array(16).fill(0));
     expect([...toBits(flat(0), "thermal")]).toEqual(Array(16).fill(1));
+  });
+
+  it("pattern mode stamps one shade step per flat area, tiled on the screen grid", () => {
+    const flat = (v: number) => frame(Array.from({ length: 8 }, () => Array(16).fill(v)));
+    const half = toBits(flat(128), "pattern");
+    // Step 16 is the 50% checkerboard; the second 8×8 tile repeats the first.
+    expect(half.reduce((n, ink) => n + ink, 0)).toBe(64);
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 8; x++) expect(half[y * 16 + x + 8]).toBe(half[y * 16 + x]);
+    }
+    expect([...toBits(flat(255), "pattern")]).toEqual(Array(128).fill(0));
+    expect([...toBits(flat(0), "pattern")]).toEqual(Array(128).fill(1));
   });
 
   it("ascii mode stamps a solid dark 8×8 tile black", () => {
@@ -119,5 +132,29 @@ describe("coverFrame", () => {
     expect(greyAt(dest, 0, 0)).toBe(200);
     expect(greyAt(dest, 0, 3)).toBe(200);
     expect(greyAt(dest, 1, 0)).toBe(0);
+  });
+});
+
+describe("shade patterns", () => {
+  it("runs from black to white, each step whiter than the last", () => {
+    const white = (level: number) =>
+      SHADE_PATTERNS[level]!.reduce((n, row) => n + row.toString(2).split("1").length - 1, 0);
+    expect(SHADE_LEVELS).toBe(33);
+    expect(white(0)).toBe(0);
+    expect(white(SHADE_LEVELS - 1)).toBe(64);
+    for (let level = 1; level < SHADE_LEVELS; level++) expect(white(level)).toBeGreaterThan(white(level - 1));
+  });
+
+  it("maps brightness onto steps and steps onto ink", () => {
+    expect(shadeLevel(0)).toBe(0);
+    expect(shadeLevel(1)).toBe(SHADE_LEVELS - 1);
+    expect(shadeLevel(-1)).toBe(0);
+    expect(shadeLevel(2)).toBe(SHADE_LEVELS - 1);
+    expect(shadeInk(0, 3, 5)).toBe(1);
+    expect(shadeInk(SHADE_LEVELS - 1, 3, 5)).toBe(0);
+    // Step 1 has one white dot at the top-left of the tile.
+    expect(shadeInk(1, 0, 0)).toBe(0);
+    expect(shadeInk(1, 1, 0)).toBe(1);
+    expect(shadeInk(1, 8, 8)).toBe(0);
   });
 });

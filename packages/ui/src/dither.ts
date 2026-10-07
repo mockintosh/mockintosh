@@ -5,6 +5,7 @@
  */
 
 import { asciiToBits, createAsciiDitherer, type AsciiDitherOptions } from "./asciiDither.ts";
+import { SHADE_PATTERNS, shadeLevel } from "./shadePatterns.ts";
 
 /** Decoded raster: 8-bit RGBA, row-major, as `ImageData` but without the DOM. */
 export interface ImageFrame {
@@ -13,8 +14,12 @@ export interface ImageFrame {
   rgba: Uint8ClampedArray;
 }
 
-/** `thermal` is a clustered-dot halftone for thermal printers (see `CLUSTER_MAP`). */
-export type DitherMode = "threshold" | "atkinson" | "bayer" | "thermal" | "ascii";
+/**
+ * `thermal` is a clustered-dot halftone for thermal printers (see `CLUSTER_MAP`).
+ * `pattern` posterizes into the 33-step `SHADE_PATTERNS` ramp: flat areas of
+ * a classic fill pattern, and nothing crawls when the picture moves.
+ */
+export type DitherMode = "threshold" | "atkinson" | "bayer" | "thermal" | "pattern" | "ascii";
 
 export interface DitherOptions extends AsciiDitherOptions {
   /** Luminance cut for `threshold` and Bayer (default 128). */
@@ -96,6 +101,18 @@ function thermalTo1bit(rgba: Uint8ClampedArray, w: number, h: number, out: Uint8
   }
 }
 
+function patternTo1bit(rgba: Uint8ClampedArray, w: number, h: number, out: Uint8Array): void {
+  for (let y = 0; y < h; y++) {
+    const row = y & 7;
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const ri = i << 2;
+      const level = shadeLevel(luminance(rgba[ri], rgba[ri + 1], rgba[ri + 2]) / 255);
+      out[i] = (SHADE_PATTERNS[level][row] >> (7 - (x & 7))) & 1 ? 0 : 1;
+    }
+  }
+}
+
 function apply(
   frame: ImageFrame,
   mode: Exclude<DitherMode, "ascii">,
@@ -108,6 +125,7 @@ function apply(
   if (mode === "atkinson") atkinsonTo1bit(frame.rgba, frame.width, frame.height, out, lum!);
   else if (mode === "bayer") bayerTo1bit(frame.rgba, frame.width, frame.height, out, cut);
   else if (mode === "thermal") thermalTo1bit(frame.rgba, frame.width, frame.height, out);
+  else if (mode === "pattern") patternTo1bit(frame.rgba, frame.width, frame.height, out);
   else thresholdTo1bit(frame.rgba, len, out, cut);
 }
 
