@@ -1,4 +1,5 @@
 import { MOCKINTOSH_CHAT_CONTEXT } from "./mockintosh-context";
+import { envLimit, guardRequest, type RouteLimits } from "./_guard";
 import { TYPE_DIGEST, SOURCE_MAP } from "./mockintosh-context.generated";
 import {
   AGENT_BRIEF,
@@ -94,17 +95,25 @@ export function toLLMMessages(messages: ChatMessage[], mode: "chat" | "build", t
   ];
 }
 
+/** A build session makes one request per tool round, so the hourly budget is generous. */
+const CHAT_LIMITS: RouteLimits = {
+  route: "chat",
+  // Vercel refuses bodies over 4.5 MB before the function runs.
+  maxBodyBytes: 4_000_000,
+  perClient: { max: envLimit("CHAT_LIMIT_PER_HOUR", 200), windowSeconds: 3600 },
+  global: { max: envLimit("CHAT_LIMIT_PER_DAY", 5000), windowSeconds: 86400 },
+};
+
+/** More than any Mockintosh session offers the model. */
+const MAX_TOOLS = 128;
+
 export function staticPromptPrefix(mode: "chat" | "build"): string {
   return buildSystemPrompt(mode);
 }
 
 export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  const guard = await guardRequest(req, CHAT_LIMITS);
+  if (!guard.ok) return guard.response;
 
   if (!LLM_API_KEY) {
     return new Response(
@@ -116,7 +125,12 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = JSON.parse(guard.body);
+  } catch {
+    body = null;
+  }
   const parsed = parseChatRequest(body);
   if (!parsed) {
     return new Response(JSON.stringify({ error: "Missing prompt" }), {
@@ -126,6 +140,12 @@ export default async function handler(req: Request): Promise<Response> {
   }
   const options = parseChatOptions(body);
   const tools = parseClientTools(body) ?? HTTP_TOOLS;
+  if (tools.length > MAX_TOOLS) {
+    return new Response(JSON.stringify({ error: "Too many tools" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const mode = options.mode ?? "chat";
   const thinking = thinkingLevel(parsed, options.thinking) ?? (mode === "build" ? "medium" : undefined);
 
@@ -160,8 +180,9 @@ export default async function handler(req: Request): Promise<Response> {
       body: JSON.stringify(payload),
     });
     if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`LLM API error: ${err}`);
+      // The provider's body can describe our account; keep it in the logs.
+      console.error("LLM API error:", resp.status, await resp.text());
+      throw new Error(`LLM API error (${resp.status})`);
     }
     const data = await resp.json();
     const result = completeFromLLMChoice(data.choices?.[0]);

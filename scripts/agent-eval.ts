@@ -1,6 +1,6 @@
 /**
  * Phase 0 eval: run the real LLM through runAgent on the headless OS.
- * Skips when LLM_API_KEY is unset.
+ * Skips when LLM_API_KEY or API_ACCESS_TOKEN is unset.
  *
  *   npm run agent:eval
  *   npm run agent:eval -- --task notes
@@ -52,7 +52,10 @@ const TASKS = [
 async function complete(messages: ChatMessage[], tools: OpenAITool[]): Promise<CompleteResult> {
   const response = await handler(new Request("http://eval/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.API_ACCESS_TOKEN ?? ""}`,
+    },
     body: JSON.stringify({ messages, tools, mode: "build" }),
   }));
   return response.json() as Promise<CompleteResult>;
@@ -73,6 +76,10 @@ async function tryInvoke(
 async function main() {
   if (!process.env.LLM_API_KEY) {
     console.log("agent:eval skipped (no LLM_API_KEY)");
+    return;
+  }
+  if (!process.env.API_ACCESS_TOKEN) {
+    console.log("agent:eval skipped (no API_ACCESS_TOKEN; /api/chat refuses unauthenticated calls)");
     return;
   }
   let filter: EvalTaskId[] | undefined;

@@ -430,4 +430,4 @@ Browses `registry.json`. Only `sdk` major ≥ 2 entries are shown. Install impor
 
 ## Deployment
 
-Vercel: Vite static site + Edge Functions (`api/chat`, `api/checkout`, `api/verify-purchase`, Safari's `api/browse` and `api/web-image`, and the `api/oauth` phone sign-in relay behind `useApp().signIn`). The relay keeps pairings in a Redis REST store (`KV_REST_API_URL` / `KV_REST_API_TOKEN`); `scripts/dev-api.ts` keeps them in memory.
+Vercel: Vite static site + Edge Functions (`api/chat`, `api/checkout`, `api/verify-purchase`, Safari's `api/browse` and `api/web-image`, and the `api/oauth` phone sign-in relay behind `useApp().signIn`). The relay keeps pairings in a Redis REST store (`KV_REST_API_URL` / `KV_REST_API_TOKEN`); `scripts/dev-api.ts` keeps them in memory. `api/chat` and `api/generate-image` spend the server's model key, so `api/_guard.ts` refuses them without `Authorization: Bearer $API_ACCESS_TOKEN` (no token configured = always refused), then checks origin, body size, and per-client and daily limits counted in the same Redis store.

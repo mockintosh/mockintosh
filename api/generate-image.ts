@@ -1,13 +1,21 @@
+import { envLimit, guardRequest, type RouteLimits } from "./_guard";
+
 const IMAGE_API_URL = "https://api.openai.com/v1/images/generations";
 const LLM_API_KEY = process.env.LLM_API_KEY || "";
 
+/** Each image costs far more than a chat turn. */
+const IMAGE_LIMITS: RouteLimits = {
+  route: "image",
+  maxBodyBytes: 8_000,
+  perClient: { max: envLimit("IMAGE_LIMIT_PER_HOUR", 20), windowSeconds: 3600 },
+  global: { max: envLimit("IMAGE_LIMIT_PER_DAY", 300), windowSeconds: 86400 },
+};
+
+const MAX_PROMPT_CHARS = 2000;
+
 export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  const guard = await guardRequest(req, IMAGE_LIMITS);
+  if (!guard.ok) return guard.response;
 
   if (!LLM_API_KEY) {
     return new Response(
@@ -18,10 +26,21 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
-  const { prompt } = await req.json();
+  let prompt: unknown;
+  try {
+    prompt = (JSON.parse(guard.body) as { prompt?: unknown } | null)?.prompt;
+  } catch {
+    prompt = undefined;
+  }
 
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return new Response(JSON.stringify({ error: "Missing prompt" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (prompt.length > MAX_PROMPT_CHARS) {
+    return new Response(JSON.stringify({ error: "Prompt too long" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
@@ -44,9 +63,10 @@ export default async function handler(req: Request): Promise<Response> {
     });
 
     if (!imgResponse.ok) {
-      const err = await imgResponse.text();
+      // The provider's body can describe our account; keep it in the logs.
+      console.error("Image API error:", imgResponse.status, await imgResponse.text());
       return new Response(
-        JSON.stringify({ error: "Image API error", details: err }),
+        JSON.stringify({ error: `Image API error (${imgResponse.status})` }),
         { status: 502, headers: { "Content-Type": "application/json" } }
       );
     }
