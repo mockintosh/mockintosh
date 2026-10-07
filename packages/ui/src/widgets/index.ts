@@ -18,6 +18,8 @@ export { Button } from "./Button";
 export type { ButtonProps } from "./Button";
 export { ButtonGroup } from "./ButtonGroup";
 export type { ButtonGroupProps } from "./ButtonGroup";
+export { DialogButton } from "./DialogButton";
+export type { DialogButtonProps } from "./DialogButton";
 export { Card } from "./Card";
 export type { CardProps } from "./Card";
 export { Checkbox } from "./Checkbox";

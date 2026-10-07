@@ -35,12 +35,22 @@ export interface ButtonProps {
    * The face keeps its own border box; this is a wrapping box.
    */
   ring?: boolean;
+  /**
+   * Paint the ring outside the button's layout box, as the Dialog Manager
+   * does, so a default button's face lines up with its neighbours.
+   */
+  ringOverhang?: boolean;
   /** Named cursor. Buttons leave the host default (arrow) unless set. */
   cursor?: CursorName;
   width?: LayoutStyle["width"];
   /** Face height. Defaults to {@link FACE.height}. */
   height?: LayoutStyle["height"];
   minWidth?: LayoutStyle["minWidth"];
+  /**
+   * Where the button sits across its container. By default it follows the
+   * container's `alignItems` (centred in a row that centres), except that it
+   * keeps its own size where the container stretches; `"stretch"` fills.
+   */
   alignSelf?: LayoutStyle["alignSelf"];
 }
 
@@ -60,42 +70,48 @@ export function Button(props: ButtonProps): JSX.Element {
   const borderStyle = (): "solid" | "dotted" =>
     props.disabled ? "dotted" : "solid";
 
+  // The outer box only takes the container's alignment. Where the container
+  // stretches it may be stretched; the button inside keeps its own size and
+  // sits at its start, and is all that's drawn and all that takes a press.
+  const fill = () => props.alignSelf === "stretch" || props.width !== undefined;
+
   return (
-    <box
-      {...press.rootProps()}
-      width={props.width}
-      alignSelf={props.alignSelf ?? "flex-start"}
-      padding={props.ring ? RING.gap : 0}
-      borderColor={props.ring ? 1 : undefined}
-      borderWidth={props.ring ? RING.pen : undefined}
-      borderRadius={props.ring ? RING.radius : undefined}
-      background={props.ring ? 0 : undefined}
-      cursor={props.cursor}
-    >
+    <box width={props.width} alignSelf={props.alignSelf} alignItems={fill() ? "stretch" : "flex-start"}>
       <box
-        paddingLeft={inset() ? slot() : 0}
-        paddingTop={inset() ? slot() : 0}
-        paddingRight={!inset() ? slot() : 0}
-        paddingBottom={!inset() ? slot() : 0}
+        {...press.rootProps()}
+        margin={props.ring && props.ringOverhang ? -(RING.pen + RING.gap) : undefined}
+        padding={props.ring ? RING.gap : 0}
+        borderColor={props.ring ? 1 : undefined}
+        borderWidth={props.ring ? RING.pen : undefined}
+        borderRadius={props.ring ? RING.radius : undefined}
+        background={props.ring ? 0 : undefined}
+        cursor={props.cursor}
       >
         <box
-          width={props.width !== undefined ? "100%" : undefined}
-          height={props.height ?? FACE.height}
-          minWidth={props.minWidth ?? (props.ring ? 59 : undefined)}
-          paddingLeft={FACE.padX}
-          paddingRight={FACE.padX}
-          background={background()}
-          borderColor={1}
-          borderWidth={1}
-          borderStyle={borderStyle()}
-          borderRadius={props.borderRadius ?? radius()}
-          shadow={shadow() && !press.pressed()}
-          justifyContent="center"
-          alignItems="center"
+          paddingLeft={inset() ? slot() : 0}
+          paddingTop={inset() ? slot() : 0}
+          paddingRight={!inset() ? slot() : 0}
+          paddingBottom={!inset() ? slot() : 0}
         >
-          <text font={props.font ?? "body"} size={props.size} bold={props.bold} italic={props.italic} color={press.pressed() ? 0 : 1} align="center" verticalAlign="middle" nowrap>
-            {props.label}
-          </text>
+          <box
+            width={props.width !== undefined ? "100%" : undefined}
+            height={props.height ?? FACE.height}
+            minWidth={props.minWidth ?? (props.ring ? 59 : undefined)}
+            paddingLeft={FACE.padX}
+            paddingRight={FACE.padX}
+            background={background()}
+            borderColor={1}
+            borderWidth={1}
+            borderStyle={borderStyle()}
+            borderRadius={props.borderRadius ?? radius()}
+            shadow={shadow() && !press.pressed()}
+            justifyContent="center"
+            alignItems="center"
+          >
+            <text font={props.font ?? "body"} size={props.size} bold={props.bold} italic={props.italic} color={press.pressed() ? 0 : 1} align="center" verticalAlign="middle" nowrap>
+              {props.label}
+            </text>
+          </box>
         </box>
       </box>
     </box>

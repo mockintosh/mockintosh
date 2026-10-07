@@ -1,6 +1,6 @@
 import { For, Show } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Button, Spacer, TextInput, createSignal, layoutText, resolveFont } from "@mockintosh/ui";
+import { DialogButton, Spacer, TextInput, createSignal, layoutText, resolveFont } from "@mockintosh/ui";
 import type { DialogVariant } from "@mockintosh/sdk";
 import { useWindow } from "../windowContext";
 import { alertIcon } from "../iconCatalog/catalog";
@@ -20,8 +20,10 @@ const PADDING = 16;
 const GAP = 16;
 /** Room between the message and the buttons. */
 const BUTTON_GAP = 20;
-/** A 20px button face inside its 4px default ring. */
-const BUTTON_ROW = 28;
+/** Room for the default ring's 4px overhang above and below the faces. */
+const RING_OVERHANG = 4;
+/** A 20px button face plus the default ring's overhang. */
+const BUTTON_ROW = 20 + 2 * RING_OVERHANG;
 const INPUT_ROW = 36;
 const WIDTH = 376;
 
@@ -90,17 +92,10 @@ export function DialogApp(props: DialogProps): JSX.Element {
         </box>
       </Show>
       <Spacer />
-      <box flexDirection="row" gap={16}>
+      <box flexDirection="row" gap={16} paddingTop={RING_OVERHANG} paddingBottom={RING_OVERHANG}>
         <For each={buttons()}>
           {(label) => (
-            <Button
-              label={label}
-              font="menu"
-              height={20}
-              borderRadius={5}
-              ring={label === defaultLabel()}
-              onClick={() => finish(label)}
-            />
+            <DialogButton label={label} default={label === defaultLabel()} onClick={() => finish(label)} />
           )}
         </For>
       </box>

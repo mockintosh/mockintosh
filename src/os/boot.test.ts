@@ -285,15 +285,17 @@ describe("bootOS on the headless platform", () => {
     // Stop-hand ink in the icon cell (inside the frame + 16px pad).
     expect(inkCoverage(frame, x + inset + 16, y + inset + 16, 32, 32)).toBeGreaterThan(0.25);
     // Default-ring OK sits on the bottom-left (20px face + 4px ring + 16px pad).
+    // The face starts on the pad, inside the outer hairline the content box
+    // starts under, and the ring overhangs it 4px to the left.
     const btnTop = y + inset + 112 - 16 - 28;
-    const btnLeft = x + inset + 16;
+    const faceLeft = x + 1 + 16;
+    const btnLeft = faceLeft - 4;
     expect(inkCoverage(frame, btnLeft + 10, btnTop, 40, 3)).toBe(1);
+    expect(inkCoverage(frame, btnLeft, btnTop + 10, 3, 8)).toBe(1);
+    expect(inkCoverage(frame, faceLeft, btnTop + 10, 1, 8)).toBe(1);
 
     // CDEF FontInfo: Chicago 12 in a 20px face → baseline 14, caps on 5–13.
-    // The label now sits on the FontInfo line box (15px) centered in the face,
-    // so the same caps land two rows higher than a face-filling measure.
     const faceTop = btnTop + 4;
-    const faceLeft = btnLeft + 4;
     let inkMin = 20;
     let inkMax = -1;
     for (let row = 1; row < 19; row++) {
@@ -302,8 +304,8 @@ describe("bootOS on the headless platform", () => {
         if (row > inkMax) inkMax = row;
       }
     }
-    expect(inkMin).toBe(3);
-    expect(inkMax).toBeGreaterThanOrEqual(13);
+    expect(inkMin).toBe(5);
+    expect(inkMax).toBe(13);
   });
 
   it("wraps a long alert message inside the frame and grows the alert to fit it", () => {

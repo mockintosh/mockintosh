@@ -820,6 +820,7 @@ export {
   Card,
   Checkbox,
   Dialog,
+  DialogButton,
   DialogTitle,
   DialogDescription,
   DialogFooter,
