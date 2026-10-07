@@ -27,6 +27,7 @@ import { sprites as op1Sprites } from "@/apps/op1/icons";
 import { sprites as tp7Sprites } from "@/apps/tp7/icons";
 import { sprites as pchkraftSprites } from "@/apps/pchkraft/icons";
 import { sprites as visualizerSprites } from "@/apps/visualizer/icons";
+import { sprites as earthSprites } from "@/apps/earth/icons";
 import { sprites as foundrySprites } from "@/apps/foundry/icons";
 
 const declared = declarations as Record<string, AppDeclaration>;
@@ -203,4 +204,15 @@ registerBundledApp({
   sprites: visualizerSprites,
   requires: ["audio"],
   load: () => import("@/apps/Visualizer"),
+});
+
+registerBundledApp({
+  id: "earth",
+  declaration: declared["earth"],
+  title: "Earth",
+  description:
+    "The whole Earth in one bit, after Google Earth: drag to turn the globe, scroll to come down to it, and fly anywhere from the Go menu. The Sun lights it as it does now, or at any hour the Time menu turns to, against the real stars. Go flies Apollo 8's free return round the Moon and home.",
+  icon: "earth/icon",
+  sprites: earthSprites,
+  load: () => import("@/apps/Earth"),
 });

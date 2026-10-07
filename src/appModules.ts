@@ -31,6 +31,7 @@ export const APP_MODULES: Readonly<Record<string, AppModuleLoader>> = {
   tp7: () => import("@/apps/TP7"),
   pchkraft: () => import("@/apps/Pchkraft"),
   visualizer: () => import("@/apps/Visualizer"),
+  earth: () => import("@/apps/Earth"),
   terminal: () => import("@/apps/Terminal"),
   source_editor: () => import("@/apps/SourceEditor"),
   chatgippity: () => import("@/apps/ChatGippity"),
