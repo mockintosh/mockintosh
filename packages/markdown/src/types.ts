@@ -78,8 +78,12 @@ export type LayoutNode =
       /** CSS-style corner radius the picture is clipped to (half its size for a circle). */
       borderRadius?: number;
     }
-  /** Columns side by side, stacked instead when the page is narrower than `minWidth`. */
-  | { type: "columns"; columns: LayoutColumn[]; gap: number; minWidth: number }
+  /**
+   * Columns side by side, stacked instead when the page is narrower than
+   * `minWidth`. `center` lines their contents up on the row's middle, for a
+   * toolbar; they otherwise hang from the top.
+   */
+  | { type: "columns"; columns: LayoutColumn[]; gap: number; minWidth: number; center?: boolean }
   /** A bordered card around its nodes. */
   | { type: "box"; nodes: LayoutNode[] }
   | { type: "spacer"; height: number }

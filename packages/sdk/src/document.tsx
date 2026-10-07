@@ -104,7 +104,7 @@ function Block(props: BlockProps): JSX.Element {
     );
   }
   if (node.type === "columns") {
-    return <ColumnsView columns={node.columns} gap={node.gap} minWidth={node.minWidth} width={props.width} view={props.view} />;
+    return <ColumnsView columns={node.columns} gap={node.gap} minWidth={node.minWidth} center={node.center ?? false} width={props.width} view={props.view} />;
   }
   return <box height={6} />;
 }
@@ -125,6 +125,7 @@ function ColumnsView(props: {
   columns: readonly LayoutColumn[];
   gap: number;
   minWidth: number;
+  center: boolean;
   width: number;
   view: DocumentViewProps;
 }): JSX.Element {
@@ -142,7 +143,7 @@ function ColumnsView(props: {
   );
   return (
     <Show when={props.width >= props.minWidth} fallback={stacked}>
-      <box flexDirection="row" gap={props.gap} alignItems="flex-start">
+      <box flexDirection="row" gap={props.gap} alignItems={props.center ? "center" : "flex-start"}>
         <For each={props.columns.map((column, index) => ({ column, index }))}>
           {(entry) => (
             <box flexDirection="column" gap={BLOCK_GAP} width={widths()[entry.index]} flexShrink={0} minWidth={0}>

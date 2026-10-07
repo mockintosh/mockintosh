@@ -18,6 +18,7 @@ import {
   type RepoInfo,
 } from "./api";
 import { commitSubject, formatAge, formatBytes, formatCount } from "./format";
+import { GITHUB_MARK } from "./icons";
 import { formatGithubLocation, parseGithubLocation, type GithubLocation } from "./location";
 
 /**
@@ -136,9 +137,10 @@ function viewerOf(context: SiteContext): Promise<string> {
   return viewer;
 }
 
-/** Header columns: the site's name, and the account corner (a right-aligned button or login). */
-const SITE_WIDTH = 40;
+/** Header columns: GitHub's mark, and the account corner, signed in (the login, right-aligned) and out (the Sign In button). */
+const MARK_SIZE = 16;
 const ACCOUNT_WIDTH = 90;
+const SIGN_IN_WIDTH = 48;
 
 /**
  * The band across the top of every GitHub page, as on github.com: the home
@@ -157,14 +159,16 @@ function withHeader(page: DocumentPage, viewer: string | null, account = true): 
     type: "form",
     form: { action: "https://github.com/search", method: "get", controls: [{ kind: "text", name: "q", value: "", placeholder: "Search or jump to…" }] },
   };
+  const mark: LayoutNode = { type: "image", src: GITHUB_MARK, alt: "GitHub", align: "left", width: MARK_SIZE, height: MARK_SIZE, href: githubUrl({ kind: "home" }) };
   const header: LayoutNode = {
     type: "columns",
     gap: 8,
     minWidth: 0,
+    center: true,
     columns: [
-      { width: SITE_WIDTH, nodes: [heading(3, "GitHub", githubUrl({ kind: "home" }))] },
+      { width: MARK_SIZE, nodes: [mark] },
       { nodes: [search] },
-      { width: ACCOUNT_WIDTH, nodes: corner },
+      { width: account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
     ],
   };
   return { ...page, nodes: [header, { type: "hr" }, ...page.nodes] };
@@ -274,7 +278,7 @@ function card(header: InlineSegment[], body: readonly LayoutNode[]): LayoutNode 
 /** A heading on the left and a button on the right, as above github.com's lists. */
 function toolbar(title: string, button: LayoutNode | null): LayoutNode {
   if (!button) return heading(2, title);
-  return { type: "columns", gap: 8, minWidth: 0, columns: [{ nodes: [heading(2, title)] }, { width: 120, nodes: [button] }] };
+  return { type: "columns", gap: 8, minWidth: 0, center: true, columns: [{ nodes: [heading(2, title)] }, { width: 120, nodes: [button] }] };
 }
 
 /** A button that goes to `location`, as github.com's "New issue" does. */

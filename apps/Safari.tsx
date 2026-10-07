@@ -11,6 +11,7 @@ import { BOOKMARKS_KEY, addBookmark, bookmarkTitle, parseBookmarks, removeBookma
 import { faviconCache, type FaviconLoader } from "./safari/favicon";
 import { remoteImageLoader } from "./safari/remote";
 import { loadPage, readerApplies, type PageResult } from "./safari/router";
+import { githubSprites } from "./safari/sites/github/icons";
 import { GITHUB_SIGN_IN_HOST, signInToGithub } from "./safari/sites/github/signIn";
 import { FAVICON_SIZE, StartView } from "./safari/startView";
 import { activeTab, closeTab, navigateActive, openTab, selectTab, startTabs, updateTab, type TabSet } from "./safari/tabs";
@@ -526,6 +527,7 @@ export default defineApp({
   title: "Safari",
   icon: "icon/safari",
   smallIcon: "icon/safari-16x16",
+  sprites: githubSprites,
   about: {
     description:
       "Browses the web the way it looked in 1996: text, links, pictures and forms, without style sheets or scripts. GitHub and Hacker News are drawn from their APIs.",

@@ -116,6 +116,13 @@
   },
   "about": {
    "description": "Browses the web the way it looked in 1996: text, links, pictures and forms, without style sheets or scripts. GitHub and Hacker News are drawn from their APIs."
+  },
+  "sprites": {
+   "safari/github-mark-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "ACqoAAKqqoAKaqmgKmqpqCpVVaiqVVWqqVVVaqlVVWqpVVVqqVVVaqpVVaoqpVqoKaVaqApVWqACpVqAACVYAA=="
+   }
   }
  },
  "maps": {
