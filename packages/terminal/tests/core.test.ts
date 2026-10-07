@@ -237,3 +237,33 @@ describe("TerminalBridge", () => {
     expect(await bridge.process.exited).toBe(3);
   });
 });
+
+describe("colour scheme", () => {
+  it("tells programs the scheme and the colours, and when the scheme changes", async () => {
+    const screen = createTerminalScreen({ size: { cols: 20, rows: 4 }, colorScheme: "dark" });
+    const replies: string[] = [];
+    screen.onInput((d) => replies.push(d));
+    await screen.write("\x1b[?996n\x1b]11;?\x07\x1b]10;?\x07");
+    expect(replies).toEqual(["\x1b[?997;1n", "\x1b]11;rgb:0000/0000/0000\x1b\\", "\x1b]10;rgb:ffff/ffff/ffff\x1b\\"]);
+    replies.length = 0;
+    screen.setColorScheme("light");
+    expect(replies).toEqual([]);
+    await screen.write("\x1b[?2031h");
+    screen.setColorScheme("dark");
+    expect(replies).toEqual(["\x1b[?997;1n"]);
+    screen.dispose();
+  });
+
+  it("draws dark as the exact inverse of light, margins included", async () => {
+    const { GridPainter } = await import("../src/view/render");
+    const screen = createTerminalScreen({ size: { cols: 10, rows: 2 } });
+    await screen.write("\x1b[7mhi\x1b[0m there");
+    const light = new GridPainter(64, 26);
+    const dark = new GridPainter(64, 26);
+    dark.setDark(true);
+    light.paint(screen.frame(), () => ({ cursor: { col: 3, width: 1, shape: "block" } }));
+    dark.paint(screen.frame(), () => ({ cursor: { col: 3, width: 1, shape: "block" } }));
+    expect(Array.from(dark.pixels, (p) => p ^ 1)).toEqual(Array.from(light.pixels));
+    screen.dispose();
+  });
+});

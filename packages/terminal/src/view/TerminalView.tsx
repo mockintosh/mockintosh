@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { heldModifiers, type JSX, type Modifiers } from "@mockintosh/ui";
-import { createTerminalScreen, type TerminalScreen, type TerminalSize } from "../screen";
+import { createTerminalScreen, type ColorScheme, type TerminalScreen, type TerminalSize } from "../screen";
 import { encodeFocus, encodeKey, encodeMouse, encodePaste, type MouseAction, type MouseButton } from "../keys";
 import { SelectionModel, type CellPosition } from "../selection";
 import { CELL_HEIGHT, CELL_WIDTH } from "../glyphs";
@@ -30,6 +30,8 @@ export interface TerminalViewProps {
   active?: boolean;
   scheduler: { requestFrame(callback: (timeMs: number) => void): () => void; now(): number };
   scrollback?: number;
+  /** Black on white ("light", the default) or white on black ("dark"). */
+  theme?: ColorScheme;
   /** Name for inspection and automation. */
   name?: string;
   onTitle?(title: string): void;
@@ -49,7 +51,7 @@ const SYNC_RELEASE_MS = 150;
  */
 export function TerminalView(props: TerminalViewProps): JSX.Element {
   const initial = gridSize(untrack(() => props.width), untrack(() => props.height));
-  const screen = createTerminalScreen({ size: initial, scrollback: untrack(() => props.scrollback) ?? 2000 });
+  const screen = createTerminalScreen({ size: initial, scrollback: untrack(() => props.scrollback) ?? 2000, colorScheme: untrack(() => props.theme) ?? "light" });
   const painter = new GridPainter(untrack(() => props.width), untrack(() => props.height));
   const [revision, setRevision] = createSignal(0, { ownedWrite: true });
   const [focused, setFocused] = createSignal(false, { ownedWrite: true });
@@ -132,6 +134,15 @@ export function TerminalView(props: TerminalViewProps): JSX.Element {
         off();
         if (process === next) process = null;
       };
+    },
+  );
+
+  createEffect(
+    () => props.theme ?? "light",
+    (theme) => {
+      painter.setDark(theme === "dark");
+      screen.setColorScheme(theme);
+      repaint();
     },
   );
 

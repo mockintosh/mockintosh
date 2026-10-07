@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { useUIServices, type JSX } from "@mockintosh/ui";
 import { defineApp, useApp, type AppContext } from "@mockintosh/sdk";
 import { Pty, exitBuiltin, kernelProcesses, runShell } from "@mockintosh/terminal";
@@ -8,13 +8,37 @@ import { terminalPrograms } from "./terminal/programs";
 
 const HISTORY_KEY = "bash_history";
 const HISTORY_SIZE = 500;
+const THEME_KEY = "theme";
+
+type Theme = "light" | "dark";
+
+/** Every Terminal window shares the theme; dark unless the user chose light. */
+const [theme, setTheme] = createSignal<Theme>("dark", { ownedWrite: true });
+let themeLoaded = false;
+
+function loadTheme(app: AppContext): void {
+  if (themeLoaded) return;
+  themeLoaded = true;
+  void app.storage.read(THEME_KEY).then((saved) => {
+    if (saved === "light" || saved === "dark") setTheme(saved);
+  });
+}
+
+function chooseTheme(app: AppContext, next: Theme): void {
+  setTheme(next);
+  void app.storage.write(THEME_KEY, next);
+}
+
+/** The usual hint to programs about the terminal's colours: foreground;background. */
+const colorFgBg = (t: Theme) => (t === "dark" ? "15;0" : "0;15");
 
 /** 80×24 in Monaco 9 cells, plus the view's margins. */
 const DEFAULT_SIZE = { width: 80 * 6 + 4, height: 24 * 11 + 2 };
 
-function startShell(app: AppContext, pty: Pty, onKilled: () => void, clipboard?: { writeText(text: string): Promise<void> }): void {
+function startShell(app: AppContext, pty: Pty, onKilled: () => void, clipboard?: { writeText(text: string): Promise<void> }): BashRunner {
   const runner = new BashRunner({
     kernel: app.kernel!,
+    env: { COLORFGBG: colorFgBg(untrack(theme)) },
     programs: terminalPrograms(app, clipboard),
     banner: "Mockintosh bash. Your disk is ~ (/disk). Type help for commands, mac help for the Macintosh's own, fx for the coding agent.\n",
     loadHistory: async () => {
@@ -30,6 +54,7 @@ function startShell(app: AppContext, pty: Pty, onKilled: () => void, clipboard?:
       pty.exit(1);
     },
   );
+  return runner;
 }
 
 function Terminal(): JSX.Element {
@@ -41,7 +66,9 @@ function Terminal(): JSX.Element {
   let handle: TerminalHandle | undefined;
   const [exited, setExited] = createSignal<number | null>(null, { ownedWrite: true });
   const [title, setTitle] = createSignal("", { ownedWrite: true });
-  startShell(app, pty, () => win.close(), clipboard);
+  loadTheme(app);
+  const runner = startShell(app, pty, () => win.close(), clipboard);
+  createEffect(theme, (t) => runner.session.setVariable("COLORFGBG", colorFgBg(t)));
   onCleanup(() => {
     pty.hangUp();
     release?.();
@@ -57,8 +84,8 @@ function Terminal(): JSX.Element {
   );
 
   createEffect(
-    () => exited(),
-    (code) => {
+    () => [exited(), theme()] as const,
+    ([code, current]) => {
       app.setMenus([
         {
           label: "File",
@@ -95,6 +122,20 @@ function Terminal(): JSX.Element {
           ],
         },
         {
+          label: "View",
+          items: [
+            {
+              type: "radiogroup",
+              value: current,
+              onValueChange: (value) => chooseTheme(app, value as Theme),
+              items: [
+                { label: "Dark", value: "dark" },
+                { label: "Light", value: "light" },
+              ],
+            },
+          ],
+        },
+        {
           label: "Shell",
           items: [
             { label: "Send Interrupt (⌃C)", shortcut: ".", disabled: code !== null, onClick: () => handle?.type("\x03") },
@@ -113,6 +154,7 @@ function Terminal(): JSX.Element {
       width={win.width()}
       height={win.height()}
       active={win.isActive()}
+      theme={theme()}
       scheduler={app.scheduler}
       name="terminal"
       onReady={(h) => (handle = h)}

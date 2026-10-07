@@ -165,6 +165,8 @@ function outlineCells(pix: Uint8Array, stride: number, y: number, from: number, 
 export class GridPainter {
   pixels: Uint8Array;
   private keys: string[] = [];
+  /** White on black: every finished row, and the margins, are inverted. */
+  private dark = false;
 
   constructor(public width: number, public height: number) {
     this.pixels = new Uint8Array(width * height);
@@ -174,7 +176,14 @@ export class GridPainter {
     if (width === this.width && height === this.height) return;
     this.width = width;
     this.height = height;
-    this.pixels = new Uint8Array(width * height);
+    this.pixels = new Uint8Array(width * height).fill(this.dark ? 1 : 0);
+    this.keys = [];
+  }
+
+  setDark(dark: boolean): void {
+    if (dark === this.dark) return;
+    this.dark = dark;
+    this.pixels.fill(dark ? 1 : 0);
     this.keys = [];
   }
 
@@ -189,6 +198,15 @@ export class GridPainter {
       if (this.keys[y] === key) continue;
       this.keys[y] = key;
       drawRow(this.pixels, this.width, y, row, overlay);
+      if (this.dark) {
+        // Inverting the finished row keeps every style, the selection and the cursor readable.
+        const top = PAD_Y + y * CELL_HEIGHT;
+        const left = PAD_X, right = Math.min(this.width, PAD_X + row.cells.length * CELL_WIDTH);
+        for (let ay = top; ay < Math.min(this.height, top + CELL_HEIGHT); ay++) {
+          const base = ay * this.width;
+          for (let ax = left; ax < right; ax++) this.pixels[base + ax] ^= 1;
+        }
+      }
       drawn++;
     }
     return drawn;

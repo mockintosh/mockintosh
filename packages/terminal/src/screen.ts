@@ -89,12 +89,22 @@ export interface TerminalScreen {
   onChange(handler: () => void): () => void;
   onTitle(handler: (title: string) => void): () => void;
   onBell(handler: () => void): () => void;
+  /**
+   * What programs are told about the screen's colours: OSC 10/11 queries, the
+   * color-scheme report (`CSI ? 996 n`, and `?2031` updates when it changes).
+   */
+  readonly colorScheme: ColorScheme;
+  setColorScheme(scheme: ColorScheme): void;
   dispose(): void;
 }
+
+/** Black ink on white paper, or white on black. */
+export type ColorScheme = "light" | "dark";
 
 export interface ScreenOptions {
   size: TerminalSize;
   scrollback?: number;
+  colorScheme?: ColorScheme;
 }
 
 function colorOf(cell: IBufferCell, which: "fg" | "bg"): TerminalColor {
@@ -154,6 +164,12 @@ export function createTerminalScreen(options: ScreenOptions): TerminalScreen {
   });
   let cursorVisible = true;
   let sgrMouse = false;
+  let colorScheme: ColorScheme = options.colorScheme ?? "light";
+  /** The program asked to hear when the color scheme changes (`?2031h`). */
+  let schemeUpdates = false;
+  const reply = (data: string) => term.input(data, false);
+  const schemeReport = () => `\x1b[?997;${colorScheme === "dark" ? 1 : 2}n`;
+  const rgb = (white: boolean) => (white ? "rgb:ffff/ffff/ffff" : "rgb:0000/0000/0000");
   const changeHandlers = new Set<() => void>();
   const changed = () => {
     for (const handler of changeHandlers) handler();
@@ -165,12 +181,31 @@ export function createTerminalScreen(options: ScreenOptions): TerminalScreen {
     term.parser.registerCsiHandler({ prefix: "?", final: "h" }, (params) => {
       if (params.includes(25)) cursorVisible = true;
       if (params.includes(1006)) sgrMouse = true;
+      if (params.includes(2031)) schemeUpdates = true;
       return false;
     }),
     term.parser.registerCsiHandler({ prefix: "?", final: "l" }, (params) => {
       if (params.includes(25)) cursorVisible = false;
       if (params.includes(1006)) sgrMouse = false;
+      if (params.includes(2031)) schemeUpdates = false;
       return false;
+    }),
+    // Color-scheme query (CSI ? 996 n): 1 is dark, 2 is light.
+    term.parser.registerCsiHandler({ prefix: "?", final: "n" }, (params) => {
+      if (params[0] !== 996) return false;
+      reply(schemeReport());
+      return true;
+    }),
+    // Foreground and background colour queries (OSC 10/11 with "?").
+    term.parser.registerOscHandler(10, (data) => {
+      if (data !== "?") return false;
+      reply(`\x1b]10;${rgb(colorScheme === "dark")}\x1b\\`);
+      return true;
+    }),
+    term.parser.registerOscHandler(11, (data) => {
+      if (data !== "?") return false;
+      reply(`\x1b]11;${rgb(colorScheme === "light")}\x1b\\`);
+      return true;
     }),
   ];
   const scratch = term.buffer.active.getNullCell();
@@ -268,6 +303,7 @@ export function createTerminalScreen(options: ScreenOptions): TerminalScreen {
       term.reset();
       cursorVisible = true;
       sgrMouse = false;
+      schemeUpdates = false;
       changed();
     },
     onChange(handler) {
@@ -281,6 +317,15 @@ export function createTerminalScreen(options: ScreenOptions): TerminalScreen {
     onBell(handler) {
       const d = term.onBell(handler);
       return () => d.dispose();
+    },
+    get colorScheme() {
+      return colorScheme;
+    },
+    setColorScheme(scheme) {
+      if (scheme === colorScheme) return;
+      colorScheme = scheme;
+      if (schemeUpdates) reply(schemeReport());
+      changed();
     },
     dispose() {
       for (const d of disposables) d.dispose();

@@ -5,6 +5,7 @@
  */
 export { createTerminalScreen } from "./screen";
 export type {
+  ColorScheme,
   TerminalScreen, TerminalSize, TerminalFrame, TerminalRow, TerminalCell, TerminalCursor, TerminalModes, ScreenOptions,
 } from "./screen";
 export { monochromeStyle, paletteRgb, luminance, sameStyle, styleKey, PLAIN_STYLE } from "./style";

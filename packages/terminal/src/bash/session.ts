@@ -96,6 +96,11 @@ export class BashSession {
     return this.env[name];
   }
 
+  /** Set a variable from outside the shell, as the terminal does for COLORFGBG. */
+  setVariable(name: string, value: string): void {
+    this.env[name] = value;
+  }
+
   /**
    * What a program started from this shell inherits. just-bash doesn't mark
    * exports, so it's every variable but the shell's own machinery.
