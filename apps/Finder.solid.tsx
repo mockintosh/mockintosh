@@ -37,24 +37,31 @@ import { ROOT_ID, isFSError, type FileSystem, type FSNode } from "@mockintosh/fs
 import { WindowHeader, type MenubarDefinition } from "@mockintosh/sdk";
 import {
   bumpZOrder,
-  clearPositions,
   finderAttributes,
   iconForNode,
   placeIcons,
+  setIconPositions,
   type IconPlacement,
+  type IconPosition,
 } from "./finder/attributes";
+import {
+  ICON_SIZE,
+  DESKTOP_ICON_CELL_W,
+  FOLDER_ICON_CELL_H,
+  FOLDER_ICON_CELL_W,
+  FOLDER_PADDING,
+  arrangeIcons,
+  cleanUpIcons,
+  desktopGrid,
+  folderGrid,
+  type GridIcon,
+  type IconGrid,
+} from "./finder/iconGrid";
 import { INFO_BAR_H, windowContentRect, windowTotalHeight } from "../src/os/windowGeometry";
 
 // ---------------------------------------------------------------------------
 // Layout constants
 // ---------------------------------------------------------------------------
-const ICON_SIZE           = 32;
-const DESKTOP_PADDING_TOP = 8;
-const DESKTOP_ICON_CELL_W = 64;
-const DESKTOP_ICON_CELL_H = 64;
-const FOLDER_ICON_CELL_W  = 80;
-const FOLDER_ICON_CELL_H  = 56;
-const FOLDER_PADDING      = 16;
 const DRAG_THRESHOLD      = 4;
 const LABEL_PAD           = 2;
 const FONT                = "body" as const;
@@ -427,8 +434,15 @@ function toFinderIcon(fs: FileSystem, node: FSNode, isVolume = false): FinderIco
   };
 }
 
+/**
+ * A folder window's icons. The Trash and the Desktop Folder's contents sit on
+ * the desktop at desktop positions, so like a classic disk window this one
+ * doesn't list them.
+ */
 function buildFolderIcons(fs: FileSystem, directoryId: string): FinderIcon[] {
-  return fs.children(directoryId).map((n) => toFinderIcon(fs, n));
+  return fs.children(directoryId)
+    .filter((n) => n.kind !== "directory" || (n.role !== "trash" && n.role !== "desktop"))
+    .map((n) => toFinderIcon(fs, n));
 }
 
 function buildDesktopIcons(fs: FileSystem): FinderIcon[] {
@@ -458,41 +472,46 @@ function buildDesktopIcons(fs: FileSystem): FinderIcon[] {
   return icons;
 }
 
-function desktopIconPos(
-  icon: FinderIcon,
-  index: number,
-  screenW: number,
-  menubarH: number,
-  screenH: number
-): { x: number; y: number } {
-  if (icon.position) return icon.position;
-  const desktopH = screenH - menubarH;
-  const maxRows = Math.max(1, Math.floor((desktopH - DESKTOP_PADDING_TOP) / DESKTOP_ICON_CELL_H));
-  const col = Math.floor(index / maxRows);
-  const row = index % maxRows;
+/**
+ * Draw positions for a view's icons, saving a slot for each icon that had
+ * none so it stays put when others come and go. Clean Up moves them all to
+ * their nearest grid slots.
+ */
+function createIconLayout<G extends IconGrid>(
+  fs: FileSystem,
+  icons: Accessor<FinderIcon[]>,
+  grid: (icons: GridIcon[]) => G,
+  home: (icon: FinderIcon, grid: G) => IconPosition | undefined = () => undefined,
+): { positions: Accessor<Map<string, IconPosition>>; cleanUp: () => void } {
+  const layout = createMemo(() => {
+    const list = icons();
+    const bare = list.map((icon): GridIcon => ({ id: icon.nodeId, position: icon.position }));
+    const g = grid(bare);
+    const gridIcons = list.map((icon, i): GridIcon => (icon.position ? bare[i] : { ...bare[i], home: home(icon, g) }));
+    return { grid: g, ...arrangeIcons(gridIcons, g) };
+  });
+
+  createEffect(
+    () => layout().placed,
+    (placed) => {
+      // The FS flushes on every write, which an effect callback can't do; save just after.
+      if (placed.size > 0) queueMicrotask(() => setIconPositions(fs, placed));
+    },
+  );
+
   return {
-    x: screenW - (col + 1) * DESKTOP_ICON_CELL_W,
-    y: row * DESKTOP_ICON_CELL_H + DESKTOP_PADDING_TOP,
+    positions: () => layout().positions,
+    cleanUp: () => {
+      const { grid: g, positions } = layout();
+      const current = [...positions].map(([id, position]) => ({ id, position }));
+      setIconPositions(fs, cleanUpIcons(current, g));
+    },
   };
 }
 
-function folderIconPos(icon: FinderIcon, index: number, cols: number): { x: number; y: number } {
-  if (icon.position) return icon.position;
-  const col = index % cols;
-  const row = Math.floor(index / cols);
-  return {
-    x: FOLDER_PADDING + col * FOLDER_ICON_CELL_W,
-    y: FOLDER_PADDING + row * FOLDER_ICON_CELL_H,
-  };
-}
-
-function computeFolderContentHeight(icons: FinderIcon[], cols: number): number {
+function computeFolderContentHeight(positions: Iterable<IconPosition>): number {
   let maxY = 0;
-  for (let i = 0; i < icons.length; i++) {
-    const pos = folderIconPos(icons[i], i, cols);
-    const bottom = pos.y + FOLDER_ICON_CELL_H;
-    if (bottom > maxY) maxY = bottom;
-  }
+  for (const pos of positions) maxY = Math.max(maxY, pos.y + FOLDER_ICON_CELL_H);
   return maxY + FOLDER_PADDING;
 }
 
@@ -687,7 +706,7 @@ export function FinderDesktop(): JSX.Element {
   // window without its own menus, is active). Folder windows override per window.
   // Signals used here must already be declared: compute runs synchronously.
   createEffect(
-    () => buildFinderMenus(os.fs, undefined, {os, selected: setToArray(selectedSet())}),
+    () => buildFinderMenus(os.fs, undefined, {os, selected: setToArray(selectedSet())}, () => layout.cleanUp()),
     (menus) => setAppMenus(FINDER_APP_ID, menus),
   );
   const { marquee, handlers: marqueeHandlers } = createMarquee({
@@ -711,12 +730,17 @@ export function FinderDesktop(): JSX.Element {
     return buildDesktopIcons(os.fs);
   });
 
+  const layout = createIconLayout(
+    os.fs,
+    icons,
+    () => desktopGrid(os.resolution.width, os.resolution.height - os.menubarHeight),
+    (icon, grid) => (icon.nodeId === getTrashId(os.fs) ? grid.trashSlot : undefined),
+  );
+
   const orderedIcons = createMemo((): PositionedIcon[] => {
-    const list = icons();
-    const { width: sw, height: sh } = os.resolution;
-    const mh = os.menubarHeight;
-    return list
-      .map((icon, i) => ({ icon, pos: desktopIconPos(icon, i, sw, mh, sh) }))
+    const positions = layout.positions();
+    return icons()
+      .map((icon) => ({ icon, pos: positions.get(icon.nodeId)! }))
       .sort((a, b) => a.icon.zOrder - b.icon.zOrder);
   });
 
@@ -893,21 +917,19 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
   });
 
   const contentW = () => windowContentRect(win).width;
-  const cols = createMemo(() =>
-    Math.max(1, Math.floor((contentW() - FOLDER_PADDING) / FOLDER_ICON_CELL_W))
-  );
+
+  const layout = createIconLayout(os.fs, icons, (list) => folderGrid(contentW(), list));
 
   const orderedIcons = createMemo((): PositionedIcon[] => {
-    const list = icons();
-    const c = cols();
-    return list
-      .map((icon, i) => ({ icon, pos: folderIconPos(icon, i, c) }))
+    const positions = layout.positions();
+    return icons()
+      .map((icon) => ({ icon, pos: positions.get(icon.nodeId)! }))
       .sort((a, b) => a.icon.zOrder - b.icon.zOrder);
   });
 
   createEffect(
     () => {
-      const h = computeFolderContentHeight(icons(), cols());
+      const h = computeFolderContentHeight(layout.positions().values());
       return { h, current: win.contentHeight };
     },
     ({ h, current }) => {
@@ -969,7 +991,7 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
 
   // This window's menus reflect its folder (Clean Up) and the trash state.
   createEffect(
-    () => buildFinderMenus(os.fs, dirId(), {os, selected: setToArray(selectedSet())}),
+    () => buildFinderMenus(os.fs, dirId(), {os, selected: setToArray(selectedSet())}, layout.cleanUp),
     (menus) => windowApi.setMenus(menus),
   );
 
@@ -1422,7 +1444,12 @@ export function FinderDragGhost(): JSX.Element {
  * Pure: callers install the result via `setAppMenus` / `useWindow().setMenus`
  * and rebuild it when the file system changes.
  */
-export function buildFinderMenus(fs: FileSystem, activeDirId?: string, selection?: {os: ReturnType<typeof useOS>; selected: readonly string[]}): MenubarDefinition[] {
+export function buildFinderMenus(
+  fs: FileSystem,
+  activeDirId?: string,
+  selection?: {os: ReturnType<typeof useOS>; selected: readonly string[]},
+  cleanUp?: () => void,
+): MenubarDefinition[] {
   const selected = selection?.selected.length === 1 ? fs.node(selection.selected[0]) : undefined;
   const projectApp = selected && fs.attributes(selected.id).projectApp;
   const projectId = selected?.kind === "directory" && fs.child(selected.id, "mockintosh.json") ? selected.id
@@ -1482,9 +1509,9 @@ export function buildFinderMenus(fs: FileSystem, activeDirId?: string, selection
       label: "Special",
       items: [
         {
-          label: "Clean Up",
-          disabled: !activeDirId,
-          onClick: () => { if (activeDirId) clearPositions(fs, activeDirId); },
+          label: activeDirId ? "Clean Up Window" : "Clean Up Desktop",
+          disabled: !cleanUp,
+          onClick: () => cleanUp?.(),
         },
         {
           label: "Empty Trash",

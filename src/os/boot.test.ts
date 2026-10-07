@@ -17,6 +17,8 @@ import { TITLE_BAR_H, titleBarOuterHeight } from "./windowGeometry";
 import { buildTinyTtf } from "../platform/fontRaster/tinyTtf";
 import type { HostToProcess, ProcessPort, ProcessToHost } from "./process/protocol";
 import Foundry from "@/apps/Foundry";
+import { finderAttributes } from "@/apps/finder/attributes";
+import { DESKTOP_ICON_CELL_W, ICON_SIZE } from "@/apps/finder/iconGrid";
 
 const WIDTH = 512;
 const HEIGHT = 342;
@@ -364,6 +366,7 @@ describe("bootOS on the headless platform", () => {
     const folder = fs.children(desktop!.id).find((n) => n.name === "untitled folder");
     expect(folder).toBeTruthy();
 
+    await Promise.resolve(); // the Finder saves a new icon's slot just after drawing it
     const pos = desktopCellPos(fs, folder!.id);
     expect(pos).not.toBeNull();
 
@@ -873,35 +876,15 @@ describe("host display resize", () => {
   });
 });
 
-/** Layout constants mirrored from Finder.solid — desktop icons without a stored position. */
-const DESKTOP_ICON_CELL_W = 64;
-const DESKTOP_ICON_CELL_H = 64;
-const DESKTOP_PADDING_TOP = 8;
-const ICON_SIZE = 32;
-
+/** Where the Finder drew a desktop icon: the slot it saved on first showing it. */
 function desktopCellPos(
   fs: BootedOS["services"]["fs"],
   nodeId: string,
 ): { iconX: number; iconY: number; labelX: number; labelY: number } | null {
-  const ids: string[] = [];
-  for (const vol of fs.volumes()) ids.push(vol.id);
-  for (const vol of fs.volumes()) {
-    const desktop = fs.locate("desktop", vol.id);
-    if (!desktop) continue;
-    for (const node of fs.children(desktop.id)) ids.push(node.id);
-  }
-  const trash = fs.locate("trash");
-  if (trash && !ids.includes(trash.id)) ids.push(trash.id);
-
-  const index = ids.indexOf(nodeId);
-  if (index < 0) return null;
-
-  const desktopH = HEIGHT - MENUBAR_HEIGHT;
-  const maxRows = Math.max(1, Math.floor((desktopH - DESKTOP_PADDING_TOP) / DESKTOP_ICON_CELL_H));
-  const col = Math.floor(index / maxRows);
-  const row = index % maxRows;
-  const cellX = WIDTH - (col + 1) * DESKTOP_ICON_CELL_W;
-  const cellY = MENUBAR_HEIGHT + row * DESKTOP_ICON_CELL_H + DESKTOP_PADDING_TOP;
+  const position = finderAttributes(fs, nodeId).position;
+  if (!position) return null;
+  const cellX = position.x;
+  const cellY = MENUBAR_HEIGHT + position.y;
   const iconOffsetX = Math.floor((DESKTOP_ICON_CELL_W - ICON_SIZE) / 2);
   return {
     iconX: cellX + iconOffsetX + ICON_SIZE / 2,
