@@ -3,10 +3,9 @@
  * theme; the Macintosh has black ink on white paper. This is the one place
  * a cell's colours and attributes become how it is drawn.
  *
- * - The foreground decides the ink: dark greys and SGR 2 (faint) draw *dim*,
- *   with a quarter of the glyph's pixels left out, so a program's quieter
- *   text stays quieter and still reads.
- *   Everything else draws in plain ink: colour has no meaning here.
+ * - The foreground's colour has no meaning here: text draws in plain ink.
+ *   Dark greys and SGR 2 (faint) are marked *dim*, but drawn like any text
+ *   (see `CellStyle.dim`).
  * - The background decides the paper. A program sets a background to set
  *   something apart, so the paper says how strongly: a dark-theme tint (the
  *   greys a TUI puts behind a selected row) is a light 25% pattern, anything
@@ -39,7 +38,12 @@ export interface CellStyle {
   invisible: boolean;
   /** Glyph pixels: black on light paper, white on black paper. */
   ink: "black" | "white";
-  /** Lighter glyph (a quarter of its pixels out): the program's dark-grey or faint text. */
+  /**
+   * The program's dark-grey or faint text. Drawn in plain ink: Monaco 9's
+   * strokes are one pixel wide, so any pattern knocked out of them breaks
+   * letters, and a screen-aligned one breaks every other line (cells are 11
+   * pixels tall). A program's emphasis still shows through bold.
+   */
   dim: boolean;
   paper: Paper;
 }
