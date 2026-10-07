@@ -91,6 +91,7 @@ export function buildAppWindow<P extends Record<string, unknown>>(
     contentWidth: bounds.width,
     scrollable,
     resizable,
+    growBox: spec.growBox ?? app.growBox,
     movable: spec.movable,
     onGoAway: spec.onGoAway,
     modal: spec.modal,

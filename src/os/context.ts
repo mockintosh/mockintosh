@@ -14,6 +14,7 @@ import type {
   AudioService,
   BrowserService,
   CameraService,
+  GpuService,
   DialogOptions,
   DownloadService,
   FetchFunction,
@@ -65,6 +66,7 @@ export interface OSServices {
   images?: ImageService;
   video?: VideoService;
   camera?: CameraService;
+  gpu?: GpuService;
   audio?: AudioService;
   microphone?: MicrophoneService;
   agentRuntime?: AgentRuntime;

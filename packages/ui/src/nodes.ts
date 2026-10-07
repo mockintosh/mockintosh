@@ -122,7 +122,8 @@ export interface MouseEventHandlers {
   onDragStart?: (localX: number, localY: number, globalX: number, globalY: number) => void;
   onDrag?: (localX: number, localY: number, globalX: number, globalY: number) => void;
   onDragEnd?: (localX: number, localY: number, globalX: number, globalY: number) => void;
-  onScroll?: (deltaY: number) => void;
+  /** The wheel turned over this node; (localX, localY) is where the pointer was. */
+  onScroll?: (deltaY: number, localX: number, localY: number) => void;
   /**
    * Semantic cursor name (`pointer`, `text`, `watch`, …) or the app's own
    * 16×16 `CursorFace`. Hosts map a name to CSS or a 1-bit face — see `cursor.ts`.

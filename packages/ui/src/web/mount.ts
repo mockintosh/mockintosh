@@ -14,7 +14,7 @@ import { createWebImageService } from "./decode";
 import { copyHostPalette, DEFAULT_HOST_PALETTE, type HostPalette } from "./palette";
 import { hostKeyStrokes } from "./hostKeyboard";
 import { hostPresentsCursor, pointerKind } from "./hostPointer";
-import { wheelIsPinchZoom } from "./hostWheel";
+import { wheelDeltaY, wheelIsPinchZoom } from "./hostWheel";
 import { createScreenCanvas, type ScreenCanvasSize } from "./screenCanvas";
 
 export type CanvasSize = ScreenCanvasSize;
@@ -324,7 +324,7 @@ export function mountCanvasUI(options: CanvasUIOptions): CanvasUIHost {
       e.preventDefault();
       return;
     }
-    if (ui!.dispatchPointer("scroll", x, y, { deltaY: e.deltaY })) {
+    if (ui!.dispatchPointer("scroll", x, y, { deltaY: wheelDeltaY(e, canvas.clientHeight) })) {
       e.preventDefault();
     }
   };

@@ -79,6 +79,8 @@ export interface ProcessStart {
   monitor: boolean;
   /** The host can decode PNG/JPEG/GIF (`AppContext.images`, and `<image>` sources). */
   images: boolean;
+  /** The host has a graphics processor; the process opens its own (`AppContext.gpu`). */
+  gpu: boolean;
   /** The traps the instance's kernel session grants (`AppContext.kernel.describe()`); absent = no kernel. */
   kernel?: OperationContract[];
   /** The file types each registered app opens, for `os.openersFor`. */

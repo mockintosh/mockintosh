@@ -75,6 +75,8 @@ export interface OSWindow {
   contentWidth: number;
   scrollable: boolean;
   resizable: boolean;
+  /** Where a resizable window without scroll bars keeps its grow box (`WindowSpec.growBox`). */
+  growBox?: "band" | "overlay";
   /** `false` pins the window: its title bar does not drag. */
   movable?: boolean;
   /** Replaces closing on a close-box click; the app closes the window itself. */

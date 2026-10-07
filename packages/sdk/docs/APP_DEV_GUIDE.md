@@ -20,6 +20,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Canvas | `Canvas.tsx` | SDK-clean |
 | Foundry | `Foundry.tsx` | SDK-clean |
 | Safari | `Safari.tsx` | SDK-clean |
+| Maps | `Maps.tsx` | SDK-clean |
 | Testing | `Testing.tsx` | SDK-clean |
 | File | `FileViewer.tsx` | SDK-clean |
 | Preview | `Preview.tsx` | SDK-clean |
@@ -282,6 +283,7 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `microphone` | `useApp().microphone` is available (see [Sound input](#sound-input)) |
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
 | `sign-in`   | `useApp().signIn` is available (see [Signing in](#signing-in))        |
+| `gpu`       | `useApp().gpu` is available: WGSL pixel programs rendered to an `ImageFrame`, and a rasterizer for meshes kept on the GPU, drawn by a WGSL corner program with a depth test (see `GpuService`) |
 | `agent-runtime` | `useApp().agentRuntime` is available (see [Agents](#agents))      |
 
 Two ways to use them:

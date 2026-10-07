@@ -119,9 +119,18 @@ export function hasGrowBox(win: OSWindow): boolean {
   return win.resizable && windowDefinition(win.kind).growBox;
 }
 
+/**
+ * Whether the window keeps an empty scroll-bar band down its right edge for
+ * the grow box: resizable, no scroll bars, and not asking for the grow box
+ * over its content.
+ */
+export function hasGrowBand(win: OSWindow): boolean {
+  return !win.scrollable && hasGrowBox(win) && win.growBox !== "overlay";
+}
+
 /** Width available to the window's content component. */
 export function windowContentWidth(win: OSWindow): number {
-  const reserved = win.scrollable || hasGrowBox(win) ? SB_INNER : 0;
+  const reserved = win.scrollable || hasGrowBand(win) ? SB_INNER : 0;
   return win.width - 2 * windowFrame(win) - reserved;
 }
 

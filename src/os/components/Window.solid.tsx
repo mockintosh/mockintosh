@@ -32,6 +32,7 @@ import {
   CLOSE_SIZE,
   ZOOM_SIZE,
   GROW_SIZE,
+  hasGrowBand,
   hasGrowBox,
   hasTitleBar,
   headerBandHeight,
@@ -603,6 +604,22 @@ export function Window(props: WindowProps): JSX.Element {
             background={0}
           >
             <box position="absolute" left={0} top={0} width={contentW()} height={1} background={1} />
+          </box>
+        </Show>
+
+        {/* ── Empty scroll-bar band for the grow box ─────────────── */}
+        {/* A resizable window without scroll bars, as DrawGrowIcon drew it:
+            the band runs beside the body, and a footer keeps its full width. */}
+        <Show when={hasGrowBand(props.win)}>
+          <box
+            position="absolute"
+            left={innerW() - SB_INNER}
+            top={headerInnerH()}
+            width={SB_W}
+            height={props.win.height}
+            background={0}
+          >
+            <box position="absolute" left={0} top={0} width={1} height={props.win.height} background={1} />
           </box>
         </Show>
 
