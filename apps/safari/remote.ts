@@ -19,17 +19,23 @@ interface BrowseReply {
 /** Any page, read on the server from its HTML. */
 export async function loadRemotePage(fetch: FetchFunction, request: PageRequest): Promise<DocumentPage> {
   const body: BrowseRequest = { url: request.url, reader: request.reader, method: request.method, body: request.body };
-  let reply: BrowseReply;
+  let response;
   try {
-    const response = await fetch("/api/browse", {
+    response = await fetch("/api/browse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    reply = (await response.json()) as BrowseReply;
-    if (!response.ok && !reply.error) reply.error = `Could not load the page (${response.status}).`;
   } catch {
     throw new PageError("Safari can't reach the server.");
+  }
+  // The firewall's 429, or a function that crashed, has no JSON body.
+  const reply = ((await response.json().catch(() => null)) ?? {}) as BrowseReply;
+  if (!response.ok && !reply.error) {
+    reply.error =
+      response.status === 429
+        ? "Safari is opening pages too quickly. Wait a minute, then try again."
+        : `Could not load the page (${response.status}).`;
   }
   if (reply.error || !Array.isArray(reply.nodes)) throw new PageError(reply.error ?? "The server sent back nothing.");
   const url = reply.url || request.url;

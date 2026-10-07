@@ -1,6 +1,7 @@
 /**
  * Spend protection for the endpoints that call a paid model with our key
- * (`/api/chat`, `/api/generate-image`). Anyone who can reach the function
+ * (`/api/chat`, `/api/generate-image`), and `fromOwnSite` for the free
+ * ones that fetch the web for Safari. Anyone who can reach the function
  * can send it a request, so each one passes, in order:
  *
  *   0. Authentication — `Authorization: Bearer <API_ACCESS_TOKEN>`. With no
@@ -152,12 +153,30 @@ function authenticated(req: Request, env: GuardEnv): boolean {
   return !!match && sameSecret(match[1].trim(), env.accessToken);
 }
 
-function originAllowed(req: Request, env: GuardEnv): boolean {
-  const origin = req.headers.get("origin");
+function isOwnOrigin(origin: string | null, req: Request, env: GuardEnv): boolean {
   if (!origin) return false;
   if (env.allowedOrigins.includes(origin)) return true;
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
   return !!host && origin === `https://${host}`;
+}
+
+function originAllowed(req: Request, env: GuardEnv): boolean {
+  return isOwnOrigin(req.headers.get("origin"), req, env);
+}
+
+/**
+ * True when a browser on this deployment sent the request: for the free
+ * endpoints (`/api/browse`, `/api/web-image`), which need no token but
+ * should not be a proxy for other sites. A same-origin GET carries no
+ * `Origin`, so `Sec-Fetch-Site` answers first. Like the origin check, it
+ * stops other sites and casual scripts, not a forged header; the Vercel
+ * Firewall's per-IP rate limit on these paths bounds the rest.
+ */
+export function fromOwnSite(req: Request, env: GuardEnv = guardEnvFromProcess()): boolean {
+  if (!env.hosted) return true;
+  const site = req.headers.get("sec-fetch-site");
+  if (site === "same-origin") return true;
+  return isOwnOrigin(req.headers.get("origin"), req, env);
 }
 
 /** The body as text, or `null` once it passes `maxBytes`. */
