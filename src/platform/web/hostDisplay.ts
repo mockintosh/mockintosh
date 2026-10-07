@@ -14,6 +14,9 @@ export const HOST_RESOLUTIONS: readonly HostResolution[] = [
 
 const STORAGE_KEY = "mockintosh-host-display";
 
+/** Auto never zooms past this. Higher zooms stay available as explicit choices. */
+export const AUTO_MAX_SCALE = 3;
+
 interface SavedHostDisplay {
   resolution: string;
   scale: HostScale;
@@ -27,7 +30,7 @@ export function maxFixedScale(width: number, height: number, cssWidth: number, c
 
 function nativeViewportScale(): number {
   const dpr = typeof devicePixelRatio === "number" ? devicePixelRatio : 1;
-  return Math.max(1, Math.round(dpr));
+  return Math.min(AUTO_MAX_SCALE, Math.max(1, Math.round(dpr)));
 }
 
 function cssViewport(): { width: number; height: number } {
@@ -61,17 +64,17 @@ function preset(id: string): HostResolution | undefined {
 
 function layoutFor(resolution: string, scale: HostScale): ScreenCanvasSize {
   const chosen = preset(resolution);
-  const numeric = scale === "auto" ? undefined : Math.max(1, Math.round(scale));
   if (!chosen?.width || !chosen.height) {
-    return { mode: "viewport", scale: scale === "auto" ? nativeViewportScale() : numeric };
+    return { mode: "viewport", scale: scale === "auto" ? nativeViewportScale() : Math.max(1, Math.round(scale)) };
   }
-  return { width: chosen.width, height: chosen.height, scale: numeric };
+  // The canvas shrinks any zoom that doesn't fit, so Auto is just the cap.
+  return { width: chosen.width, height: chosen.height, scale: scale === "auto" ? AUTO_MAX_SCALE : Math.max(1, Math.round(scale)) };
 }
 
 /** Canvas size for this boot, including a saved Host panel choice. */
 export function initialScreenSize(fallback: { width: number; height: number }): ScreenCanvasSize {
   const saved = readHostDisplayPreference();
-  if (!saved) return { width: fallback.width, height: fallback.height };
+  if (!saved) return { width: fallback.width, height: fallback.height, scale: AUTO_MAX_SCALE };
   return layoutFor(saved.resolution, saved.scale);
 }
 
