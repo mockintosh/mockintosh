@@ -277,6 +277,7 @@ describe("asciiToBits", () => {
       dither(src, out);
       best = Math.min(best, performance.now() - t0);
     }
-    expect(best).toBeLessThan(80);
+    // A CI runner is a few times slower; there this only catches a gross regression.
+    expect(best).toBeLessThan(process.env.CI ? 300 : 80);
   });
 });

@@ -466,6 +466,7 @@ describe("bootOS on the headless platform", () => {
     for (const hold of [false, true]) {
       let ready!: () => void;
       const loaded = new Promise<void>((resolve) => { ready = resolve; });
+      let opening!: Promise<unknown>;
       const id = `test-late-${hold}`;
       registerApp({
         id,
@@ -475,13 +476,13 @@ describe("bootOS on the headless platform", () => {
         Component: () => whiteBox(),
         onOpen(app, props) {
           const release = hold ? app.keepAlive?.() : undefined;
-          void loaded.then(() => app.openWindow({ props })).finally(() => release?.());
+          opening = loaded.then(() => app.openWindow({ props })).finally(() => release?.());
         },
       });
       os.services.openApp(id, { fileId: "f1", title: "Doc" });
       ready();
-      await loaded;
-      await Promise.resolve();
+      if (hold) await opening;
+      else await expect(opening).rejects.toThrow("App instance ended");
       platform.tick();
       expect(getWindows().some((w) => w.appId === id)).toBe(hold);
     }
