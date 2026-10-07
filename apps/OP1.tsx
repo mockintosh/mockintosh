@@ -1241,6 +1241,7 @@ export default defineApp({
   id: "op1",
   title: "OP-1",
   icon: "op1/icon",
+  smallIcon: "op1/icon-16x16",
   sprites,
   requires: ["audio"],
   about: {

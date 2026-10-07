@@ -701,6 +701,7 @@ export default defineApp({
   id: "foundry",
   title: "Foundry",
   icon: "foundry/icon",
+  smallIcon: "foundry/icon-16x16",
   defaultSize: { width: 420, height: 300 },
   minSize: { width: 300, height: 220 },
   resizable: true,

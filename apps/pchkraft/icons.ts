@@ -1,4 +1,4 @@
-import type { Sprite } from "@mockintosh/sdk";
+import { fromGrid, type Sprite } from "@mockintosh/sdk";
 import { createFrame, frameRect, plot, rect } from "../synth/pixels";
 
 const SIZE = 32;
@@ -58,6 +58,27 @@ function cassette(): Sprite {
   return { width: SIZE, height: SIZE, data: art.pixels, mask: mask.pixels };
 }
 
+/** The cassette for the application menu: the reel window with its two hubs, the head openings below. */
+const CASSETTE_16: Sprite = fromGrid(16, 16, [
+  "................",
+  "................",
+  ".#############..",
+  "#ooooooooooooo##",
+  "#ooooooooooooo##",
+  "#oo#########oo##",
+  "#oo#oo###oo#oo##",
+  "#oo#oo###oo#oo##",
+  "#oo#########oo##",
+  "#ooooooooooooo##",
+  "#ooooooooooooo##",
+  "#o##o##o##o##o##",
+  "#o##o##o##o##o##",
+  "#ooooooooooooo##",
+  ".#############.#",
+  "................",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "pchkraft/icon": cassette(),
+  "pchkraft/icon-16x16": CASSETTE_16,
 };

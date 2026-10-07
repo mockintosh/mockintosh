@@ -1,4 +1,4 @@
-import type { Sprite } from "@mockintosh/sdk";
+import { fromGrid, type Sprite } from "@mockintosh/sdk";
 import { createFrame, frameRect, plot, rect } from "./pixels";
 
 const SIZE = 32;
@@ -42,6 +42,27 @@ function synthesizer(): Sprite {
   return { width: SIZE, height: SIZE, data: art.pixels, mask: mask.pixels };
 }
 
+/** The 16×16 for the application menu: the cabinet with its scope sine, one knob and the keyboard. */
+export const SYNTH_16: Sprite = fromGrid(16, 16, [
+  "................",
+  "................",
+  "###############.",
+  "#ooooooooooooo##",
+  "#o#######ooooo##",
+  "#o##oo###o#o#o##",
+  "#o#o##o##o###o##",
+  "#o#####o#o###o##",
+  "#o#######ooooo##",
+  "#ooooooooooooo##",
+  "################",
+  "#oo###o###oo#o##",
+  "#oo###o###oo#o##",
+  "#ooo#ooo#ooo#o##",
+  "################",
+  ".###############",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "synth/icon": synthesizer(),
+  "synth/icon-16x16": SYNTH_16,
 };

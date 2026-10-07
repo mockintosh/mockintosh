@@ -644,6 +644,7 @@ export default defineApp({
   id: "earth",
   title: "Earth",
   icon: "earth/icon",
+  smallIcon: "earth/icon-16x16",
   sprites,
   about: {
     version: "1.0",

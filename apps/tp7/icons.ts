@@ -1,4 +1,4 @@
-import type { Sprite } from "@mockintosh/sdk";
+import { fromGrid, type Sprite } from "@mockintosh/sdk";
 import { GRAY, createFrame, frameRect, line, plot, rect, type Frame } from "../synth/pixels";
 
 const SIZE = 32;
@@ -79,7 +79,28 @@ function memo(): Sprite {
   return { width: SIZE, height: SIZE, data: art.pixels, mask: mask.pixels };
 }
 
+/** The TP-7 for the application menu: the display, the big reel, speaker dots, the side buttons. */
+const RECORDER_16: Sprite = fromGrid(16, 16, [
+  "................",
+  "................",
+  ".#############..",
+  "#ooooooooooooo#.",
+  "#o####oo####oo##",
+  "#o#oo#o##oo##o##",
+  "#o#oo#o#oooo#o##",
+  "#o####o#oooo#o##",
+  "#oooooo##oo##o##",
+  "#ooooooo####oo#.",
+  "#o#####ooooooo##",
+  "#ooooooooooooo##",
+  "#o#####ooooooo##",
+  "#ooooooooooooo#.",
+  ".#############..",
+  "................",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "tp7/icon": recorder(),
+  "tp7/icon-16x16": RECORDER_16,
   "tp7/memo": memo(),
 };

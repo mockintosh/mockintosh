@@ -94,6 +94,7 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "Pchkraft.tsx": ["pchkraft", "synth", "chord"],
   "Visualizer.tsx": ["visualizer", "showreel", "surface", "synth"],
   "Earth.tsx": ["earth", "showreel"],
+  "Terminal.tsx": ["terminal"],
   "Fx.tsx": ["fx"],
 };
 

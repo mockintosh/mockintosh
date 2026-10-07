@@ -44,6 +44,8 @@ export interface SearchHit {
   score: number;
   /** 3 = exact name, 2 = name prefix, 1 = name contains, 0 = other fields only. */
   nameRank: number;
+  /** How many query tokens hit. */
+  matched: number;
   icon: IconRecord;
   /** True when threshold conversion would be almost all white. */
   washout: boolean;

@@ -58,6 +58,7 @@ export default defineApp({
   id: "testing",
   title: "Testing",
   icon: "icon/computer",
+  smallIcon: "icon/computer-16x16",
   defaultSize: { width: 280, height: 250 },
   scrollable: true,
   Component: Testing,

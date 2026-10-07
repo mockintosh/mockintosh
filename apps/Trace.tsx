@@ -544,6 +544,7 @@ export default defineApp({
   requires: ["images"],
   title: "Trace",
   icon: "trace/icon",
+  smallIcon: "trace/icon-16x16",
   sprites,
   about: {
     version: "1.1",

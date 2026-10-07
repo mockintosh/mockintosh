@@ -1,4 +1,4 @@
-import type { Sprite } from "@mockintosh/sdk";
+import { fromGrid, type Sprite } from "@mockintosh/sdk";
 import { GRAY, LIGHT, createFrame, frameRect, plot, rect } from "../synth/pixels";
 
 const SIZE = 32;
@@ -37,6 +37,27 @@ function op1(): Sprite {
   return { width: SIZE, height: SIZE, data: art.pixels, mask: mask.pixels };
 }
 
+/** The OP-1 for the application menu: speaker dots, the black display, a row of keys. */
+const OP1_16: Sprite = fromGrid(16, 16, [
+  "................",
+  "................",
+  "................",
+  "................",
+  ".#############..",
+  "#ooooooooooooo##",
+  "#o#o#####ooooo##",
+  "#ooo#####o###o##",
+  "#o#o#####ooooo##",
+  "#ooooooooooooo##",
+  "#o#o#o#o#o#o#o##",
+  "#o#o#o#o#o#o#o##",
+  "#ooooooooooooo##",
+  ".#############.#",
+  ".###############",
+  "................",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "op1/icon": op1(),
+  "op1/icon-16x16": OP1_16,
 };

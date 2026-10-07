@@ -304,6 +304,7 @@ export default defineApp({
   id: "visualizer",
   title: "Visualizer",
   icon: "visualizer/icon",
+  smallIcon: "visualizer/icon-16x16",
   sprites,
   requires: ["audio"],
   about: {

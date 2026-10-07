@@ -176,6 +176,7 @@ export default defineApp<PreviewProps>({
   id: APP_ID,
   title: "Preview",
   icon: "icon/camera",
+  smallIcon: "icon/camera-16x16",
   about: {
     version: "1.0",
     description: "Shows pictures. Open them in another app to change them.",

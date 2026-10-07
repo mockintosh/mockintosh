@@ -468,6 +468,7 @@ export default defineApp({
   requires: ["images"],
   title: "Dither",
   icon: "dither/icon",
+  smallIcon: "dither/icon-16x16",
   sprites,
   defaultSize: { width: 288, height: 288 },
   minSize: { width: 120, height: 80 },

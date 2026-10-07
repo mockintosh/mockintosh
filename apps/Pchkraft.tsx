@@ -612,6 +612,7 @@ export default defineApp({
   id: "pchkraft",
   title: "pchkraft",
   icon: "pchkraft/icon",
+  smallIcon: "pchkraft/icon-16x16",
   sprites,
   requires: ["audio"],
   about: { version: "1.0", description: ABOUT },

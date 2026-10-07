@@ -224,22 +224,27 @@ function MemberTile(props: { member: IconFamilyMember }): JSX.Element {
   );
 }
 
-const catalogIcon = (() => {
+/** System 7's generic Application family: its ICN# and the ics# Apple drew to go with it. */
+const catalogFamily = (() => {
   const rec = (catalogFile.families as CatalogFamilyRecord[]).find(
     (f) => f.group === "system" && f.id === -3996 && f.icn
   );
-  return rec ? familyFromRecord(rec).icn : undefined;
+  return rec ? familyFromRecord(rec) : undefined;
 })();
 
 export default defineApp({
   id: "icon_gallery",
   title: "Icon Gallery",
   icon: "icon-gallery/icon",
+  smallIcon: "icon-gallery/icon-16x16",
   defaultSize: { width: 420, height: 280 },
   minSize: { width: 280, height: 80 },
   resizable: true,
   scrollable: true,
   singleInstance: true,
-  sprites: catalogIcon ? { "icon-gallery/icon": catalogIcon } : undefined,
+  sprites:
+    catalogFamily?.icn && catalogFamily.ics
+      ? { "icon-gallery/icon": catalogFamily.icn, "icon-gallery/icon-16x16": catalogFamily.ics }
+      : undefined,
   Component: IconGallery,
 });

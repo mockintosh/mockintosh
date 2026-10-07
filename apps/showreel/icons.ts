@@ -1,4 +1,4 @@
-import type { Sprite } from "@mockintosh/sdk";
+import { fromGrid, type Sprite } from "@mockintosh/sdk";
 import { INK, PAPER, Painter, createFrame, type Paint, type Vec } from "./painter";
 
 const SIZE = 32;
@@ -132,7 +132,28 @@ function bomb(): Sprite {
   return { width: SIZE, height: SIZE, data: art.pixels, mask: silhouette.pixels };
 }
 
+/** The clapperboard: the striped stick lifted open, the striped band, and the lens ring. */
+const CLAPPERBOARD_16: Sprite = fromGrid(16, 16, [
+  "...........####.",
+  ".......####oo##.",
+  "...####oo####...",
+  ".#oo####........",
+  ".##.............",
+  ".##############.",
+  ".##oo###oo###o#.",
+  ".#oo###oo###oo#.",
+  ".##############.",
+  ".#oooooooooooo#.",
+  ".#oooo####oooo#.",
+  ".#ooo##oo##ooo#.",
+  ".#ooo##oo##ooo#.",
+  ".#oooo####oooo#.",
+  ".#oooooooooooo#.",
+  ".##############.",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "showreel/icon": clapperboard(),
+  "showreel/icon-16x16": CLAPPERBOARD_16,
   "showreel/bomb": bomb(),
 };

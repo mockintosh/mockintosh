@@ -899,6 +899,7 @@ export default defineApp({
   id: "tp7",
   title: "TP-7",
   icon: "tp7/icon",
+  smallIcon: "tp7/icon-16x16",
   sprites,
   requires: ["audio"],
   fileTypes: [WAV],

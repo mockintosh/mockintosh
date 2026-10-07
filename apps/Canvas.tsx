@@ -1148,6 +1148,7 @@ export default defineApp({
   id: "canvas",
   title: "Canvas",
   icon: "canvas/icon",
+  smallIcon: "canvas/icon-16x16",
   about: {
     version: "1.0",
     description: "Draw with objects — move, resize, and edit shapes and text without flattening to a bitmap.",

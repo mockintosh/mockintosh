@@ -393,6 +393,7 @@ export default defineApp({
   id: "macpaint",
   title: "MacPaint",
   icon: "macpaint/icon",
+  smallIcon: "macpaint/icon-16x16",
   defaultSize: { width: DOC_WINDOW_WIDTH, height: DOC_WINDOW_HEIGHT },
   resizable: false,
   scrollable: false,

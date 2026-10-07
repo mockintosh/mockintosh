@@ -376,6 +376,7 @@ export default defineApp({
   requires: ["network"],
   title: "Safari",
   icon: "icon/safari",
+  smallIcon: "icon/safari-16x16",
   about: {
     description:
       "Browses the web the way it looked in 1996: text, links, pictures and forms, without style sheets or scripts. GitHub and Hacker News are drawn from their APIs.",

@@ -516,6 +516,7 @@ export default defineApp({
   id: "chord",
   title: "Pocket Chord",
   icon: "chord/icon",
+  smallIcon: "chord/icon-16x16",
   sprites,
   requires: ["audio"],
   about: {

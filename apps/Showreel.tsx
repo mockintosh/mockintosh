@@ -363,6 +363,7 @@ export default defineApp({
   id: "showreel",
   title: "Showreel",
   icon: "showreel/icon",
+  smallIcon: "showreel/icon-16x16",
   sprites,
   about: {
     version: "4.0",

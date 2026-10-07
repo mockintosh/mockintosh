@@ -1,9 +1,11 @@
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
-import { pngBufferToSprite, spriteToPreviewPng, isWashout } from "./convert";
+import { pngBufferToSprite, isWashout } from "./convert";
 import { fetchIconPng } from "./fetchIcon";
 import { slugKey } from "./iconsModule";
 import { previewRoot } from "./paths";
+import { writeIconSheets, type SheetIcon } from "./sheet";
+import { isSystem753File, system753Family } from "./system753";
 import type { ConvertMode, SearchHit } from "./types";
 
 export interface PreviewResult {
@@ -14,8 +16,10 @@ export interface PreviewResult {
   category: string;
   description: string;
   score: number;
-  colorPng: string;
-  bitPng: string;
+  /** The contact sheet page that shows this hit. */
+  sheet: string;
+  /** Sizes the hit has: a System 7.5.3 family may have both. */
+  sizes: string[];
   washout: boolean;
   suggestedKey: string;
 }
@@ -30,43 +34,44 @@ function sessionDir(query: string): string {
   return join(previewRoot(), `${slug}-${stamp}`);
 }
 
-function safeFileStem(file: string): string {
-  return file.replace(/[/\\]/g, "_").replace(/\.png$/i, "");
+const PER_PAGE = 6;
+
+/** The hit's sprites: a System 7.5.3 family locally, a ryOS PNG fetched and thresholded. */
+async function hitIcon(hit: SearchHit, label: string, mode: ConvertMode): Promise<SheetIcon> {
+  if (isSystem753File(hit.icon.file)) {
+    const family = system753Family(hit.icon.file);
+    return { label, large: family?.large, small: family?.small };
+  }
+  const sprite = await pngBufferToSprite(await fetchIconPng(hit.icon.file), mode);
+  hit.washout = isWashout(sprite);
+  return sprite.width <= 16 ? { label, small: sprite } : { label, large: sprite };
 }
 
 export async function writeSearchPreviews(
   query: string,
   hits: SearchHit[],
   mode: ConvertMode = "threshold"
-): Promise<{ dir: string; results: PreviewResult[] }> {
+): Promise<{ dir: string; sheets: string[]; results: PreviewResult[] }> {
   const dir = sessionDir(query);
   await mkdir(dir, { recursive: true });
-  const results: PreviewResult[] = [];
+  const icons: SheetIcon[] = [];
   for (let i = 0; i < hits.length; i++) {
-    const { icon, score } = hits[i];
-    const n = String(i + 1).padStart(2, "0");
-    const stem = safeFileStem(icon.file);
-    const colorPng = "";
-    const bitPng = join(dir, `${n}-${stem}.1bit.png`);
-    const png = await fetchIconPng(icon.file);
-    const sprite = await pngBufferToSprite(png, mode);
-    await spriteToPreviewPng(sprite, bitPng);
-    const washout = isWashout(sprite);
-    hits[i].washout = washout;
-    results.push({
-      index: i + 1,
-      file: icon.file,
-      name: icon.name,
-      collection: icon.collection,
-      category: icon.category,
-      description: icon.description,
-      score,
-      colorPng,
-      bitPng,
-      washout,
-      suggestedKey: `icon/${slugKey(icon.name, icon.file)}`,
-    });
+    icons.push(await hitIcon(hits[i], `${i + 1}. ${hits[i].icon.name || hits[i].icon.file}  [${hits[i].icon.collection}]`, mode));
   }
-  await writeFile(join(dir, "results.json"), JSON.stringify({ query, mode, results }, null, 2));
-  return { dir, results };
+  const sheets = await writeIconSheets(icons, join(dir, "sheet.png"), PER_PAGE);
+  const results = hits.map(({ icon, score, washout }, i): PreviewResult => ({
+    index: i + 1,
+    file: icon.file,
+    name: icon.name,
+    collection: icon.collection,
+    category: icon.category,
+    description: icon.description,
+    score,
+    sheet: sheets[Math.floor(i / PER_PAGE)],
+    sizes: [icons[i].large && "32x32", icons[i].small && "16x16"].filter(Boolean) as string[],
+    washout,
+    suggestedKey: `icon/${slugKey(icon.name, icon.file)}`,
+  }));
+  await writeFile(join(dir, "results.json"), JSON.stringify({ query, mode, sheets, results }, null, 2));
+  return { dir, sheets, results };
 }

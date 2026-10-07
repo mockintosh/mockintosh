@@ -673,6 +673,7 @@ export default defineApp({
   requires: ["camera"],
   title: "Photo Booth",
   icon: "icon/photobooth-smr-32",
+  smallIcon: "icon/photobooth-smr-32-16x16",
   defaultSize: { width: PREVIEW, height: PREVIEW + BAR_H },
   scrollable: false,
   resizable: false,

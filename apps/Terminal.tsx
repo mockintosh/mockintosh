@@ -2,6 +2,7 @@ import { createEffect, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { TextInput } from "@mockintosh/ui";
 import { defineApp, useApp } from "@mockintosh/sdk";
+import { sprites } from "./terminal/icons";
 
 function Terminal(): JSX.Element {
   const app = useApp();
@@ -71,7 +72,9 @@ function Terminal(): JSX.Element {
 export default defineApp({
   id: "terminal",
   title: "Terminal",
-  icon: "icon/computer",
+  icon: "terminal/icon",
+  smallIcon: "terminal/icon-16x16",
+  sprites,
   defaultSize: {
     width: 460,
     height: 260

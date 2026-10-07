@@ -624,6 +624,7 @@ export default defineApp({
   id: "surface",
   title: "Surface",
   icon: "surface/icon",
+  smallIcon: "surface/icon-16x16",
   sprites,
   about: {
     version: "0.1",
