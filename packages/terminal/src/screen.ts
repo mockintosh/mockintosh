@@ -12,7 +12,7 @@ import { monochromeStyle, styleKey, PLAIN_STYLE, type CellStyle, type TerminalCo
 returnWindow();
 
 // The ES build exports `Terminal`; Node's CommonJS build arrives as a default export.
-const Terminal = (xterm.Terminal ?? (xterm as unknown as { default: typeof xterm }).default.Terminal) as typeof xterm.Terminal;
+const Terminal = (xterm.Terminal ?? (Reflect.get(xterm, "default") as typeof xterm).Terminal) as typeof xterm.Terminal;
 
 export interface TerminalSize {
   cols: number;
