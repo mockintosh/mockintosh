@@ -103,6 +103,11 @@
   "requires": [
    "network"
   ],
+  "signIn": {
+   "hosts": [
+    "github.com"
+   ]
+  },
   "scrollable": true,
   "resizable": true,
   "minSize": {
@@ -787,6 +792,7 @@
   "smallIcon": "earth/icon-16x16",
   "scrollable": false,
   "resizable": true,
+  "growBox": "overlay",
   "minSize": {
    "width": 200,
    "height": 150

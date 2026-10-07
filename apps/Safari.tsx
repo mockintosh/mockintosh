@@ -6,11 +6,12 @@ import { addressToUrl, formRequest, isSecure, resolveLink, urlToAddress } from "
 import { AddressField, BACK_FORWARD_W, BackForward, HEADER_H, TOOLBAR_BUTTON_W, TOOLBAR_H, TOOLBAR_HEADER_H, TabBar, ToolbarButton, type TabLabel } from "./safari/chrome";
 import { goBack, goForward, replace, visit } from "./safari/history";
 import { backIcon, forwardIcon, plusIcon, shareIcon, windowsIcon } from "./safari/icons";
-import { START_URL, pageRequest, type PageRequest, type WebPage } from "./safari/page";
+import { PageError, START_URL, pageRequest, type GithubAccount, type PageRequest, type WebPage } from "./safari/page";
 import { BOOKMARKS_KEY, addBookmark, bookmarkTitle, parseBookmarks, removeBookmark, serializeBookmarks, type Bookmark } from "./safari/bookmarks";
 import { faviconCache, type FaviconLoader } from "./safari/favicon";
 import { remoteImageLoader } from "./safari/remote";
 import { loadPage, readerApplies, type PageResult } from "./safari/router";
+import { GITHUB_SIGN_IN_HOST, signInToGithub } from "./safari/sites/github/signIn";
 import { FAVICON_SIZE, StartView } from "./safari/startView";
 import { activeTab, closeTab, navigateActive, openTab, selectTab, startTabs, updateTab, type TabSet } from "./safari/tabs";
 
@@ -166,17 +167,44 @@ function Safari(props: Record<string, unknown>): JSX.Element {
   void app.storage.read(TOKEN_KEY).then((value) => setStoredToken(value ?? ""));
   const token = () => tokenOverride() ?? storedToken();
 
+  const github: GithubAccount = {
+    async signIn() {
+      if (!app.signIn) throw new PageError("This Macintosh can't sign in from a phone.");
+      let next: string | null;
+      try {
+        next = await signInToGithub(fetch, app.signIn, app.crypto);
+      } catch (error) {
+        throw new PageError(error instanceof Error ? error.message : "Signing in to GitHub failed.");
+      }
+      if (next !== null) await saveToken(next);
+      return next;
+    },
+    signOut: () => saveToken(""),
+  };
+
   /**
    * Pages by history entry, so switching tabs and going back show what was
-   * already loaded. Reload and Reader make a new entry and load again.
+   * already loaded. Reload and Reader make a new entry and load again. A
+   * post is sent once, whatever the token does meanwhile (signing in is one).
    */
   const loaded = new WeakMap<PageRequest, { token: string; result: Promise<PageResult> }>();
   function load(request: PageRequest, githubToken: string): Promise<PageResult> {
     const hit = loaded.get(request);
-    if (hit && hit.token === githubToken) return hit.result;
-    const result = loadPage(request, { fetch, settings: { githubToken } });
+    if (hit && (hit.token === githubToken || request.method === "post")) return hit.result;
+    const result = loadPage(request, { fetch, settings: { githubToken }, github });
     loaded.set(request, { token: githubToken, result });
     return result;
+  }
+
+  /** A post a site adapter took lands on an ordinary page, which takes its place in history. */
+  function land(tabId: number, request: PageRequest, result: PageResult): boolean {
+    if (result.kind !== "page" || !result.landed) return false;
+    const landed = result.landed;
+    loaded.set(landed, { token: token(), result: Promise.resolve({ kind: "page", page: result.page }) });
+    setTabs((set) =>
+      updateTab(set, tabId, (tab) => (tab.history.current === request ? { ...tab, history: replace(tab.history, landed) } : tab)),
+    );
+    return true;
   }
 
   const wanted = createMemo(
@@ -188,6 +216,7 @@ function Safari(props: Record<string, unknown>): JSX.Element {
     () => ({ ...wanted(), githubToken: token() }),
     ({ tabId, request, githubToken }) => {
       void load(request, githubToken).then((result) => {
+        if (land(tabId, request, result)) return;
         if (wanted().tabId === tabId && wanted().request === request) setShown({ tabId, request, result });
       });
     },
@@ -374,6 +403,7 @@ function Safari(props: Record<string, unknown>): JSX.Element {
         canCopyLink: canCopyLink(),
         canBookmark: bookmarks() !== null && bookmarkablePage() !== null,
         bookmarks: bookmarks() ?? [],
+        signedIn: token() !== "",
       };
     },
     (state) => {
@@ -421,8 +451,9 @@ function Safari(props: Record<string, unknown>): JSX.Element {
             ...(state.bookmarks.length > 0 ? [{ type: "separator" } as const] : []),
             ...state.bookmarks.map((bookmark): MenubarItemDef => ({ label: bookmark.title, onClick: () => openBookmark(bookmark) })),
             { type: "separator" },
+            { label: "Sign In to GitHub…", disabled: state.signedIn, onClick: () => go(pageRequest("https://github.com/login")) },
+            { label: "Sign Out of GitHub", disabled: !state.signedIn, onClick: () => void saveToken("") },
             { label: "GitHub Token…", onClick: () => void editToken() },
-            { label: "Forget GitHub Token", onClick: () => void saveToken("") },
           ],
         },
       ]);
@@ -491,6 +522,7 @@ function Safari(props: Record<string, unknown>): JSX.Element {
 export default defineApp({
   id: "safari",
   requires: ["network"],
+  signIn: { hosts: [GITHUB_SIGN_IN_HOST] },
   title: "Safari",
   icon: "icon/safari",
   smallIcon: "icon/safari-16x16",

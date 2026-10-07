@@ -21,6 +21,7 @@ export interface RepoInfo {
   license: string;
   homepage: string;
   topics: string[];
+  hasDiscussions: boolean;
 }
 
 export interface DirEntry {
@@ -51,6 +52,22 @@ export interface CommentInfo {
   user: string;
   body: string;
   createdAt: string;
+  /** A discussion comment's thread. */
+  replies?: CommentInfo[];
+  /** Marked as the discussion's answer. */
+  answer?: boolean;
+}
+
+export interface DiscussionInfo extends IssueInfo {
+  category: string;
+  answered: boolean;
+}
+
+export interface DiscussionCategory {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
 }
 
 export interface FileBody {
@@ -95,13 +112,21 @@ export type GithubPage =
   | { view: "issues"; repo: RepoInfo; issues: IssueInfo[] }
   | { view: "issue"; repo: RepoInfo; issue: IssueInfo; comments: CommentInfo[] }
   | { view: "pulls"; repo: RepoInfo; pulls: IssueInfo[] }
-  | { view: "pull"; repo: RepoInfo; pull: IssueInfo; comments: CommentInfo[] };
+  | { view: "pull"; repo: RepoInfo; pull: IssueInfo; comments: CommentInfo[] }
+  | { view: "newIssue"; repo: RepoInfo }
+  | { view: "discussions"; repo: RepoInfo; discussions: DiscussionInfo[] }
+  | { view: "discussion"; repo: RepoInfo; discussion: DiscussionInfo; comments: CommentInfo[] }
+  /** `category` is null until one is chosen from `categories`. */
+  | { view: "newDiscussion"; repo: RepoInfo; categories: DiscussionCategory[]; category: DiscussionCategory | null };
+
+/** Pages drawn from the API; the rest (home, signing in and out) need none. */
+export type ApiLocation = Exclude<GithubLocation, { kind: "home" | "login" | "logout" }>;
 
 const API = "https://api.github.com";
 /** Blobs larger than this are summarized instead of drawn into the window. */
 const MAX_TEXT = 48_000;
 
-export async function loadPage(fetch: FetchFunction, token: string, location: Exclude<GithubLocation, { kind: "home" }>): Promise<GithubPage> {
+export async function loadPage(fetch: FetchFunction, token: string, location: ApiLocation): Promise<GithubPage> {
   if (location.kind === "search") {
     const data = asRecord(await gh(fetch, token, `/search/repositories?q=${encodeURIComponent(location.query)}&per_page=30`));
     return { view: "search", query: location.query, repos: Array.isArray(data.items) ? data.items.map(profileRepo) : [] };
@@ -117,6 +142,17 @@ export async function loadPage(fetch: FetchFunction, token: string, location: Ex
   if (location.kind === "pulls") {
     const pulls = await listIssues(fetch, token, repo, "pull");
     return { view: "pulls", repo, pulls };
+  }
+  if (location.kind === "newIssue") return { view: "newIssue", repo };
+  if (location.kind === "discussions") return { view: "discussions", repo, discussions: await listDiscussions(fetch, token, repo) };
+  if (location.kind === "discussion") {
+    const { discussion, comments } = await getDiscussion(fetch, token, repo, location.number);
+    return { view: "discussion", repo, discussion, comments };
+  }
+  if (location.kind === "newDiscussion") {
+    const { categories } = await getDiscussionCategories(fetch, token, repo);
+    const category = categories.find((item) => item.slug === location.category) ?? null;
+    return { view: "newDiscussion", repo, categories, category };
   }
   const [item, comments] = await Promise.all([
     getIssue(fetch, token, repo, location.number),
@@ -262,6 +298,7 @@ async function getRepo(fetch: FetchFunction, token: string, owner: string, repo:
     license: stringField(license, "spdx_id") || stringField(license, "name"),
     homepage: stringField(record, "homepage"),
     topics,
+    hasDiscussions: record.has_discussions === true,
   };
 }
 
@@ -332,6 +369,138 @@ async function getComments(fetch: FetchFunction, token: string, repo: RepoInfo, 
   });
 }
 
+/** The login the token belongs to. */
+export async function getViewer(fetch: FetchFunction, token: string): Promise<string> {
+  return stringField(asRecord(await gh(fetch, token, "/user")), "login");
+}
+
+/** Opens an issue; resolves with its number. */
+export async function createIssue(fetch: FetchFunction, token: string, owner: string, repo: string, title: string, body: string): Promise<number> {
+  const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`;
+  return numberField(asRecord(await gh(fetch, token, path, { title, body })), "number");
+}
+
+/** Comments on an issue or pull request. */
+export async function addIssueComment(fetch: FetchFunction, token: string, owner: string, repo: string, number: number, body: string): Promise<void> {
+  await gh(fetch, token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${number}/comments`, { body });
+}
+
+const DISCUSSION_FIELDS = "number title body createdAt author { login } category { name } answerChosenAt comments { totalCount }";
+
+/** Enough of a repository to find it. */
+type RepoName = Pick<RepoInfo, "owner" | "name">;
+
+async function listDiscussions(fetch: FetchFunction, token: string, repo: RepoName): Promise<DiscussionInfo[]> {
+  const data = await graphql(fetch, token, `query($owner: String!, $name: String!) {
+    repository(owner: $owner, name: $name) {
+      discussions(first: 30, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { ${DISCUSSION_FIELDS} } }
+    }
+  }`, { owner: repo.owner, name: repo.name });
+  const nodes = asRecord(asRecord(asRecord(data).repository).discussions).nodes;
+  return Array.isArray(nodes) ? nodes.map((node) => discussionInfo(asRecord(node))) : [];
+}
+
+async function getDiscussion(
+  fetch: FetchFunction,
+  token: string,
+  repo: RepoName,
+  number: number,
+): Promise<{ id: string; discussion: DiscussionInfo; comments: CommentInfo[] }> {
+  const data = await graphql(fetch, token, `query($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      discussion(number: $number) {
+        id ${DISCUSSION_FIELDS}
+        comments(first: 30) {
+          nodes {
+            body createdAt isAnswer author { login }
+            replies(first: 10) { nodes { body createdAt author { login } } }
+          }
+        }
+      }
+    }
+  }`, { owner: repo.owner, name: repo.name, number });
+  const record = asRecord(asRecord(asRecord(data).repository).discussion);
+  if (!record.id) throw new GithubError("Not found on GitHub.", 404);
+  const nodes = asRecord(record.comments).nodes;
+  const comments = Array.isArray(nodes)
+    ? nodes.map((node) => {
+      const comment = asRecord(node);
+      const replies = asRecord(comment.replies).nodes;
+      return {
+        ...discussionComment(comment),
+        answer: comment.isAnswer === true,
+        replies: Array.isArray(replies) ? replies.map((reply) => discussionComment(asRecord(reply))) : [],
+      };
+    })
+    : [];
+  return { id: stringField(record, "id"), discussion: discussionInfo(record), comments };
+}
+
+async function getDiscussionCategories(
+  fetch: FetchFunction,
+  token: string,
+  repo: RepoName,
+): Promise<{ repositoryId: string; categories: DiscussionCategory[] }> {
+  const data = await graphql(fetch, token, `query($owner: String!, $name: String!) {
+    repository(owner: $owner, name: $name) { id discussionCategories(first: 25) { nodes { id slug name description } } }
+  }`, { owner: repo.owner, name: repo.name });
+  const repository = asRecord(asRecord(data).repository);
+  const nodes = asRecord(repository.discussionCategories).nodes;
+  const categories = Array.isArray(nodes)
+    ? nodes.map((node) => {
+      const record = asRecord(node);
+      return { id: stringField(record, "id"), slug: stringField(record, "slug"), name: stringField(record, "name"), description: stringField(record, "description") };
+    })
+    : [];
+  return { repositoryId: stringField(repository, "id"), categories };
+}
+
+/** Starts a discussion in the category with this slug; resolves with its number. */
+export async function createDiscussion(
+  fetch: FetchFunction,
+  token: string,
+  owner: string,
+  repo: string,
+  categorySlug: string,
+  title: string,
+  body: string,
+): Promise<number> {
+  const { repositoryId, categories } = await getDiscussionCategories(fetch, token, { owner, name: repo });
+  const category = categories.find((item) => item.slug === categorySlug);
+  if (!category) throw new GithubError("That discussion category doesn't exist.", 404);
+  const data = await graphql(fetch, token, `mutation($repo: ID!, $category: ID!, $title: String!, $body: String!) {
+    createDiscussion(input: { repositoryId: $repo, categoryId: $category, title: $title, body: $body }) { discussion { number } }
+  }`, { repo: repositoryId, category: category.id, title, body });
+  return numberField(asRecord(asRecord(asRecord(data).createDiscussion).discussion), "number");
+}
+
+export async function addDiscussionComment(fetch: FetchFunction, token: string, owner: string, repo: string, number: number, body: string): Promise<void> {
+  const { id } = await getDiscussion(fetch, token, { owner, name: repo }, number);
+  await graphql(fetch, token, `mutation($id: ID!, $body: String!) {
+    addDiscussionComment(input: { discussionId: $id, body: $body }) { comment { id } }
+  }`, { id, body });
+}
+
+function discussionInfo(record: Record<string, unknown>): DiscussionInfo {
+  return {
+    ...discussionComment(record),
+    number: numberField(record, "number"),
+    title: stringField(record, "title"),
+    comments: numberField(asRecord(record.comments), "totalCount"),
+    state: "open",
+    category: stringField(asRecord(record.category), "name"),
+    answered: typeof record.answerChosenAt === "string",
+  };
+}
+
+function discussionComment(record: Record<string, unknown>): CommentInfo {
+  return {
+    user: stringField(asRecord(record.author), "login") || "ghost",
+    body: stringField(record, "body"),
+    createdAt: stringField(record, "createdAt"),
+  };
+}
+
 function dirEntry(value: unknown): DirEntry {
   const record = asRecord(value);
   const type = record.type;
@@ -379,14 +548,16 @@ function contentsPath(repo: RepoInfo, path: string, ref: string): string {
   return `${repoPath(repo)}/contents${suffix}?ref=${encodeURIComponent(ref)}`;
 }
 
-async function gh(fetch: FetchFunction, token: string, path: string): Promise<unknown> {
+/** A REST call: GET, or POST with `json`. */
+async function gh(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<unknown> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "User-Agent": "mockintosh",
     "X-GitHub-Api-Version": "2022-11-28",
   };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(`${API}${path}`, { headers });
+  if (json !== undefined) headers["Content-Type"] = "application/json";
+  const response = await fetch(`${API}${path}`, json === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(json) });
   if (response.status === 404) throw new GithubError("Not found on GitHub.", 404);
   if (!response.ok) {
     const detail = await errorMessage(response);
@@ -396,6 +567,18 @@ async function gh(fetch: FetchFunction, token: string, path: string): Promise<un
     throw new GithubError(detail || `GitHub returned ${response.status}.`, response.status);
   }
   return response.json();
+}
+
+/** GitHub's GraphQL API, which alone has discussions. It always needs a token. */
+async function graphql(fetch: FetchFunction, token: string, query: string, variables: Record<string, unknown>): Promise<unknown> {
+  if (!token) throw new GithubError("Sign in to GitHub to see discussions.", 401);
+  const data = asRecord(await gh(fetch, token, "/graphql", { query, variables }));
+  const errors = Array.isArray(data.errors) ? data.errors.map((error) => stringField(asRecord(error), "message")).filter(Boolean) : [];
+  if (errors.length > 0) {
+    const missing = Array.isArray(data.errors) && data.errors.some((error) => asRecord(error).type === "NOT_FOUND");
+    throw new GithubError(missing ? "Not found on GitHub." : errors.join(" "), missing ? 404 : 422);
+  }
+  return data.data;
 }
 
 async function errorMessage(response: { json(): Promise<unknown> }): Promise<string> {

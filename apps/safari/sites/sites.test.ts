@@ -22,6 +22,7 @@ const REPO: RepoInfo = {
   license: "MIT",
   homepage: "",
   topics: [],
+  hasDiscussions: false,
 };
 
 function links(nodes: readonly LayoutNode[]): string[] {

@@ -11,8 +11,16 @@ export type GithubLocation =
   | { kind: "blob"; owner: string; repo: string; ref: string; path: string }
   | { kind: "issues"; owner: string; repo: string }
   | { kind: "issue"; owner: string; repo: string; number: number }
+  | { kind: "newIssue"; owner: string; repo: string }
   | { kind: "pulls"; owner: string; repo: string }
-  | { kind: "pull"; owner: string; repo: string; number: number };
+  | { kind: "pull"; owner: string; repo: string; number: number }
+  | { kind: "discussions"; owner: string; repo: string }
+  | { kind: "discussion"; owner: string; repo: string; number: number }
+  /** `category` is a category's slug; empty asks for one. */
+  | { kind: "newDiscussion"; owner: string; repo: string; category: string }
+  /** Signing in or out, then back to `returnTo` (a github.com URL, or empty for the home page). */
+  | { kind: "login"; returnTo: string }
+  | { kind: "logout"; returnTo: string };
 
 const NAME = /^[\w.-]+$/;
 
@@ -26,10 +34,14 @@ export function parseGithubLocation(raw: string): GithubLocation | null {
     return query ? { kind: "search", query } : { kind: "home" };
   }
   const tab = profileTab(text);
+  const query = /\?([^#]*)/.exec(text)?.[1] ?? "";
   text = text.replace(/[?#].*$/, "").replace(/\/+$/, "");
   text = text.replace(/^https?:\/\//i, "").replace(/^(?:www\.)?github\.com(?:\/|$)/i, "").replace(/^\/+/, "");
   const parts = text.split("/").filter((part) => part.length > 0);
   if (parts.length === 0) return { kind: "home" };
+  if (parts.length === 1 && (parts[0] === "login" || parts[0] === "logout")) {
+    return { kind: parts[0], returnTo: returnTo(queryParam(query, "return_to")) };
+  }
   if (parts.length === 1) {
     return NAME.test(parts[0]) ? { kind: "profile", login: parts[0], tab } : null;
   }
@@ -47,8 +59,15 @@ export function parseGithubLocation(raw: string): GithubLocation | null {
   const [head, second, ...tail] = rest;
   if (head === "issues") {
     if (rest.length === 1) return { kind: "issues", owner, repo };
+    if (second === "new") return tail.length > 0 ? null : { kind: "newIssue", owner, repo };
     const number = issueNumber(second);
     return number === null || tail.length > 0 ? null : { kind: "issue", owner, repo, number };
+  }
+  if (head === "discussions") {
+    if (rest.length === 1) return { kind: "discussions", owner, repo };
+    if (second === "new") return tail.length > 0 ? null : { kind: "newDiscussion", owner, repo, category: queryParam(query, "category") ?? "" };
+    const number = issueNumber(second);
+    return number === null || tail.length > 0 ? null : { kind: "discussion", owner, repo, number };
   }
   if (head === "pulls") return rest.length === 1 ? { kind: "pulls", owner, repo } : null;
   if (head === "pull") {
@@ -66,6 +85,10 @@ export function parseGithubLocation(raw: string): GithubLocation | null {
 /** Address-bar text for a location, without a scheme. */
 export function formatGithubLocation(location: GithubLocation): string {
   if (location.kind === "home") return "";
+  if (location.kind === "login" || location.kind === "logout") {
+    const root = `github.com/${location.kind}`;
+    return location.returnTo ? `${root}?return_to=${encodeURIComponent(location.returnTo)}` : root;
+  }
   if (location.kind === "search") return `github.com/search?q=${encodeURIComponent(location.query)}`;
   if (location.kind === "profile") {
     const root = `github.com/${location.login}`;
@@ -74,6 +97,12 @@ export function formatGithubLocation(location: GithubLocation): string {
   const root = `github.com/${location.owner}/${location.repo}`;
   if (location.kind === "issues") return `${root}/issues`;
   if (location.kind === "issue") return `${root}/issues/${location.number}`;
+  if (location.kind === "newIssue") return `${root}/issues/new`;
+  if (location.kind === "discussions") return `${root}/discussions`;
+  if (location.kind === "discussion") return `${root}/discussions/${location.number}`;
+  if (location.kind === "newDiscussion") {
+    return location.category ? `${root}/discussions/new?category=${encodeURIComponent(location.category)}` : `${root}/discussions/new`;
+  }
   if (location.kind === "pulls") return `${root}/pulls`;
   if (location.kind === "pull") return `${root}/pull/${location.number}`;
   if (!location.ref && !location.path) return root;
@@ -84,9 +113,13 @@ export function formatGithubLocation(location: GithubLocation): string {
 }
 
 export function repoOf(location: GithubLocation): { owner: string; repo: string } | null {
-  return location.kind === "home" || location.kind === "search" || location.kind === "profile"
-    ? null
-    : { owner: location.owner, repo: location.repo };
+  return "owner" in location ? { owner: location.owner, repo: location.repo } : null;
+}
+
+/** Only addresses on github.com come back from signing in. */
+function returnTo(raw: string | null): string {
+  if (!raw) return "";
+  return /^https:\/\/(?:www\.)?github\.com(?:[/?#]|$)/i.test(raw) ? raw : "";
 }
 
 function profileTab(raw: string): ProfileTab {

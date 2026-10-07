@@ -45,9 +45,18 @@ export interface SiteSettings {
   githubToken: string;
 }
 
+/** The GitHub account Safari is signed in to. Each call updates `githubToken` for later pages. */
+export interface GithubAccount {
+  /** Put up the phone sign-in sheet. Resolves with the new token, or null when the user cancels. */
+  signIn(): Promise<string | null>;
+  signOut(): Promise<void>;
+}
+
 export interface SiteContext {
   fetch: FetchFunction;
   settings: SiteSettings;
+  /** Absent when this Macintosh can't sign in from a phone. */
+  github?: GithubAccount;
 }
 
 /**
@@ -61,6 +70,13 @@ export interface SiteAdapter {
   /** The URLs this adapter draws. Adapters only see GET requests. */
   handles(url: WebUrl): boolean;
   load(url: WebUrl, context: SiteContext): Promise<WebPage>;
+  /**
+   * A form posted to the site (`body` urlencoded), done through its API.
+   * Resolves with the page to land on, which stands in for the post in
+   * history, so Back and Reload don't post it again. Without `submit`,
+   * posts go to the server like any other site's.
+   */
+  submit?(url: WebUrl, body: string, context: SiteContext): Promise<WebPage>;
 }
 
 /** An error to show in place of the page. */

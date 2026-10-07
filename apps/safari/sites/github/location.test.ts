@@ -2,6 +2,28 @@ import { describe, expect, it } from "vitest";
 import { formatGithubLocation, parseGithubLocation } from "./location";
 
 describe("parseGithubLocation", () => {
+  it("reads new issues, discussions and signing in, and writes them back", () => {
+    const cases = [
+      ["github.com/octocat/Hello-World/issues/new", { kind: "newIssue", owner: "octocat", repo: "Hello-World" }],
+      ["github.com/octocat/Hello-World/discussions", { kind: "discussions", owner: "octocat", repo: "Hello-World" }],
+      ["github.com/octocat/Hello-World/discussions/12", { kind: "discussion", owner: "octocat", repo: "Hello-World", number: 12 }],
+      ["github.com/octocat/Hello-World/discussions/new", { kind: "newDiscussion", owner: "octocat", repo: "Hello-World", category: "" }],
+      ["github.com/octocat/Hello-World/discussions/new?category=q-a", { kind: "newDiscussion", owner: "octocat", repo: "Hello-World", category: "q-a" }],
+      ["github.com/login", { kind: "login", returnTo: "" }],
+      ["github.com/login?return_to=https%3A%2F%2Fgithub.com%2Focto%2Frepo%2Fissues%2F1", { kind: "login", returnTo: "https://github.com/octo/repo/issues/1" }],
+      ["github.com/logout", { kind: "logout", returnTo: "" }],
+    ] as const;
+    for (const [address, location] of cases) {
+      expect(parseGithubLocation(address)).toEqual(location);
+      expect(formatGithubLocation(location)).toBe(address);
+    }
+  });
+
+  it("comes back from signing in only to github.com", () => {
+    expect(parseGithubLocation("github.com/login?return_to=https%3A%2F%2Fevil.example%2F")).toEqual({ kind: "login", returnTo: "" });
+    expect(parseGithubLocation("github.com/login?return_to=https%3A%2F%2Fgithub.com.evil.example%2F")).toEqual({ kind: "login", returnTo: "" });
+  });
+
   it("treats an empty address as the start page", () => {
     expect(parseGithubLocation("  ")).toEqual({ kind: "home" });
     expect(parseGithubLocation("https://github.com/")).toEqual({ kind: "home" });
