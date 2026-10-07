@@ -655,5 +655,7 @@ export default defineApp({
   minSize: { width: 200, height: 150 },
   scrollable: false,
   resizable: true,
+  // The globe runs to the window's edges; the grow box sits over its corner.
+  growBox: "overlay",
   Component: Earth,
 });
