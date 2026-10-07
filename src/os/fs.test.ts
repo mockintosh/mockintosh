@@ -39,7 +39,7 @@ describe("bootstrapFileSystem", () => {
     await bootstrapFileSystem(fs);
 
     const names = fs.children(fs.locate("desktop")!.id).map((n) => n.name);
-    const firstBoot = ["Photo Booth", "1984.mp4", "Safari", "App Store", "Icon Gallery", "Showreel", "Terminal"];
+    const firstBoot = ["Photo Booth", "1984.mp4", "Safari", "Maps", "App Store", "Icon Gallery", "Showreel", "Terminal"];
     expect(names).toEqual([...firstBoot].sort((a, b) => a.localeCompare(b)));
     expect(names).not.toContain("Canvas");
     expect(names).not.toContain("MacPaint");
@@ -58,7 +58,7 @@ describe("bootstrapFileSystem", () => {
     expect(fs.locate("preferences")).toBeDefined();
   });
 
-  it("adds Showreel and Terminal shortcuts to an existing desktop that lacks them", async () => {
+  it("adds Showreel, Maps and Terminal shortcuts to an existing desktop that lacks them", async () => {
     const fs = await FileSystem.open({ backend: new InMemoryBackend(), persistDelayMs: 0 });
     const hd = fs.mkdir(ROOT_ID, STARTUP_VOLUME_NAME, { role: "volume" });
     fs.mkdir(hd.id, "Desktop Folder", { role: "desktop" });
@@ -70,6 +70,9 @@ describe("bootstrapFileSystem", () => {
     const showreel = fs.child(fs.locate("desktop")!.id, "Showreel");
     expect(showreel).toMatchObject({ kind: "file", type: MIME.appShortcut });
     expect(fs.attributes(showreel!.id).icon).toBe("showreel/icon");
+    const maps = fs.child(fs.locate("desktop")!.id, "Maps");
+    expect(maps).toMatchObject({ kind: "file", type: MIME.appShortcut });
+    expect(fs.attributes(maps!.id).icon).toBe("maps/icon");
     const terminal = fs.child(fs.locate("desktop")!.id, "Terminal");
     expect(terminal).toMatchObject({ kind: "file", type: MIME.appShortcut });
     expect(fs.attributes(terminal!.id).icon).toBe("terminal/icon");
