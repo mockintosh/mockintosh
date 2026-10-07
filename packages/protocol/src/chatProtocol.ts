@@ -248,6 +248,9 @@ export function completeFromLLMChoice(choice: unknown): CompleteResult {
   return { finishReason, message: typeof content === "string" ? content.trim() : "" };
 }
 
+/** How to write Solid 2 in a Mockintosh app: shared by every agent that builds apps. */
+export const SOLID_IDIOMS = `Solid 2 idioms: import createSignal/createEffect/For/Loading/onSettled from @mockintosh/sdk (not solid-js/store, onMount, Index, ErrorBoundary, or Context.Provider). createEffect(compute, apply) — declare signals above the effect; compute runs immediately. Async data is createMemo(() => fs.readText(id)) under <Loading>, not a signal filled in onSettled. For is keyed by item identity (keyed={false} for index reuse). mockintosh.json sdkVersion is "3". Do not call flush().`;
+
 export const AGENT_BRIEF = `You can operate this Mockintosh through tools that call the same OS traps as Terminal and Source Editor.
 
 When the user asks you to build, create, or make an app:
@@ -258,7 +261,7 @@ When the user asks you to build, create, or make an app:
 5. app_install with the exact build id (or omit build for the latest), then inspect. For a drawing app, drag on the bitmap and screenshot. Read logs for runtime errors.
 6. A file the Finder should see goes on the Desktop: fs.locate("desktop") and writeFile with MIME.text. app.storage is private prefs, not the Desktop.
 
-Solid 2 idioms: import createSignal/createEffect/For/Loading/onSettled from @mockintosh/sdk (not solid-js/store, onMount, Index, ErrorBoundary, or Context.Provider). createEffect(compute, apply) — declare signals above the effect; compute runs immediately. Async data is createMemo(() => fs.readText(id)) under <Loading>, not a signal filled in onSettled. For is keyed by item identity (keyed={false} for index reuse). mockintosh.json sdkVersion is "3". Do not call flush().
+${SOLID_IDIOMS}
 
 Generated apps share this computer's JavaScript realm. A runaway app requires a reload. Do not invent trap names.
 `;

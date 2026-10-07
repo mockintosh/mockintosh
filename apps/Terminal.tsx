@@ -12,11 +12,11 @@ const HISTORY_SIZE = 500;
 /** 80×24 in Monaco 9 cells, plus the view's margins. */
 const DEFAULT_SIZE = { width: 80 * 6 + 4, height: 24 * 11 + 2 };
 
-function startShell(app: AppContext, pty: Pty, onKilled: () => void): void {
+function startShell(app: AppContext, pty: Pty, onKilled: () => void, clipboard?: { writeText(text: string): Promise<void> }): void {
   const runner = new BashRunner({
     kernel: app.kernel!,
-    programs: terminalPrograms(app),
-    banner: "Mockintosh bash. Your disk is ~ (/disk). Type help for commands, mac help for the Macintosh's own.\n",
+    programs: terminalPrograms(app, clipboard),
+    banner: "Mockintosh bash. Your disk is ~ (/disk). Type help for commands, mac help for the Macintosh's own, fx for the coding agent.\n",
     loadHistory: async () => {
       const saved = await app.storage.read(HISTORY_KEY);
       return saved ? saved.split("\n").filter(Boolean) : [];
@@ -41,7 +41,7 @@ function Terminal(): JSX.Element {
   let handle: TerminalHandle | undefined;
   const [exited, setExited] = createSignal<number | null>(null, { ownedWrite: true });
   const [title, setTitle] = createSignal("", { ownedWrite: true });
-  startShell(app, pty, () => win.close());
+  startShell(app, pty, () => win.close(), clipboard);
   onCleanup(() => {
     pty.hangUp();
     release?.();

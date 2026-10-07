@@ -35,4 +35,5 @@ export const APP_MODULES: Readonly<Record<string, AppModuleLoader>> = {
   terminal: () => import("@/apps/Terminal"),
   source_editor: () => import("@/apps/SourceEditor"),
   chatgippity: () => import("@/apps/ChatGippity"),
+  fx: () => import("@/apps/Fx"),
 };

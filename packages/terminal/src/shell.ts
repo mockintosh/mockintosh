@@ -30,6 +30,8 @@ export interface Job {
 export interface ShellRunner {
   /** Printed once when the shell starts. */
   banner?(): string;
+  /** Run once before the first prompt (a startup file). */
+  startup?(job: Pick<Job, "write">): Promise<void>;
   prompt(): string;
   /** Run one line as the foreground job; resolve with its exit status. */
   run(line: string, job: Job): Promise<number>;
@@ -120,6 +122,7 @@ export async function runShell(tty: Tty, runner: ShellRunner, options: RunShellO
   });
   const banner = runner.banner?.();
   if (banner) tty.write(banner);
+  await runner.startup?.({ write: (data) => tty.write(data) });
   let status = 0;
   try {
     for (;;) {

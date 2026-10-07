@@ -2,7 +2,7 @@ import { createEffect, createSignal, onCleanup } from "solid-js";
 import { useUIServices, type JSX } from "@mockintosh/ui";
 import { useApp } from "@mockintosh/sdk";
 import { TerminalBridge } from "@mockintosh/terminal";
-import { bashWorkspace } from "@mockintosh/terminal/bash";
+import { BashSession, HOME, bashWorkspace, fxEnvironment, shellAgentInstructions } from "@mockintosh/terminal/bash";
 import { TerminalView, type TerminalHandle } from "@mockintosh/terminal/view";
 import { readSettings } from "./settings";
 
@@ -49,8 +49,10 @@ export function FxTerminal(): JSX.Element {
     try {
       const fx = await runtime.createTerminal({
         apiKey: settings.apiKey,
+        env: fxEnvironment({}),
+        instructions: await shellAgentInstructions(new BashSession({ kernel: app.kernel! }).bash.fs, HOME),
         screen: bridge.terminal,
-        workspace: bashWorkspace(app.kernel!, { permission: "prompt" }),
+        workspace: bashWorkspace(app.kernel!),
         storage: app.storage,
         openUrl: async (url) => {
           if (!app.browser) return false;

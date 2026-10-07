@@ -10,6 +10,7 @@ import type {
   AgentTurn,
 } from "@mockintosh/sdk";
 import type { FxHostTool, FxRevisioned, FxTerminalOptions, FxTurn, FxTurnEvent } from "libfx/browser";
+import { fetchWithInstructions } from "./agentInstructions";
 
 const FX_VERSION = "0.0.11";
 
@@ -50,8 +51,14 @@ export function createWebAgentRuntime(): AgentRuntime | undefined {
  */
 async function createTerminal(options: AgentTerminalOptions): Promise<AgentTerminal> {
   const { createFxTerminal } = await import("libfx/browser");
+  const runtime = await createFxTerminal(fxTerminalOptions(options, globalThis.fetch.bind(globalThis)));
+  return { interactive: runtime.interactive, exited: runtime.exited, abort: () => runtime.abort() };
+}
+
+/** libfx's terminal options for an agent terminal: any libfx build takes them (the Node one, in tests). */
+export function fxTerminalOptions(options: AgentTerminalOptions, fetch: typeof globalThis.fetch): FxTerminalOptions {
   const screen = options.screen;
-  const fxOptions: FxTerminalOptions = {
+  return {
     terminal: {
       write: (bytes) => screen.write(bytes),
       onData: (callback) => screen.onData(callback),
@@ -63,8 +70,9 @@ async function createTerminal(options: AgentTerminalOptions): Promise<AgentTermi
       },
       onResize: (callback) => screen.onResize(callback),
     },
-    env: { AI_GATEWAY_API_KEY: options.apiKey },
-    ...(options.model ? { args: ["--model", options.model] } : {}),
+    env: { ...options.env, AI_GATEWAY_API_KEY: options.apiKey, HOME: options.workspace?.root ?? "/" },
+    args: [...(options.model ? ["--model", options.model] : []), ...(options.args ?? [])],
+    fetch: options.instructions ? fetchWithInstructions(fetch, options.instructions) : fetch,
     ...(options.workspace
       ? {
           workspace: {
@@ -78,8 +86,6 @@ async function createTerminal(options: AgentTerminalOptions): Promise<AgentTermi
     clipboard: options.clipboard ?? null,
     ...(options.storage ? fxStores(options.storage) : {}),
   };
-  const runtime = await createFxTerminal(fxOptions);
-  return { interactive: runtime.interactive, exited: runtime.exited, abort: () => runtime.abort() };
 }
 
 /** A storage key from an fx id: ids may hold characters a file name can't. */

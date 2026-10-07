@@ -11,3 +11,6 @@ export type { KernelLike } from "./kernelFs";
 export { osCommands, runS1, s1Quote, OS_COMMANDS } from "./osCommands";
 export { bashWorkspace } from "./workspace";
 export type { BashWorkspace, WorkspaceRequest } from "./workspace";
+export { fxProgram, fxEnvironment, KEY_VARIABLE, DEFAULT_PERMISSION_MODE } from "./fx";
+export type { FxProgramOptions } from "./fx";
+export { SHELL_AGENT_BRIEF, shellAgentInstructions } from "./brief";

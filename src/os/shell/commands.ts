@@ -33,8 +33,12 @@ export const commands: Readonly<Record<string, Command>> = {
     },
   },
   project: {
-    operands: "path app-id title", json: true,
-    async run(args, {invoke, path}, usage) { usage(3); return invoke("project_create", {path: path(args[0]), id: args[1], title: args[2]}); },
+    operands: "path app-id title [counter|blank|canvas]", json: true,
+    async run(args, {invoke, path}, usage) {
+      usage(3, 4);
+      if (args[3] !== undefined && !["counter", "blank", "canvas"].includes(args[3])) throw new UsageError(commandHelp.project);
+      return invoke("project_create", {path: path(args[0]), id: args[1], title: args[2], ...(args[3] ? {template: args[3]} : {})});
+    },
   },
   edit: {
     operands: "project-path", json: true,
@@ -54,6 +58,20 @@ export const commands: Readonly<Record<string, Command>> = {
       if (run) await invoke("app_install", {path: project, build: job.id});
       return job;
     },
+  },
+  check: {
+    operands: "project-path", json: true,
+    format: result => {
+      const diagnostics = (result as {diagnostics: {message: string; file?: string; line?: number; column?: number}[]}).diagnostics;
+      return diagnostics.length ? diagnostics.map(d => `${d.file ?? "project"}:${d.line ?? 0}:${d.column ?? 0}: ${d.message}\n`).join("") : "No problems.\n";
+    },
+    async run(args, {invoke, path}, usage) { usage(1); return invoke("project_check", {path: path(args[0])}); },
+  },
+  logs: {
+    operands: "[instance-id]", json: true,
+    format: result => (result as {instance: string; at: number; message: string; source: string}[])
+      .map(e => `${new Date(e.at).toISOString()}  ${e.instance}  ${e.source}: ${e.message}\n`).join(""),
+    async run(args, {invoke}, usage) { usage(0, 1); return invoke("logs", args[0] ? {instance: args[0]} : {}); },
   },
   install: {
     operands: "project-path build-id", json: true,

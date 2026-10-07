@@ -668,5 +668,21 @@
   "permissions": [
    "kernel:*"
   ]
+ },
+ "fx": {
+  "id": "fx",
+  "title": "fx",
+  "icon": "icon/chat",
+  "defaultSize": {
+   "width": 380,
+   "height": 280
+  },
+  "requires": [
+   "network",
+   "agent-runtime"
+  ],
+  "permissions": [
+   "kernel:*"
+  ]
  }
 }

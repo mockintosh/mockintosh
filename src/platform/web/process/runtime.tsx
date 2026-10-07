@@ -33,6 +33,7 @@ import {
   WindowSlotsContext,
   type WindowBandView,
   type WindowSlots,
+  type AgentRuntime,
   type AppContext,
   type AppServices,
   type AppWindow,
@@ -105,7 +106,13 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-export function runProcess(scope: ProcessScope, load: LoadApp): void {
+/** Services the worker provides itself rather than asking the OS for. */
+export interface ProcessServices {
+  /** Language-model agents, run in this worker (fx's WebAssembly core). */
+  agentRuntime?: AgentRuntime;
+}
+
+export function runProcess(scope: ProcessScope, load: LoadApp, services: ProcessServices = {}): void {
   const post = (message: ProcessToHost, transfer?: Transferable[]) => scope.postMessage(message, transfer);
 
   let nextCallId = 1;
@@ -312,6 +319,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       },
       capabilities,
       print,
+      agentRuntime: capabilities.has("agent-runtime") ? services.agentRuntime : undefined,
       kernel: start.kernel && {
         describe: () => start.kernel!,
         invoke(name, args, options) {

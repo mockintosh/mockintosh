@@ -79,6 +79,8 @@ declare module "libfx/browser" {
 
   export interface FxTerminalOptions {
     terminal: FxTerminalAdapter;
+    /** Every model request goes through it (`globalThis.fetch` by default). */
+    fetch?: typeof fetch;
     env?: Record<string, string>;
     args?: string[];
     workspace?: FxWorkspaceAdapter;

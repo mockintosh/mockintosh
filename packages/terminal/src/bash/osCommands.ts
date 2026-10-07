@@ -14,7 +14,7 @@ import type { KernelLike } from "./kernelFs";
 export const OS_COMMANDS = [
   "open", "apps", "windows", "inspect", "activate", "click", "dblclick", "drag", "key", "menu", "render",
   "screenshot", "desktop_pattern", "project", "edit", "build", "install", "restart", "restore", "instances", "write",
-  "ps", "kill",
+  "ps", "kill", "check", "logs",
 ] as const;
 
 /** Quote a word for the S1 parser: single quotes, with `'` spelled `'\''`. */

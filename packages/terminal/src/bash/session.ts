@@ -34,6 +34,9 @@ export interface ExecResult {
 
 export const HOME = "/disk";
 
+/** Variables that are the shell's own, not its environment. */
+const SHELL_ONLY = new Set(["IFS", "PS1", "PS2", "PS3", "PS4", "OPTIND", "OPTARG", "SHELLOPTS", "HISTFILE", "HISTSIZE", "OLDPWD"]);
+
 const DEFAULT_ENV: Record<string, string> = {
   HOME,
   USER: "mac",
@@ -91,6 +94,27 @@ export class BashSession {
 
   variable(name: string): string | undefined {
     return this.env[name];
+  }
+
+  /**
+   * What a program started from this shell inherits. just-bash doesn't mark
+   * exports, so it's every variable but the shell's own machinery.
+   */
+  environment(): Record<string, string> {
+    const env: Record<string, string> = {};
+    for (const [name, value] of Object.entries(this.env)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || SHELL_ONLY.has(name) || name.startsWith("BASH")) continue;
+      env[name] = value;
+    }
+    env.PWD = this.cwdPath;
+    return env;
+  }
+
+  /** Run ~/.bashrc, as an interactive bash does when it starts. */
+  async startup(): Promise<ExecResult | null> {
+    const rc = `${this.env.HOME ?? HOME}/.bashrc`;
+    if (!(await this.bash.fs.exists(rc))) return null;
+    return this.exec(`source ${rc}`);
   }
 
   /** Run one line (or script) as this shell. */

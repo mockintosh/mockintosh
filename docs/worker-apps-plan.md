@@ -154,6 +154,7 @@ Everything an app declares or reaches for through `useApp()` works in a process,
 - **Fonts:** installed fonts, replayed from a journal of registrations. `fonts.install`, `fontRaster`.
 - **Sprites:** the whole registry.
 - **Kernel sessions:** traps with streamed output and cancellation.
+- **Agents:** the process runs fx's engine itself (`AgentRuntime`, libfx with JSPI), so fx and Terminal's `fx` run in processes.
 - **Windows:** scrolling windows, `WindowHeader` / `WindowFooter` bands (drawn in the process's band), full screen, custom About boxes (drawn by the OS from its copy of the module).
 
 ### Still on the OS's thread
@@ -162,7 +163,6 @@ Everything an app declares or reaches for through `useApp()` works in a process,
 | --- | --- |
 | Finder, App Store, Icon Gallery | Shell apps (see above) |
 | Spotify | `browser.loadScript` hands the app a live object from a script in the page (the Web Playback SDK); it can't cross into a worker |
-| fx | Its agent runtime is a WebAssembly core the web host loads for the page |
 
 `signIn` isn't served yet, so an app that signs in stays on the OS's thread.
 

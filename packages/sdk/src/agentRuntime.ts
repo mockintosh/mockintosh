@@ -127,6 +127,15 @@ export interface AgentStorage {
 export interface AgentTerminalOptions {
   apiKey: string;
   model?: string;
+  /** Command-line arguments, as the agent's own CLI takes them (`--resume`, `--continue`). */
+  args?: string[];
+  /** Environment variables for the agent's CLI (`FX_MODEL`, `FX_PERMISSION_MODE`). */
+  env?: Record<string, string>;
+  /**
+   * Context the agent gets beside its own: where it is and how things work
+   * here. Added to the system prompt of every request.
+   */
+  instructions?: string;
   screen: AgentTerminalScreen;
   workspace?: AgentWorkspace;
   /** Where the agent keeps its sessions, settings and prompt history between launches. */

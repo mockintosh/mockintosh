@@ -49,12 +49,15 @@ export interface BashRunnerOptions extends BashSessionOptions {
 export class BashRunner implements ShellRunner {
   readonly session: BashSession;
   private programs = new Map<string, TtyProgram>();
-  private captured: string[] | null = null;
+  private captured: { args: string[]; env: Record<string, string> } | null = null;
 
   constructor(private options: BashRunnerOptions) {
     for (const program of options.programs ?? []) this.programs.set(program.name, program);
-    const capture = defineCommand(ARGV_COMMAND, async (args) => {
-      this.captured = args;
+    const capture = defineCommand(ARGV_COMMAND, async (args, ctx) => {
+      // Variables set for this command only (FOO=bar fx) are in its environment.
+      const env: Record<string, string> = {};
+      for (const [name, value] of ctx.env) if (this.session.variable(name) !== value && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) env[name] = value;
+      this.captured = { args, env };
       return { stdout: "", stderr: "", exitCode: 0 };
     });
     const programCommands: Command[] = [...this.programs.values()].map((program) =>
@@ -74,6 +77,17 @@ export class BashRunner implements ShellRunner {
     return this.options.banner ?? "";
   }
 
+  /** Source ~/.bashrc and show what it printed. */
+  async startup(job: Pick<Job, "write">): Promise<void> {
+    const result = await this.session.startup().catch((error: unknown) => ({
+      stdout: "",
+      stderr: `bash: ~/.bashrc: ${error instanceof Error ? error.message : String(error)}\n`,
+      exitCode: 1,
+    }));
+    if (result?.stdout) job.write(result.stdout);
+    if (result?.stderr) job.write(result.stderr);
+  }
+
   prompt(): string {
     return this.session.prompt();
   }
@@ -91,10 +105,17 @@ export class BashRunner implements ShellRunner {
   }
 
   /** The program a line runs on its own, with the rest of the line still to expand. */
-  private attachedProgram(line: string): { program: TtyProgram; rest: string } | null {
+  /**
+   * The program a line runs on the terminal: the last command of the line
+   * when it is a program on its own (no pipe or redirection), with what
+   * comes before it (`cd proj && fx`) and the operator between them.
+   */
+  private attachedProgram(line: string): { program: TtyProgram; rest: string; before: string; operator: ";" | "&&" | "||" | null } | null {
+    const { before, operator, last } = splitLastCommand(line);
     let ast: { statements: AstNode[] };
     try {
-      ast = this.session.bash.transform(line).ast as unknown as { statements: AstNode[] };
+      ast = this.session.bash.transform(last).ast as unknown as { statements: AstNode[] };
+      if (before) this.session.bash.transform(before);
     } catch {
       return null;
     }
@@ -104,29 +125,35 @@ export class BashRunner implements ShellRunner {
     const commands = pipelines[0]!.commands as AstNode[];
     if (commands.length !== 1 || commands[0]!.type !== "SimpleCommand") return null;
     const command = commands[0]!;
-    if ((command.redirections as unknown[]).length || (command.assignments as unknown[]).length) return null;
-    const m = /^\s*(\S+)/.exec(line);
-    const program = m ? this.programs.get(m[1]!) : undefined;
+    if ((command.redirections as unknown[]).length) return null;
+    // Leading assignments (FOO=bar fx) stay with the expansion below.
+    const m = /^((?:\s*[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"[^"]*"|\S)*)*)\s*(\S+)/.exec(last);
+    const program = m ? this.programs.get(m[2]!) : undefined;
     if (!program) return null;
-    return { program, rest: line.slice(m![0].length) };
+    return { program, rest: `${m![1]} ${ARGV_COMMAND}${last.slice(m![0].length)}`, before, operator };
   }
 
   async run(line: string, job: Job): Promise<number> {
     const attached = this.attachedProgram(line);
     if (attached) {
-      // Let bash expand the arguments (globs, variables, quotes), then run the program on the tty.
+      if (attached.before) {
+        // What comes first runs as bash; the operator decides whether the program follows.
+        const first = await this.session.exec(attached.before, { signal: job.signal });
+        if (first.stdout) job.write(first.stdout);
+        if (first.stderr) job.write(first.stderr);
+        if (job.stoppedBy) return first.exitCode;
+        if ((attached.operator === "&&" && first.exitCode !== 0) || (attached.operator === "||" && first.exitCode === 0)) return first.exitCode;
+      }
+      // Let bash expand the arguments (globs, variables, quotes) and assignments, then run the program on the tty.
       this.captured = null;
-      const expanded = await this.session.exec(`${ARGV_COMMAND}${attached.rest}`, { signal: job.signal });
+      const expanded = await this.session.exec(attached.rest.trim(), { signal: job.signal });
       if (expanded.exitCode !== 0 || !this.captured) {
         job.write(expanded.stderr);
         return expanded.exitCode || 1;
       }
-      const argv = [attached.program.name, ...(this.captured as string[])];
-      const env: Record<string, string> = {};
-      for (const name of ["HOME", "USER", "PATH", "TERM", "LANG", "SHELL", "PWD"]) {
-        const value = this.session.variable(name);
-        if (value !== undefined) env[name] = value;
-      }
+      const captured = this.captured as { args: string[]; env: Record<string, string> };
+      const argv = [attached.program.name, ...captured.args];
+      const env = { ...this.session.environment(), ...captured.env };
       env.COLUMNS = String(job.tty.size.cols);
       env.LINES = String(job.tty.size.rows);
       const code = await attached.program.attached({ argv, cwd: this.session.cwd, env, job, fs: this.session.bash.fs }).catch((error: unknown) => {
@@ -149,4 +176,43 @@ function decodeLatin1(bytes: string): string {
   const array = new Uint8Array(bytes.length);
   for (let i = 0; i < bytes.length; i++) array[i] = bytes.charCodeAt(i) & 0xff;
   return new TextDecoder().decode(array);
+}
+
+/**
+ * Split a line at its last top-level `;`, `&&`, `||` or newline, outside
+ * quotes, escapes and parentheses: what comes before, the operator, and the
+ * last command.
+ */
+export function splitLastCommand(line: string): { before: string; operator: ";" | "&&" | "||" | null; last: string } {
+  let quote: string | null = null;
+  let depth = 0;
+  let split = -1;
+  let operator: ";" | "&&" | "||" | null = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]!;
+    if (c === "\\" && quote !== "'") {
+      i++;
+      continue;
+    }
+    if (quote) {
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === "`") quote = c;
+    else if (c === "(" || c === "{") depth++;
+    else if (c === ")" || c === "}") depth = Math.max(0, depth - 1);
+    else if (depth === 0) {
+      const two = line.slice(i, i + 2);
+      if (two === "&&" || two === "||") {
+        split = i;
+        operator = two;
+        i++;
+      } else if (c === ";" || c === "\n") {
+        split = i;
+        operator = ";";
+      }
+    }
+  }
+  if (split < 0) return { before: "", operator: null, last: line };
+  return { before: line.slice(0, split), operator, last: line.slice(split + (operator === ";" ? 1 : 2)) };
 }
