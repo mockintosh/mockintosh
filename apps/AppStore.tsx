@@ -229,65 +229,78 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
     };
   }
 
+  // The shelf and an app page share the window's scroll: a page opens at its
+  // top, and Back returns to where the shelf was.
+  let shelfScrollY = 0;
+
   function openPage(item: StoreApp): void {
     setStatus("");
+    if (!page()) shelfScrollY = win.scrollY();
     setPage(item);
+    win.scrollTo(0);
   }
 
   function closePage(): void {
     setStatus("");
     setPage(null);
+    win.scrollTo(shelfScrollY);
   }
 
   return (
-    <box width={win.width()} height={win.height()} padding={8} flexDirection="column" gap={6} background={0}>
+    <box
+      width={win.width()}
+      minHeight={win.height()}
+      padding={8}
+      flexDirection="column"
+      gap={6}
+      background={0}
+      onLayout={({ height }) => win.setContentSize(win.width(), height)}
+    >
       <Show when={!page()}>
         <text font="menu" spacing={1}>App Store</text>
       </Show>
       <Show when={status()}>
         <text font="body">{status()}</text>
       </Show>
-      <box overflow="scroll" flexGrow={1} minHeight={0} flexDirection="column" gap={8}>
-        <Show
-          when={page()}
-          fallback={
-            <box flexDirection="column" gap={8}>
-              <text font="menu" spacing={1}>Mockintosh Apps</text>
-              <AppShelf apps={bundledApps().map(bundledListing)} columns={columns()} onOpen={openPage} />
-              <Show when={fetch}>
-                <text font="menu" spacing={1}>From the Registry</text>
-                <text font="body">SDK v3 apps only</text>
-                <Loading fallback={<text font="body">Loading catalog…</text>}>
-                  <Errored fallback={() => <text font="body">Failed to load catalog.</text>}>
-                    <Show
-                      when={catalog().length === 0}
-                      fallback={
-                        <AppShelf
-                          apps={catalog().map(registryListing)}
-                          columns={columns()}
-                          onOpen={openPage}
-                        />
-                      }
-                    >
-                      <text font="body">No SDK v3 apps in the catalog.</text>
-                    </Show>
-                  </Errored>
-                </Loading>
-              </Show>
-            </box>
-          }
-        >
-          {(item) => (
-            <AppPage
-              app={item()}
-              installed={installed().has(item().id)}
-              busy={busyId() === item().id}
-              onBack={closePage}
-              onOpen={() => app.os.openApp(item().id)}
-            />
-          )}
-        </Show>
-      </box>
+      <Show
+        when={page()}
+        fallback={
+          <box flexDirection="column" gap={8}>
+            <text font="menu" spacing={1}>Mockintosh Apps</text>
+            <AppShelf apps={bundledApps().map(bundledListing)} columns={columns()} onOpen={openPage} />
+            <Show when={fetch}>
+              <text font="menu" spacing={1}>From the Registry</text>
+              <text font="body">SDK v3 apps only</text>
+              <Loading fallback={<text font="body">Loading catalog…</text>}>
+                <Errored fallback={() => <text font="body">Failed to load catalog.</text>}>
+                  <Show
+                    when={catalog().length === 0}
+                    fallback={
+                      <AppShelf
+                        apps={catalog().map(registryListing)}
+                        columns={columns()}
+                        onOpen={openPage}
+                      />
+                    }
+                  >
+                    <text font="body">No SDK v3 apps in the catalog.</text>
+                  </Show>
+                </Errored>
+              </Loading>
+            </Show>
+          </box>
+        }
+      >
+        {(item) => (
+          <AppPage
+            app={item()}
+            installed={installed().has(item().id)}
+            busy={busyId() === item().id}
+            onBack={closePage}
+            onOpen={() => app.os.openApp(item().id)}
+          />
+        )}
+      </Show>
     </box>
   );
 }
