@@ -168,6 +168,7 @@ export function Menubar(props: MenubarProps): JSX.Element {
       width={os.resolution.width}
       height={MENUBAR_H}
       background={0}
+      keepsFocus
     >
       {/* Bottom border */}
       <box

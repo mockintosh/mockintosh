@@ -345,6 +345,8 @@ export interface BoxProps extends LayoutStyle, EventHandlers, SemanticProps {
   inert?: boolean;
   /** Treat this node as a Tab-cycle / last-focus scope. */
   focusScope?: boolean;
+  /** Presses in this subtree leave keyboard focus where it is (a menu bar). */
+  keepsFocus?: boolean;
   /**
    * Vertical scroll offset in pixels (requires overflow="scroll"). Together
    * with `onScroll` the owner drives the offset: the wheel and touch pans
