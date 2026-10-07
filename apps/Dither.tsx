@@ -9,6 +9,7 @@ import {
   defineApp,
   encodePng1bit,
   readImageFile,
+  fitNameWithSuffix,
   useApp,
   writeSpriteFile,
   ASCII_DIFFUSE_DEFAULT,
@@ -184,7 +185,7 @@ function Dither(props: DitherProps): JSX.Element {
     const { width, height } = view();
     const base = props.title ? stem(String(props.title)) : "Dither";
     try {
-      await writeSpriteFile(app.fs, desktop.id, `${base} 1-bit`, { width, height, data: pixels }, {
+      await writeSpriteFile(app.fs, desktop.id, fitNameWithSuffix(base, " 1-bit"), { width, height, data: pixels }, {
         attributes: { icon: "icon/camera" },
       });
     } catch (e) {
@@ -407,14 +408,14 @@ function Dither(props: DitherProps): JSX.Element {
         <Loading
           fallback={
             <box width={view().width} height={view().height} justifyContent="center" alignItems="center">
-              <text font="menu">Opening…</text>
+              <text font="menu" spacing={1}>Opening…</text>
             </box>
           }
         >
           <Errored
             fallback={(err) => (
               <box width={view().width} height={view().height} justifyContent="center" alignItems="center" padding={12}>
-                <text font="menu" align="center">{err instanceof Error ? err.message : String(err)}</text>
+                <text font="menu" spacing={1} align="center">{err instanceof Error ? err.message : String(err)}</text>
               </box>
             )}
           >
@@ -468,6 +469,7 @@ export default defineApp({
   requires: ["images"],
   title: "Dither",
   icon: "dither/icon",
+  smallIcon: "dither/icon-16x16",
   sprites,
   defaultSize: { width: 288, height: 288 },
   minSize: { width: 120, height: 80 },

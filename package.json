@@ -35,6 +35,7 @@
     "icons:import": "tsx scripts/import-icon.ts",
     "icons:refresh-catalog": "tsx scripts/refresh-icon-catalog.ts",
     "icons:gallery": "tsx scripts/icons-gallery.ts",
+    "icons:preview": "tsx scripts/preview-icons.ts",
     "glyphs:ascii": "tsx scripts/preview-ascii-glyphs.ts --out /tmp/ascii-glyphs.png",
     "fonts:import-pixel": "python3 scripts/import-geist-pixel.py",
     "fonts:import-lisa": "python3 scripts/import-lisa-terminal.py",

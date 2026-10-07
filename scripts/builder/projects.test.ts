@@ -119,7 +119,7 @@ describe("complete M2 project workflow", () => {
         job = parse(jobSchema, await invoke("build_status", {id: job.id}));
       }
       expect(job.state).toBe("succeeded");
-      const truncated = job.id.replace(/^build-os-/, "");
+      const truncated = job.id.replace(/^build-/, "");
       await expect(invoke("app_install", {path, build: truncated})).rejects.toMatchObject({
         code: "missing-resource",
         message: expect.stringContaining(job.id),

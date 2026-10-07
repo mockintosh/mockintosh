@@ -58,6 +58,7 @@ export default defineApp({
   id: "file",
   title: "File",
   icon: "icon/file",
+  smallIcon: "icon/file-16x16",
   defaultSize: { width: 350, height: 200 },
   scrollable: true,
   fileTypes: [MIME.text, MIME.markdown, MIME.json],

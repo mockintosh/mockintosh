@@ -223,6 +223,7 @@ export default defineApp({
   id: "fx",
   title: "fx",
   icon: "icon/chat",
+  smallIcon: "icon/chat-16x16",
   defaultSize: { width: 380, height: 280 },
   requires: ["network", "agent-runtime"],
   permissions: ["kernel:*"],

@@ -1,4 +1,4 @@
-import type { Sprite } from "@mockintosh/sdk";
+import { fromGrid, type Sprite } from "@mockintosh/sdk";
 import { createFrame, frameRect, plot, rect } from "../synth/pixels";
 
 const SIZE = 32;
@@ -42,6 +42,27 @@ function visualizer(): Sprite {
   return { width: SIZE, height: SIZE, data: art.pixels, mask: mask.pixels };
 }
 
+/** The 16×16 for the application menu: the monitor on its stand, four bars on the dark screen. */
+const ICON_16: Sprite = fromGrid(16, 16, [
+  "................",
+  ".#############..",
+  ".#ooooooooooo##.",
+  ".#o#########o##.",
+  ".#o###o#####o##.",
+  ".#o###o#o###o##.",
+  ".#o#o#o#o###o##.",
+  ".#o#o#o#o#o#o##.",
+  ".#o#o#o#o#o#o##.",
+  ".#o#########o##.",
+  ".#ooooooooooo##.",
+  ".#oo####ooooo##.",
+  ".#ooooooooooo##.",
+  ".##############.",
+  "......####......",
+  "....########....",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "visualizer/icon": visualizer(),
+  "visualizer/icon-16x16": ICON_16,
 };

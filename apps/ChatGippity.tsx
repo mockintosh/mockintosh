@@ -192,6 +192,7 @@ export default defineApp({
   requires: ["network"],
   title: "ChatGippity",
   icon: "icon/computer",
+  smallIcon: "icon/computer-16x16",
   defaultSize: { width: 360, height: 260 },
   permissions: ["kernel:*"],
   Component: ChatGippity,

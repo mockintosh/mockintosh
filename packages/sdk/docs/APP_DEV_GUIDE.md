@@ -20,6 +20,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Canvas | `Canvas.tsx` | SDK-clean |
 | Foundry | `Foundry.tsx` | SDK-clean |
 | Safari | `Safari.tsx` | SDK-clean |
+| Maps | `Maps.tsx` | SDK-clean |
 | Testing | `Testing.tsx` | SDK-clean |
 | File | `FileViewer.tsx` | SDK-clean |
 | Preview | `Preview.tsx` | SDK-clean |
@@ -155,6 +156,14 @@ The screen is 1-bit. Every colour prop (`background`, `color`, `borderColor`) ta
 
 Any installed family works too: the Mac city fonts (`"geneva"`, `"newYork"`, …) and whatever the user put in System Folder › Fonts, by registry key (`familyKey("Futura")` → `"futura"`). `<text size={n}>` picks the strike: a bitmap family snaps to its nearest bitmap size, a TrueType family draws at exactly `n`, rendered and hinted by the Font Manager's scaler. `bold` / `italic` use a real Bold or Italic face when the family has one and synthesize otherwise.
 
+`<text spacing={n}>` puts `n` pixels between glyphs instead of the face's own gap. Chicago (`"menu"`) has the real Mac's 2px, the look of menus, dialogs and window titles. Inside your app's windows, set `spacing={1}` on Chicago text for the tighter look the bundled apps use:
+
+```tsx
+<text font="menu" spacing={1}>Now Playing</text>
+```
+
+Where an API takes only a font name (`measureText`, `fontLineHeight`, a `TextFont` family id), pass `spacedFontName("menu", 1)` so measuring and drawing agree.
+
 `useApp().fonts.list()` returns every family (`scalable` marks outline families, `displayName` is the font's own name for menus). Rebuild a Font menu from `fonts.onChange(listener)`. `fonts.install(suitcase)` saves a `FontSuitcase` into the Fonts folder for every app; Foundry is the app that makes them.
 
 `measureText(text, font?, style?, size?)` is re-exported from `@mockintosh/ui`; it includes pair kerning, so measure with it rather than summing glyph widths.
@@ -274,6 +283,7 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `microphone` | `useApp().microphone` is available (see [Sound input](#sound-input)) |
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
 | `sign-in`   | `useApp().signIn` is available (see [Signing in](#signing-in))        |
+| `gpu`       | `useApp().gpu` is available: WGSL pixel programs rendered to an `ImageFrame`, and a rasterizer for meshes kept on the GPU, drawn by a WGSL corner program with a depth test (see `GpuService`) |
 | `agent-runtime` | `useApp().agentRuntime` is available (see [Agents](#agents))      |
 
 Two ways to use them:
@@ -469,6 +479,8 @@ async function saveNote(fs: AppFileSystem, text: string) {
 ```
 
 Files have one MIME `type` (`MIME.text`, `MIME.markdown`, `MIME.sprite`, …; `inferMimeType(name)` guesses from an extension). Mutations throw `FSError` (`isFSError(err, "exists")`) on name clashes and invalid moves — show the message in a dialog rather than swallowing it.
+
+A file or folder name holds at most `MAX_NAME_LENGTH` (28) characters; a longer new name throws `FSError` with code `"invalid-name"`. Fit names you build rather than letting the save fail: `fitName("A very long photo name.png")` cuts the stem and keeps the extension, `fitNameWithSuffix(title, " copy")` keeps the suffix, and `uniqueChildName(fs, folderId, name)` does both and numbers clashes. When you ask for a name, pass `inputMaxLength: MAX_NAME_LENGTH` to `showDialog`.
 
 `<Markdown text={src} />` (and `parseMarkdown`) render markdown through the 1-bit layout tree. Import them from `@mockintosh/sdk`, not `@mockintosh/markdown`.
 

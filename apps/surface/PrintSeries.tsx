@@ -1,6 +1,6 @@
 import { createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Button, TextInput, useApp } from "@mockintosh/sdk";
+import { DialogButton, TextInput, useApp } from "@mockintosh/sdk";
 import { planBatch } from "./batch";
 
 export const PRINT_SERIES_SIZE = { width: 260, height: 118 } as const;
@@ -73,8 +73,8 @@ export function PrintSeries(props: PrintSeriesProps): JSX.Element {
       <text font="body" nowrap>{summary()}</text>
       <box flexGrow={1} />
       <box flexDirection="row" alignItems="center" justifyContent="flex-end" gap={10}>
-        <Button name="cancel" label="Cancel" onClick={close} />
-        <Button name="print" label="Print" ring disabled={!plan().ok} onClick={print} />
+        <DialogButton name="cancel" label="Cancel" onClick={close} />
+        <DialogButton name="print" label="Print" default disabled={!plan().ok} onClick={print} />
       </box>
     </box>
   );

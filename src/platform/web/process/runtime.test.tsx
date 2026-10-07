@@ -34,6 +34,7 @@ const START: Omit<ProcessStart, "appId" | "source"> = {
   microphone: false,
   monitor: false,
   images: false,
+  gpu: false,
   videoPlayback: false,
   camera: false,
 };

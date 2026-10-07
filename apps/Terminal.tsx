@@ -4,6 +4,7 @@ import { defineApp, useApp, type AppContext } from "@mockintosh/sdk";
 import { Pty, exitBuiltin, kernelProcesses, runShell } from "@mockintosh/terminal";
 import { BashRunner } from "@mockintosh/terminal/bash";
 import { TerminalView, type TerminalHandle } from "@mockintosh/terminal/view";
+import { sprites } from "./terminal/icons";
 import { terminalPrograms } from "./terminal/programs";
 
 const HISTORY_KEY = "bash_history";
@@ -170,7 +171,9 @@ function Terminal(): JSX.Element {
 export default defineApp({
   id: "terminal",
   title: "Terminal",
-  icon: "icon/computer",
+  icon: "terminal/icon",
+  smallIcon: "terminal/icon-16x16",
+  sprites,
   defaultSize: DEFAULT_SIZE,
   minSize: { width: 20 * 6 + 4, height: 5 * 11 + 2 },
   singleInstance: false,

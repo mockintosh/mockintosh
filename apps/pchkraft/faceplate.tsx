@@ -120,7 +120,7 @@ export function Screen(props: {
           }}
         />
       ) : (
-        <text width={GRID_W} height={GRID_H} font="menu" color={0}>
+        <text width={GRID_W} height={GRID_H} font="menu" spacing={1} color={0}>
           {props.tracker}
         </text>
       )}

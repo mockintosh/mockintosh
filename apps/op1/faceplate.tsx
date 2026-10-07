@@ -389,7 +389,7 @@ export function FaceButton(props: {
           }}
         />
       ) : (
-        <text font="menu" color={inverted() ? 0 : 1} align="center" nowrap>
+        <text font="menu" spacing={1} color={inverted() ? 0 : 1} align="center" nowrap>
           {props.disabled ? "" : props.label ?? ""}
         </text>
       )}

@@ -539,7 +539,7 @@ function Surface(_props: Record<string, unknown>): JSX.Element {
     <box width={win.width()} height={win.height()} flexDirection="column" background={0}>
       <Show when={!isFullScreen()}>
         <box height={BAR_H} flexDirection="row" alignItems="center" paddingLeft={4} paddingRight={4} gap={4}>
-          <text font="menu">z =</text>
+          <text font="menu" spacing={1}>z =</text>
           <TextInput
             name="equation"
             value={draft()}
@@ -611,7 +611,7 @@ function Surface(_props: Record<string, unknown>): JSX.Element {
             disabled={!(compiled()?.usesTime ?? false)}
             onClick={() => (playing() ? stop() : play())}
           />
-          <text font="menu">
+          <text font="menu" spacing={1}>
             {printing() ?? error() ?? (compiled()?.usesTime ? `t = ${time().toFixed(1)}` : "Drag to orbit")}
           </text>
         </box>
@@ -624,6 +624,7 @@ export default defineApp({
   id: "surface",
   title: "Surface",
   icon: "surface/icon",
+  smallIcon: "surface/icon-16x16",
   sprites,
   about: {
     version: "0.1",

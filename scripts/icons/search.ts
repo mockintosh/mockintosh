@@ -42,24 +42,31 @@ function tokenScore(icon: IconRecord, token: string): { score: number; nameRank:
 export interface IconScore {
   score: number;
   nameRank: number;
+  /** How many query tokens hit. */
+  matched: number;
 }
 
-/** Score one icon against whitespace-separated query tokens (AND: every token must hit). */
+/**
+ * Score one icon against whitespace-separated query tokens. Any token may
+ * hit, so synonyms can be added to a query; icons that match more tokens
+ * rank first.
+ */
 export function scoreIcon(icon: IconRecord, query: string): IconScore {
   const tokens = query
     .split(/\s+/)
     .map(normalize)
     .filter(Boolean);
-  if (tokens.length === 0) return { score: 0, nameRank: 0 };
   let score = 0;
   let rank = 0;
+  let matched = 0;
   for (const token of tokens) {
     const part = tokenScore(icon, token);
-    if (part.score === 0) return { score: 0, nameRank: 0 };
+    if (part.score === 0) continue;
+    matched++;
     score += part.score;
     if (part.nameRank > rank) rank = part.nameRank;
   }
-  return { score, nameRank: rank };
+  return { score, nameRank: rank, matched };
 }
 
 export function searchIcons(
@@ -72,12 +79,13 @@ export function searchIcons(
   const hits: SearchHit[] = [];
   for (const icon of catalog) {
     if (category && normalize(icon.category) !== category) continue;
-    const { score, nameRank } = scoreIcon(icon, query);
+    const { score, nameRank, matched } = scoreIcon(icon, query);
     if (score <= 0) continue;
-    hits.push({ score, nameRank, icon, washout: false });
+    hits.push({ score, nameRank, matched, icon, washout: false });
   }
   hits.sort(
     (a, b) =>
+      b.matched - a.matched ||
       b.nameRank - a.nameRank ||
       b.score - a.score ||
       a.icon.name.localeCompare(b.icon.name)

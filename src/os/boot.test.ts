@@ -12,11 +12,13 @@ import { createHeadlessPlatform, type HeadlessPlatform } from "../platform/headl
 import { registerApp } from "./apps";
 import { declaredApp } from "./appDeclaration";
 import { MIME } from "@mockintosh/fs";
-import { getActiveAppId, getActiveWindowId, getWindows, isMenubarHidden, setWindowFullScreen } from "./state";
+import { getActiveAppId, getActiveWindowId, getWindows, isAppHidden, isMenubarHidden, setWindowFullScreen } from "./state";
 import { TITLE_BAR_H, titleBarOuterHeight } from "./windowGeometry";
 import { buildTinyTtf } from "../platform/fontRaster/tinyTtf";
 import type { HostToProcess, ProcessPort, ProcessToHost } from "./process/protocol";
 import Foundry from "@/apps/Foundry";
+import { finderAttributes } from "@/apps/finder/attributes";
+import { DESKTOP_ICON_CELL_W, ICON_SIZE } from "@/apps/finder/iconGrid";
 
 const WIDTH = 512;
 const HEIGHT = 342;
@@ -40,6 +42,23 @@ function whiteBox(): JSX.Element {
 }
 
 /** Fraction of black pixels in a rectangle of the last presented frame. */
+/**
+ * Use a menu as the Mac does: press at the first point (a title), slide
+ * through the rest with the button down, and let go at the last.
+ */
+function menuDrag(platform: HeadlessPlatform, ...points: [number, number][]): void {
+  const [[x0, y0], ...rest] = points;
+  platform.pointer({ type: "down", x: x0, y: y0, button: 0 });
+  platform.tick();
+  for (const [x, y] of rest) {
+    platform.pointer({ type: "move", x, y });
+    platform.tick();
+  }
+  const [x1, y1] = points.at(-1)!;
+  platform.pointer({ type: "up", x: x1, y: y1, button: 0 });
+  platform.tick();
+}
+
 function inkCoverage(frame: Uint8Array, x0: number, y0: number, w: number, h: number): number {
   let black = 0;
   for (let y = y0; y < y0 + h; y++) {
@@ -116,7 +135,7 @@ describe("bootOS on the headless platform", () => {
     }
   });
 
-  it("opens a menu when its title is clicked and closes it on the next click", () => {
+  it("pulls a menu down while the button is held and puts it away on release", () => {
     // Find the Apple menu: the first black pixels in the menubar row.
     const frame = platform.lastFrame()!;
     let appleX = -1;
@@ -125,14 +144,15 @@ describe("bootOS on the headless platform", () => {
     }
     expect(appleX).toBeGreaterThan(0);
 
-    platform.click(appleX + 3, 10);
+    platform.pointer({ type: "down", x: appleX + 3, y: 10, button: 0 });
     platform.tick();
     const open = platform.lastFrame()!;
     // A dropdown with a black frame now hangs below the menubar at the left.
     expect(inkCoverage(open, 0, MENUBAR_HEIGHT, 120, 40)).toBeGreaterThan(0.1);
     expect(inkCoverage(open, 0, MENUBAR_HEIGHT, 120, 40)).toBeLessThan(0.45); // not desktop pattern
 
-    platform.click(300, 200); // click on the desktop dismisses it
+    platform.pointer({ type: "move", x: 300, y: 200 });
+    platform.pointer({ type: "up", x: 300, y: 200, button: 0 }); // letting go off the menu chooses nothing
     platform.tick();
     const closed = platform.lastFrame()!;
     const desktopAgain = inkCoverage(closed, 0, MENUBAR_HEIGHT + 2, 120, 40);
@@ -265,15 +285,17 @@ describe("bootOS on the headless platform", () => {
     // Stop-hand ink in the icon cell (inside the frame + 16px pad).
     expect(inkCoverage(frame, x + inset + 16, y + inset + 16, 32, 32)).toBeGreaterThan(0.25);
     // Default-ring OK sits on the bottom-left (20px face + 4px ring + 16px pad).
+    // The face starts on the pad, inside the outer hairline the content box
+    // starts under, and the ring overhangs it 4px to the left.
     const btnTop = y + inset + 112 - 16 - 28;
-    const btnLeft = x + inset + 16;
+    const faceLeft = x + 1 + 16;
+    const btnLeft = faceLeft - 4;
     expect(inkCoverage(frame, btnLeft + 10, btnTop, 40, 3)).toBe(1);
+    expect(inkCoverage(frame, btnLeft, btnTop + 10, 3, 8)).toBe(1);
+    expect(inkCoverage(frame, faceLeft, btnTop + 10, 1, 8)).toBe(1);
 
     // CDEF FontInfo: Chicago 12 in a 20px face → baseline 14, caps on 5–13.
-    // The label now sits on the FontInfo line box (15px) centered in the face,
-    // so the same caps land two rows higher than a face-filling measure.
     const faceTop = btnTop + 4;
-    const faceLeft = btnLeft + 4;
     let inkMin = 20;
     let inkMax = -1;
     for (let row = 1; row < 19; row++) {
@@ -282,8 +304,8 @@ describe("bootOS on the headless platform", () => {
         if (row > inkMax) inkMax = row;
       }
     }
-    expect(inkMin).toBe(3);
-    expect(inkMax).toBeGreaterThanOrEqual(13);
+    expect(inkMin).toBe(5);
+    expect(inkMax).toBe(13);
   });
 
   it("wraps a long alert message inside the frame and grows the alert to fit it", () => {
@@ -328,13 +350,32 @@ describe("bootOS on the headless platform", () => {
     platform.tick();
     expect(getActiveAppId()).toBe("switch-b");
 
-    platform.click(WIDTH - 8, 10);
-    platform.tick();
-    // Finder, then Aaa, then Bee. Aaa is the second row of the dropdown.
-    platform.click(WIDTH - 30, 47);
-    platform.tick();
+    // Hide, Hide Others, Show All, a separator, then Finder, Aaa and Bee in 18px rows.
+    menuDrag(platform, [WIDTH - 20, 10], [WIDTH - 30, 20 + 3 * 16 + 16 + 18 + 9]);
     expect(getActiveAppId()).toBe("switch-a");
     expect(getWindows().filter((w) => w.appId === "switch-a").at(-1)?.id).toBe(getActiveWindowId());
+  });
+
+  it("hides the front application and shows it again from the application menu", () => {
+    registerApp({
+      id: "hide-a",
+      title: "Aaa",
+      icon: "icon/computer",
+      defaultSize: { width: 80, height: 40 },
+      Component: () => whiteBox(),
+    });
+    os.services.openApp("hide-a");
+    platform.tick();
+    expect(getActiveAppId()).toBe("hide-a");
+
+    // Hide Aaa: the first row.
+    menuDrag(platform, [WIDTH - 20, 10], [WIDTH - 30, 20 + 8]);
+    expect(isAppHidden("hide-a")).toBe(true);
+    expect(getActiveAppId()).toBe("finder");
+
+    // Show All: the third row.
+    menuDrag(platform, [WIDTH - 20, 10], [WIDTH - 30, 20 + 2 * 16 + 8]);
+    expect(isAppHidden("hide-a")).toBe(false);
   });
 
   it("runs ⌘-shortcuts from the active menubar (⌘N creates a folder on the desktop)", () => {
@@ -364,6 +405,7 @@ describe("bootOS on the headless platform", () => {
     const folder = fs.children(desktop!.id).find((n) => n.name === "untitled folder");
     expect(folder).toBeTruthy();
 
+    await Promise.resolve(); // the Finder saves a new icon's slot just after drawing it
     const pos = desktopCellPos(fs, folder!.id);
     expect(pos).not.toBeNull();
 
@@ -516,6 +558,35 @@ describe("bootOS on the headless platform", () => {
     expect(titleBarStripeLines(platform.lastFrame()!, even.x, even.y)).toBe(6);
   });
 
+  it("centers the title's caps on the close box, above the separator", () => {
+    registerApp({
+      id: "test-title-middle",
+      title: "HIH",
+      icon: "icon/computer",
+      defaultSize: { width: 180, height: 50 },
+      Component: () => null,
+      onOpen(app) {
+        app.openWindow({ position: { x: 40, y: 80 }, size: { width: 180, height: 50 }, title: "HIH" });
+      },
+    });
+    os.services.openApp("test-title-middle");
+    platform.tick();
+
+    const win = getWindows().find((w) => w.appId === "test-title-middle")!;
+    const frame = platform.lastFrame()!;
+    const inkRows = (x0: number, w: number) => {
+      const rows: number[] = [];
+      for (let y = win.y + 1; y < win.y + TITLE_BAR_H - 1; y++) {
+        if (inkCoverage(frame, x0, y, w, 1) > 0) rows.push(y);
+      }
+      return rows;
+    };
+    // Window center column holds only the title; the close box sits 7px in from the frame.
+    const caps = inkRows(win.x + win.width / 2 - 6, 12);
+    const box = inkRows(win.x + 1 + 7, 11);
+    expect(caps[0]! - box[0]!).toBe(box.at(-1)! - caps.at(-1)!);
+  });
+
   it("opens submenus on hover, runs their items, and binds their shortcuts", () => {
     const ran: string[] = [];
     registerApp({
@@ -552,32 +623,24 @@ describe("bootOS on the headless platform", () => {
     }
     expect(ran).toEqual(["E"]);
 
-    // Short labels keep every panel at the 80px minimum width; rows are 16px
-    // below a 4px pad, and a submenu's first row lines up with its item.
-    const hover = (x: number, y: number) => {
-      platform.pointer({ type: "move", x, y });
-      platform.tick();
-    };
-    const openThings = () => {
-      platform.click(34, 10);
-      platform.tick();
-    };
-
-    openThings();
-    hover(50, 47); // B
-    hover(130, 47); // C, in B's submenu beside the first panel
-    platform.click(130, 47);
-    platform.tick();
+    // Titles start at x 33, past the Apple menu. Rows are 16px straight under
+    // the border at y 19, and a panel is only as wide as its rows (about 50px
+    // here), so B's submenu opens near x 83 and D's near x 133. A submenu's
+    // first row lines up with its item.
+    menuDrag(platform, [50, 10], [60, 44], [110, 44]); // B, then C in B's submenu beside it
     expect(ran).toEqual(["E", "C"]);
 
-    openThings();
-    hover(50, 47);
-    hover(130, 47);
-    hover(130, 63); // D
-    hover(200, 63); // E, a level deeper
-    platform.click(200, 63);
-    platform.tick();
+    menuDrag(platform, [50, 10], [60, 44], [110, 44], [110, 60], [170, 60]); // D, then E a level deeper
     expect(ran).toEqual(["E", "C", "E"]);
+
+    // Press the Apple menu and slide right onto Things: Things comes down in its place.
+    menuDrag(platform, [20, 10], [50, 10], [60, 28]);
+    expect(ran).toEqual(["E", "C", "E", "A"]);
+
+    // Letting go on the title, or on a submenu's own row, chooses nothing.
+    menuDrag(platform, [50, 10]);
+    menuDrag(platform, [50, 10], [60, 44]);
+    expect(ran).toEqual(["E", "C", "E", "A"]);
   });
 
   it("a window can go full screen — covering the menubar — and come back, by menu shortcut too", () => {
@@ -873,35 +936,15 @@ describe("host display resize", () => {
   });
 });
 
-/** Layout constants mirrored from Finder.solid — desktop icons without a stored position. */
-const DESKTOP_ICON_CELL_W = 64;
-const DESKTOP_ICON_CELL_H = 64;
-const DESKTOP_PADDING_TOP = 8;
-const ICON_SIZE = 32;
-
+/** Where the Finder drew a desktop icon: the slot it saved on first showing it. */
 function desktopCellPos(
   fs: BootedOS["services"]["fs"],
   nodeId: string,
 ): { iconX: number; iconY: number; labelX: number; labelY: number } | null {
-  const ids: string[] = [];
-  for (const vol of fs.volumes()) ids.push(vol.id);
-  for (const vol of fs.volumes()) {
-    const desktop = fs.locate("desktop", vol.id);
-    if (!desktop) continue;
-    for (const node of fs.children(desktop.id)) ids.push(node.id);
-  }
-  const trash = fs.locate("trash");
-  if (trash && !ids.includes(trash.id)) ids.push(trash.id);
-
-  const index = ids.indexOf(nodeId);
-  if (index < 0) return null;
-
-  const desktopH = HEIGHT - MENUBAR_HEIGHT;
-  const maxRows = Math.max(1, Math.floor((desktopH - DESKTOP_PADDING_TOP) / DESKTOP_ICON_CELL_H));
-  const col = Math.floor(index / maxRows);
-  const row = index % maxRows;
-  const cellX = WIDTH - (col + 1) * DESKTOP_ICON_CELL_W;
-  const cellY = MENUBAR_HEIGHT + row * DESKTOP_ICON_CELL_H + DESKTOP_PADDING_TOP;
+  const position = finderAttributes(fs, nodeId).position;
+  if (!position) return null;
+  const cellX = position.x;
+  const cellY = MENUBAR_HEIGHT + position.y;
   const iconOffsetX = Math.floor((DESKTOP_ICON_CELL_W - ICON_SIZE) / 2);
   return {
     iconX: cellX + iconOffsetX + ICON_SIZE / 2,

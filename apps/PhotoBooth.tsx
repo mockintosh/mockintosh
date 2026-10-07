@@ -11,6 +11,7 @@ import {
   defineApp,
   isBaselineAscii,
   renderAsciiGlyphAtlas,
+  uniqueChildName,
   useApp,
   writeSpriteFile,
   type AsciiDitherOptions,
@@ -39,6 +40,7 @@ import {
   ensurePhotoLibrary,
   findPhotoLibrary,
   listStoredPhotos,
+  photoFileName,
   storePhoto,
 } from "./photobooth/library";
 
@@ -69,11 +71,6 @@ function paintPicture(surface: RasterSurface, picture: Photo | null, view: Size,
   if (!picture) return;
   const origin = placedOrigin(picture, view, pan);
   surface.blitPixels(picture.pixels, picture.width, picture.height, origin.x, origin.y);
-}
-
-function photoDateLabel(photo: Photo): string {
-  const date = new Date(photo.timestamp);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 }
 
 function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
@@ -229,9 +226,9 @@ function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
   }
 
   async function savePhoto(photo: Photo): Promise<void> {
-    const name = `Photo ${photoDateLabel(photo)}`;
     const desktop = app.fs.locate("desktop");
     if (!desktop) return;
+    const name = uniqueChildName(app.fs, desktop.id, photoFileName(photo.timestamp));
     try {
       await writeSpriteFile(
         app.fs,
@@ -573,14 +570,14 @@ function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
         <Show when={loading()}>
           <box position="absolute" left={0} top={0} width={view().width} height={view().height} justifyContent="center" alignItems="center">
             <box background={0} padding={2}>
-              <text font="menu">Initializing camera...</text>
+              <text font="menu" spacing={1}>Initializing camera...</text>
             </box>
           </box>
         </Show>
         <Show when={!!errorText()}>
           <box position="absolute" left={0} top={0} width={view().width} height={view().height} justifyContent="center" alignItems="center">
             <box background={0} padding={2}>
-              <text font="menu">{errorText()}</text>
+              <text font="menu" spacing={1}>{errorText()}</text>
             </box>
           </box>
         </Show>
@@ -595,7 +592,7 @@ function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
               justifyContent="center"
               alignItems="center"
             >
-              <text font="menu" align="center">{String(countdown())}</text>
+              <text font="menu" spacing={1} align="center">{String(countdown())}</text>
             </box>
           </box>
         </Show>
@@ -673,6 +670,7 @@ export default defineApp({
   requires: ["camera"],
   title: "Photo Booth",
   icon: "icon/photobooth-smr-32",
+  smallIcon: "icon/photobooth-smr-32-16x16",
   defaultSize: { width: PREVIEW, height: PREVIEW + BAR_H },
   scrollable: false,
   resizable: false,

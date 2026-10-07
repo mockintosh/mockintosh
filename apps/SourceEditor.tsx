@@ -90,6 +90,7 @@ export default defineApp({
   id: "source_editor",
   title: "Source Editor",
   icon: "icon/computer",
+  smallIcon: "icon/computer-16x16",
   defaultSize: {width: 480, height: 260},
   singleInstance: false,
   permissions: [

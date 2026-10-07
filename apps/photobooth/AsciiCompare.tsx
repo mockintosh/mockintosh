@@ -154,14 +154,14 @@ export function AsciiCompare(_props: Record<string, unknown>): JSX.Element {
       <Loading
         fallback={
           <box flexGrow={1} justifyContent="center" alignItems="center">
-            <text font="menu">Decoding…</text>
+            <text font="menu" spacing={1}>Decoding…</text>
           </box>
         }
       >
         <Errored
           fallback={(err) => (
             <box flexGrow={1} justifyContent="center" alignItems="center">
-              <text font="menu">{err instanceof Error ? err.message : String(err)}</text>
+              <text font="menu" spacing={1}>{err instanceof Error ? err.message : String(err)}</text>
             </box>
           )}
         >
@@ -187,7 +187,7 @@ export function AsciiCompare(_props: Record<string, unknown>): JSX.Element {
               <>
                 <box flexDirection="row" gap={8}>
                   <box flexDirection="column" gap={4}>
-                    <text font="menu">Ours</text>
+                    <text font="menu" spacing={1}>Ours</text>
                     <box
                       width={COMPARE_SIZE}
                       height={COMPARE_SIZE}
@@ -206,7 +206,7 @@ export function AsciiCompare(_props: Record<string, unknown>): JSX.Element {
                     </box>
                   </box>
                   <box flexDirection="column" gap={4}>
-                    <text font="menu">{showDiff() ? "Diff" : "Expected"}</text>
+                    <text font="menu" spacing={1}>{showDiff() ? "Diff" : "Expected"}</text>
                     <raster
                       width={COMPARE_SIZE}
                       height={COMPARE_SIZE}

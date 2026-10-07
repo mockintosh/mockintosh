@@ -137,7 +137,7 @@ function Preview(props: PreviewProps): JSX.Element {
 
   const message = (text: string) => (
     <box width={win.width()} height={win.height()} justifyContent="center" alignItems="center" padding={12}>
-      <text font="menu" align="center" wrap>{text}</text>
+      <text font="menu" spacing={1} align="center" wrap>{text}</text>
     </box>
   );
 
@@ -176,6 +176,7 @@ export default defineApp<PreviewProps>({
   id: APP_ID,
   title: "Preview",
   icon: "icon/camera",
+  smallIcon: "icon/camera-16x16",
   about: {
     version: "1.0",
     description: "Shows pictures. Open them in another app to change them.",

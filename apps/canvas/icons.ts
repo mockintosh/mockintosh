@@ -160,6 +160,27 @@ export const TOOL_ICONS: Record<ToolId, Sprite> = {
   line: LINE,
 };
 
+/** The 16×16 for the application menu: the page with its folded tab and clipped corner, a box, a pin and an oval. */
+export const APP_ICON_16: Sprite = fromGrid(16, 16, [
+  "................",
+  "..##########....",
+  "..#oooooo#oo#...",
+  "..#oooooo#oo#...",
+  "..#oooooo#####..",
+  "..#o#####oooo#..",
+  "..#o#ooo#o##o#..",
+  "..#o#ooo#o##o#..",
+  "..#o#####oo#o#..",
+  "..#oooooooo#o#..",
+  "..#oo####oooo#..",
+  "..#o#oooo#ooo#..",
+  "..#o#oooo#oo##..",
+  "..#oo####oo##...",
+  "..#ooooooo##....",
+  "..#########.....",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "canvas/icon": APP_ICON,
+  "canvas/icon-16x16": APP_ICON_16,
 };

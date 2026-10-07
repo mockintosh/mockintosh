@@ -21,6 +21,7 @@ import type {
   AudioService,
   BrowserService,
   CameraService,
+  GpuService,
   Capability,
   FetchFunction,
   DownloadService,
@@ -172,6 +173,8 @@ export interface Platform {
   images?: ImageService;
   video?: VideoService;
   camera?: CameraService;
+  /** A graphics processor for pixel programs (`GpuService`). */
+  gpu?: GpuService;
   /** A speaker: PCM output streams the apps render into. */
   audio?: AudioService;
   /** A microphone: PCM input the apps are handed as it arrives. */

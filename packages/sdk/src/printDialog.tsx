@@ -5,7 +5,7 @@
  * shows is what `printPicture` sends.
  */
 import { createMemo, createSignal, onCleanup } from "solid-js";
-import { Button, RadioGroup, Select, type JSX, type RasterSurface } from "@mockintosh/ui";
+import { DialogButton, RadioGroup, Select, type JSX, type RasterSurface } from "@mockintosh/ui";
 import { useApp } from "./index";
 import type {
   AppContext,
@@ -235,8 +235,8 @@ function PrintDialog(props: PrintDialogProps): JSX.Element {
           {field("Scale:", <PrintScaleSelect value={scale()} onChange={setScale} />)}
         </box>
         <box flexDirection="column" gap={8} alignItems="stretch">
-          <Button name="print" label="Print" font="menu" width={70} ring onClick={confirm} />
-          <Button name="cancel" label="Cancel" font="menu" width={70} onClick={cancel} />
+          <DialogButton name="print" label="Print" width={70} default onClick={confirm} />
+          <DialogButton name="cancel" label="Cancel" width={70} onClick={cancel} />
           <PrintPreview layout={layout()} width={PREVIEW_SIZE.width} height={PREVIEW_SIZE.height} />
         </box>
       </box>

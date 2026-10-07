@@ -183,7 +183,7 @@ function VideoPlayer(_props: Record<string, unknown>): JSX.Element {
           onChange={scrub}
         />
         <box width={CLOCK_W}>
-          <text font="menu" nowrap>
+          <text font="menu" spacing={1} nowrap>
             {`${formatTime(time())} / ${formatTime(duration())}`}
           </text>
         </box>
@@ -197,6 +197,7 @@ export default defineApp({
   requires: ["video"],
   title: "1984.mp4",
   icon: "icon/MacFlim",
+  smallIcon: "icon/MacFlim-16x16",
   defaultSize: { width: 340, height: 260 },
   minSize: { width: 220, height: 140 },
   scrollable: false,

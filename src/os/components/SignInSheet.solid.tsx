@@ -1,6 +1,6 @@
 import { Show, onCleanup, onSettled } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Button, Spacer, createSignal } from "@mockintosh/ui";
+import { DialogButton, Spacer, createSignal } from "@mockintosh/ui";
 import { encodeQR, type Sprite } from "@mockintosh/sdk";
 import type { SignInPollResult, SignInRelay } from "../../platform/types";
 import type { SignInSheetRequest } from "../signIn";
@@ -165,9 +165,9 @@ export function SignInSheet(props: SignInSheetProps): JSX.Element {
         </text>
         <Spacer />
         <box flexDirection="row" gap={10}>
-          <Button label="Cancel" font="menu" height={20} borderRadius={5} onClick={() => settle({ params: null })} />
+          <DialogButton label="Cancel" onClick={() => settle({ params: null })} />
           <Show when={state().phase === "expired" || state().phase === "failed"}>
-            <Button label="New Code" font="menu" height={20} borderRadius={5} ring onClick={() => void begin()} />
+            <DialogButton label="New Code" default onClick={() => void begin()} />
           </Show>
         </box>
       </box>

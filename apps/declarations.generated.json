@@ -7,6 +7,7 @@
    "width": 280,
    "height": 250
   },
+  "smallIcon": "icon/computer-16x16",
   "scrollable": true
  },
  "file": {
@@ -17,6 +18,7 @@
    "width": 350,
    "height": 200
   },
+  "smallIcon": "icon/file-16x16",
   "scrollable": true,
   "fileTypes": [
    "text/plain",
@@ -32,6 +34,7 @@
    "width": 256,
    "height": 256
   },
+  "smallIcon": "icon/camera-16x16",
   "scrollable": true,
   "resizable": true,
   "minSize": {
@@ -62,6 +65,7 @@
    "width": 340,
    "height": 260
   },
+  "smallIcon": "icon/MacFlim-16x16",
   "requires": [
    "video"
   ],
@@ -80,6 +84,7 @@
    "width": 288,
    "height": 328
   },
+  "smallIcon": "icon/photobooth-smr-32-16x16",
   "requires": [
    "camera"
   ],
@@ -94,6 +99,7 @@
    "width": 480,
    "height": 320
   },
+  "smallIcon": "icon/safari-16x16",
   "requires": [
    "network"
   ],
@@ -107,6 +113,117 @@
    "description": "Browses the web the way it looked in 1996: text, links, pictures and forms, without style sheets or scripts. GitHub and Hacker News are drawn from their APIs."
   }
  },
+ "maps": {
+  "id": "maps",
+  "title": "Maps",
+  "icon": "maps/icon",
+  "defaultSize": {
+   "width": 460,
+   "height": 290
+  },
+  "smallIcon": "maps/icon-16x16",
+  "requires": [
+   "network"
+  ],
+  "scrollable": false,
+  "resizable": true,
+  "growBox": "overlay",
+  "minSize": {
+   "width": 240,
+   "height": 180
+  },
+  "about": {
+   "version": "1.0",
+   "description": "Street maps of the whole world from OpenStreetMap, drawn in one bit. Drag to move, double-click or scroll to zoom, click a place or search for one to see its info, and get directions by car, bike or on foot. Map data © OpenStreetMap contributors, tiles by OpenFreeMap, search by Nominatim, directions by OSRM on FOSSGIS servers."
+  },
+  "sprites": {
+   "maps/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgAAAVCgAAqmqAAWpWACpWmaoBqpYKlVZmZqaWpglVVpmZppqmCVVWZmZmqqYJVVaZmaWqlglVVmZmZWpWCVVWmZmlVVYJVVZmZmVZVglVVqmZpVlaCVWqWqZlWaYJalZVaqWZVgqVVqVVqlVaCVWqmpVlVqYJalZmamWpVgqVqpmZqlVWCWpWZmZlVVYKlWqZmaVVVglpVmZmZVVWCpWmmZmlVVYJWlamZmVVWgpVqAqZpVagCWoAACplqAAKgAAAAKoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "maps/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAAAAAAoAAKCloApqVaqlaVWqamlVqmZpVapqaVaqWWlpqlVqlapaqVWqpWlaqlWpoKpaCgAKoAAAAAAA=="
+   },
+   "maps/car": {
+    "width": 16,
+    "height": 11,
+    "data": "AAAAAACqqgACAgCACAIAICqqqqiAAAACigAAoooAAKKqqqqqKgAAqCoAAKg="
+   },
+   "maps/car-selected": {
+    "width": 16,
+    "height": 11,
+    "data": "AAAAAABVVQABAQBABAEAEBVVVVRAAAABRQAAUUUAAFFVVVVVFQAAVBUAAFQ="
+   },
+   "maps/foot": {
+    "width": 16,
+    "height": 11,
+    "data": "AAKAAAACgAAAAAAAAAqgAAAiiAAAgoIAAAKAAAAIIAAACCAAACAIAACgCgA="
+   },
+   "maps/foot-selected": {
+    "width": 16,
+    "height": 11,
+    "data": "AAFAAAABQAAAAAAAAAVQAAARRAAAQUEAAAFAAAAEEAAABBAAABAEAABQBQA="
+   },
+   "maps/bike": {
+    "width": 16,
+    "height": 11,
+    "data": "AAAAAAAACoAAKgIAAAqqAAqiCqAgIgiIgIiggoKqoIKACCACICAICAqAAqA="
+   },
+   "maps/bike-selected": {
+    "width": 16,
+    "height": 11,
+    "data": "AAAAAAAABUAAFQEAAAVVAAVRBVAQEQREQERQQUFVUEFABBABEBAEBAVAAVA="
+   },
+   "maps/swap": {
+    "width": 9,
+    "height": 10,
+    "data": "CAAKgAiIACAACAgCAgAAgAIiACoAAgA="
+   },
+   "maps/start": {
+    "width": 9,
+    "height": 9,
+    "data": "CqgKVopValVWlVWlVWpVaKVoCqgA"
+   },
+   "maps/end": {
+    "width": 9,
+    "height": 9,
+    "data": "CqgKqoqVqpVapVapVaqVqKqoCqgA"
+   },
+   "maps/info": {
+    "width": 11,
+    "height": 11,
+    "data": "AqoAIAICAgIgAAKAoAoAgCgCAKAqAiAAICACACqgAA=="
+   },
+   "maps/info-selected": {
+    "width": 11,
+    "height": 11,
+    "data": "AVUAEAEBAQEQAAFAUAUAQBQBAFAVARAAEBABABVQAA=="
+   },
+   "maps/back": {
+    "width": 5,
+    "height": 9,
+    "data": "AICAgICACACACACA"
+   },
+   "maps/close": {
+    "width": 7,
+    "height": 7,
+    "data": "gAiAgIgAgAiAgIgAgA=="
+   },
+   "maps/close-pressed": {
+    "width": 7,
+    "height": 7,
+    "data": "QARAQEQAQARAQEQAQA=="
+   },
+   "maps/search": {
+    "width": 11,
+    "height": 10,
+    "data": "CqAAgCAIACAgAICAAgIACAIAgAKooAAAoAAAoA=="
+   }
+  }
+ },
  "showreel": {
   "id": "showreel",
   "title": "Showreel",
@@ -115,6 +232,7 @@
    "width": 400,
    "height": 248
   },
+  "smallIcon": "showreel/icon-16x16",
   "scrollable": false,
   "resizable": true,
   "minSize": {
@@ -131,6 +249,11 @@
     "height": 32,
     "data": "AAAAAAAKoAAAAAAAAKaoAAAAAAAqWqgAAAAACpVqoAAAAACqVagAAAAAKqlqAAAAAAqapqAAAAAApWqoAAAAAApVqgAAAAAACVagAAAAAAAKqAAAAAAAAAIAAAAAAAAAAqqqqqqqqqACqVapVqlWoAKlWqVapVqgApVqlWqVaqACqqqqqqqqoAJVVVVVVVVgAlVVWqlVVWACVVVqqlVVYAJVValalVVgAlVVpVaVVWACVVWlVpVVYAJVVaVWlVVgAlVVqVqVVWACVVVqqlVVYAJVVVqpVVVgAlVVVVVVVWACqqqqqqqqoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
    },
+   "showreel/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAACqAACqWgCqWqAJaoAACgAAAAqqqqoKWpamCWpalgqqqqoJVVVWCVapVglaWlYJWlpWCVapVglVVVYKqqqqA=="
+   },
    "showreel/bomb": {
     "width": 32,
     "height": 32,
@@ -146,6 +269,7 @@
    "width": 288,
    "height": 288
   },
+  "smallIcon": "dither/icon-16x16",
   "requires": [
    "images"
   ],
@@ -182,6 +306,11 @@
     "width": 32,
     "height": 32,
     "data": "qqqqqqqqqqqqqqqqmqVVVqqpqpqpqlVWqqqqqmqapVaqqqpqpqqpVqqqqqqqaqpaqpqpVqWppWqqqqllpVqlqqqqalVpVpWmqqqmlVVVlaqqmqlVVVVlmqqpqmVVWlWqqqqmlVVVlaaqqqpVVWVlaqqqWmlWWmWqpqmmlVallZqqmqqWWqWVaqmqWWVZqlVqqmpqZVqqqWaqpaZWWqqpqqmqqVVVqaqqqpqZZaWpqpqqqalqppaaqqaqqVaqVqqqqpqllVZqaaqpqqWaVWqqpqqqmlqpmqaqqmmlpqqpqqqqqqVVVqqqapqqmlVaamqmqmmpZVqqqqqqqqqqqqqqqg=="
+   },
+   "dither/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "KqqqqKqqqVaqqqpWqpWWmqalVVqqpVVaqqVVWqqlVVqqpWlWqqVqmqmVWaqqlqWqqpVWmqaWqqqqlWqqKqqqqA=="
    }
   }
  },
@@ -193,6 +322,7 @@
    "width": 300,
    "height": 320
   },
+  "smallIcon": "trace/icon-16x16",
   "requires": [
    "images"
   ],
@@ -233,6 +363,11 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAgAAAAAAAAAJgAAAAAAAACVgAAAAAAAAlVgAAAAAAAJVVgAAAAAACVVVgAAAAAAlVVVgAAAAAJVVVVgAAAACVVVVVgAAAAlVVVVVgAAAJVVVVVVgAACVVVVVVVgAAlVVVVVVVgAJVVVVVVVVgCVVVVVaqlVglVVVVWVVlVglVVVVlVVlVglVVVZaVVlYAlVVVqWVVmAAlVWpaqqVqgAlVVlaVVVqAAlVVlVVVWoAAlVVlVVVagAAlVVpVVVqAAAlVVaqqWoAAAlVVVgCqgAAAlVVYAAqAAAAlVWAAAAAAAAlVgAAAAAAAAlYAAAAAAAAAmAAAAAAAAAAgAAAAA=="
+   },
+   "trace/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAACAAAACYAAACVgAACVWAACVVYACVVVgCVVaWCVVZZYJVZlqAlpqmgCVlVoAJWqqAAlYCgACYAAAAIAAA=="
    }
   }
  },
@@ -244,6 +379,7 @@
    "width": 380,
    "height": 280
   },
+  "smallIcon": "icon/spotify-16x16",
   "requires": [
    "network",
    "browser",
@@ -259,7 +395,12 @@
    "icon/spotify": {
     "width": 32,
     "height": 32,
-    "data": "AACqoAAAAAAAKqqqAAAAAACqqqqAAAAAAqgAKqAAAAAKgAACqAAAACoAKoCqAAAAKAKqqCoAAACoCqqqCoAAAKAqgCqCgAAAoKoACqKAAACgqAACooAAAKCoAAKigAAAoKoACqKAAACgKoAqgoAAAKgKqqoKgAAAKAKqqCoAAAAqACqAqgAAAAqAAAKoAAAAAqgAKqAAAAAAqqqqgAAAAAAqqqoAAAAAAACqoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAqqqgAAAAAAqqqqoAAAAAqqqqqqAAAAKqqqqqqAAACqqqqqqqAAAqqqqqqqqAACqqqVaqqoAAqqlVVVaqoACqVVVVVVqgAqlVVVVVVqgCpVWqqqVVqAKlWqqqqlWoAqmqqqqqpqgCqqpVVVqqqAKqlVVVVWqoAqpVVqlVWqgCqlaqqqlaqAKqqqqqqqqoAqqqqVaqqqgAqqlVVVaqoACqlVVVVWqgACqVqqqlaoAAKqqqqqqqgAAKqqqqqqoAAAKqqqqqqAAAAKqqqqqgAAAACqqqqgAAAAAAqqqgAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "icon/spotify-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAACqqgACqqqACqqqoCqlWqgqWqWoKaqqaCqlWqgqWqWoKqqqqCqlWqgqmqaoCqqqoAKqqoAAqqoAAAAAAA=="
    },
    "spotify/play": {
     "width": 16,
@@ -296,6 +437,7 @@
    "width": 416,
    "height": 240
   },
+  "smallIcon": "macpaint/icon-16x16",
   "scrollable": false,
   "resizable": false,
   "singleInstance": true,
@@ -315,6 +457,11 @@
     "height": 32,
     "data": "AAAAAgAAAAAAAAAJgAAAAAAAACVgAAAAAAAAlVgAAAAAAAJVagAAAAAACVWqgAAAAAAlVqqgAAAAAJVaqpgAAAACVVmqVgAAAAlVZqlVgAAAJVWWpVVgAACVVVmVVVgAAlVVVlVVVgAJVVVZVVVVgCVVVVVaqlVglVVVlWVVlVglVVZVlVVlVglVWlZaVVlYAlValqWVVmAAlVapaqqVqgAlVVlaVVVqAAlVVlVVVWoAAlVVlVVVagAAlVVpVVVqAAAlVVaqqWoAAAlVVVgCqgAAAlVVYAAqAAAAlVWAAAAAAAAlVgAAAAAAAAlYAAAAAAAAAmAAAAAAAAAAgAAAAA=="
    },
+   "macpaint/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAKAAAAKoAAAKWgAAKWaAAKWpoAKWpWgKWpVaKalqpqlVZWqKValagpVlagClaqoAKVaAAApaAAACqAAAAKAAA=="
+   },
    "macpaint/document": {
     "width": 32,
     "height": 32,
@@ -330,6 +477,7 @@
    "width": 480,
    "height": 276
   },
+  "smallIcon": "canvas/icon-16x16",
   "scrollable": false,
   "resizable": true,
   "minSize": {
@@ -348,6 +496,11 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAAAAAAAACqqqqqAAAAAJVVVVqgAAAAlVVVWWgAAACVVVVZWAAAAJVVVVqoAAAAlVVVVVVgAACVqqqlVWAAAJWVVWVVYAAAlZVVZalgAACVlVVlmWAAAJWVVWWpYAAAlaqqpWVgAACVVVVVZWAAAJVaqlVlYAAAlWlWlVVgAACVlVVlVWAAAJWVVWVVYAAAlWlWlVVgAACVWqpVVWAAAJVVVVVVYAAAlVVVVWqgAACVVVVVoAAAAJVVVVaAAAAAlVVVWgAAAACVVVVoAAAAAKqqqqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "canvas/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAqqqgAJVWWACVVlgAlVaqAJqpVgCZWaYAmVmmAJqpZgCVVWYAlqlWAJlWVgCZVloAlqloAJVVoACqqoAA=="
    }
   }
  },
@@ -359,6 +512,7 @@
    "width": 320,
    "height": 300
   },
+  "smallIcon": "surface/icon-16x16",
   "scrollable": false,
   "resizable": true,
   "minSize": {
@@ -374,6 +528,11 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAqAAAAAAAAAKaAAAAAAAACZYAAAAAAAAmVoAAAAAAAKZVoAAAAAAAllWgAAAAAAKZVWgAAAAABZlVqgAAAAAJqlWaoAAAABZlllmoAAAAaWVmWmaAAAKZZVlWZWAACWVlWlZZaAAlZZVmVZqaAKmVlWWVppYClqqlZWaVloJVlZqVZmWlilZWVZVZZWWaVlZVqapZaWZWVlZWVllZWVZZVlaWllqZWVlWWZWWUipZWVlZpaWoAKlZWVllZIAAAqVZWWlqAAAAKGVlWUgAAAACqWVaoAAAAAACpVYAAAAAAAAJUgAAAAAAAAJYAAAAAAAAAkgAAAAAAAAAoAAAA=="
+   },
+   "surface/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAACgAAACWAAAAlgAAAmmAAAJpgAAJqmAACZZgAKaWmgJWVZWKWlWlopqqpoCpVWoAKlWoAAKWgAAAqgAA=="
    }
   }
  },
@@ -385,6 +544,7 @@
    "width": 420,
    "height": 300
   },
+  "smallIcon": "foundry/icon-16x16",
   "resizable": true,
   "minSize": {
    "width": 300,
@@ -410,6 +570,11 @@
     "width": 32,
     "height": 32,
     "data": "VVVVVVVVVVWqqqqqqqqqqlVVVVVVVVVVqqqqqqqqqqpVVVVVVVWVlaqqqqqqqlWqVVVVVVVZVZWqqqqqqqVVqlVVVVVVlVWVqqqqqqpVVapVVVVVWVVVlaqqqqqlVVWqVVVVVZVVVZWqqqqqVVVVqlVVVVlVWVWVqqqqpVVpVapVVVWVVZlVlaqqqlVWqVWqVVVZVVlZVZWqqqVVaqlVqlVVlVVVVVWVqqpVVVVVVapVWVVVVVVVlaqlVWqqqVWqVZVVlVVZVZWqVVaqqqlVqllVWVVVWVWVpVVqqqqpVaqVVZVVVVlVlaqqqqqqqqqqVVVVVVVVVVWqqqqqqqqqqg=="
+   },
+   "foundry/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "FVVWVKqqqmpVVWZVqqqmalVVllWqqlZqVVlmVaqppmpVZaZVqpamalZVVlWpVVZqWaqqVaVVVmqqqqpVqqqqqg=="
    }
   }
  },
@@ -421,6 +586,7 @@
    "width": 500,
    "height": 296
   },
+  "smallIcon": "synth/icon-16x16",
   "requires": [
    "audio"
   ],
@@ -435,6 +601,11 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACqqqqqqqqqAlVVVVVVVVWiaqqqpVVVVaJqWqqlqWpqommmqqZqpqmiaqqqpqqqqqJmqapmqqqqomqqaaWpamqiaqqWpVVVVaJqqqqlVVVVolVVVVVVVVWiqqqqqqqqqqKaqmaqqmamopqqZqqqZqaimqpmqqpmpqKaqmaqqmamopqqZqqqZqailllllllllqKWWWWWWWWWopZZZZZZZZailllllllllqCqqqqqqqqqoKqqqqqqqqqgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "synth/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAAAACqqqqolVVVWpqqlVqaWpmamaaampqpmpqaqpValVVVWqqqqqqWpqWalqalmpWVlZqqqqqqKqqqqg=="
    }
   }
  },
@@ -446,6 +617,7 @@
    "width": 392,
    "height": 172
   },
+  "smallIcon": "chord/icon-16x16",
   "requires": [
    "audio"
   ],
@@ -460,6 +632,11 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqqqqqqqqqgJVVVVVVVVVomqqqpVpVmaiaqqqlpaVVaJqqpaWVZZmomqlqplpZVWiaqWqmWlmZqJpaqqWVZVVomlqqpaWlmaiaqqqlWlVVaJVVVVVVVVVolVVVVVVVVWiVVVVVVVVVaJqampqampqompqZmpqamqiampmampqaqJqamZqampqompqZmpqamqiampmampqaqJqampqampqolVVVVVVVVWiVVVVVVVVVaCqqqqqqqqqIKqqqqqqqqqgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "chord/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAAAAAqqqqglVVVWpqqWlqaqmqamqpqmpqqWlqVVVVamZWZmpmZmZqZmZmalVVVWiqqqqIKqqqqAAAAAA=="
    }
   }
  },
@@ -471,6 +648,7 @@
    "width": 496,
    "height": 178
   },
+  "smallIcon": "op1/icon-16x16",
   "requires": [
    "audio"
   ],
@@ -485,6 +663,11 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACqqqqqqqqqglVVVVVVVVVqZmqqqVVVVWpVaqqpqqqqallpapmqqaZqVWaaaaqqqmpmaqWpVVVValVqqqlVVVVqVVVVVVVVVWpaaaVaaVaaalpppVppVppqVVVVVVVVVWppppppppppqmmmmmmmmmmqVVVVVVVVVWiqqqqqqqqqiKqqqqqqqqqoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "op1/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAAAAAAAAAAAAAAACqqqqCVVVVamaqVWpWqmpqZqpValVVVWpmZmZqZmZmalVVVWiqqqqIqqqqqAAAAAA=="
    }
   }
  },
@@ -496,6 +679,7 @@
    "width": 466,
    "height": 236
   },
+  "smallIcon": "tp7/icon-16x16",
   "requires": [
    "audio"
   ],
@@ -514,6 +698,11 @@
     "height": 32,
     "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKqqqqqqqqECVVVVVVVVWgJVVVVVVVVaqlqqqlVVVVqqWmaaVWqlWqpZVlZWlVpaqllVVlpZVpqqWVZWWWZVmgJaqqplmZlqqlVVVWZlZmqaVVVVZZZZappVVVVmZWZqmlZmZmWZmWqqVVVVWWZlmgJZmZlaWZaaqlVVVVaVWlqaVmZmVWqlWppVVVVVVVVamlVVVVVVVVqoqqqqqqqqogGqqqqqqqqqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
    },
+   "tp7/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAAAAAqqqqglVVVWJqlqlqZZpaamWZVmpqmVZqVVpaalVWqWJqpVVqVVVVamqlVWpVVVVgqqqqgAAAAAA=="
+   },
    "tp7/memo": {
     "width": 32,
     "height": 32,
@@ -529,6 +718,7 @@
    "width": 468,
    "height": 260
   },
+  "smallIcon": "pchkraft/icon-16x16",
   "requires": [
    "audio"
   ],
@@ -543,6 +733,11 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKqqqqqqqqoSVVVVVVVVVaJpVVVVVVVpolVVVVVVVVWiVVVVVVVVVaJVaqVVWqlVolWVWqqlVlWiVlZWqpWVlaJWVVZVlVWVolZmZqqZmZWiVlVWVZVVlaJWVlaqlZWVolWVWqqlVlWiVWqlVVqpVaJVVVVVVVVVolVVVVVVVVWiVapqmqapVaJVqmqapqlVolWqapqmqVWiVapqmqapVaJVqmqapqlVomlVVVVVVWmiVVVVVVVVVaJVVVVVVVVVoKqqqqqqqqogAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "pchkraft/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAAAAAqqqqglVVVWpVVVVqWqqpallqWWpZallqWqqpalVVVWpVVVVqaaaaammmmmpVVVVoqqqqiAAAAAA=="
    }
   }
  },
@@ -554,6 +749,7 @@
    "width": 400,
    "height": 262
   },
+  "smallIcon": "visualizer/icon-16x16",
   "requires": [
    "audio"
   ],
@@ -572,6 +768,11 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAAAAAAAAAAAAAAAAAAKqqqqqqqqACVVVVVVVVWgJqqqaqqqqaAmqqqqqmqpoCaqamqqqqmgJqqqZqpqqaAmqmZqqmqpoCaqamamaqmgJqZmZqpmqaAmqmZmZmqpoCamZmamZmmgJmZmZmZmqaAmpmZmZmZpoCZmZmZmZmmgJmZmZmZmaaAmZmZmZmZpoCZmZmZmZmmgJqqqqqqqqaAlVVVVVVVVoCVVVVVVVVWgJWqqlVVVZaAKqqqqqqqqoAqqqqqqqqqgAAABaqUAAAAAAAFqpQAAAAAACqqqkAAAAAAJVVWQAAAAAAqqqpAAAAAABqqqoAAAAAAAAAAAAAA=="
+   },
+   "visualizer/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAACqqqqAlVVVoJqqqaCamqmgmpmpoJmZqaCZmZmgmZmZoJqqqaCVVVWglqlVoJVVVaCqqqqgACqAAAKqqAA=="
    }
   }
  },
@@ -583,6 +784,7 @@
    "width": 480,
    "height": 320
   },
+  "smallIcon": "earth/icon-16x16",
   "scrollable": false,
   "resizable": true,
   "minSize": {
@@ -598,17 +800,23 @@
     "width": 32,
     "height": 32,
     "data": "AAAAAAAAAAAAAAKqqoAAAAAAqVVVagAAAAKWWqlWgAAACWmqqVVgAAAlaqlVVVgAAJaqqZVVVgACWqqVVVVVgApqqpVWZVWgCaqqWpVVVWAJqqpWqlVVYCaqqVWVVVVYJqqlVVVWpZgmqpVVVVVpmCaqlVVVZamYJqqVVVVWqpglqqVVVVWqmCWqqqVVVqqYJWqqqVVaqpglWqqpVVqqmCVqqqpVWqqYCVqqqlVaqmAJaqqpVWaqYApqqqpVpqmgAlqqqlWqpYAAmqqqlqqmAAAlqqqqqlgAAAlqqqqpYAAAApaqqpaAAAAAqVVVagAAAAACqqqAAAAAAAAAAAAAAA=="
+   },
+   "earth/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAqqAACqlaACqpVYCqpVWgmpVVYJqVVWCaVVpgmpVqYJqlamCapWpgqqlqoCqqaoAKqqoAAKqgAAAAAAA=="
    }
   }
  },
  "terminal": {
   "id": "terminal",
   "title": "Terminal",
-  "icon": "icon/computer",
+  "icon": "terminal/icon",
   "defaultSize": {
    "width": 484,
    "height": 266
   },
+  "smallIcon": "terminal/icon-16x16",
   "permissions": [
    "kernel:run_shell",
    "kernel:shell_close",
@@ -632,7 +840,19 @@
    "width": 124,
    "height": 57
   },
-  "singleInstance": false
+  "singleInstance": false,
+  "sprites": {
+   "terminal/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAACqqqqqqqgAAlVVVVVVVgAJVVVVVVVVgCVqqqqqqqVgJaqqqqqqqWglqqqqqqqpaCWqqqqqqqloJalqqqqqqWglqlqqqqqpaCWqlqqqqqloJaqlqqqqqWglqqWqqqqpaCWqlqqqqqloJapalVWqqWglqWqVVaqpaCWqqqqqqqloJaqqqqqqqWglqqqqqqqpaCWqqqqqqqloJaqqqqqqqWglqqqqqqqpaCWqqqqqqqloJaqqqqqqqWglaqqqqqqlaAlVVVVVVVWoAlVVVVVVVqAAqqqqqqqqgAAqqqqqqqoAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "terminal/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAACqqqqCVVVVYmqqqmpqqqpqaaqqampqqmpqmqpqamqqammlWmpqqqpqaqqqamqqqmpVVVVoqqqqqCqqqqA=="
+   }
+  }
  },
  "source_editor": {
   "id": "source_editor",
@@ -642,6 +862,7 @@
    "width": 480,
    "height": 260
   },
+  "smallIcon": "icon/computer-16x16",
   "permissions": [
    "kernel:stat",
    "kernel:read",
@@ -662,6 +883,7 @@
    "width": 360,
    "height": 260
   },
+  "smallIcon": "icon/computer-16x16",
   "requires": [
    "network"
   ],
@@ -677,6 +899,7 @@
    "width": 380,
    "height": 280
   },
+  "smallIcon": "icon/chat-16x16",
   "requires": [
    "network",
    "agent-runtime"

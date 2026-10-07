@@ -461,7 +461,12 @@ export function createPointerDispatcher(
     let node = nodeAt(root, x, y) ?? hitTest(root, x, y);
     while (node) {
       const canScroll = node.style.overflow === "scroll";
-      const onScroll = node._eventHandlers.onScroll;
+      const handler = node._eventHandlers.onScroll;
+      const at = node;
+      const onScroll = handler && ((delta: number) => {
+        const { lx, ly } = localOf(at, x, y);
+        handler(delta, lx, ly);
+      });
       if (canScroll && onScroll && isScrollOwned(node)) {
         onScroll(dy);
         return true;

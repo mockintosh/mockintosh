@@ -24,6 +24,7 @@ const DESKTOP_SHORTCUTS: readonly DesktopShortcut[] = [
   { name: "App Store",    appId: "appstore",     icon: "icon/appstore-smr-32x32" },
   { name: "Icon Gallery", appId: "icon_gallery", icon: "icon-gallery/icon" },
   { name: "Showreel",     appId: "showreel",     icon: "showreel/icon" },
+  { name: "Terminal",     appId: "terminal",     icon: "terminal/icon" },
 ];
 
 /** Create the startup volume and its standard folders on a fresh disk; repair them otherwise. */
@@ -48,6 +49,7 @@ export async function bootstrapFileSystem(fs: FileSystem): Promise<void> {
     }
   } else {
     await ensureDesktopShortcut(fs, desktop, "showreel");
+    await ensureDesktopShortcut(fs, desktop, "terminal");
   }
   await fs.flush();
 }

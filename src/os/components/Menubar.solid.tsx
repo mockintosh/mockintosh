@@ -9,6 +9,8 @@ import {
   FINDER_APP_ID,
   activateApp,
   getActiveAppId,
+  isAppHidden,
+  showAllApps,
   getHighlightedMenuItem,
   getOpenMenuIndex,
   getWindows,
@@ -29,16 +31,35 @@ const APP_MENU = -2;
 // ---------------------------------------------------------------------------
 // Layout constants
 // ---------------------------------------------------------------------------
+// Measured against System 7.5.3. Panel offsets are from the panel's outer
+// left edge (its border); rows sit directly inside the border, with no padding.
 const MENUBAR_H     = 20;
+const TITLE_TOP     = 1;        // a highlighted title leaves the bar's top row white
+const TITLE_H       = MENUBAR_H - 1 - TITLE_TOP;
 const ITEM_H        = 16;
-const MENU_PADDING  = 4;
-const SEPARATOR_H   = 8;
-const LABEL_PAD     = 12;   // horizontal padding inside each menu title
-const APPLE_W       = 24;   // Apple menu is wider than label alone
+const ICON_ITEM_H   = 18;       // an application menu row with its 16×16 icon
+const SEPARATOR_H   = 16;       // a dotted line through the middle of a blank row
+const APPLE_LEFT    = 9;        // the Apple menu's title starts in from the screen's left edge
+const APPLE_W       = 24;       // the part of the Apple title that answers the mouse
+const APPLE_HILITE_W = 29;      // its highlight, x 9–37
+const APPLE_INK     = { x: 10, y: 2 };  // the logo inside the Apple title
+const TITLE_EXTRA   = 13;       // a title answers the mouse over its text's width plus this
+const TITLE_TEXT_X  = 10;       // the text inside a title
+// A highlight is wider than the part of the title that answers the mouse: it
+// spills into the next title. File's highlight is x 33–74, but Edit answers
+// from x 69, so the last black pixels of File pull down Edit.
+const HILITE_AFTER  = 6;
 const MENU_FONT     = "menu";
-const CHECK_COL_W   = 14;       // fixed column for the radio-group check mark so labels align
+const MARK_X        = 4;        // check mark
+const TEXT_X        = 16;       // label, past the mark column
+const ICON_X        = 15;       // application menu icon
+const ICON_TEXT_X   = 36;       // application menu label, past the icon
+const RIGHT_PAD     = 7;        // from the widest row's advance to the panel's outer right edge
+const APP_RIGHT_PAD = 9;        // the same, in the application menu
+const SHADOW_INSET  = 3;        // the 1px shadow starts this far along from the panel's corners
 const SMALL_ICON    = 16;       // ics# — what the application menu shows
-const SWITCHER_W    = 26;       // icon plus the gap the menu bar keeps around it
+const SWITCHER_W    = 34;       // the application menu's title: icon plus its margins
+const SWITCHER_GAP  = 6;        // between the application menu's title and the screen's right edge
 
 interface MenubarProps {
   height: number;
@@ -52,37 +73,30 @@ interface MenubarProps {
 // ---------------------------------------------------------------------------
 
 function menuTitleWidth(label: string): number {
-  return measureText(label, MENU_FONT) + LABEL_PAD * 2;
+  return measureText(label, MENU_FONT) + TITLE_EXTRA;
 }
 
-/** Whether a panel reserves the check column: any radio group or checkable item aligns every label after it. */
-function hasCheckColumn(items: MenubarItemDef[]): boolean {
-  return items.some(
-    (item) => item.type === "radiogroup" || ((item.type ?? "action") === "action" && (item as MenubarActionItem).checked !== undefined),
-  );
-}
-
+/** Outer width: the widest row's end, plus the right margin. */
 function menuDropdownWidth(items: MenubarItemDef[]): number {
-  let max = 80;
-  const checkCol = hasCheckColumn(items) ? CHECK_COL_W : 0;
+  let max = 0;
   for (const item of items) {
     if ("label" in item && item.label) {
-      const w = measureText(item.label, MENU_FONT) + checkCol;
       const shortcut = "shortcut" in item ? (item as MenubarActionItem).shortcut : undefined;
       const sw = shortcut ? measureText(`${COMMAND_KEY}${shortcut}`, MENU_FONT) + 16
         : item.type === "submenu" ? SUBMENU_ARROW.width + 16 : 0;
-      max = Math.max(max, w + sw + 32);
+      max = Math.max(max, TEXT_X + measureText(item.label, MENU_FONT) + sw);
     } else if ((item as MenubarRadioGroupDef).type === "radiogroup") {
       for (const ri of (item as MenubarRadioGroupDef).items) {
-        max = Math.max(max, CHECK_COL_W + measureText(ri.label, MENU_FONT) + 32);
+        max = Math.max(max, TEXT_X + measureText(ri.label, MENU_FONT));
       }
     }
   }
-  return max;
+  return max + RIGHT_PAD;
 }
 
+/** Outer height: the rows plus the top and bottom border. */
 function menuDropdownHeight(items: MenubarItemDef[]): number {
-  let h = MENU_PADDING * 2;
+  let h = 2;
   for (const item of items) {
     if ((item as any).type === "separator") {
       h += SEPARATOR_H;
@@ -95,10 +109,21 @@ function menuDropdownHeight(items: MenubarItemDef[]): number {
   return h;
 }
 
+/**
+ * The Menu Manager's tracking: a menu is down only while the button is. The
+ * row under the pointer arms what letting go will do; letting go anywhere
+ * else does nothing but close the menu.
+ */
+let armed: (() => void) | null = null;
+
+function arm(run: (() => void) | null): void {
+  armed = run;
+}
+
 /** Cumulative x positions of each menu title. */
 function computeMenuXOffsets(menus: MenubarDefinition[]): number[] {
   const xs: number[] = [];
-  let x = APPLE_W;
+  let x = APPLE_LEFT + APPLE_W;
   for (const menu of menus) {
     xs.push(x);
     x += menuTitleWidth(menu.label);
@@ -127,7 +152,7 @@ export function Menubar(props: MenubarProps): JSX.Element {
     }),
   );
   const activeIcon = () => running().find((app) => app.id === getActiveAppId())?.icon;
-  const switcherX = () => os.resolution.width - SWITCHER_W;
+  const switcherX = () => os.resolution.width - SWITCHER_GAP - SWITCHER_W;
 
   const openIdx   = () => getOpenMenuIndex();
   const openMenu  = () => {
@@ -138,20 +163,53 @@ export function Menubar(props: MenubarProps): JSX.Element {
   };
   const openMenuX = () => {
     const idx = openIdx();
-    if (idx === -1) return 0;
+    if (idx === -1) return APPLE_LEFT;
     if (idx === APP_MENU) return switcherX();
     return idx !== null ? menuXOffsets()[idx] ?? 0 : 0;
   };
 
-  function toggleMenu(idx: number) {
-    setOpenMenuIndex(openIdx() === idx ? null : idx);
+  function pullDown(idx: number) {
+    if (openIdx() === idx) return;
+    arm(null);
+    setOpenMenuIndex(idx);
     setHighlightedMenuItem(null);
   }
 
+  /** Sliding onto another title while the button is down pulls that menu down instead. */
+  function slideOnto(idx: number) {
+    if (openIdx() !== null) pullDown(idx);
+  }
+
   function closeMenu() {
+    arm(null);
     setOpenMenuIndex(null);
     setHighlightedMenuItem(null);
   }
+
+  /** The button came up: the press began on a title, so it gets the release wherever it is. */
+  function release() {
+    const run = armed;
+    closeMenu();
+    run?.();
+  }
+
+  /** Handlers every title shares: press to pull down, slide across, let go to choose. */
+  const titleHandlers = (idx: number) => ({
+    onMouseDown: () => pullDown(idx),
+    onMouseEnter: () => slideOnto(idx),
+    onMouseUp: release,
+  });
+
+  /** The highlight behind an open title: its hit rect, widened into the next title. */
+  const hilite = () => {
+    const idx = openIdx();
+    if (idx === null || idx === APP_MENU) return null;
+    if (idx === -1) return { left: APPLE_LEFT, width: APPLE_HILITE_W };
+    const left = menuXOffsets()[idx];
+    const menu = props.menus[idx];
+    if (left === undefined || !menu) return null;
+    return { left, width: menuTitleWidth(menu.label) + HILITE_AFTER };
+  };
 
   function runItem(item: MenubarActionItem) {
     closeMenu();
@@ -180,18 +238,22 @@ export function Menubar(props: MenubarProps): JSX.Element {
         background={1}
       />
 
+      {/* An open title's highlight, under every title so it can spill into the next one. */}
+      <Show when={hilite()}>
+        {(h) => (
+          <box position="absolute" left={h().left} top={TITLE_TOP} width={h().width} height={TITLE_H} background={1} />
+        )}
+      </Show>
+
       {/* Apple menu */}
       <box
         position="absolute"
-        left={0}
-        top={0}
+        left={APPLE_LEFT}
+        top={TITLE_TOP}
         width={APPLE_W}
-        height={MENUBAR_H - 1}
-        justifyContent="center"
-        alignItems="center"
-        background={openIdx() === -1 ? 1 : 0}
+        height={TITLE_H}
         semantic={{ name: "Apple", role: "menu" }}
-        onClick={() => toggleMenu(-1)}
+        {...titleHandlers(-1)}
       >
         <Show
           when={appleSprite}
@@ -203,6 +265,9 @@ export function Menubar(props: MenubarProps): JSX.Element {
         >
           {(s) => (
             <image
+              position="absolute"
+              left={APPLE_INK.x}
+              top={APPLE_INK.y}
               width={s().width}
               height={s().height}
               src={{ width: s().width, height: s().height, data: s().data, mask: s().mask }}
@@ -220,17 +285,18 @@ export function Menubar(props: MenubarProps): JSX.Element {
             <box
               position="absolute"
               left={menuXOffsets()[idx()]}
-              top={0}
+              top={TITLE_TOP}
               width={menuTitleWidth(menu.label)}
-              height={MENUBAR_H - 1}
+              height={TITLE_H}
+              paddingLeft={TITLE_TEXT_X}
               justifyContent="center"
-              background={isOpen() ? 1 : 0}
               semantic={{ name: menu.label, role: "menu" }}
-              onClick={() => toggleMenu(idx())}
+              onMouseDown={() => pullDown(idx())}
+              onMouseEnter={() => slideOnto(idx())}
+              onMouseUp={release}
             >
               <text
                 font={MENU_FONT}
-                align="center"
                 verticalAlign="middle"
                 color={isOpen() ? 0 : 1}
                 nowrap
@@ -246,14 +312,14 @@ export function Menubar(props: MenubarProps): JSX.Element {
       <box
         position="absolute"
         left={switcherX()}
-        top={0}
+        top={TITLE_TOP}
         width={SWITCHER_W}
-        height={MENUBAR_H - 1}
+        height={TITLE_H}
         justifyContent="center"
         alignItems="center"
-        background={openIdx() === APP_MENU ? 1 : 0}
+        background={openIdx() === APP_MENU ? 1 : undefined}
         semantic={{ name: "Application", role: "menu" }}
-        onClick={() => toggleMenu(APP_MENU)}
+        {...titleHandlers(APP_MENU)}
       >
         <Show when={activeIcon()}>
           {(icon) => (
@@ -271,7 +337,8 @@ export function Menubar(props: MenubarProps): JSX.Element {
         <AppMenuDropdown
           apps={running()}
           activeId={getActiveAppId()}
-          screenWidth={os.resolution.width}
+          right={switcherX() + SWITCHER_W}
+          onHide={(ids) => os.hideApps(ids, { x: switcherX(), y: TITLE_TOP, width: SWITCHER_W, height: TITLE_H })}
           onClose={closeMenu}
           onChoose={(id) => {
             closeMenu();
@@ -315,15 +382,6 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
 
   return (
     <>
-      {/* Background overlay to capture clicks outside the menu and close it */}
-      <box
-        position="absolute"
-        left={0}
-        top={0}
-        width={10000}
-        height={10000}
-        onClick={() => props.onClose()}
-      />
       <Show when={props.menu} keyed>
         {(menu) => (
           <MenuPanel
@@ -388,7 +446,7 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
       row,
       item,
       left: right + subW <= props.screenWidth ? right : Math.max(0, left - subW + 1),
-      top: top + rowTop - MENU_PADDING,
+      top: top + rowTop,
     });
   }
 
@@ -399,9 +457,13 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
 
   let itemIndex = 0;
   const itemNodes: JSX.Element[] = [];
-  const labelLeft = 8 + (hasCheckColumn(props.items) ? CHECK_COL_W : 0);
+  // Rows are laid out inside the border, so they are 2px narrower than the panel
+  // and every x is one less than its offset from the panel's outer edge.
+  const rowW = w - 2;
+  const labelLeft = TEXT_X - 1;
+  const markLeft = MARK_X - 1;
 
-  let yOffset = MENU_PADDING;
+  let yOffset = 0;
   for (let i = 0; i < props.items.length; i++) {
     const item = props.items[i];
 
@@ -417,11 +479,12 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
           position="absolute"
           left={0}
           top={yTop}
-          width={w}
+          width={rowW}
           height={ITEM_H}
           background={isHighlighted() ? 1 : 0}
           semantic={{ name: sub.label, role: "menu" }}
           onMouseEnter={() => {
+            arm(null);
             if (sub.disabled) return;
             enterRow(idxSelf);
             openSubmenu(idxSelf, sub, yTop);
@@ -429,12 +492,12 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
           onMouseLeave={() => props.setHighlighted(null)}
           onClick={() => { if (!sub.disabled) openSubmenu(idxSelf, sub, yTop); }}
         >
-          <box position="absolute" left={labelLeft} top={0} width={w - 8 - labelLeft} height={ITEM_H} justifyContent="center">
+          <box position="absolute" left={labelLeft} top={0} width={rowW - labelLeft} height={ITEM_H} justifyContent="center">
             <text font={MENU_FONT} nowrap color={ink()} stipple={sub.disabled} verticalAlign="middle">
               {sub.label}
             </text>
           </box>
-          <SubmenuArrow left={w - 8 - SUBMENU_ARROW.width} ink={ink()} />
+          <SubmenuArrow left={rowW - 8 - SUBMENU_ARROW.width} ink={ink()} />
         </box>
       );
       yOffset += ITEM_H;
@@ -442,11 +505,11 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
       itemNodes.push(
         <box
           position="absolute"
-          left={1}
+          left={0}
           top={yOffset + SEPARATOR_H / 2}
-          width={w - 2}
+          width={rowW}
           height={1}
-          background={1}
+          background="checker"
         />
       );
       yOffset += SEPARATOR_H;
@@ -462,18 +525,24 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
             position="absolute"
             left={0}
             top={yTop}
-            width={w}
+            width={rowW}
             height={ITEM_H}
             background={isHighlighted() ? 1 : 0}
-            onMouseEnter={() => enterRow(idxSelf)}
-            onMouseLeave={() => props.setHighlighted(null)}
+            onMouseEnter={() => {
+              enterRow(idxSelf);
+              arm(() => runRadioItem(rg, riSelf.value));
+            }}
+            onMouseLeave={() => {
+              props.setHighlighted(null);
+              arm(null);
+            }}
             onClick={() => {
               props.onClose();
               runRadioItem(rg, riSelf.value);
             }}
           >
             <Show when={riSelf.value === rg.value}>
-              <box position="absolute" left={8} top={0} width={CHECK_COL_W} height={ITEM_H} justifyContent="center">
+              <box position="absolute" left={markLeft} top={0} width={labelLeft - markLeft} height={ITEM_H} justifyContent="center">
                 <text font={MENU_FONT} nowrap color={isHighlighted() ? 0 : 1} verticalAlign="middle">
                   {CHECK_MARK}
                 </text>
@@ -481,9 +550,9 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
             </Show>
             <box
               position="absolute"
-              left={8 + CHECK_COL_W}
+              left={labelLeft}
               top={0}
-              width={w - 16 - CHECK_COL_W}
+              width={rowW - labelLeft}
               height={ITEM_H}
               justifyContent="center"
             >
@@ -505,32 +574,36 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
           position="absolute"
           left={0}
           top={yTop}
-          width={w}
+          width={rowW}
           height={ITEM_H}
           background={isHighlighted() && !ai.disabled ? 1 : 0}
           onMouseEnter={() => {
             if (ai.disabled) setSubmenu(null);
             else enterRow(idxSelf);
+            arm(ai.disabled ? null : () => props.onRun(ai));
           }}
-          onMouseLeave={() => props.setHighlighted(null)}
+          onMouseLeave={() => {
+            props.setHighlighted(null);
+            arm(null);
+          }}
           onClick={() => { if (!ai.disabled) props.onRun(ai); }}
         >
           <Show when={ai.checked}>
-            <box position="absolute" left={8} top={0} width={CHECK_COL_W} height={ITEM_H} justifyContent="center">
+            <box position="absolute" left={markLeft} top={0} width={labelLeft - markLeft} height={ITEM_H} justifyContent="center">
               <text font={MENU_FONT} nowrap color={isHighlighted() && !ai.disabled ? 0 : 1}
                 stipple={ai.disabled} verticalAlign="middle">
                 {CHECK_MARK}
               </text>
             </box>
           </Show>
-          <box position="absolute" left={labelLeft} top={0} width={w - 8 - labelLeft} height={ITEM_H} justifyContent="center">
+          <box position="absolute" left={labelLeft} top={0} width={rowW - labelLeft} height={ITEM_H} justifyContent="center">
             <text font={MENU_FONT} nowrap color={isHighlighted() && !ai.disabled ? 0 : 1}
               stipple={ai.disabled} verticalAlign="middle">
               {ai.label}
             </text>
           </box>
           <Show when={ai.shortcut}>
-            <box position="absolute" left={w - 40} top={0} width={36} height={ITEM_H} justifyContent="center">
+            <box position="absolute" left={rowW - 40} top={0} width={36} height={ITEM_H} justifyContent="center">
               <text font={MENU_FONT} nowrap align="right" verticalAlign="middle"
                 color={isHighlighted() && !ai.disabled ? 0 : 1}>
                 {`${COMMAND_KEY}${ai.shortcut}`}
@@ -557,6 +630,7 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
       >
         {itemNodes}
       </box>
+      <MenuShadow left={left} top={top} width={w} height={h} />
       <Show when={submenu()} keyed>
         {(open) => (
           <MenuPanel
@@ -607,52 +681,160 @@ interface AppMenuEntry {
   icon?: Sprite;
 }
 
+/** The 1px drop shadow along a panel's right and bottom edges, starting a few pixels in from its corners. */
+function MenuShadow(props: { left: number; top: number; width: number; height: number }): JSX.Element {
+  return (
+    <>
+      <box
+        position="absolute"
+        left={props.left + props.width}
+        top={props.top + SHADOW_INSET}
+        width={1}
+        height={props.height - SHADOW_INSET + 1}
+        background={1}
+      />
+      <box
+        position="absolute"
+        left={props.left + SHADOW_INSET}
+        top={props.top + props.height}
+        width={props.width - SHADOW_INSET + 1}
+        height={1}
+        background={1}
+      />
+    </>
+  );
+}
+
+/** A text row of the application menu: Hide, Hide Others, Show All. */
+interface AppMenuCommand {
+  label: string;
+  enabled: boolean;
+  run: () => void;
+}
+
 function AppMenuDropdown(props: {
   apps: AppMenuEntry[];
   activeId: string;
-  screenWidth: number;
+  /** Screen x just past the application menu's title; the panel's right edge lines up with it. */
+  right: number;
+  /** Hide these apps, zooming their windows into the menu's title. */
+  onHide: (appIds: string[]) => void;
   onClose: () => void;
   onChoose: (id: string) => void;
 }): JSX.Element {
-  let labelW = 80;
-  for (const app of props.apps) labelW = Math.max(labelW, measureText(app.title, MENU_FONT));
-  const w = 8 + CHECK_COL_W + SMALL_ICON + 6 + labelW + 12;
-  const h = MENU_PADDING * 2 + props.apps.length * ITEM_H;
-  const left = Math.min(props.screenWidth - SWITCHER_W, props.screenWidth - w - 4);
+  const active = props.apps.find((app) => app.id === props.activeId);
+  const others = props.apps.filter((app) => app.id !== props.activeId);
+  const commands: AppMenuCommand[] = [
+    {
+      label: `Hide ${active?.title ?? "Finder"}`,
+      // Something else has to be left to come forward.
+      enabled: others.some((app) => !isAppHidden(app.id)),
+      run: () => props.onHide([props.activeId]),
+    },
+    {
+      label: "Hide Others",
+      enabled: others.some((app) => !isAppHidden(app.id)),
+      run: () => props.onHide(others.map((app) => app.id)),
+    },
+    {
+      label: "Show All",
+      enabled: props.apps.some((app) => isAppHidden(app.id)),
+      run: () => showAllApps(),
+    },
+  ];
+
+  let contentW = 0;
+  for (const command of commands) contentW = Math.max(contentW, TEXT_X + measureText(command.label, MENU_FONT));
+  for (const app of props.apps) contentW = Math.max(contentW, ICON_TEXT_X + measureText(app.title, MENU_FONT));
+  const w = contentW + APP_RIGHT_PAD;
+  const rowW = w - 2;
+  const appsTop = commands.length * ITEM_H + SEPARATOR_H;
+  const h = 2 + appsTop + props.apps.length * ICON_ITEM_H;
+  const left = Math.max(0, props.right - w);
+  const top = MENUBAR_H - 1;
   const highlighted = getHighlightedMenuItem;
 
   return (
     <>
-      <box position="absolute" left={0} top={0} width={10000} height={10000} onClick={() => props.onClose()} />
       <box
         position="absolute"
-        left={Math.max(0, left)}
-        top={MENUBAR_H - 1}
+        left={left}
+        top={top}
         width={w}
         height={h}
         background={0}
         borderColor={1}
         borderWidth={1}
       >
+        <For each={commands}>
+          {(command, index) => {
+            const on = () => command.enabled && highlighted() === index();
+            return (
+              <box
+                position="absolute"
+                left={0}
+                top={index() * ITEM_H}
+                width={rowW}
+                height={ITEM_H}
+                background={on() ? 1 : 0}
+                semantic={{ name: command.label, role: "menuitem" }}
+                onMouseEnter={() => {
+                  setHighlightedMenuItem(index());
+                  arm(command.enabled ? command.run : null);
+                }}
+                onMouseLeave={() => {
+                  setHighlightedMenuItem(null);
+                  arm(null);
+                }}
+                onClick={() => {
+                  if (!command.enabled) return;
+                  props.onClose();
+                  command.run();
+                }}
+              >
+                <box position="absolute" left={TEXT_X - 1} top={0} width={rowW - TEXT_X + 1} height={ITEM_H} justifyContent="center">
+                  <text font={MENU_FONT} nowrap color={on() ? 0 : 1} stipple={!command.enabled} verticalAlign="middle">
+                    {command.label}
+                  </text>
+                </box>
+              </box>
+            );
+          }}
+        </For>
+        <box
+          position="absolute"
+          left={0}
+          top={commands.length * ITEM_H + SEPARATOR_H / 2}
+          width={rowW}
+          height={1}
+          background="checker"
+        />
         <For each={props.apps}>
           {(app, index) => {
-            const top = MENU_PADDING + index() * ITEM_H;
-            const on = () => highlighted() === index();
+            const row = () => commands.length + index();
+            const on = () => highlighted() === row();
             const ink = () => (on() ? 0 : 1);
             return (
               <box
                 position="absolute"
                 left={0}
-                top={top}
-                width={w}
-                height={ITEM_H}
+                top={appsTop + index() * ICON_ITEM_H}
+                width={rowW}
+                height={ICON_ITEM_H}
                 background={on() ? 1 : 0}
-                onMouseEnter={() => setHighlightedMenuItem(index())}
-                onMouseLeave={() => setHighlightedMenuItem(null)}
+                semantic={{ name: app.title, role: "menuitem" }}
+                onMouseEnter={() => {
+                  setHighlightedMenuItem(row());
+                  arm(() => props.onChoose(app.id));
+                }}
+                onMouseLeave={() => {
+                  setHighlightedMenuItem(null);
+                  arm(null);
+                }}
                 onClick={() => props.onChoose(app.id)}
               >
                 <Show when={app.id === props.activeId}>
-                  <box position="absolute" left={4} top={0} width={CHECK_COL_W} height={ITEM_H} justifyContent="center">
+                  <box position="absolute" left={MARK_X - 1} top={0} width={ICON_X - MARK_X} height={ICON_ITEM_H} justifyContent="center">
                     <text font={MENU_FONT} nowrap color={ink()} verticalAlign="middle">{CHECK_MARK}</text>
                   </box>
                 </Show>
@@ -660,8 +842,8 @@ function AppMenuDropdown(props: {
                   {(icon) => (
                     <image
                       position="absolute"
-                      left={4 + CHECK_COL_W}
-                      top={0}
+                      left={ICON_X - 1}
+                      top={1}
                       width={SMALL_ICON}
                       height={SMALL_ICON}
                       src={spriteSrc(icon())}
@@ -671,10 +853,10 @@ function AppMenuDropdown(props: {
                 </Show>
                 <box
                   position="absolute"
-                  left={4 + CHECK_COL_W + SMALL_ICON + 6}
+                  left={ICON_TEXT_X - 1}
                   top={0}
-                  width={labelW}
-                  height={ITEM_H}
+                  width={rowW - ICON_TEXT_X + 1}
+                  height={ICON_ITEM_H}
                   justifyContent="center"
                 >
                   <text font={MENU_FONT} nowrap color={ink()} verticalAlign="middle">{app.title}</text>
@@ -684,6 +866,7 @@ function AppMenuDropdown(props: {
           }}
         </For>
       </box>
+      <MenuShadow left={left} top={top} width={w} height={h} />
     </>
   );
 }

@@ -14,6 +14,7 @@ import type {
   AudioService,
   BrowserService,
   CameraService,
+  GpuService,
   DialogOptions,
   DownloadService,
   FetchFunction,
@@ -65,6 +66,7 @@ export interface OSServices {
   images?: ImageService;
   video?: VideoService;
   camera?: CameraService;
+  gpu?: GpuService;
   audio?: AudioService;
   microphone?: MicrophoneService;
   agentRuntime?: AgentRuntime;
@@ -106,6 +108,12 @@ export interface OSServices {
    * duration so the XOR frames are not overwritten.
    */
   playWindowOpenAnimation: (fromRect: AnimRect, toRect: AnimRect, onDone: () => void) => void;
+  /**
+   * Hide applications (the application menu's Hide and Hide Others): each of
+   * their on-screen windows zooms closed into `toRect`, the menubar's
+   * application menu title.
+   */
+  hideApps: (appIds: readonly string[], toRect: AnimRect) => void;
   /**
    * Show an XOR drag outline at the given visual rect while dragging or
    * resizing a window.  The outline is drawn every frame on top of the Solid

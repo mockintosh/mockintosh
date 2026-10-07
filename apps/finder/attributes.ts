@@ -6,7 +6,7 @@
  * is the only place that knows their keys, so the FS core stays free of pixel
  * geometry.
  */
-import { MIME, type FileSystem, type FSNode, type NodeAttributes } from "@mockintosh/fs";
+import { MIME, isFSError, type FileSystem, type FSNode, type NodeAttributes } from "@mockintosh/fs";
 
 export interface IconPosition {
   x: number;
@@ -80,11 +80,18 @@ export function bumpZOrder(fs: FileSystem, nodeId: string): void {
   fs.setAttributes(nodeId, { zOrder: maxZ + 1 });
 }
 
-/** Forget every free-form position in a directory so icons re-flow into the grid. */
-export function clearPositions(fs: FileSystem, directoryId: string): void {
+/**
+ * Save several icons' positions as one write. A node that went away or is
+ * mid-write is skipped; its view places it again on the next pass.
+ */
+export function setIconPositions(fs: FileSystem, positions: ReadonlyMap<string, IconPosition>): void {
   fs.batch(() => {
-    for (const child of fs.children(directoryId)) {
-      if (finderAttributes(fs, child.id).position) setIconPosition(fs, child.id, undefined);
+    for (const [nodeId, position] of positions) {
+      try {
+        setIconPosition(fs, nodeId, position);
+      } catch (err) {
+        if (!isFSError(err)) throw err;
+      }
     }
   });
 }

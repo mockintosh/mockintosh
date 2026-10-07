@@ -34,7 +34,7 @@ const declared = declarations as Record<string, AppDeclaration>;
 
 for (const app of [AppStore, IconGallery]) registerApp(app);
 
-for (const id of ["testing", "file", "preview", "video", "photobooth", "safari", "showreel"]) {
+for (const id of ["testing", "file", "preview", "video", "photobooth", "safari", "maps", "showreel", "terminal"]) {
   registerApp(declaredApp(declared[id]!, APP_MODULES[id]!));
 }
 

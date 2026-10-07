@@ -58,9 +58,11 @@ export function escapeForTS(b64: string): string {
 export interface AppendIconOptions {
   key: string;
   constName: string;
-  sprite: ConvertedSprite;
+  sprite: Pick<ConvertedSprite, "width" | "height" | "b64">;
   sourceFile: string;
   mode: ConvertMode;
+  /** The doc comment's source line; defaults to the ryOS path and conversion mode. */
+  provenance?: string;
 }
 
 export function appendIconSource(source: string, options: AppendIconOptions): string {
@@ -75,7 +77,7 @@ export function appendIconSource(source: string, options: AppendIconOptions): st
     throw new Error(`Const name already exists: ${options.constName}`);
   }
   const decl = [
-    `/** ryos: ${options.sourceFile} · ${options.mode} */`,
+    `/** ${options.provenance ?? `ryos: ${options.sourceFile} · ${options.mode}`} */`,
     `const ${options.constName} = defineSprite(`,
     `  ${options.sprite.width},`,
     `  ${options.sprite.height},`,

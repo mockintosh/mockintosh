@@ -5,6 +5,7 @@ import {
   defineApp,
   EditableText,
   measureText,
+  MAX_NAME_LENGTH,
   MIME,
   useApp,
   type MenubarItemDef,
@@ -566,6 +567,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
       buttons: ["Cancel", "Save"],
       showInput: true,
       inputDefault: fileName() ?? DEFAULT_NAME,
+      inputMaxLength: MAX_NAME_LENGTH,
       variant: "note",
     });
     const trimmed = name?.trim();
@@ -1148,6 +1150,7 @@ export default defineApp({
   id: "canvas",
   title: "Canvas",
   icon: "canvas/icon",
+  smallIcon: "canvas/icon-16x16",
   about: {
     version: "1.0",
     description: "Draw with objects — move, resize, and edit shapes and text without flattening to a bitmap.",

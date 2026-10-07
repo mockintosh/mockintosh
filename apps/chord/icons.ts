@@ -1,4 +1,4 @@
-import type { Sprite } from "@mockintosh/sdk";
+import { fromGrid, type Sprite } from "@mockintosh/sdk";
 import { createFrame, frameRect, plot, rect } from "../synth/pixels";
 
 const SIZE = 32;
@@ -48,6 +48,27 @@ function pocketChord(): Sprite {
   return { width: SIZE, height: SIZE, data: art.pixels, mask: mask.pixels };
 }
 
+/** The pocket chord for the application menu: the black display, the joystick gate, a row of keys with the third pressed. */
+const POCKET_CHORD_16: Sprite = fromGrid(16, 16, [
+  "................",
+  "................",
+  ".#############..",
+  "#ooooooooooooo##",
+  "#o######oo##oo##",
+  "#o######o####o##",
+  "#o######o####o##",
+  "#o######oo##oo##",
+  "#ooooooooooooo##",
+  "#o#o#ooo#o#o#o##",
+  "#o#o#o#o#o#o#o##",
+  "#o#o#o#o#o#o#o##",
+  "#ooooooooooooo##",
+  ".#############.#",
+  "..##############",
+  "................",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "chord/icon": pocketChord(),
+  "chord/icon-16x16": POCKET_CHORD_16,
 };

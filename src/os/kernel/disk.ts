@@ -1,4 +1,4 @@
-import { FSError, type FileSystem, type FSNode } from "@mockintosh/fs";
+import { FSError, assertNewNameFits, type FileSystem, type FSNode } from "@mockintosh/fs";
 import { ServiceError, normalizePath } from "./errors";
 import type { SourceProvider } from "../../platform/types";
 
@@ -267,6 +267,9 @@ export class Disk {
       throw new ServiceError("conflict", "Destination contains source name");
     }
     return this.mutate(() => {
+      // Check before moving: the batch isn't a transaction, so a rename that
+      // throws would leave the node moved under its old name.
+      if (name !== node.name) assertNewNameFits(name);
       this.fs.batch(() => {
         this.fs.move(node.id, parent.id);
         this.fs.rename(node.id, name);

@@ -13,6 +13,7 @@ import type { GrafPort } from "@mockintosh/quickdraw";
 import type { Sprite } from "@mockintosh/ui";
 import type { MenubarDefinition } from "./menus";
 import type { AppScheduler, CameraService, ImageService, VideoService } from "./media";
+import type { GpuService } from "./gpu";
 import type { AudioService } from "./audio";
 import type { MicrophoneService } from "./microphone";
 import type { AgentRuntime } from "./agentRuntime";
@@ -38,6 +39,9 @@ export {
   isFontType,
   IMAGE_TYPES,
   uniqueChildName,
+  MAX_NAME_LENGTH,
+  fitName,
+  fitNameWithSuffix,
   FONT_TYPES,
   type NodeId,
   type NodeRole,
@@ -114,6 +118,7 @@ export type {
   CameraService,
   AppScheduler,
 } from "./media";
+export type { GpuService, GpuProgram, GpuRenderRequest, GpuRasterizer, GpuRasterRequest, GpuRasterBatch, GpuCornerProgram, GpuMesh } from "./gpu";
 export type {
   AudioService,
   AudioMonitor,
@@ -231,6 +236,8 @@ export interface DialogOptions {
   buttons?: string[];
   showInput?: boolean;
   inputDefault?: string;
+  /** Most characters the input takes, e.g. `MAX_NAME_LENGTH` when it asks for a file name. */
+  inputMaxLength?: number;
   /** Which alert icon to show. Defaults to `stop`. */
   variant?: DialogVariant;
 }
@@ -420,6 +427,14 @@ export interface WindowSpec<P extends Record<string, unknown> = Record<string, u
   position?: { x: number; y: number };
   scrollable?: boolean;
   resizable?: boolean;
+  /**
+   * Where a \`resizable\` window without scroll bars keeps its grow box.
+   * \`"band"\` (default): in an empty scroll-bar band down the right edge, as
+   * \`DrawGrowIcon\` drew it. \`"overlay"\`: over the bottom-right corner of the
+   * content, which then runs to the frame — for a picture that fills the
+   * window, like a map or a video. Keep that corner free of controls.
+   */
+  growBox?: "band" | "overlay";
   /** `false` pins the window where it opened: its title bar does not drag. */
   movable?: boolean;
   /**
@@ -513,6 +528,8 @@ export interface AppContext {
   video?: VideoService;
   /** Live camera frames, when this platform can. */
   camera?: CameraService;
+  /** Pixel programs on a graphics processor, when this platform has one. */
+  gpu?: GpuService;
   /** Sound output streams, when this platform has a speaker. */
   audio?: AudioService;
   /** Sound input, when this platform has a microphone. */
@@ -570,10 +587,11 @@ export type FetchFunction = (url: string, options?: FetchRequest) => Promise<Fet
  * - `sign-in`   — `useApp().signIn` is available (sign in from a phone; see `SignInService`)
  * - `agent-runtime` — `useApp().agentRuntime` is available (language-model agents; see `AgentRuntime`)
  * - `fonts`     — `useApp().fontRaster` is available
+ * - `gpu`       — `useApp().gpu` is available (pixel programs; see `GpuService`)
  */
 export type Capability =
   | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in"
-  | "agent-runtime" | "fonts";
+  | "agent-runtime" | "fonts" | "gpu";
 
 /**
  * What "About <app>…" — the first Apple-menu item while the app is frontmost —
@@ -636,6 +654,8 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
   windowKind?: WindowKind;
   scrollable?: boolean;
   resizable?: boolean;
+  /** Where the main window keeps its grow box; see `WindowSpec.growBox`. */
+  growBox?: "band" | "overlay";
   minSize?: { width: number; height: number };
   singleInstance?: boolean;
   /**
@@ -777,6 +797,7 @@ export function useApp(): AppServices {
 
 export {
   measureText,
+  spacedFontName,
   fontLineHeight,
   drawString,
   drawPixels,
@@ -825,6 +846,7 @@ export {
   Card,
   Checkbox,
   Dialog,
+  DialogButton,
   DialogTitle,
   DialogDescription,
   DialogFooter,

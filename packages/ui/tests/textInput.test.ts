@@ -81,6 +81,31 @@ describe("TextInput", () => {
     dispose();
   });
 
+  it("ignores typing past maxLength, but replaces a selection", async () => {
+    const ui = createUI({ screen: newBitMap(200, 40) });
+    const [value, setValue] = createSignal("");
+    const dispose = ui.render(() =>
+      createComponent(TextInput, {
+        name: "draft",
+        get value() { return value(); },
+        onChange: setValue,
+        autoFocus: true,
+        maxLength: 5,
+      }),
+    );
+    ui.frame();
+    await Promise.resolve();
+    ui.frame();
+
+    type(ui, "abcdefg");
+    expect(value()).toBe("abcde");
+
+    ui.dispatchKeyboard("keydown", "a", { meta: true });
+    type(ui, "xy");
+    expect(value()).toBe("xy");
+    dispose();
+  });
+
   it("inverts every selected glyph when dragging backwards", async () => {
     const W = 200;
     const H = 24;

@@ -5,6 +5,7 @@ import { useOS } from "../context";
 import {
   getActiveAppId,
   getActiveWindowId,
+  isAppHidden,
   bringToFront,
   updateOSWindow,
   setWindowOutline,
@@ -31,6 +32,7 @@ import {
   CLOSE_SIZE,
   ZOOM_SIZE,
   GROW_SIZE,
+  hasGrowBand,
   hasGrowBox,
   hasTitleBar,
   headerBandHeight,
@@ -43,6 +45,9 @@ import {
   titleBarOuterHeight,
   hasZoomBox,
 } from "../windowGeometry";
+
+/** Where a hidden app's windows wait: far enough left that no frame or shadow reaches the screen. */
+const HIDDEN_LEFT = -100_000;
 
 /** Offsets of the six title-bar stripe lines within the 11px close-box band. */
 const TITLE_BAR_STRIPE_ROWS = [0, 2, 4, 6, 8, 10];
@@ -77,6 +82,11 @@ export function Window(props: WindowProps): JSX.Element {
   const appFront = () => getActiveAppId() === props.win.appId;
   const chromeOn = () => (def().toolPalette ? appFront() : isActive());
   const shown = () => !(def().toolPalette || def().backdrop) || appFront();
+  /**
+   * A hidden app's windows move off screen rather than unmount, so their
+   * content keeps its state until the app is shown again.
+   */
+  const left = () => (isAppHidden(props.win.appId) ? HIDDEN_LEFT : props.win.x);
 
   // Outer geometry
   const frame = createMemo(() => windowFrame(props.win));
@@ -199,7 +209,7 @@ export function Window(props: WindowProps): JSX.Element {
     <Show when={shown()}>
     <box
       position="absolute"
-      left={props.win.x}
+      left={left()}
       top={props.win.y}
       width={props.win.width + SHADOW}
       height={totalH() + SHADOW}
@@ -435,14 +445,15 @@ export function Window(props: WindowProps): JSX.Element {
             </Show>
           </Show>
 
-          {/* Title text — optical middle (cap box), not the full Decker cell. Untitled palettes omit it. */}
+          {/* Title text — optical middle (cap box), not the full Decker cell, centered
+              above the separator line. Untitled palettes omit it. */}
           <Show when={props.win.title}>
           <text
             position="absolute"
             left={0}
             top={0}
             width={innerW()}
-            height={barInner()}
+            height={barInner() - 1}
             font="menu"
             align="center"
             verticalAlign="middle"
@@ -594,6 +605,22 @@ export function Window(props: WindowProps): JSX.Element {
             background={0}
           >
             <box position="absolute" left={0} top={0} width={contentW()} height={1} background={1} />
+          </box>
+        </Show>
+
+        {/* ── Empty scroll-bar band for the grow box ─────────────── */}
+        {/* A resizable window without scroll bars, as DrawGrowIcon drew it:
+            the band runs beside the body, and a footer keeps its full width. */}
+        <Show when={hasGrowBand(props.win)}>
+          <box
+            position="absolute"
+            left={innerW() - SB_INNER}
+            top={headerInnerH()}
+            width={SB_W}
+            height={props.win.height}
+            background={0}
+          >
+            <box position="absolute" left={0} top={0} width={1} height={props.win.height} background={1} />
           </box>
         </Show>
 

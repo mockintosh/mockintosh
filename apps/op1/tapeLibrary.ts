@@ -13,6 +13,7 @@ import {
   decodeTape,
   demoTape,
   encodeTape,
+  MAX_TAPE_NAME,
   sameMix,
   suggestedName,
   tapeKey,
@@ -153,6 +154,7 @@ export function useTapeLibrary(options: TapeLibraryOptions): TapeLibrary {
         buttons: ["Cancel", "Save"],
         showInput: true,
         inputDefault: suggestion,
+        inputMaxLength: MAX_TAPE_NAME,
         variant: "note",
       });
       if (typed === null) return false;

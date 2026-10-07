@@ -22,11 +22,12 @@ import type {
   PointerButton,
 } from "../types";
 import { browserBuilder } from "./builder";
-import { CanvasPresenter, createScreenCanvas, wheelIsPinchZoom } from "@mockintosh/ui/web";
+import { CanvasPresenter, createScreenCanvas, wheelDeltaY, wheelIsPinchZoom } from "@mockintosh/ui/web";
 import { bitMapHeight, bitMapWidth } from "@mockintosh/quickdraw/bits";
 import { createHostDisplay, initialScreenSize } from "./hostDisplay";
 import { createWebDownloadService } from "./download";
 import { createWebImageService } from "./media/images";
+import { createWebGpuService } from "./media/gpu";
 import { createWebVideoService } from "./media/video";
 import { createWebCameraService } from "./media/camera";
 import { createWebAudioService } from "./media/audio";
@@ -145,6 +146,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     images: createWebImageService(),
     video: createWebVideoService(),
     camera: createWebCameraService(),
+    gpu: createWebGpuService(),
     audio: createWebAudioService(),
     microphone: createWebMicrophoneService(),
     agentRuntime: createWebAgentRuntime(),
@@ -223,7 +225,7 @@ function createDOMInput(
     (e) => {
       e.preventDefault();
       if (wheelIsPinchZoom(e)) return;
-      emitPointer({ type: "scroll", ...toScreen(e), deltaX: e.deltaX, deltaY: e.deltaY });
+      emitPointer({ type: "scroll", ...toScreen(e), deltaX: e.deltaX, deltaY: wheelDeltaY(e, canvas.clientHeight) });
     },
     { passive: false }
   );

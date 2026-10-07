@@ -300,6 +300,7 @@ export default defineApp({
   signIn: { hosts: [SPOTIFY_ACCOUNTS_HOST] },
   title: "Spotify Player",
   icon: "icon/spotify",
+  smallIcon: "icon/spotify-16x16",
   sprites: spotifySprites,
   defaultSize: { width: 380, height: 280 },
   scrollable: false,

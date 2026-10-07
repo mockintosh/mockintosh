@@ -197,6 +197,7 @@ export class AppProcess {
         microphone: typeof this.context.microphone?.openPort === "function",
         monitor: typeof this.context.audio?.monitor === "function",
         images: this.context.images !== undefined,
+        gpu: this.context.gpu !== undefined,
         kernel: this.context.kernel ? JSON.parse(JSON.stringify(this.context.kernel.describe())) : undefined,
         openers: this.openers,
         sprites: this.os.sprites.all(),

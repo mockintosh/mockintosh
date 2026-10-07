@@ -731,6 +731,7 @@ export default defineApp({
   id: "synth",
   title: "Synthesizer",
   icon: "synth/icon",
+  smallIcon: "synth/icon-16x16",
   sprites,
   requires: ["audio"],
   about: {

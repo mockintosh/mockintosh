@@ -8,7 +8,7 @@ import type { DeckerFont } from "./font";
 import { carryAdvances, getGlyphPixel, getGlyphWidth } from "./font";
 import { smearDeckerFontBold } from "./boldSmear";
 import { outlineDeckerFont, padDeckerShadow } from "./outlineSmear";
-import { getRealFace, requireFont } from "./registry";
+import { getRealFace, requireFont, spacedFontName } from "./registry";
 
 /**
  * Synthesized type style. Bold, italic, outline, and shadow are Font Manager
@@ -45,8 +45,11 @@ export function fontStyleFromProps(props: Record<string, unknown> | undefined): 
   };
 }
 
+/** The node's `font`, re-spaced when it sets `spacing`. */
 export function fontNameFromProps(props: Record<string, unknown> | undefined): string {
-  return (props?.["font"] as string | undefined) ?? "body";
+  const name = (props?.["font"] as string | undefined) ?? "body";
+  const spacing = props?.["spacing"];
+  return typeof spacing === "number" ? spacedFontName(name, spacing) : name;
 }
 
 export function fontSizeFromProps(props: Record<string, unknown> | undefined): number | undefined {

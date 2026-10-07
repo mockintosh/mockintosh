@@ -1,7 +1,8 @@
 #!/usr/bin/env npx tsx
 /**
- * Search the pinned ryOS native 1-bit catalog (ICN# / ics# / SICN) and write
- * previews under /tmp. Does not modify the repo.
+ * Search classic Mac 1-bit icons — the System 7.5.3 families the Icon Gallery
+ * shows, then the pinned ryOS catalog — and write contact sheets under the
+ * temp dir. Does not modify the repo.
  *
  *   npm run icons:find -- trash folder
  *   npm run icons:find -- document --category system --limit 6
@@ -11,13 +12,15 @@ import { loadCatalog } from "./icons/catalog";
 import { slugKey } from "./icons/iconsModule";
 import { writeSearchPreviews } from "./icons/preview";
 import { searchIcons } from "./icons/search";
+import { system753Records } from "./icons/system753";
 
 function usage(): never {
   console.error(`Usage: npm run icons:find -- <query...> [--limit 8] [--category system]
                     [--no-preview] [--json]
 
-Search native 1-bit icons from ryokun6/ryos (System 7 + Mac OS 8 ICN# / ics# / SICN).
-Import a pick with: npm run icons:import -- "<era/path.png>" --key icon/name`);
+Search native 1-bit icons: the System 7.5.3 families (32×32 + hand-drawn 16×16)
+and ryokun6/ryos (System 7 + Mac OS 8 ICN# / ics# / SICN). Any term may match.
+Import a pick with: npm run icons:import -- "<file>" --key icon/name`);
   process.exit(2);
 }
 
@@ -31,7 +34,7 @@ async function main(): Promise<void> {
   const json = flagBool(flags, "json");
   const preview = !flagBool(flags, "no-preview");
 
-  const hits = searchIcons(loadCatalog(), query, { limit, category });
+  const hits = searchIcons([...system753Records(), ...loadCatalog()], query, { limit, category });
   if (hits.length === 0) {
     console.error(`No icons matched ${JSON.stringify(query)}. Try broader terms.`);
     process.exit(1);
@@ -45,6 +48,7 @@ async function main(): Promise<void> {
         {
           query,
           dir: payload?.dir ?? null,
+          sheets: payload?.sheets ?? [],
           results: payload?.results ?? hits.map((hit, i) => ({
             index: i + 1,
             file: hit.icon.file,
@@ -62,7 +66,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (payload) console.log(`Previews: ${payload.dir}\n`);
+  if (payload) {
+    for (const sheet of payload.sheets) console.log(`sheet: ${sheet}`);
+    console.log("");
+  }
   const rows = payload?.results ?? hits.map((hit, i) => ({
     index: i + 1,
     file: hit.icon.file,
@@ -72,14 +79,14 @@ async function main(): Promise<void> {
     description: hit.icon.description,
     score: hit.score,
     suggestedKey: `icon/${slugKey(hit.icon.name, hit.icon.file)}`,
-    bitPng: "",
+    sizes: [] as string[],
   }));
 
   for (const row of rows) {
     console.log(`${row.index}. ${row.name || row.file}  [${row.collection}/${row.category}]  score=${row.score}`);
     console.log(`   ${row.file}`);
     if (row.description) console.log(`   ${row.description}`);
-    if (row.bitPng) console.log(`   preview: ${row.bitPng}`);
+    if (row.sizes.length) console.log(`   sizes: ${row.sizes.join(" + ")}`);
     console.log(`   import: npm run icons:import -- "${row.file}" --key ${row.suggestedKey}`);
     console.log("");
   }

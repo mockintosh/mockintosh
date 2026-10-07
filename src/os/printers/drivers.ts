@@ -5,7 +5,7 @@
  * id replaces it, so a built-in can be adjusted by saving a copy.
  */
 import { createSignal } from "solid-js";
-import type { FileSystem } from "@mockintosh/fs";
+import { fitName, type FileSystem } from "@mockintosh/fs";
 import {
   BUILTIN_PRINTER_DRIVERS,
   parsePrinterDriverText,
@@ -42,10 +42,10 @@ export interface PrinterDriverCatalog {
   shutdown(): void;
 }
 
-/** A file name for a driver: its name, minus characters file names can't have. */
+/** A file name for a driver: its name, minus characters file names can't have, cut to fit. */
 export function driverFileName(driver: PrinterDriver): string {
   const base = driver.name.replace(/[/:]/g, "-").trim() || driver.id;
-  return `${base}.json`;
+  return fitName(`${base}.json`);
 }
 
 export async function createPrinterDriverCatalog(fs: FileSystem): Promise<PrinterDriverCatalog> {
@@ -99,7 +99,8 @@ export async function createPrinterDriverCatalog(fs: FileSystem): Promise<Printe
       const dir = folder();
       if (!dir) throw new Error("The Printer Drivers folder is missing");
       const previous = files().find((e) => e.driver.id === driver.id)?.fileName;
-      const name = previous ?? driverFileName(driver);
+      // A new driver must not replace another's file under a shortened name.
+      const name = previous ?? fs.availableName(dir.id, driverFileName(driver));
       await fs.writeFile(dir.id, name, JSON.stringify(printerDriverToJSON(driver), null, 2) + "\n", {
         type: "application/json",
       });

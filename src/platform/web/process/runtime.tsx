@@ -51,6 +51,7 @@ import type { AppSource, HostToProcess, ProcessStart, ProcessToHost, WindowState
 import { createWorkerAudio } from "./audio";
 import { createWorkerMicrophone } from "./microphone";
 import { createWorkerMedia } from "./media";
+import { createWebGpuService } from "../media/gpu";
 import { createFsMirror } from "./fsMirror";
 import { createWorkerVideo } from "./video";
 
@@ -343,6 +344,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         ? { decode: (bytes, type, options) => call("images.decode", [bytes, type, options]) as ReturnType<NonNullable<AppContext["images"]>["decode"]> }
         : undefined,
       microphone: start.microphone ? microphone.service : undefined,
+      gpu: start.gpu ? createWebGpuService() : undefined,
       fonts: {
         // Registered here for this app straight away, and with the OS for every other app.
         register: (name, data, size) => {

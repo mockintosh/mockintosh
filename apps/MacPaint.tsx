@@ -6,6 +6,7 @@ import {
   readPaintFile,
   useApp,
   writePaintFile,
+  MAX_NAME_LENGTH,
   MIME,
   type AppContext,
   type MenubarDefinition,
@@ -204,6 +205,7 @@ function startSession(app: AppContext, screenWidth: number, screenHeight: number
         buttons: ["Cancel", "Save"],
         showInput: true,
         inputDefault: defaultName,
+        inputMaxLength: MAX_NAME_LENGTH,
         variant: "note",
       });
       const name = typed?.trim();
@@ -393,6 +395,7 @@ export default defineApp({
   id: "macpaint",
   title: "MacPaint",
   icon: "macpaint/icon",
+  smallIcon: "macpaint/icon-16x16",
   defaultSize: { width: DOC_WINDOW_WIDTH, height: DOC_WINDOW_HEIGHT },
   resizable: false,
   scrollable: false,

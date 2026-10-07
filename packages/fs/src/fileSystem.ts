@@ -17,6 +17,7 @@ import type { FSBackend } from "./backend";
 import { CURRENT_CATALOG_VERSION, emptyCatalog, parseCatalog, type CatalogDocument } from "./catalogDocument";
 import { FSError } from "./errors";
 import { inferMimeType } from "./mime";
+import { assertNewNameFits, availableChildName } from "./names";
 import {
   ROOT_ID,
   type AttributeValue,
@@ -205,17 +206,11 @@ export class FileSystem {
 
   /**
    * `name` if unused in the directory, else the first free of `name 2`,
-   * `name 3`, … (the extension, if any, stays at the end).
+   * `name 3`, … (the extension, if any, stays at the end). A name longer than
+   * {@link MAX_NAME_LENGTH} is shortened to fit, number and all.
    */
   availableName(dirId: NodeId, name: string): string {
-    if (!this.child(dirId, name)) return name;
-    const dot = name.lastIndexOf(".");
-    const stem = dot > 0 ? name.slice(0, dot) : name;
-    const ext = dot > 0 ? name.slice(dot) : "";
-    for (let i = 2; ; i++) {
-      const candidate = `${stem} ${i}${ext}`;
-      if (!this.child(dirId, candidate)) return candidate;
-    }
+    return availableChildName(this, dirId, name);
   }
 
   /** Resolve an absolute path like `/Mockintosh HD/Desktop Folder`. */
@@ -318,6 +313,7 @@ export class FileSystem {
       if (existing.kind === "directory") return this.adoptRole(existing, options.role);
       throw new FSError("exists", `A file named "${name}" already exists`);
     }
+    assertNewNameFits(name);
     if (options.id !== undefined && this.state.nodes[options.id]) {
       throw new FSError("exists", `Node ${options.id} already exists`);
     }
@@ -391,6 +387,7 @@ export class FileSystem {
     if (found && found.kind !== "file") {
       throw new FSError("exists", `A folder named "${name}" already exists`);
     }
+    if (!found) assertNewNameFits(name);
     const existing = found as FSFile | undefined;
     if (options.expectedRevision !== undefined && options.expectedRevision !== (existing?.revision ?? 0)) {
       throw new FSError("conflict", "Resource revision changed");
@@ -437,6 +434,7 @@ export class FileSystem {
     assertValidName(name);
     const node = this.requireMutable(id);
     if (node.name === name) return;
+    assertNewNameFits(name);
     const clash = this.child(node.parentId!, name);
     if (clash && clash.id !== id) {
       throw new FSError("exists", `"${name}" already exists in this folder`);

@@ -2,7 +2,7 @@
 
 ## Classic Mac icons
 
-When the user wants icons, sprites, or classic Mac artwork (alerts, folders, app icons, chrome), follow [`.cursor/skills/classic-mac-icons/SKILL.md`](.cursor/skills/classic-mac-icons/SKILL.md). Search and import go through `npm run icons:find` / `npm run icons:import`. Pixels stay as `defineSprite` in `src/os/sprites/icons.ts`; do not add PNGs under `public/`.
+When the user wants icons, sprites, or classic Mac artwork (alerts, folders, app icons and their 16×16 small icons, chrome), follow [`.cursor/skills/classic-mac-icons/SKILL.md`](.cursor/skills/classic-mac-icons/SKILL.md): find in the catalog, else draw, and judge every icon from `npm run icons:preview` sheets. Pixels stay in TypeScript (`defineSprite` / `fromGrid`); do not add PNGs under `public/`.
 
 ## Thermal printers
 

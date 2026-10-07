@@ -59,7 +59,7 @@ function Block(props: BlockProps): JSX.Element {
     ];
     return node.level === 3
       ? <text font="body" bold wrap align={node.align} runs={runs} />
-      : <text font="menu" wrap align={node.align} runs={runs} />;
+      : <text font="menu" spacing={1} wrap align={node.align} runs={runs} />;
   }
   if (node.type === "paragraph") {
     return <text font="body" wrap align={node.align} runs={inlineRuns(node.segments, onLink)} />;

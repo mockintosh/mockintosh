@@ -4,6 +4,9 @@ import {
   Button,
   FONT_TYPES,
   MIME,
+  fitName,
+  fitNameWithSuffix,
+  uniqueChildName,
   Radio,
   Slider,
   TextInput,
@@ -42,7 +45,7 @@ import {
   stripGlyphs,
   stripInnerWidth,
   toggleDraftPixel,
-  uniqueDesktopName,
+  MAX_FAMILY_NAME,
 } from "./foundry/strike";
 import { sprites } from "./foundry/icons";
 import {
@@ -369,8 +372,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     const s = currentSuitcase();
     const desktop = app.fs.locate("desktop");
     if (!s || !desktop) return;
-    const names = app.fs.children(desktop.id).filter((n) => n.kind === "file").map((n) => n.name);
-    const name = uniqueDesktopName(names, `${s.family.replace(/[/:]/g, "-")}.suit`);
+    const name = uniqueChildName(app.fs, desktop.id, fitName(`${s.family.replace(/[/:]/g, "-")}.suit`));
     await app.fs.writeFile(desktop.id, name, encodeSuitcase(s), { type: MIME.suitcase });
     setSuitcase(s);
     setDirty(false);
@@ -381,8 +383,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     const desktop = app.fs.locate("desktop");
     if (!d || !desktop) return;
     const packed = encodeDeckerFont(deckerFontFromDraft(d));
-    const names = app.fs.children(desktop.id).filter((n) => n.kind === "file").map((n) => n.name);
-    const name = uniqueDesktopName(names, `${d.family}-${d.size}.fnt`);
+    const name = uniqueChildName(app.fs, desktop.id, fitNameWithSuffix(d.family, `-${d.size}.fnt`));
     await app.fs.writeFile(desktop.id, name, packed, { type: MIME.deckerFont });
     setDirty(false);
   }
@@ -608,7 +609,7 @@ function Foundry(props: FoundryProps): JSX.Element {
             />
             <box flexDirection="row" gap={4} alignItems="center">
               <text font="body" nowrap>Name</text>
-              <TextInput name="family" value={family()} onChange={setFamily} width={120} />
+              <TextInput name="family" value={family()} onChange={setFamily} maxLength={MAX_FAMILY_NAME} width={120} />
             </box>
           </box>
           <Show when={selectedGlyph() && draft()}>
@@ -701,6 +702,7 @@ export default defineApp({
   id: "foundry",
   title: "Foundry",
   icon: "foundry/icon",
+  smallIcon: "foundry/icon-16x16",
   defaultSize: { width: 420, height: 300 },
   minSize: { width: 300, height: 220 },
   resizable: true,

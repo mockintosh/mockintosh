@@ -65,13 +65,15 @@ describe("tape names", () => {
   it("can't be empty, too long, a path, or a demo's", () => {
     expect(tapeNameProblem("Monday Tape")).toBeNull();
     expect(tapeNameProblem("")).toMatch(/needs a name/);
-    expect(tapeNameProblem("x".repeat(32))).toMatch(/31/);
+    expect(tapeNameProblem("x".repeat(19))).toBeNull();
+    expect(tapeNameProblem("x".repeat(20))).toMatch(/19/);
     expect(tapeNameProblem("a/b")).toMatch(/can't be called/);
     expect(tapeNameProblem("sunday tape")).toMatch(/“Sunday Tape” is a demo tape/);
   });
 
   it("are suggested from the tape on, and remembered by reference", () => {
     expect(suggestedName(DEFAULT_TAPE)).toBe("Sunday Tape copy");
+    expect(suggestedName({ kind: "demo", name: "Welcome to Macintosh" })).toBe("Welcome to Mac copy");
     expect(suggestedName({ kind: "saved", name: "Jam" })).toBe("Jam");
     expect(suggestedName({ kind: "new" })).toBe("Untitled Tape");
     expect(sanitizeTapeRef({ kind: "saved", name: "Jam" })).toEqual({ kind: "saved", name: "Jam" });

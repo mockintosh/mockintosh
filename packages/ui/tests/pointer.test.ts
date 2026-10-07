@@ -295,6 +295,15 @@ describe("scroll bubbling", () => {
     expect(deltas).toEqual([16]);
   });
 
+  it("tells the handler where the pointer is, in its own coordinates", () => {
+    const { root, outer } = nestedTree();
+    const seen: number[][] = [];
+    outer._eventHandlers.onScroll = (dy, lx, ly) => seen.push([dy, lx, ly]);
+    const ptr = createPointerDispatcher(root, createFocusManager(root));
+    ptr.dispatch("scroll", 30, 25, { deltaY: -4 });
+    expect(seen).toEqual([[-4, 20, 15]]);
+  });
+
   it("wheels an overflow:scroll pane that has no onScroll", () => {
     const root = createNode("_root");
     root.style = { width: 80, height: 80 };

@@ -37,6 +37,27 @@ const GLOBE = [
   "................................",
 ];
 
+/** The 16×16 for the application menu: the globe with Africa and Europe in paper on an ink sea. */
+const GLOBE_16: Sprite = fromGrid(16, 16, [
+  "................",
+  ".....######.....",
+  "...#####ooo##...",
+  "..######ooooo#..",
+  ".######oooooo##.",
+  ".#o###oooooooo#.",
+  ".#o###oooooooo#.",
+  ".#o##oooooo##o#.",
+  ".#o###oooo###o#.",
+  ".#o####ooo###o#.",
+  ".#o####ooo###o#.",
+  ".#######oo#####.",
+  "..#######o####..",
+  "...##########...",
+  ".....######.....",
+  "................",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "earth/icon": fromGrid(32, 32, GLOBE),
+  "earth/icon-16x16": GLOBE_16,
 };
