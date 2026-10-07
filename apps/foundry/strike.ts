@@ -1,4 +1,5 @@
 import {
+  MAX_NAME_LENGTH,
   deckerOrdinalForCharCode,
   type FontStrikeDraft,
   type FontStrikeGlyph,
@@ -69,16 +70,11 @@ export function blitDraftLines(
   return { width, height, pixels };
 }
 
-export function uniqueDesktopName(existing: readonly string[], wanted: string): string {
-  if (!existing.includes(wanted)) return wanted;
-  const dot = wanted.lastIndexOf(".");
-  const stem = dot > 0 ? wanted.slice(0, dot) : wanted;
-  const ext = dot > 0 ? wanted.slice(dot) : "";
-  for (let n = 2; ; n++) {
-    const candidate = `${stem} ${n}${ext}`;
-    if (!existing.includes(candidate)) return candidate;
-  }
-}
+/**
+ * Longest family name: a strike is saved as `<family>-<size>.fnt`, and the
+ * Fonts folder reads the family back from that name, so it has to fit whole.
+ */
+export const MAX_FAMILY_NAME = MAX_NAME_LENGTH - "-127.fnt".length;
 
 /** Character-strip chrome. Border is always reserved so selection does not shrink ink. */
 export const STRIP_GAP = 1;

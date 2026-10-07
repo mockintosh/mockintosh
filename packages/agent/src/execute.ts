@@ -221,7 +221,8 @@ async function settleResult(invoke: AgentInvoke, callId: string, name: string, v
   const text = typeof value === "string" ? value : JSON.stringify(value);
   if (EXEMPT.has(name) || text.length <= (RESULT_BUDGETS[name] ?? TOOL_RESULT_MAX)) return text;
   await ensureSpillDir(invoke);
-  const path = `${SPILL_DIR}/${callId.replace(/[^\w.-]/g, "_")}.txt`;
+  // File names hold 28 characters; a call id's random part is at its end.
+  const path = `${SPILL_DIR}/${callId.replace(/[^\w.-]/g, "_").slice(-24)}.txt`;
   await invoke("write", { path, body: text });
   return `${text.slice(0, 800)}\n\n[... ${text.length} chars; full result at ${path}]`;
 }

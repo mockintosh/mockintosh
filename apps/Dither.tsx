@@ -9,6 +9,7 @@ import {
   defineApp,
   encodePng1bit,
   readImageFile,
+  fitNameWithSuffix,
   useApp,
   writeSpriteFile,
   ASCII_DIFFUSE_DEFAULT,
@@ -184,7 +185,7 @@ function Dither(props: DitherProps): JSX.Element {
     const { width, height } = view();
     const base = props.title ? stem(String(props.title)) : "Dither";
     try {
-      await writeSpriteFile(app.fs, desktop.id, `${base} 1-bit`, { width, height, data: pixels }, {
+      await writeSpriteFile(app.fs, desktop.id, fitNameWithSuffix(base, " 1-bit"), { width, height, data: pixels }, {
         attributes: { icon: "icon/camera" },
       });
     } catch (e) {

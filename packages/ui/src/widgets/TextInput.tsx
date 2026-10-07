@@ -30,8 +30,16 @@ export interface TextInputProps {
   padding?: number;
   /** Omit the field border (e.g. inline rename over a label). */
   borderless?: boolean;
+  /**
+   * Where the line sits: `"middle"` (default) centres its caps in the field;
+   * `"top"` sets it at the top padding like a plain `<text>`, so a field laid
+   * over a label keeps the label's text where it was.
+   */
+  verticalAlign?: "top" | "middle";
   disabled?: boolean;
   password?: boolean;
+  /** Most characters the field holds; typing past it is ignored. */
+  maxLength?: number;
   autoFocus?: boolean;
   selectAllOnFocus?: boolean;
   /**
@@ -199,6 +207,12 @@ export function TextInput(props: TextInputProps): JSX.Element {
     const cur = cursorAt;
     const ss = selLo;
     const se = selHi;
+
+    if (props.maxLength !== undefined) {
+      const replaced = ss !== null && se !== null ? Math.abs(se - ss) : 0;
+      chars = chars.slice(0, Math.max(0, props.maxLength - (text.length - replaced)));
+      if (!chars) return;
+    }
 
     if (ss !== null && se !== null) {
       const lo = Math.min(ss, se), hi = Math.max(ss, se);
@@ -456,7 +470,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
           font={fontName()}
           size={fontSize()}
           color={1}
-          verticalAlign="middle"
+          verticalAlign={props.verticalAlign ?? "middle"}
           nowrap
         >
           {displayValue()}
@@ -473,7 +487,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
           font={fontName()}
           size={fontSize()}
           color={0}
-          verticalAlign="middle"
+          verticalAlign={props.verticalAlign ?? "middle"}
           nowrap
         >
           {selectedSlice()}
@@ -500,7 +514,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
           font={fontName()}
           size={fontSize()}
           color={1}
-          verticalAlign="middle"
+          verticalAlign={props.verticalAlign ?? "middle"}
           nowrap
         >
           {props.placeholder}

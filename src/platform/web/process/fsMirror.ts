@@ -9,7 +9,7 @@
  */
 import { createSignal } from "solid-js";
 import type { AppFileSystem } from "@mockintosh/sdk";
-import { FSError, ROOT_ID, type FSDirectory, type FSFile, type FSNode, type MkdirOptions, type NodeRole } from "@mockintosh/fs";
+import { FSError, ROOT_ID, assertNewNameFits, type FSDirectory, type FSFile, type FSNode, type MkdirOptions, type NodeRole } from "@mockintosh/fs";
 import type { FsSnapshot } from "../../../os/process/protocol";
 
 type Call = (method: string, args: unknown[]) => Promise<unknown>;
@@ -166,6 +166,7 @@ export function createFsMirror(call: Call, notify: Notify): FsMirror {
         }
         throw new FSError("exists", `A file named "${name}" already exists`);
       }
+      assertNewNameFits(name);
       const now = Date.now();
       const dir: FSDirectory = { id: options.id ?? newId(), name, kind: "directory", parentId: parent.id, createdAt: now, modifiedAt: now, revision: 1 };
       if (options.role) dir.role = options.role;
@@ -177,6 +178,7 @@ export function createFsMirror(call: Call, notify: Notify): FsMirror {
       assertValidName(name);
       const n = requireMutable(id);
       if (n.name === name) return;
+      assertNewNameFits(name);
       const clash = child(n.parentId!, name);
       if (clash && clash.id !== id) throw new FSError("exists", `"${name}" already exists in this folder`);
       apply([{ ...n, name, modifiedAt: Date.now(), revision: n.revision + 1 }]);

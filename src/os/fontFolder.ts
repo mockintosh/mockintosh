@@ -8,7 +8,7 @@
  * family and size in its file name (`futura-12.fnt`).
  */
 import { createSignal } from "solid-js";
-import { MIME, extensionOf, type FileSystem, type FSNode } from "@mockintosh/fs";
+import { MIME, extensionOf, fitName, type FileSystem, type FSNode } from "@mockintosh/fs";
 import {
   decodeSuitcase,
   encodeSuitcase,
@@ -40,9 +40,9 @@ export interface FontFolder {
 
 const OUTLINE_EXTENSIONS = new Set(["ttf", "otf", "ttc"]);
 
-/** A suitcase file name for a family: its name, minus characters file names can't have. */
+/** A suitcase file name for a family: its name, minus characters file names can't have, cut to fit. */
 export function suitcaseFileName(suitcase: FontSuitcase): string {
-  return `${suitcase.family.replace(/[/:]/g, "-").trim() || suitcaseKey(suitcase)}.suit`;
+  return fitName(`${suitcase.family.replace(/[/:]/g, "-").trim() || suitcaseKey(suitcase)}.suit`);
 }
 
 /** `family-12.fnt` / `Family 12.fnt` → family key and point size. */

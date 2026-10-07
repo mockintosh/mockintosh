@@ -10,6 +10,7 @@ import {
   defineApp,
   encodePng1bit,
   isImageType,
+  fitNameWithSuffix,
   readImageFile,
   useApp,
   writeSpriteFile,
@@ -222,7 +223,7 @@ function Trace(props: TraceProps): JSX.Element {
     if (!traced || !desktop) return;
     const base = docTitle() ? stem(docTitle()!) : "Trace";
     try {
-      await writeSpriteFile(app.fs, desktop.id, `${base} bitmap`, {
+      await writeSpriteFile(app.fs, desktop.id, fitNameWithSuffix(base, " bitmap"), {
         width: traced.width,
         height: traced.height,
         data: traced.pixels,
