@@ -11,6 +11,7 @@ import { fontFromProps } from "./fonts/style";
 import { indexAtPoint, layoutNodeText } from "./fonts/textLayout";
 import { collectNodeText, setNodeProperty, textWraps, type CanvasNode, type TextAlign } from "./nodes";
 import { scrollPaintOffset } from "./scroll";
+import { createTextClicks, paragraphRangeAt, type TextClickSelection } from "./textClicks";
 
 export interface TextSelection {
   lo: number;
@@ -123,13 +124,6 @@ function caretAt(from: CanvasNode, gx: number, gy: number): Caret {
   return { node: last, offset: collectNodeText(last).length };
 }
 
-function selectWord(text: string, idx: number): { start: number; end: number } {
-  let start = idx, end = idx;
-  while (start > 0 && /\S/.test(text[start - 1]!)) start--;
-  while (end < text.length && /\S/.test(text[end]!)) end++;
-  return { start, end };
-}
-
 function isOn(value: unknown): boolean {
   return value === true || value === "";
 }
@@ -186,21 +180,36 @@ export function applySelectable(node: CanvasNode, value: unknown): void {
   const focusManager = getFocusManager();
   const { clipboard } = useUIServices();
 
+  // Double-click selects a word, triple-click the paragraph.
+  const clicks = createTextClicks({ third: paragraphRangeAt });
+  const select = ({ anchor: from, caret: to }: TextClickSelection) =>
+    setCaret({ node, offset: from }, { node, offset: to });
+
   const onMouseDown = (lx: number, ly: number) => {
     focusManager.focus(node);
-    const offset = indexAtLocal(node, lx, ly);
-    setCaret({ node, offset }, { node, offset });
+    select(clicks.down(lx, ly, collectNodeText(node), indexAtLocal(node, lx, ly)));
   };
 
   const onDrag = (_lx: number, _ly: number, gx: number, gy: number) => {
     if (!anchor) return;
-    setCaret(anchor, caretAt(node, gx, gy));
+    const text = collectNodeText(node);
+    const target = caretAt(node, gx, gy);
+    if (target.node === node) {
+      select(clicks.drag(text, target.offset));
+      return;
+    }
+    // Into another node: keep the whole word or paragraph pressed here, by
+    // extending it to this node's far edge, then select on by character.
+    const after = compare({ node, offset: 0 }, target) < 0;
+    const edge = clicks.drag(text, after ? text.length : 0);
+    setCaret({ node, offset: edge.anchor }, target);
   };
 
   const onDoubleClick = (lx: number, ly: number) => {
+    const sel = clicks.doubleClick(lx, ly, collectNodeText(node), indexAtLocal(node, lx, ly));
+    if (!sel) return;
     focusManager.focus(node);
-    const word = selectWord(collectNodeText(node), indexAtLocal(node, lx, ly));
-    setCaret({ node, offset: word.start }, { node, offset: word.end });
+    select(sel);
   };
 
   const onKeyDown = (key: string, mod: { meta?: boolean; ctrl?: boolean }) => {

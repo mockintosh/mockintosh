@@ -15,6 +15,7 @@ import {
   type TextBlock,
 } from "../fonts/textLayout";
 import type { CanvasNode, Modifiers, TextAlign } from "../nodes";
+import { createTextClicks, paragraphRangeAt, type TextClickSelection } from "../textClicks";
 
 export interface EditableTextProps {
   name?: string;
@@ -118,14 +119,12 @@ export function EditableText(props: EditableTextProps): JSX.Element {
     return { start: line.start, end: line.start + line.text.length };
   }
 
-  function selectWord(index: number): void {
-    const text = valueNow();
-    let start = index;
-    let end = index;
-    while (start > 0 && /\S/.test(text[start - 1]!)) start--;
-    while (end < text.length && /\S/.test(text[end]!)) end++;
-    anchorAt = start;
-    place(end, true);
+  /** Double-click selects a word, triple-click the paragraph. */
+  const clicks = createTextClicks({ third: paragraphRangeAt });
+
+  function select({ anchor, caret }: TextClickSelection): void {
+    anchorAt = anchor;
+    place(caret, true);
   }
 
   function onKeyDown(key: string, mod: Modifiers): void {
@@ -264,10 +263,13 @@ export function EditableText(props: EditableTextProps): JSX.Element {
       onBlur={onBlur}
       onMouseDown={(lx: number, ly: number) => {
         if (node) focusManager.focus(node);
-        place(indexAt(lx, ly), false);
+        select(clicks.down(lx, ly, valueNow(), indexAt(lx, ly)));
       }}
-      onDrag={(lx: number, ly: number) => place(indexAt(lx, ly), true)}
-      onDoubleClick={(lx: number, ly: number) => selectWord(indexAt(lx, ly))}
+      onDrag={(lx: number, ly: number) => select(clicks.drag(valueNow(), indexAt(lx, ly)))}
+      onDoubleClick={(lx: number, ly: number) => {
+        const sel = clicks.doubleClick(lx, ly, valueNow(), indexAt(lx, ly));
+        if (sel) select(sel);
+      }}
       onKeyDown={onKeyDown}
       onKeyPress={onKeyPress}
     >

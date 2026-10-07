@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
 import { createUI } from "../src/ui";
+import { measureText } from "../src/fonts/bridge";
 
 function mount(ui: ReturnType<typeof createUI>, view: () => unknown) {
   const dispose = ui.render(view as () => import("solid-js").JSX.Element);
@@ -113,6 +114,61 @@ describe("text selectable", () => {
     ui.dispatchPointer("mouseup", b.x + Math.max(2, b.width - 2), b.y + 2);
     copyKeys(ui);
     expect(copied.at(-1)).toBe("alpha\nbravo");
+    dispose();
+  });
+
+  /** Like the web host: every press is a mousedown, the second also a dblclick. */
+  function clicks(ui: ReturnType<typeof createUI>, x: number, y: number, count: number) {
+    for (let i = 1; i <= count; i++) {
+      ui.dispatchPointer("mousedown", x, y);
+      if (i === 2) ui.dispatchPointer("dblclick", x, y);
+      ui.dispatchPointer("mouseup", x, y);
+    }
+  }
+
+  function twoParagraphs() {
+    const copied: string[] = [];
+    const ui = createUI({
+      screen: newBitMap(240, 80),
+      services: { clipboard: { readText: async () => "", writeText: async (text) => { copied.push(text); } } },
+    });
+    const dispose = mount(ui, () => (
+      <box width={220} flexDirection="column" gap={4}>
+        <text selectable semantic={{ name: "a" }}>see foo.bar now</text>
+        <text selectable semantic={{ name: "b" }}>next line</text>
+      </box>
+    ));
+    const a = ui.inspect().find((n) => n.name === "a")!.bounds;
+    const b = ui.inspect().find((n) => n.name === "b")!.bounds;
+    const xOf = (prefix: string) => a.x + measureText(prefix) + 1;
+    return { ui, copied, dispose, a, b, xOf };
+  }
+
+  it("selects the word under a double-click", () => {
+    const { ui, copied, dispose, a, xOf } = twoParagraphs();
+    clicks(ui, xOf("see f"), a.y + 4, 2);
+    copyKeys(ui);
+    expect(copied.at(-1)).toBe("foo");
+    dispose();
+  });
+
+  it("selects the paragraph under a triple-click", () => {
+    const { ui, copied, dispose, a, xOf } = twoParagraphs();
+    clicks(ui, xOf("see f"), a.y + 4, 3);
+    copyKeys(ui);
+    expect(copied.at(-1)).toBe("see foo.bar now");
+    dispose();
+  });
+
+  it("keeps the double-clicked word when dragging into the next node", () => {
+    const { ui, copied, dispose, a, b, xOf } = twoParagraphs();
+    clicks(ui, xOf("see f"), a.y + 4, 1);
+    ui.dispatchPointer("mousedown", xOf("see f"), a.y + 4);
+    ui.dispatchPointer("dblclick", xOf("see f"), a.y + 4);
+    ui.dispatchPointer("mousemove", b.x + measureText("ne") + 1, b.y + 4);
+    ui.dispatchPointer("mouseup", b.x + measureText("ne") + 1, b.y + 4);
+    copyKeys(ui);
+    expect(copied.at(-1)).toBe("foo.bar now\nne");
     dispose();
   });
 });

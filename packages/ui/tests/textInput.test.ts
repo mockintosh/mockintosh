@@ -164,4 +164,58 @@ describe("TextInput", () => {
     expect(value()).toBe("hi");
     dispose();
   });
+
+  async function mountWithText(text: string) {
+    const ui = createUI({ screen: newBitMap(200, 40) });
+    const [value, setValue] = createSignal("");
+    const dispose = ui.render(() =>
+      createComponent(TextInput, {
+        name: "draft",
+        get value() { return value(); },
+        onChange: setValue,
+        autoFocus: true,
+        width: 180,
+      }),
+    );
+    ui.frame();
+    await Promise.resolve();
+    ui.frame();
+    type(ui, text);
+    const { x, y, height } = ui.inspect().find((node) => node.name === "draft")!.bounds;
+    const at = (prefix: string) => ({ x: x + 5 + measureText(prefix) + 1, y: y + Math.floor(height / 2) });
+    // Like the web host: every press is a mousedown, the second also a dblclick.
+    const click = (p: { x: number; y: number }, count: number) => {
+      for (let i = 1; i <= count; i++) {
+        ui.dispatchPointer("mousedown", p.x, p.y);
+        if (i === 2) ui.dispatchPointer("dblclick", p.x, p.y);
+        ui.dispatchPointer("mouseup", p.x, p.y);
+        ui.frame();
+      }
+    };
+    return { ui, value, dispose, at, click };
+  }
+
+  it("selects the word under a double-click", async () => {
+    const { ui, value, dispose, at, click } = await mountWithText("hello brave world");
+    click(at("hello br"), 2);
+    type(ui, "new");
+    expect(value()).toBe("hello new world");
+    dispose();
+  });
+
+  it("selects only the word, not surrounding punctuation", async () => {
+    const { ui, value, dispose, at, click } = await mountWithText("see foo.bar now");
+    click(at("see f"), 2);
+    type(ui, "x");
+    expect(value()).toBe("see x.bar now");
+    dispose();
+  });
+
+  it("selects everything on a triple-click", async () => {
+    const { ui, value, dispose, at, click } = await mountWithText("hello brave world");
+    click(at("hello br"), 3);
+    type(ui, "x");
+    expect(value()).toBe("x");
+    dispose();
+  });
 });

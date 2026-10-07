@@ -5,6 +5,7 @@ import {useUIServices} from "../services";
 import {useRadius} from "../theme";
 import {measureText} from "../fonts/bridge";
 import type {CanvasNode, Modifiers} from "../nodes";
+import {createTextClicks, paragraphRangeAt, type TextClickSelection} from "../textClicks";
 
 export interface TextEditorProps {
   name?: string; value: string; onChange(value: string): void;
@@ -92,15 +93,27 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
       insert("");
     }
   }
-  function pointer(x: number, y: number, extend = false) {
+  // Double-click selects a word, triple-click the line.
+  const clicks = createTextClicks({third: paragraphRangeAt});
+  const pointAt = (x: number, y: number) => indexAt(top() + Math.floor((y - 4) / lineHeight), left() + Math.round((x - 4) / charWidth));
+  function select({anchor: at, caret: to}: TextClickSelection) {
+    anchorAt = at;
+    setAnchor(at);
+    move(to, true);
+  }
+  function pointer(x: number, y: number) {
     focus.focus(node);
-    move(indexAt(top() + Math.floor((y - 4) / lineHeight), left() + Math.round((x - 4) / charWidth)), extend);
+    select(clicks.down(x, y, valueNow(), pointAt(x, y)));
+  }
+  function doubleClick(x: number, y: number) {
+    const sel = clicks.doubleClick(x, y, valueNow(), pointAt(x, y));
+    if (sel) { focus.focus(node); select(sel); }
   }
   return <box ref={n => node = n} semantic={{name: props.name, role: "textbox", value: props.value, enabled: !props.disabled}}
     width={props.width} height={props.height} borderWidth={1} borderColor={1} borderRadius={radius()} background={0} overflow="hidden" tabIndex={0}
     cursor={props.disabled ? "default" : "text"}
     onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-    onMouseDown={(x, y) => pointer(x, y)} onDrag={(x, y) => pointer(x, y, true)}
+    onMouseDown={(x, y) => pointer(x, y)} onDrag={(x, y) => select(clicks.drag(valueNow(), pointAt(x, y)))} onDoubleClick={doubleClick}
     onScroll={delta => setTop(t => Math.max(0, Math.min(lines().length - rows(), t + Math.sign(delta) * 3)))}
     onKeyDown={key} onKeyPress={insert}>
     <For each={lines().slice(top(), top() + rows())}>{(line, row) => {

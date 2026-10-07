@@ -6,6 +6,7 @@ import { useRadius } from "../theme";
 import { useUIServices } from "../services";
 import { measureText } from "../fonts/bridge";
 import type { CanvasNode, Modifiers } from "../nodes";
+import { createTextClicks, wordRangeAt, type TextClickSelection } from "../textClicks";
 
 export interface TextInputProps {
   name?: string;
@@ -15,6 +16,7 @@ export interface TextInputProps {
   onChange: (value: string) => void;
   onSubmit?: (value: string) => void;
   onCancel?: () => void;
+  onFocus?: () => void;
   onBlur?: () => void;
   placeholder?: string;
   font?: string;
@@ -97,10 +99,10 @@ export function TextInput(props: TextInputProps): JSX.Element {
   // --- Focus management ---
   let isInitialFocus = true;
 
-  /** Caret index where the current pointer gesture started (mousedown). */
-  let dragAnchorIndex = 0;
-  /** True after onDrag — suppresses onClick so it does not clear a drag selection. */
-  let didPointerDrag = false;
+  /** Double-click selects a word (a password is one word, like the Mac); triple, everything. */
+  const clicks = createTextClicks({
+    word: (text, index) => (props.password ? { start: 0, end: text.length } : wordRangeAt(text, index)),
+  });
 
   function handleFocus(): void {
     setIsFocused(true);
@@ -112,6 +114,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
         writeCursor(props.value.length);
       }
     }
+    props.onFocus?.();
   }
 
   function handleBlur(): void {
@@ -186,16 +189,6 @@ export function TextInput(props: TextInputProps): JSX.Element {
       accumulated += cw;
     }
     return text.length;
-  }
-
-  function selectWordAtIndex(idx: number): void {
-    const text = props.value;
-    let start = idx;
-    let end = idx;
-    while (start > 0 && /\S/.test(text[start - 1])) start--;
-    while (end < text.length && /\S/.test(text[end])) end++;
-    writeSel(start, end);
-    writeCursor(end);
   }
 
   // --- Text insertion ---
@@ -337,41 +330,27 @@ export function TextInput(props: TextInputProps): JSX.Element {
     return pixelsToCharIndex(localToContentX(lx) + scrollX());
   }
 
-  function handleMouseDown(lx: number, _ly: number): void {
+  function select({ anchor, caret }: TextClickSelection): void {
+    writeSel(anchor === caret ? null : Math.min(anchor, caret), anchor === caret ? null : Math.max(anchor, caret));
+    writeCursor(caret);
+  }
+
+  function handleMouseDown(lx: number, ly: number): void {
     if (props.disabled) return;
-    didPointerDrag = false;
     if (rootNode) focusManager.focus(rootNode);
-    const idx = indexAtPointer(lx);
-    dragAnchorIndex = idx;
-    writeCursor(idx);
-    writeSel(null, null);
+    select(clicks.down(lx, ly, valueNow(), indexAtPointer(lx)));
   }
 
-  function handleClick(lx: number): void {
-    if (didPointerDrag) {
-      didPointerDrag = false;
-      return;
-    }
+  function handleDoubleClick(lx: number, ly: number): void {
+    if (props.disabled) return;
+    const sel = clicks.doubleClick(lx, ly, valueNow(), indexAtPointer(lx));
+    if (!sel) return;
     if (rootNode) focusManager.focus(rootNode);
-    const idx = indexAtPointer(lx);
-    writeCursor(idx);
-    writeSel(null, null);
-  }
-
-  function handleDoubleClick(lx: number): void {
-    if (rootNode) focusManager.focus(rootNode);
-    const idx = indexAtPointer(lx);
-    selectWordAtIndex(idx);
+    select(sel);
   }
 
   function handleDrag(lx: number): void {
-    didPointerDrag = true;
-    const idx = indexAtPointer(lx);
-    const lo = Math.min(dragAnchorIndex, idx);
-    const hi = Math.max(dragAnchorIndex, idx);
-    if (lo === hi) writeSel(null, null);
-    else writeSel(lo, hi);
-    writeCursor(idx);
+    select(clicks.drag(valueNow(), indexAtPointer(lx)));
   }
 
   // Keep the insertion point inside the clipped content box.
@@ -452,8 +431,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
       onFocus={handleFocus}
       onBlur={handleBlur}
       onMouseDown={(x: number, y: number) => handleMouseDown(x, y)}
-      onClick={(x: number) => handleClick(x)}
-      onDoubleClick={(x: number) => handleDoubleClick(x)}
+      onDoubleClick={(x: number, y: number) => handleDoubleClick(x, y)}
       onDrag={(lx) => handleDrag(lx)}
       onKeyDown={(key: string, mod: Modifiers) => handleKeyDown(key, mod)}
       onKeyPress={(char: string) => handleKeyPress(char)}
