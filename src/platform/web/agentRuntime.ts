@@ -12,7 +12,7 @@ import type {
 import type { FxHostTool, FxRevisioned, FxTerminalOptions, FxTurn, FxTurnEvent } from "libfx/browser";
 import { fetchWithInstructions } from "./agentInstructions";
 
-const FX_VERSION = "0.0.11";
+const FX_VERSION = "0.0.13";
 
 /**
  * Agents on the web: fx's WebAssembly core through libfx. The engine needs

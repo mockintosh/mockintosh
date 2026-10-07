@@ -29,10 +29,10 @@ export const KEY_VARIABLE = "AI_GATEWAY_API_KEY";
 
 /**
  * How fx decides about running a command. In the browser build (libfx
- * 0.0.11) "auto" has no safety reviewer, so it holds every command, and
- * "ask" spins without yielding once it asks, which freezes the window. Full
- * access works, and fx's shell only reaches this Macintosh's disk and
- * windows, never the computer it runs on.
+ * 0.0.11 through 0.0.13) "auto" has no safety reviewer, so it holds every
+ * command, and "ask" spins without yielding once it asks, which freezes the
+ * window. Full access works, and fx's shell only reaches this Macintosh's
+ * disk and windows, never the computer it runs on. See libfx-findings.md.
  */
 export const DEFAULT_PERMISSION_MODE = "full-access";
 
@@ -60,7 +60,7 @@ export function fxProgram(options: FxProgramOptions): TtyProgram {
       }
       const fxEnv = fxEnvironment(env);
       if (/^ask$/i.test(fxEnv.FX_PERMISSION_MODE!)) {
-        say("fx: FX_PERMISSION_MODE=ask freezes fx in the browser once it asks for approval (libfx 0.0.11).\nUse full-access (the default here) or unset it.\n");
+        say("fx: FX_PERMISSION_MODE=ask freezes fx in the browser once it asks for approval (libfx 0.0.13).\nUse full-access (the default here) or unset it.\n");
         return 1;
       }
       if (fxEnv.FX_PERMISSION_MODE === DEFAULT_PERMISSION_MODE && !env.FX_PERMISSION_MODE) {

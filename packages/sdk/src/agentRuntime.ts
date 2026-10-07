@@ -156,7 +156,7 @@ export interface AgentTerminal {
 }
 
 export interface AgentRuntime {
-  /** What runs the agents, for About boxes and diagnostics ("fx 0.0.11"). */
+  /** What runs the agents, for About boxes and diagnostics ("fx 0.0.13"). */
   readonly engine: string;
   /** Start a conversation. Loading the engine may take a moment the first time. */
   createSession(options: AgentSessionOptions): Promise<AgentSession>;

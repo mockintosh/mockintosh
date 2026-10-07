@@ -1,5 +1,5 @@
 /**
- * The part of libfx 0.0.11's browser entry the web platform uses. The
+ * The part of libfx 0.0.13's browser entry the web platform uses. The
  * package ships no declarations; these follow its documentation and source
  * (`fx-sdk.js`). Keep them in step when the pinned version changes.
  */
