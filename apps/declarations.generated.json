@@ -113,6 +113,117 @@
    "description": "Browses the web the way it looked in 1996: text, links, pictures and forms, without style sheets or scripts. GitHub and Hacker News are drawn from their APIs."
   }
  },
+ "maps": {
+  "id": "maps",
+  "title": "Maps",
+  "icon": "maps/icon",
+  "defaultSize": {
+   "width": 460,
+   "height": 290
+  },
+  "smallIcon": "maps/icon-16x16",
+  "requires": [
+   "network"
+  ],
+  "scrollable": false,
+  "resizable": true,
+  "growBox": "overlay",
+  "minSize": {
+   "width": 240,
+   "height": 180
+  },
+  "about": {
+   "version": "1.0",
+   "description": "Street maps of the whole world from OpenStreetMap, drawn in one bit. Drag to move, double-click or scroll to zoom, click a place or search for one to see its info, and get directions by car, bike or on foot. Map data © OpenStreetMap contributors, tiles by OpenFreeMap, search by Nominatim, directions by OSRM on FOSSGIS servers."
+  },
+  "sprites": {
+   "maps/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgAAAVCgAAqmqAAWpWACpWmaoBqpYKlVZmZqaWpglVVpmZppqmCVVWZmZmqqYJVVaZmaWqlglVVmZmZWpWCVVWmZmlVVYJVVZmZmVZVglVVqmZpVlaCVWqWqZlWaYJalZVaqWZVgqVVqVVqlVaCVWqmpVlVqYJalZmamWpVgqVqpmZqlVWCWpWZmZlVVYKlWqZmaVVVglpVmZmZVVWCpWmmZmlVVYJWlamZmVVWgpVqAqZpVagCWoAACplqAAKgAAAAKoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "maps/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAAAAAAAoAAKCloApqVaqlaVWqamlVqmZpVapqaVaqWWlpqlVqlapaqVWqpWlaqlWpoKpaCgAKoAAAAAAA=="
+   },
+   "maps/car": {
+    "width": 16,
+    "height": 11,
+    "data": "AAAAAACqqgACAgCACAIAICqqqqiAAAACigAAoooAAKKqqqqqKgAAqCoAAKg="
+   },
+   "maps/car-selected": {
+    "width": 16,
+    "height": 11,
+    "data": "AAAAAABVVQABAQBABAEAEBVVVVRAAAABRQAAUUUAAFFVVVVVFQAAVBUAAFQ="
+   },
+   "maps/foot": {
+    "width": 16,
+    "height": 11,
+    "data": "AAKAAAACgAAAAAAAAAqgAAAiiAAAgoIAAAKAAAAIIAAACCAAACAIAACgCgA="
+   },
+   "maps/foot-selected": {
+    "width": 16,
+    "height": 11,
+    "data": "AAFAAAABQAAAAAAAAAVQAAARRAAAQUEAAAFAAAAEEAAABBAAABAEAABQBQA="
+   },
+   "maps/bike": {
+    "width": 16,
+    "height": 11,
+    "data": "AAAAAAAACoAAKgIAAAqqAAqiCqAgIgiIgIiggoKqoIKACCACICAICAqAAqA="
+   },
+   "maps/bike-selected": {
+    "width": 16,
+    "height": 11,
+    "data": "AAAAAAAABUAAFQEAAAVVAAVRBVAQEQREQERQQUFVUEFABBABEBAEBAVAAVA="
+   },
+   "maps/swap": {
+    "width": 9,
+    "height": 10,
+    "data": "CAAKgAiIACAACAgCAgAAgAIiACoAAgA="
+   },
+   "maps/start": {
+    "width": 9,
+    "height": 9,
+    "data": "CqgKVopValVWlVWlVWpVaKVoCqgA"
+   },
+   "maps/end": {
+    "width": 9,
+    "height": 9,
+    "data": "CqgKqoqVqpVapVapVaqVqKqoCqgA"
+   },
+   "maps/info": {
+    "width": 11,
+    "height": 11,
+    "data": "AqoAIAICAgIgAAKAoAoAgCgCAKAqAiAAICACACqgAA=="
+   },
+   "maps/info-selected": {
+    "width": 11,
+    "height": 11,
+    "data": "AVUAEAEBAQEQAAFAUAUAQBQBAFAVARAAEBABABVQAA=="
+   },
+   "maps/back": {
+    "width": 5,
+    "height": 9,
+    "data": "AICAgICACACACACA"
+   },
+   "maps/close": {
+    "width": 7,
+    "height": 7,
+    "data": "gAiAgIgAgAiAgIgAgA=="
+   },
+   "maps/close-pressed": {
+    "width": 7,
+    "height": 7,
+    "data": "QARAQEQAQARAQEQAQA=="
+   },
+   "maps/search": {
+    "width": 11,
+    "height": 10,
+    "data": "CqAAgCAIACAgAICAAgIACAIAgAKooAAAoAAAoA=="
+   }
+  }
+ },
  "showreel": {
   "id": "showreel",
   "title": "Showreel",

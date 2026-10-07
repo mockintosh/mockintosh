@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { footerBandHeight, headerBandHeight, titleBarOuterHeight, windowHeaderHeight, windowTotalHeight } from "./windowGeometry";
+import { footerBandHeight, hasGrowBand, headerBandHeight, titleBarOuterHeight, windowContentWidth, windowHeaderHeight, windowTotalHeight } from "./windowGeometry";
+import type { OSWindow } from "./state";
 
 const doc = { kind: "document" as const, height: 200, scrollable: true };
 
@@ -27,5 +28,20 @@ describe("window header/footer bands", () => {
     const win = { ...doc, headerHeight: 0, footerHeight: 72 };
     expect(footerBandHeight(win)).toBe(72);
     expect(windowTotalHeight(win)).toBe(20 + 200 + 72 + 16);
+  });
+});
+
+describe("the grow box of a window without scroll bars", () => {
+  const win = (growBox?: OSWindow["growBox"]) =>
+    ({ kind: "document", width: 300, height: 200, scrollable: false, resizable: true, growBox }) as OSWindow;
+
+  it("keeps an empty scroll-bar band for it by default", () => {
+    expect(hasGrowBand(win())).toBe(true);
+    expect(windowContentWidth(win())).toBe(300 - 2 - 15);
+  });
+
+  it("gives the content the full width when the grow box sits over it", () => {
+    expect(hasGrowBand(win("overlay"))).toBe(false);
+    expect(windowContentWidth(win("overlay"))).toBe(300 - 2);
   });
 });

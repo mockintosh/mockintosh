@@ -29,6 +29,7 @@ export interface AppDeclaration {
   windowKind?: string;
   scrollable?: boolean;
   resizable?: boolean;
+  growBox?: SolidApp["growBox"];
   minSize?: { width: number; height: number };
   singleInstance?: boolean;
   fileTypes?: SolidApp["fileTypes"];
@@ -52,6 +53,7 @@ export function appDeclaration(app: SolidApp<any>): AppDeclaration {
   copy("windowKind", app.windowKind);
   copy("scrollable", app.scrollable);
   copy("resizable", app.resizable);
+  copy("growBox", app.growBox);
   copy("minSize", app.minSize);
   copy("singleInstance", app.singleInstance);
   copy("fileTypes", app.fileTypes);

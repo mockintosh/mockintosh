@@ -213,6 +213,7 @@ export function createAppContext(
     images: os.images,
     video: os.video,
     camera: os.camera,
+    gpu: os.gpu,
     audio: os.audio && instanceAudio(os, os.audio, options.instanceId),
     microphone: os.microphone && instanceMicrophone(os, os.microphone, options.instanceId),
     agentRuntime: os.agentRuntime && instanceAgentRuntime(os, os.agentRuntime, options.instanceId),
