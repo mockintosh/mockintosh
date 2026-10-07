@@ -57,7 +57,7 @@ export function iconForNode(fs: FileSystem, node: FSNode): string {
   const custom = finderAttributes(fs, node.id).icon;
   if (custom) return custom;
   if (node.kind === "directory") {
-    if (node.role === "trash") return "icon/trash";
+    if (node.role === "trash") return fs.childCount(node.id) > 0 ? "icon/trash-full" : "icon/trash";
     if (node.role === "volume") return "icon/hd";
     return "icon/folder";
   }

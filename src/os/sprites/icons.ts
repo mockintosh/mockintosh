@@ -287,6 +287,18 @@ const ICON_CHAT_16X16 = fromGrid(16, 16, [
   "#oooo###########",
   "################",
 ]);
+/** System 7.5.3: System Full Trash -3984 · ICN# */
+const ICON_TRASH_FULL = defineSprite(
+  32,
+  32,
+  "AAAAKqgAAAAAAACVVgAAAAAKqqqqqqAAACVVVVVVWAAAKqqqqqqoAAAJVVVVVWAAAAlVVVVVYAAACVZVVWVgAAAlWVlZWVgAACVZWVlZWAAAlWVlVlZWAACVZWVWVlYAAlWVlVWVlYACVZWVVZWVgAJVlZVVlZWAAlWVlVWVlYACVZWVVZWVgAJVlZVVlZWAAlWVlVWVlYACVZWVVZWVgAJVlZVVlZWAAlWVlVWVlYACVZWVVZWVgACVZWVWVlYAAJVlZVZWVgAAJVlZWVlYAAAlWVlZWVgAACVZWVlZWAAACVZVVVVgAAAJVVVVVWAAAAlVVVVVYAAAAqqqqqqAAA=="
+);
+/** System 7.5.3: System Full Trash -3984 · ics# */
+const ICON_TRASH_FULL_16X16 = defineSprite(
+  16,
+  16,
+  "AAqAAAAgIAAKqqqACVVVgAqqqoACVVYACWVlgAmWWYAllllgJZZZYCWWWWAllllgCZZZgAllZYACVVYAAKqoAA=="
+);
 export const iconSprites: Record<string, Sprite> = {
   "icon/1bitcamera": ICON_1BITCAMERA,
   "icon/MacFlim": ICON_MACFLIM,
@@ -322,4 +334,6 @@ export const iconSprites: Record<string, Sprite> = {
   "icon/trash": ICON_TRASH,
   "icon/video": ICON_VIDEO,
   "foundry/icon": ICON_FOUNDRY_ICON,
+  "icon/trash-full": ICON_TRASH_FULL,
+  "icon/trash-full-16x16": ICON_TRASH_FULL_16X16,
 };
