@@ -3,9 +3,10 @@ import { FileSystem, InMemoryBackend, ROOT_ID } from "@mockintosh/fs";
 import { Kernel } from "../../../src/os/kernel";
 import { registerFileOperations } from "../../../src/os/kernel/files";
 import { registerShell } from "../../../src/os/shell";
+import { registerProcesses } from "../../../src/os/kernel/processes";
 import { Cancellation } from "../../../src/os/kernel/cancellation";
 import { BashRunner, BashSession, type KernelLike, type TtyProgram } from "../src/bash/index";
-import { createTerminalScreen, Pty, runShell, exitBuiltin, type TerminalScreen } from "../src/index";
+import { createTerminalScreen, Pty, runShell, exitBuiltin, kernelProcesses, type TerminalScreen } from "../src/index";
 
 export async function kernelRig() {
   const fs = await FileSystem.open({ backend: new InMemoryBackend() });
@@ -13,6 +14,7 @@ export async function kernelRig() {
   const kernel = new Kernel();
   registerFileOperations(kernel, fs);
   registerShell(kernel);
+  registerProcesses(kernel);
   const caller = kernel.createSession();
   const client: KernelLike = {
     invoke(name, args = {}, options = {}) {
@@ -21,7 +23,7 @@ export async function kernelRig() {
       return kernel.invoke(caller, name, args, token, { stdout: options.stdout, stderr: options.stderr });
     },
   };
-  return { fs, kernel, client };
+  return { fs, kernel, client, caller };
 }
 
 function visible(screen: TerminalScreen): string[] {
@@ -78,18 +80,19 @@ describe("BashSession on the kernel's disk", () => {
 
 describe("bash on a pseudo-terminal", () => {
   async function terminal(programs: TtyProgram[] = []) {
-    const { client } = await kernelRig();
+    const { client, kernel } = await kernelRig();
     const screen = createTerminalScreen({ size: { cols: 40, rows: 8 } });
     const pty = new Pty();
     pty.master.onOutput((data) => void screen.write(data));
     screen.onInput((data) => pty.master.write(data));
     pty.master.resize(screen.size);
     const runner = new BashRunner({ kernel: client, programs });
-    const done = runShell(pty.slave, runner, { exitCommand: exitBuiltin });
+    const killed: string[] = [];
+    const done = runShell(pty.slave, runner, { exitCommand: exitBuiltin, processes: kernelProcesses(client), name: "bash", onKilled: (signal) => killed.push(signal) });
     const settle = async () => {
       for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 5));
     };
-    return { screen, pty, done, settle, type: (s: string) => screen.input(s) };
+    return { screen, pty, done, settle, kernel, killed, type: (s: string) => screen.input(s) };
   }
 
   it("runs a line typed at the prompt", async () => {
@@ -125,5 +128,32 @@ describe("bash on a pseudo-terminal", () => {
     type("echo $?\r");
     await settle();
     expect(visible(screen).slice(3, 6)).toEqual(["^C", "~ $ echo $?", "130"]);
+  });
+
+  it("lists the shell and its job in ps, and kill from elsewhere stops the job", async () => {
+    const forever: TtyProgram = {
+      name: "forever",
+      attached: ({ job }) => new Promise((resolve) => job.signal.addEventListener("abort", () => resolve(0))),
+    };
+    const { kernel, screen, type, settle, killed } = await terminal([forever]);
+    await settle();
+    type("forever --and-ever\r");
+    await settle();
+    const other = kernel.createSession();
+    const rows = (await kernel.invoke(other, "ps", {})) as { pid: number; ppid: number; name: string; args: string[]; tty?: string }[];
+    const shell = rows.find((r) => r.name === "bash")!;
+    const job = rows.find((r) => r.name === "forever")!;
+    expect(job).toMatchObject({ ppid: shell.pid, args: ["--and-ever"], tty: shell.tty });
+    expect(shell.tty).toMatch(/^ttys\d{3}$/);
+    await kernel.invoke(other, "kill", { pid: job.pid });
+    await settle();
+    type("echo $?\r");
+    await settle();
+    expect(visible(screen).slice(1, 3)).toEqual(["~ $ echo $?", "143"]);
+    // The shell ignores an interrupt, but a kill ends it.
+    await kernel.invoke(other, "kill", { pid: shell.pid, signal: "SIGINT" });
+    await kernel.invoke(other, "kill", { pid: shell.pid, signal: "SIGTERM" });
+    await settle();
+    expect(killed).toEqual(["SIGTERM"]);
   });
 });

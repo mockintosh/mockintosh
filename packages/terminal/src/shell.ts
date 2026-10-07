@@ -10,6 +10,7 @@
  */
 import { LineEditor, type Completion } from "./lineEditor";
 import { COOKED, RAW, SIGNAL_NUMBERS, type Signal, type Tty } from "./pty";
+import type { ProcessRegistry, RegisteredProcess } from "./processes";
 
 export interface Job {
   readonly tty: Tty;
@@ -20,6 +21,10 @@ export interface Job {
   write(data: Uint8Array | string): void;
   /** Hear signals other than the ones that abort the job (SIGWINCH). */
   onSignal(handler: (signal: Signal) => void): () => void;
+  /** Deliver a signal as if the terminal sent it (`kill` from elsewhere). */
+  raise(signal: Signal): void;
+  /** The job's pid in the process table, once registered. */
+  pid?: number;
 }
 
 export interface ShellRunner {
@@ -40,7 +45,7 @@ export interface ShellRunner {
 const ENDING: ReadonlySet<Signal> = new Set<Signal>(["SIGINT", "SIGQUIT", "SIGHUP", "SIGTERM", "SIGKILL"]);
 
 /** Run `job` as the foreground job and wait for it. */
-export async function runForeground(tty: Tty, work: (job: Job) => Promise<number>): Promise<number> {
+export async function runForeground(tty: Tty, work: (job: Job) => Promise<number>, setup?: (job: Job) => void): Promise<number> {
   const controller = new AbortController();
   const listeners = new Set<(signal: Signal) => void>();
   let stoppedBy: Signal | null = null;
@@ -55,14 +60,18 @@ export async function runForeground(tty: Tty, work: (job: Job) => Promise<number
       listeners.add(handler);
       return () => listeners.delete(handler);
     },
+    raise: () => {},
   };
-  const previous = tty.setForeground((signal) => {
+  const deliver = (signal: Signal) => {
     for (const listener of listeners) listener(signal);
     if (ENDING.has(signal) && !stoppedBy) {
       stoppedBy = signal;
       controller.abort();
     }
-  });
+  };
+  job.raise = deliver;
+  const previous = tty.setForeground(deliver);
+  setup?.(job);
   try {
     const code = await work(job);
     return stoppedBy ? 128 + SIGNAL_NUMBERS[stoppedBy] : code;
@@ -76,7 +85,32 @@ export async function runForeground(tty: Tty, work: (job: Job) => Promise<number
 }
 
 /** The shell's loop. Resolves with the shell's exit status when input ends (⌃D, `exit`, hang-up). */
-export async function runShell(tty: Tty, runner: ShellRunner, options: { exitCommand?: (line: string) => number | null } = {}): Promise<number> {
+export interface RunShellOptions {
+  exitCommand?: (line: string) => number | null;
+  /** Register the shell and its jobs here, so `ps` lists them and `kill` reaches them. */
+  processes?: ProcessRegistry;
+  /** The shell's name in the process table. */
+  name?: string;
+  /** The shell itself was killed: end the session (close the terminal). */
+  onKilled?(signal: string): void;
+}
+
+/** Signal names the tty knows, from the kernel's. */
+function ttySignal(name: string): Signal | null {
+  return name in SIGNAL_NUMBERS ? (name as Signal) : null;
+}
+
+export async function runShell(tty: Tty, runner: ShellRunner, options: RunShellOptions = {}): Promise<number> {
+  const shell = await options.processes?.start(options.name ?? "sh", [], {
+    tty: "new",
+    onSignal: (signal) => {
+      // A shell ignores SIGINT at the prompt; anything that ends a process ends it.
+      if (signal === "SIGINT" || signal === "SIGWINCH" || signal === "SIGTSTP" || signal === "SIGCONT") return;
+      options.onKilled?.(signal);
+    },
+  });
+  const tty0 = shell?.tty;
+  let current: Job | null = null;
   const history = (await runner.loadHistory?.().catch(() => [])) ?? [];
   const editor = new LineEditor({
     write: (text) => tty.write(text),
@@ -129,7 +163,26 @@ export async function runShell(tty: Tty, runner: ShellRunner, options: { exitCom
       if (!line.trim()) continue;
       const exit = options.exitCommand?.(line);
       if (exit !== null && exit !== undefined) return exit;
-      status = await runForeground(tty, (job) => runner.run(line, job));
+      const words = line.trim().split(/\s+/);
+      const registered: { process: RegisteredProcess | null } = { process: null };
+      status = await runForeground(
+        tty,
+        async (job) => {
+          registered.process = (await options.processes?.start(words[0]!, words.slice(1), {
+            tty: tty0,
+            parent: shell?.pid,
+            onSignal: (signal) => {
+              const s = ttySignal(signal);
+              if (s) current?.raise(s);
+            },
+          })) ?? null;
+          if (registered.process) job.pid = registered.process.pid;
+          return runner.run(line, job);
+        },
+        (job) => (current = job),
+      );
+      current = null;
+      registered.process?.exit(status);
       // After ⌃C, what was typed meanwhile goes with the interrupted command, as in bash.
       if (status > 128 && status - 128 === SIGNAL_NUMBERS.SIGINT) {
         tty.write("\n");
@@ -137,6 +190,7 @@ export async function runShell(tty: Tty, runner: ShellRunner, options: { exitCom
       }
     }
   } finally {
+    shell?.exit(status);
     runner.exit?.();
   }
 }

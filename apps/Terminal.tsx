@@ -1,7 +1,7 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { useUIServices, type JSX } from "@mockintosh/ui";
 import { defineApp, useApp, type AppContext } from "@mockintosh/sdk";
-import { Pty, exitBuiltin, runShell } from "@mockintosh/terminal";
+import { Pty, exitBuiltin, kernelProcesses, runShell } from "@mockintosh/terminal";
 import { BashRunner } from "@mockintosh/terminal/bash";
 import { TerminalView, type TerminalHandle } from "@mockintosh/terminal/view";
 import { terminalPrograms } from "./terminal/programs";
@@ -12,7 +12,7 @@ const HISTORY_SIZE = 500;
 /** 80×24 in Monaco 9 cells, plus the view's margins. */
 const DEFAULT_SIZE = { width: 80 * 6 + 4, height: 24 * 11 + 2 };
 
-function startShell(app: AppContext, pty: Pty): void {
+function startShell(app: AppContext, pty: Pty, onKilled: () => void): void {
   const runner = new BashRunner({
     kernel: app.kernel!,
     programs: terminalPrograms(app),
@@ -23,7 +23,7 @@ function startShell(app: AppContext, pty: Pty): void {
     },
     saveHistory: (lines) => app.storage.write(HISTORY_KEY, lines.slice(-HISTORY_SIZE).join("\n")),
   });
-  void runShell(pty.slave, runner, { exitCommand: exitBuiltin }).then(
+  void runShell(pty.slave, runner, { exitCommand: exitBuiltin, processes: kernelProcesses(app.kernel!), name: "bash", onKilled }).then(
     (code) => pty.exit(code),
     (error) => {
       pty.slave.write(`\r\nbash: ${error instanceof Error ? error.message : String(error)}\r\n`);
@@ -41,7 +41,7 @@ function Terminal(): JSX.Element {
   let handle: TerminalHandle | undefined;
   const [exited, setExited] = createSignal<number | null>(null, { ownedWrite: true });
   const [title, setTitle] = createSignal("", { ownedWrite: true });
-  startShell(app, pty);
+  startShell(app, pty, () => win.close());
   onCleanup(() => {
     pty.hangUp();
     release?.();
@@ -137,6 +137,7 @@ export default defineApp({
     "kernel:run_shell", "kernel:shell_close",
     "kernel:stat", "kernel:list", "kernel:read_bytes", "kernel:write_bytes",
     "kernel:mkdir", "kernel:remove", "kernel:move", "kernel:copy",
+    "kernel:process_start", "kernel:process_exit", "kernel:process_signals", "kernel:ps", "kernel:kill", "kernel:wait",
   ],
   Component: Terminal,
 });

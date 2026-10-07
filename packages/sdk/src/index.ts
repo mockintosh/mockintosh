@@ -140,6 +140,12 @@ export type {
   AgentToolContext,
   AgentToolResult,
   AgentImage,
+  AgentTerminal,
+  AgentTerminalOptions,
+  AgentTerminalScreen,
+  AgentWorkspace,
+  AgentWorkspaceRequest,
+  AgentStorage,
 } from "./agentRuntime";
 export { readWavChunk, readWavMarkers, setWavChunk, setWavMarkers } from "./wav";
 export type { FontRasterMode, FontRasterOptions, FontRasterService, FontRegistryService } from "./fontRaster";

@@ -1,6 +1,7 @@
 import {jobSchema} from "../projects";
 import {parse} from "../kernel/schema";
-import { formatters } from "./format";
+import { formatters, formatProcesses, type ProcessRow } from "./format";
+import { parseSignal } from "../kernel/processes";
 import type { Cancellation } from "../kernel/cancellation";
 export class UsageError extends Error { }
 interface CommandContext {
@@ -70,6 +71,27 @@ export const commands: Readonly<Record<string, Command>> = {
     operands: "", json: true,
     format: result => (result as {id: string; app: string; build?: string}[]).map(i => `${i.id}  ${i.app}  ${i.build ?? "bundled"}\n`).join(""),
     async run(args, {invoke}, usage) { usage(0); return invoke("instances"); },
+  },
+  ps: {
+    operands: "[-a]", json: true,
+    format: result => formatProcesses(result as ProcessRow[]),
+    async run(args, {invoke}, usage) {
+      usage(0, 1);
+      if (args[0] !== undefined && args[0] !== "-a") throw new UsageError(commandHelp.ps);
+      return invoke("ps", args[0] === "-a" ? {all: true} : {});
+    },
+  },
+  kill: {
+    operands: "[-SIGNAL] pid...", json: false,
+    async run(args, {invoke}, usage) {
+      usage(1, 32);
+      const signal = args[0]!.startsWith("-") ? parseSignal(args.shift()!) : "SIGTERM";
+      if (!args.length) throw new UsageError(commandHelp.kill);
+      for (const pid of args) {
+        if (!/^\d+$/.test(pid)) throw new UsageError(commandHelp.kill);
+        await invoke("kill", {pid: Number(pid), signal});
+      }
+    },
   },
   help: {
     operands: "[command]", json: false,

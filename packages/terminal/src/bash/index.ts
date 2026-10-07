@@ -9,3 +9,5 @@ export type { BashRunnerOptions, ProgramContext, TtyProgram } from "./runner";
 export { KernelFs, FsError } from "./kernelFs";
 export type { KernelLike } from "./kernelFs";
 export { osCommands, runS1, s1Quote, OS_COMMANDS } from "./osCommands";
+export { bashWorkspace } from "./workspace";
+export type { BashWorkspace, WorkspaceRequest } from "./workspace";

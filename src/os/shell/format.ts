@@ -70,3 +70,26 @@ export const formatters = {
     return text((result as FileResource).path) + "\n";
   },
 };
+
+export interface ProcessRow {
+  pid: number;
+  ppid: number;
+  name: string;
+  args: string[];
+  tty?: string;
+  kind: "job" | "app";
+  state: "running" | "exited";
+  status?: number;
+  instance?: string;
+}
+
+/** `ps` as a Unix user reads it: apps are the windowed processes without a tty. */
+export function formatProcesses(rows: ProcessRow[]): string {
+  const lines = ["  PID  PPID TT       STAT COMMAND"];
+  for (const row of rows) {
+    const stat = row.state === "exited" ? `Z${row.status ?? ""}` : row.kind === "app" ? "A" : "S";
+    const command = row.kind === "app" ? `${row.name} (${row.instance})` : [row.name, ...row.args].join(" ");
+    lines.push(`${String(row.pid).padStart(5)} ${String(row.ppid).padStart(5)} ${(row.tty ?? "??").padEnd(8)} ${stat.padEnd(4)} ${command}`);
+  }
+  return lines.join("\n") + "\n";
+}

@@ -214,3 +214,26 @@ describe("widths", () => {
     expect(columns(["a", "bb", "ccc", "d"], 12)).toBe("a    ccc\r\nbb   d\r\n");
   });
 });
+
+describe("TerminalBridge", () => {
+  it("connects an xterm-shaped program to a view's process", async () => {
+    const { TerminalBridge } = await import("../src/index");
+    const bridge = new TerminalBridge();
+    const typed: string[] = [];
+    const sizes: { cols: number; rows: number }[] = [];
+    bridge.terminal.onData((d) => typed.push(d));
+    bridge.terminal.onResize((s) => sizes.push(s));
+    bridge.terminal.write("early");
+    const out: string[] = [];
+    bridge.process.onOutput((d) => out.push(String(d)));
+    bridge.process.resize({ cols: 85, rows: 29 });
+    await bridge.ready;
+    bridge.process.write("\r");
+    expect(out).toEqual(["early"]);
+    expect(typed).toEqual(["\r"]);
+    expect(sizes).toEqual([{ cols: 85, rows: 29 }]);
+    expect([bridge.terminal.cols, bridge.terminal.rows]).toEqual([85, 29]);
+    bridge.exit(3);
+    expect(await bridge.process.exited).toBe(3);
+  });
+});

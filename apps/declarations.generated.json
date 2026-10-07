@@ -619,7 +619,13 @@
    "kernel:mkdir",
    "kernel:remove",
    "kernel:move",
-   "kernel:copy"
+   "kernel:copy",
+   "kernel:process_start",
+   "kernel:process_exit",
+   "kernel:process_signals",
+   "kernel:ps",
+   "kernel:kill",
+   "kernel:wait"
   ],
   "scrollable": false,
   "minSize": {

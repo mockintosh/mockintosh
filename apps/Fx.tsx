@@ -6,6 +6,7 @@ import { createConversation, type Conversation, type TranscriptLine } from "./fx
 import { FX_INSTRUCTIONS } from "./fx/instructions";
 import { maskKey, readSettings, writeSettings } from "./fx/settings";
 import { kernelAgentTools } from "./fx/tools";
+import { FxTerminal, FX_TERMINAL_SIZE } from "./fx/FxTerminal";
 
 const INPUT_ROW_HEIGHT = 30;
 
@@ -89,6 +90,12 @@ function Fx(): JSX.Element {
           label: "File",
           items: [
             { label: "New Conversation", shortcut: "N", disabled: !key, onClick: () => void conversation?.reset() },
+            {
+              label: "New Terminal Window",
+              shortcut: "T",
+              disabled: !key || !runtime.createTerminal,
+              onClick: () => app.openWindow({ title: "fx", size: FX_TERMINAL_SIZE, scrollable: false, Component: FxTerminal }),
+            },
             { label: "API Key…", onClick: () => setEditingKey(true) },
             { type: "separator" },
             { label: "Stop", shortcut: ".", disabled: !working, onClick: () => conversation?.cancel() },

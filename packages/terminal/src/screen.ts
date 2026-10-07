@@ -5,10 +5,14 @@
  * module is the only one that imports it, and no xterm type leaves it.
  */
 import { returnWindow } from "./xtermEnv";
-import { Terminal, type IBufferCell, type IBufferLine } from "@xterm/headless";
+import * as xterm from "@xterm/headless";
+import type { IBufferCell, IBufferLine } from "@xterm/headless";
 import { monochromeStyle, styleKey, PLAIN_STYLE, type CellStyle, type TerminalColor } from "./style";
 
 returnWindow();
+
+// The ES build exports `Terminal`; Node's CommonJS build arrives as a default export.
+const Terminal = (xterm.Terminal ?? (xterm as unknown as { default: typeof xterm }).default.Terminal) as typeof xterm.Terminal;
 
 export interface TerminalSize {
   cols: number;
