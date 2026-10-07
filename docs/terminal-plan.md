@@ -254,7 +254,7 @@ Phases 1–5 shipped, and Phase 6 in part, in a different order than planned: a 
 - **Kernel PTY.** The pseudo-terminal lives in the terminal package (`pty.ts`), in Terminal's process, rather than as a kernel trap: everything that uses it runs there. The kernel got process accounting instead (`ps`, `kill`, `wait`, and `process_start`/`process_exit`/`process_signals` for job owners), which lists app instances too.
 - **Programs.** WASI programs run in their own workers with blocking system calls over shared memory: Lua, kilo, SQLite's shell, Python 3.14 with its standard library, and any `.wasm` on the disk (`wasm file.wasm`). `scripts/wasi/mactty.c` gives programs termios and the window size.
 - **fx.** `AgentRuntime.createTerminal` runs fx's terminal core on a `TerminalBridge` in an fx window (File › New Terminal Window); its shell tool runs bash on the disk and asks first.
-- **Open questions answered.** Dim text is a 50% dither. ⌥ types Mac characters: the platform's key events carry `KeyboardEvent.key` only, so ⌥-as-Meta would need `code` first.
+- **Open questions answered.** Dim text leaves out a quarter of the glyph's pixels: a 50% dither deletes whole diagonal strokes of Monaco 9 (an x vanishes), seen on fx's help screen. ⌥ types Mac characters: the platform's key events carry `KeyboardEvent.key` only, so ⌥-as-Meta would need `code` first.
 
 Not done yet:
 

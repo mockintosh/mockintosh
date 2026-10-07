@@ -124,7 +124,9 @@ export function drawRow(pix: Uint8Array, stride: number, y: number, row: Termina
           if (!on && style.bold && gx > 0) on = glyph[gy * glyphStride + gx - 1] === 1;
         }
         if ((style.underline && gy === UNDERLINE_ROW) || (style.strikethrough && gy === STRIKE_ROW)) on = true;
-        if (on && style.dim && (ax + ay) % 2 === 1) on = false;
+        // Dim: a quarter of the ink drops out. A 50% checkerboard would delete whole
+        // diagonal strokes of a 1-pixel font (x, /, \\ sit on one parity).
+        if (on && style.dim && ax % 2 === 1 && ay % 2 === 1) on = false;
         pix[base + ax] = on ? ink : paperInk(style, ax, ay);
       }
     }

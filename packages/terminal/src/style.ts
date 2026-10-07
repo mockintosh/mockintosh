@@ -4,7 +4,8 @@
  * a cell's colours and attributes become how it is drawn.
  *
  * - The foreground decides the ink: dark greys and SGR 2 (faint) draw *dim*,
- *   a 50% dither of the glyph, so a program's quieter text stays quieter.
+ *   with a quarter of the glyph's pixels left out, so a program's quieter
+ *   text stays quieter and still reads.
  *   Everything else draws in plain ink: colour has no meaning here.
  * - The background decides the paper. A program sets a background to set
  *   something apart, so the paper says how strongly: a dark-theme tint (the
@@ -38,7 +39,7 @@ export interface CellStyle {
   invisible: boolean;
   /** Glyph pixels: black on light paper, white on black paper. */
   ink: "black" | "white";
-  /** Dithered glyph: the program's dark-grey or faint text. */
+  /** Lighter glyph (a quarter of its pixels out): the program's dark-grey or faint text. */
   dim: boolean;
   paper: Paper;
 }

@@ -117,6 +117,37 @@ describe("fx on the headless platform", () => {
     expect(thread).toEqual(["what is open?", "One window is open."]);
   });
 
+  it("opens fx's own terminal interface in a terminal window, with bash as its workspace", async () => {
+    const typed: string[] = [];
+    let workspaceRoot = "";
+    runtime.createTerminal = async (options) => {
+      workspaceRoot = options.workspace!.root;
+      options.screen.write(`fx terminal ${options.screen.cols}x${options.screen.rows}\r\n`);
+      options.screen.onData((data) => typed.push(data));
+      const ran = await options.workspace!.exec({ command: "echo $((40 + 2))", cwd: workspaceRoot, signal: new AbortController().signal, timeoutMs: 5000, outputLimitBytes: 1024 });
+      options.screen.write(`workspace says ${ran.stdout.trim()}\r\n`);
+      return { interactive: Promise.resolve(), exited: new Promise(() => {}), abort() {} };
+    };
+    os.services.openApp("fx");
+    await settle();
+    typeKeys("vck_test_1234");
+    await settle();
+    const menus = (await os.kernel.invoke(os.kernel.createSession(), "menu", {})) as { label: string; items: { label?: string; disabled?: boolean }[] }[];
+    expect(menus.find((m) => m.label === "File")!.items.find((i) => i.label === "New Terminal Window")?.disabled).not.toBe(true);
+    await os.kernel.invoke(os.kernel.createSession(), "menu", { menu: "File", item: "New Terminal Window" });
+    let text = "";
+    for (let i = 0; i < 50 && !text.includes("workspace says"); i++) {
+      await settle();
+      text = (await screen()).find((node) => node.name === "fx-terminal")?.value ?? "";
+    }
+    // The window fits the 512×342 screen, so it is smaller than fx asks for.
+    expect(text).toMatch(/^Starting fx…\nfx terminal \d+x\d+\nworkspace says 42$/);
+    expect(workspaceRoot).toBe("/disk");
+    platform.key({ type: "down", key: "x", modifiers: NO_MODS });
+    await settle();
+    expect(typed).toEqual(["x"]);
+  });
+
   it("says why it can't open on a Macintosh without an agent runtime", async () => {
     os.shutdown();
     platform = createHeadlessPlatform({ width: 512, height: 342 });
