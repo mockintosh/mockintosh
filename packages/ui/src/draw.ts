@@ -38,9 +38,11 @@ import {
   patCopy,
   patBic,
   patXor,
+  notPatXor,
   srcCopy,
   srcOr,
   srcBic,
+  srcXor,
   TextFace,
   TextFont,
   TextMode,
@@ -389,7 +391,7 @@ function drawBox(
     node.props as {
       background?: Fill;
       borderColor?: Ink;
-      borderStyle?: "solid" | "dotted" | "dashed";
+      borderStyle?: "solid" | "dotted" | "dashed" | "gray";
       shadow?: boolean;
       penMode?: "copy" | "xor" | "bic";
     };
@@ -416,7 +418,8 @@ function drawBox(
       PenPat(globals.white);
     } else {
       PenNormal();
-      if (penMode === "xor") PenMode(patXor);
+      if (borderStyle === "gray") PenPat(globals.gray);
+      if (penMode === "xor") PenMode(borderStyle === "gray" ? notPatXor : patXor);
     }
 
     if (borderStyle === "dotted" || borderStyle === "dashed") {
@@ -725,7 +728,9 @@ function drawImage(
   const maskBM = packedImage(src).mask;
 
   const port = ctx.port;
-  if (maskBM) {
+  if (node.props["penMode"] === "xor") {
+    CopyBits(pixelBM, port.portBits, srcRect, dstRect, srcXor, null);
+  } else if (maskBM) {
     CopyBits(maskBM, port.portBits, srcRect, dstRect, srcBic, null);
     CopyBits(pixelBM, port.portBits, srcRect, dstRect, srcOr, null);
   } else {

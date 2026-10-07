@@ -417,3 +417,43 @@ describe("drawTree — overflow scroll text", () => {
     expect(Math.abs(half.minX - whole.minX)).toBeLessThan(4);
   });
 });
+
+describe("drawTree — DragGrayRgn outlines", () => {
+  function drawChild(type: string, style: Record<string, number | string>, props: Record<string, unknown>) {
+    const { screen, ctx, root } = makeTestContext();
+    const child = createNode(type);
+    child.style = style;
+    child.props = props;
+    child.parent = root;
+    root.children = [child];
+    computeLayout(root, W, H, noMeasure);
+    drawTree(root, ctx);
+    return screen;
+  }
+
+  it("frames a gray xor border on the gray pattern's white squares", () => {
+    const screen = drawChild(
+      "box",
+      { position: "absolute", left: 3, top: 2, width: 10, height: 6 },
+      { borderColor: 1, borderWidth: 1, borderStyle: "gray", penMode: "xor" },
+    );
+    for (let x = 3; x < 13; x++) expect(px(screen, x, 2)).toBe((x + 2) & 1);
+    for (let y = 2; y < 8; y++) expect(px(screen, 3, y)).toBe((y + 3) & 1);
+    expect(px(screen, 6, 5)).toBe(0);
+  });
+
+  it("inverts the screen under an xor image's black pixels", () => {
+    const { screen, ctx, root } = makeTestContext();
+    const ink = createNode("box");
+    ink.style = { position: "absolute", left: 0, top: 0, width: 4, height: 1 };
+    ink.props = { background: 1 };
+    const image = createNode("image");
+    image.style = { position: "absolute", left: 0, top: 0, width: 4, height: 1 };
+    image.props = { src: { width: 4, height: 1, data: new Uint8Array([1, 0, 1, 0]) }, penMode: "xor" };
+    root.children = [ink, image];
+    for (const child of root.children) child.parent = root;
+    computeLayout(root, W, H, noMeasure);
+    drawTree(root, ctx);
+    expect([0, 1, 2, 3].map((x) => px(screen, x, 0))).toEqual([0, 1, 0, 1]);
+  });
+});

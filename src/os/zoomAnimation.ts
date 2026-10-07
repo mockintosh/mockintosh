@@ -5,11 +5,10 @@ import {
   PenNormal,
   PenPat,
   SetPort,
-  patXor,
+  globals,
+  notPatXor,
   type GrafPort,
-  type Pattern,
 } from "@mockintosh/quickdraw";
-import { patternBits } from "@mockintosh/ui";
 
 export interface AnimRect {
   x: number;
@@ -98,8 +97,8 @@ export function animateZoomRect(options: ZoomAnimationOptions): Promise<void> {
       const saved = GetPort();
       SetPort(port);
       PenNormal();
-      PenMode(patXor);
-      PenPat(patternBits("darkCheckers") as Pattern);
+      PenMode(notPatXor);
+      PenPat(globals.gray);
       FrameRect({ left: r.x, top: r.y, right: r.x + r.width, bottom: r.y + r.height });
       PenNormal();
       if (saved) SetPort(saved);

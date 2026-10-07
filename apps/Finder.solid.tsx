@@ -269,11 +269,7 @@ interface ActiveDragCompanion {
   nodeId: string;
   offsetX: number;
   offsetY: number;
-  outlineData: Uint8Array;
-  /** Where the outline starts, relative to the companion's cell. */
-  outlineX: number;
-  outlineW: number;
-  outlineH: number;
+  outline: GrayOutline;
 }
 
 interface ActiveDragState {
@@ -286,11 +282,7 @@ interface ActiveDragState {
   ghostX: number;
   ghostY: number;
   /** Pre-computed mask outline — drawn as the drag ghost. */
-  outlineData: Uint8Array;
-  /** Where the outline starts, relative to the cell (left of it for a wide label). */
-  outlineX: number;
-  outlineW: number;
-  outlineH: number;
+  outline: GrayOutline;
   companions: ActiveDragCompanion[];
 }
 
@@ -365,20 +357,46 @@ function iconCellSilhouette(
   return out;
 }
 
+type OutlineSprite = { width: number; height: number; data: Uint8Array };
+
+/**
+ * A drag outline as `DragGrayRgn` frames it: gray `DragPattern` in
+ * `notPatXor`, so the outline pixels on the pattern's white squares invert the
+ * screen. The pattern is anchored to the screen, not the icon, so the outline
+ * keeps one sprite per checkerboard phase and the ghost picks one by position.
+ * Over the gray desktop the dots land on its white squares and read as a solid
+ * black line; over a window they show as a dotted one.
+ */
+interface GrayOutline {
+  /** Where the outline starts, relative to the cell (left of it for a wide label). */
+  x: number;
+  /** `phases[p]` holds the pixels whose local `(x + y) % 2 === p`. */
+  phases: readonly [OutlineSprite, OutlineSprite];
+}
+
+/** The phase whose dots land on the gray pattern's white squares (odd `x + y`) at screen `(x, y)`. */
+function grayPhase(outline: GrayOutline, x: number, y: number): OutlineSprite {
+  return outline.phases[((x + y + 1) & 1) as 0 | 1];
+}
+
 /**
  * Build a single continuous outline that covers both the icon silhouette and
  * the label rectangle.  Where the two shapes share an edge (icon bottom ↔
  * label top), the outline is suppressed so the ghost looks like one piece.
- * `x` is where the outline starts relative to the cell, left of it for a
- * label wider than the cell.
  */
-function buildOutlineForItem(
-  sprite: SpriteRef, title: string, cellW: number,
-): { data: Uint8Array; x: number; w: number; h: number } {
+function buildOutlineForItem(sprite: SpriteRef, title: string, cellW: number): GrayOutline {
   const span = labelSpan(title, cellW);
+  const w = span.width;
   const h = ICON_SIZE + LABEL_H;
-  const combined = iconCellSilhouette(sprite, cellW, span, h);
-  return { data: computeMaskOutline(combined, span.width, h), x: span.left, w: span.width, h };
+  const edge = computeMaskOutline(iconCellSilhouette(sprite, cellW, span, h), w, h);
+  const phase = (p: number): OutlineSprite => {
+    const data = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = (y + p) & 1; x < w; x += 2) data[y * w + x] = edge[y * w + x];
+    }
+    return { width: w, height: h, data };
+  };
+  return { x: span.left, phases: [phase(0), phase(1)] };
 }
 
 // ---------------------------------------------------------------------------
@@ -558,20 +576,12 @@ function activateDrag(
   ghostX: number,
   ghostY: number
 ): void {
-  const { data, x, w, h } = buildOutlineForItem(sprite, info.title, info.cellW);
-
-  const companions: ActiveDragCompanion[] = info.companions.map(c => {
-    const outline = buildOutlineForItem(c.sprite, c.title, c.cellW);
-    return {
-      nodeId: c.nodeId,
-      offsetX: c.offsetX,
-      offsetY: c.offsetY,
-      outlineData: outline.data,
-      outlineX: outline.x,
-      outlineW: outline.w,
-      outlineH: outline.h,
-    };
-  });
+  const companions: ActiveDragCompanion[] = info.companions.map(c => ({
+    nodeId: c.nodeId,
+    offsetX: c.offsetX,
+    offsetY: c.offsetY,
+    outline: buildOutlineForItem(c.sprite, c.title, c.cellW),
+  }));
 
   setFinderDrag({
     nodeId:             info.nodeId,
@@ -581,10 +591,7 @@ function activateDrag(
     cellW:              info.cellW,
     ghostX,
     ghostY,
-    outlineData:        data,
-    outlineX:           x,
-    outlineW:           w,
-    outlineH:           h,
+    outline:            buildOutlineForItem(sprite, info.title, info.cellW),
     companions,
   });
 }
@@ -1349,54 +1356,38 @@ function IconCell(props: IconCellProps): JSX.Element {
 export function FinderDragGhost(): JSX.Element {
   return (
     <Show when={finderDrag()}>
-      {(drag) => {
-        const outlineSrc = () => {
-          const d = drag();
-          return d.outlineData.length > 0
-            ? { width: d.outlineW, height: d.outlineH, data: d.outlineData, mask: d.outlineData }
-            : undefined;
-        };
-
-        return (
-          <>
-            <Show when={outlineSrc()}>
-              {(src) => (
-                <image
-                  position="absolute"
-                  left={drag().ghostX + drag().outlineX}
-                  top={drag().ghostY}
-                  width={src().width}
-                  height={src().height}
-                  src={src()}
-                />
-              )}
-            </Show>
-            <For each={drag().companions}>
-              {(c) => {
-                const cSrc = () =>
-                  c.outlineData.length > 0
-                    ? { width: c.outlineW, height: c.outlineH, data: c.outlineData, mask: c.outlineData }
-                    : undefined;
-                return (
-                  <Show when={cSrc()}>
-                    {(src) => (
-                      <image
-                        position="absolute"
-                        left={drag().ghostX + c.offsetX + c.outlineX}
-                        top={drag().ghostY + c.offsetY}
-                        width={src().width}
-                        height={src().height}
-                        src={src()}
-                      />
-                    )}
-                  </Show>
-                );
-              }}
-            </For>
-          </>
-        );
-      }}
+      {(drag) => (
+        <>
+          <GrayOutlineImage outline={drag().outline} left={drag().ghostX} top={drag().ghostY} />
+          <For each={drag().companions}>
+            {(c) => (
+              <GrayOutlineImage
+                outline={c.outline}
+                left={drag().ghostX + c.offsetX}
+                top={drag().ghostY + c.offsetY}
+              />
+            )}
+          </For>
+        </>
+      )}
     </Show>
+  );
+}
+
+/** One icon's gray drag outline, XORed at screen `(left, top)` of its cell. */
+function GrayOutlineImage(props: { outline: GrayOutline; left: number; top: number }): JSX.Element {
+  const x = () => props.left + props.outline.x;
+  const src = () => grayPhase(props.outline, x(), props.top);
+  return (
+    <image
+      position="absolute"
+      left={x()}
+      top={props.top}
+      width={src().width}
+      height={src().height}
+      src={src()}
+      penMode="xor"
+    />
   );
 }
 

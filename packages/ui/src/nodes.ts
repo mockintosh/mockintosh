@@ -331,8 +331,11 @@ export interface BoxProps extends LayoutStyle, EventHandlers, SemanticProps {
   /** Solid ink, named dither, or raw 8-byte QuickDraw pattern */
   background?: Fill;
   borderColor?: Ink;
-  /** default: "solid" */
-  borderStyle?: "solid" | "dotted" | "dashed";
+  /**
+   * default: "solid". `gray` frames with the screen-anchored 50% gray pattern;
+   * with `penMode="xor"` it is drawn `notPatXor`, the `DragGrayRgn` outline.
+   */
+  borderStyle?: "solid" | "dotted" | "dashed" | "gray";
   borderRadius?: number;
   /**
    * 1px drop shadow to the right and below (window chrome).
@@ -477,6 +480,8 @@ export interface TextRun {
 export interface ImageProps extends LayoutStyle, EventHandlers, SemanticProps {
   src: Sprite;
   mode?: "normal" | "inverted" | "outline";
+  /** `xor` inverts the screen under the sprite's black pixels and ignores the mask (drag outlines). */
+  penMode?: "copy" | "xor";
 }
 
 export interface RasterPaintRect {

@@ -44,7 +44,7 @@ export function OSRoot(props: OSRootProps): JSX.Element {
                 height={r().height}
                 borderColor={1}
                 borderWidth={1}
-                borderStyle="dotted"
+                borderStyle="gray"
                 penMode="xor"
               />
             )}
