@@ -16,7 +16,11 @@
     "paths": {
       "@/*": ["./*"],
       "@mockintosh/quickdraw": ["./packages/quickdraw/src/index.ts"],
-      "@mockintosh/quickdraw/bits": ["./packages/quickdraw/src/bits.ts"]
+      "@mockintosh/quickdraw/bits": ["./packages/quickdraw/src/bits.ts"],
+      "@mockintosh/terminal": ["./packages/terminal/src/index.ts"],
+      "@mockintosh/terminal/view": ["./packages/terminal/src/view/index.ts"],
+      "@mockintosh/terminal/bash": ["./packages/terminal/src/bash/index.ts"],
+      "@mockintosh/terminal/wasi": ["./packages/terminal/src/wasi/index.ts"]
     },
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "bundler"
@@ -34,6 +38,8 @@
     "packages/ui/src/**/*.tsx",
     "packages/fs/src/**/*.ts",
     "packages/print/src/**/*.ts",
+    "packages/terminal/src/**/*.ts",
+    "packages/terminal/src/**/*.tsx",
     "utils/**/*.ts",
     "vite-env.d.ts"
   ],

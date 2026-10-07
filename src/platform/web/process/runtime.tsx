@@ -33,6 +33,7 @@ import {
   WindowSlotsContext,
   type WindowBandView,
   type WindowSlots,
+  type AgentRuntime,
   type AppContext,
   type AppServices,
   type AppWindow,
@@ -90,6 +91,8 @@ interface ProcessWindow {
   /** Where this window's pictures go when memory can be shared with the OS. */
   shared: SharedArrayBuffer | null;
   cursor?: CursorSpec;
+  /** Last `rawKeys` told to the OS: the focused control here takes raw keys. */
+  rawKeys?: boolean;
   /** Action ids of this window's current menus, dropped when it sets new ones. */
   menuIds: number[];
 }
@@ -104,7 +107,13 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-export function runProcess(scope: ProcessScope, load: LoadApp): void {
+/** Services the worker provides itself rather than asking the OS for. */
+export interface ProcessServices {
+  /** Language-model agents, run in this worker (fx's WebAssembly core). */
+  agentRuntime?: AgentRuntime;
+}
+
+export function runProcess(scope: ProcessScope, load: LoadApp, services: ProcessServices = {}): void {
   const post = (message: ProcessToHost, transfer?: Transferable[]) => scope.postMessage(message, transfer);
 
   let nextCallId = 1;
@@ -187,6 +196,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     performance.measure("app-process:frame", { start });
     const audioMs = audio.renderMs.splice(0);
     if (sendStats) post({ t: "frameStats", frameMs, audioMs: audioMs.splice(0) });
+    reportRawKeys();
     for (const w of attached()) {
       const width = untrack(w.width);
       const height = Math.min(bandHeight, untrack(() => pictureHeight(w)));
@@ -310,6 +320,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
       },
       capabilities,
       print,
+      agentRuntime: capabilities.has("agent-runtime") ? services.agentRuntime : undefined,
       kernel: start.kernel && {
         describe: () => start.kernel!,
         invoke(name, args, options) {
@@ -454,6 +465,21 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
     for (const id of w.menuIds) menuActions.delete(id);
     setAttached((list) => list.filter((x) => x !== w));
     flush();
+  }
+
+  /** Tell the OS which window's focused control takes raw keys, so it sends that window Tab and ⌃V. */
+  function reportRawKeys(): void {
+    if (!ui) return;
+    const focused = ui.focusManager.focused;
+    const raw = ui.focusedTakesRawKeys();
+    for (const w of windows.values()) {
+      let inside = false;
+      for (let n = focused; n && !inside; n = n.parent) inside = n === w.node;
+      const value = raw && inside;
+      if ((w.rawKeys ?? false) === value) continue;
+      w.rawKeys = value;
+      post({ t: "rawKeys", key: w.key, value });
+    }
   }
 
   function focusWindow(w: ProcessWindow): void {
@@ -620,6 +646,15 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
           renderNow();
           return;
         }
+        case "paste": {
+          const w = windows.get(msg.key);
+          if (!w || !ui) return;
+          lastSeq = Math.max(lastSeq, msg.seq);
+          focusWindow(w);
+          ui.dispatchPaste(msg.text);
+          renderNow();
+          return;
+        }
         case "menu":
           menuActions.get(msg.action)?.(msg.value);
           flush();
@@ -684,7 +719,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp): void {
         const waiter = pending.get(msg.id);
         if (!waiter) return;
         pending.delete(msg.id);
-        if ("error" in msg) waiter.reject(new Error(msg.error));
+        if ("error" in msg) waiter.reject(Object.assign(new Error(msg.error), msg.code ? { code: msg.code } : {}));
         else waiter.resolve(msg.value);
         return;
       }

@@ -40,6 +40,10 @@ function sharedRuntimeImportMap(): Plugin {
             // One QuickDraw: thePort, the Font Manager and the cursor are globals.
             "@mockintosh/quickdraw": quickdraw,
             "@mockintosh/agent": chunkFile("agent-runtime") ?? "/packages/agent/src/index.ts",
+            "@mockintosh/terminal": chunkFile("terminal-runtime") ?? "/packages/terminal/src/index.ts",
+            "@mockintosh/terminal/view": chunkFile("terminal-view-runtime") ?? "/packages/terminal/src/view/index.ts",
+            "@mockintosh/terminal/bash": chunkFile("terminal-bash-runtime") ?? "/packages/terminal/src/bash/index.ts",
+            "@mockintosh/terminal/wasi": chunkFile("terminal-wasi-runtime") ?? "/packages/terminal/src/wasi/index.ts",
           },
         };
         return html.replace(
@@ -63,6 +67,7 @@ function solidJsx(): Plugin[] {
       include: [
         /packages\/ui\/(?!src\/primitives\/).*\.[tj]sx?$/,
         /packages\/sdk\/.*\.[tj]sx?$/,
+        /packages\/terminal\/src\/view\/.*\.[tj]sx?$/,
         /apps\/.*\.[tj]sx?$/,
         /src\/os\/.*\.[tj]sx?$/,
         // The app-process runtime: the worker half of an app, which mounts it with JSX.
@@ -109,6 +114,12 @@ export default defineConfig({
       { find: "@mockintosh/agent", replacement: resolve(__dirname, "packages/agent/src/index.ts") },
       { find: "@mockintosh/sdk", replacement: resolve(__dirname, "packages/sdk/src/index.ts") },
       { find: "@mockintosh/print", replacement: resolve(__dirname, "packages/print/src/index.ts") },
+      { find: "@mockintosh/terminal/view", replacement: resolve(__dirname, "packages/terminal/src/view/index.ts") },
+      { find: "@mockintosh/terminal/bash", replacement: resolve(__dirname, "packages/terminal/src/bash/index.ts") },
+      { find: "@mockintosh/terminal/wasi", replacement: resolve(__dirname, "packages/terminal/src/wasi/index.ts") },
+      { find: /^@mockintosh\/terminal$/, replacement: resolve(__dirname, "packages/terminal/src/index.ts") },
+      // The package's "module" field names a file it doesn't ship; take its ES build.
+      { find: /^@xterm\/headless$/, replacement: resolve(__dirname, "node_modules/@xterm/headless/lib-headless/xterm-headless.mjs") },
       // mdast's default Vite `browser` condition reads `document` at import time.
       {
         find: "decode-named-character-reference",
@@ -142,6 +153,8 @@ export default defineConfig({
       "packages/fs/tests/**/*.test.ts",
       "packages/print/tests/**/*.test.ts",
       "packages/sdk/tests/**/*.test.ts",
+      "packages/terminal/tests/**/*.test.ts",
+      "packages/terminal/tests/**/*.test.tsx",
       "src/os/**/*.test.ts",
       "src/platform/**/*.test.ts",
       "src/platform/**/*.test.tsx",
@@ -168,6 +181,10 @@ export default defineConfig({
         "sdk-runtime": resolve(__dirname, "packages/sdk/src/index.ts"),
         "quickdraw-runtime": resolve(__dirname, "packages/quickdraw/src/index.ts"),
         "agent-runtime": resolve(__dirname, "packages/agent/src/index.ts"),
+        "terminal-runtime": resolve(__dirname, "packages/terminal/src/index.ts"),
+        "terminal-view-runtime": resolve(__dirname, "packages/terminal/src/view/index.ts"),
+        "terminal-bash-runtime": resolve(__dirname, "packages/terminal/src/bash/index.ts"),
+        "terminal-wasi-runtime": resolve(__dirname, "packages/terminal/src/wasi/index.ts"),
         "solid-runtime": resolve(__dirname, "node_modules/solid-js/dist/solid.js"),
       },
     },

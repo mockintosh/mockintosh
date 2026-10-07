@@ -162,6 +162,18 @@ function instanceAgentRuntime(os: OSServices, runtime: AgentRuntime, instanceId?
         },
       };
     },
+    ...(runtime.createTerminal
+      ? {
+          async createTerminal(terminalOptions) {
+            const terminal = await runtime.createTerminal!(terminalOptions);
+            if (!instanceId || !os.instances) return terminal;
+            // The terminal ends with the launch, like a session.
+            const disown = os.instances.own(instanceId, () => terminal.abort());
+            void terminal.exited.finally(disown);
+            return terminal;
+          },
+        }
+      : {}),
   };
 }
 

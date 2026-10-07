@@ -1,6 +1,6 @@
 # Terminal emulator: plan
 
-Status: proposed. A spike ran fx on `@xterm/headless` in Node (see Evidence); no code in the tree yet.
+Status: built, October 2026, on the `terminal` branch, together with bash, a kernel process table and WebAssembly programs. See [As built](#as-built) at the end for what differs from this plan and what's left; ARCHITECTURE.md › Terminal is the current description.
 
 ## Why
 
@@ -244,3 +244,24 @@ xterm's own VT conformance isn't retested; we test our mapping of it.
 - ⌥ as Meta by default, or Mac characters by default?
 - Is 85×29 at full screen enough for fx's layout, or does the fx window want a smaller mono face? The spike says it fits; real use will tell.
 - Should `@mockintosh/terminal` be served through the import map so third-party apps get a terminal without bundling xterm?
+
+## As built
+
+Phases 1–5 shipped, and Phase 6 in part, in a different order than planned: a pseudo-terminal came first, because bash and WebAssembly programs both needed one.
+
+- **Package.** `@mockintosh/terminal` is a shared runtime (import map on the page, loaded lazily in app processes), which answers the open question: Terminal stays SDK-clean, and a built app can embed a terminal without bundling xterm.
+- **Terminal.app** runs bash, not S1: [just-bash](https://github.com/vercel-labs/just-bash) over the kernel's file traps, with S1's commands as bash commands. There is no client-side line discipline in front of `run_shell`; the shell reads keys in raw mode through `LineEditor` (readline's bindings, history kept in the app's storage, completion, ⌃R).
+- **Kernel PTY.** The pseudo-terminal lives in the terminal package (`pty.ts`), in Terminal's process, rather than as a kernel trap: everything that uses it runs there. The kernel got process accounting instead (`ps`, `kill`, `wait`, and `process_start`/`process_exit`/`process_signals` for job owners), which lists app instances too.
+- **Programs.** WASI programs run in their own workers with blocking system calls over shared memory: Lua, kilo, SQLite's shell, Python 3.14 with its standard library, and any `.wasm` on the disk (`wasm file.wasm`). `scripts/wasi/mactty.c` gives programs termios and the window size.
+- **fx.** `AgentRuntime.createTerminal` runs fx's terminal core as `fx` in Terminal and in an fx window (File › New Terminal Window). Its one tool is a shell running bash on the disk. The browser build reads no `AGENTS.md` (no file system) and takes no instructions, so the host adds `SHELL_AGENT_BRIEF` and any `AGENTS.md` to the system prompt of each request through `fetch`. Its workspace is `allow-sandboxed`, so fx runs commands without review; access is bounded by bash on this Macintosh. With `prompt`, the browser build can't run commands at all ([findings](../packages/terminal/src/bash/libfx-findings.md)).
+- **Open questions answered.** Dim text draws in plain ink. Both patterns tried broke Monaco 9's one-pixel strokes on fx's help screen: a 50% checkerboard deleted diagonals (an x vanished), and a 25% knock-out aligned to the screen dotted the horizontals of every other line, because cells are 11 pixels tall. fx's emphasis survives through bold. ⌥ types Mac characters: the platform's key events carry `KeyboardEvent.key` only, so ⌥-as-Meta would need `code` first.
+
+Not done yet:
+
+- OSC 8 hyperlinks and OSC 52 clipboard writes (xterm's headless API doesn't expose link ranges).
+- A scroll bar: scrollback is the wheel and Shift-Page Up/Down.
+- Bash output arrives when a line finishes (just-bash returns whole results); programs stream.
+- Job control (`&`, `fg`, ⌃Z suspends nothing), pipes between WebAssembly programs (each stage runs to completion), and programs reading the terminal from inside a pipeline.
+- `run_shell` and MCP still speak S1; bash is Terminal's and fx's.
+- A prebuilt program (Python) starts with `getcwd()` as "/"; relative paths still resolve from the shell's directory, and Python's `sitecustomize` enters `$PWD`.
+- Safari can't run WebAssembly programs (no cross-origin isolation, so no shared memory).

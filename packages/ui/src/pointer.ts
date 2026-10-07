@@ -341,6 +341,11 @@ function runMouseDownCapture(target: CanvasNode, gx: number, gy: number): boolea
   return false;
 }
 
+function keepsFocus(node: CanvasNode): boolean {
+  for (let n: CanvasNode | null = node; n; n = n.parent) if (n.props["keepsFocus"] === true) return true;
+  return false;
+}
+
 function nearestFocusable(node: CanvasNode | null): CanvasNode | null {
   let n = node;
   while (n) {
@@ -591,9 +596,11 @@ export function createPointerDispatcher(
 
         // A press inside a focus scope activates that scope (restoring its
         // last-focused node), even if the press is swallowed below — so
-        // keyboard focus follows whatever the user clicked into.
+        // keyboard focus follows whatever the user clicked into. A press in
+        // a `keepsFocus` subtree, like the menu bar, leaves focus alone.
+        const keep = keepsFocus(hit);
         const scope = focusScopeOf(hit);
-        if (scope !== focusManager.getActiveScope()) focusManager.setActiveScope(scope);
+        if (!keep && scope !== focusManager.getActiveScope()) focusManager.setActiveScope(scope);
 
         if (runMouseDownCapture(hit, x, y)) {
           captured = null;
@@ -604,6 +611,7 @@ export function createPointerDispatcher(
         captured = hit;
         const { lx, ly } = localOf(hit, x, y);
         hit._eventHandlers.onMouseDown?.(lx, ly);
+        if (keep) return false;
         const focusable = nearestFocusable(hit);
         if (focusable) focusManager.focus(focusable);
         else focusManager.blur();

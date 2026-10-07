@@ -45,6 +45,7 @@ Traps are grouped as managers in documentation only:
 | Settings | `desktop_pattern` (Control Panel and Desktop use the same typed service; bytes live in Preferences) |
 | Window / Event | `apps`, `open`, `windows`, `activate`, `inspect`, `click`, `dblclick`, `drag`, `type`, `key`, `pointer`, `menu`, `render`, `screenshot` / `screenshot_save` |
 | Project | `project_create`, `source_open`, `build_submit`, `build_status`, `build_cancel`, `app_install`, `app_restart`, `app_restore`, `instances` |
+| Process | `process_start`, `process_exit`, `process_signals` (for whoever runs a job), `ps`, `kill`, `wait` |
 
 Finder and `useApp().fs` keep talking **node ids and roles**. File traps resolve a path through `Disk`: `/disk` is a shell prefix for the volume root, not a mount. Catalog v3 revisions and compare-and-swap writes make two writers (human + agent) safe.
 
@@ -58,7 +59,7 @@ Handlers receive an `Execution` with the caller, cancellation, streams, the boot
 
 `src/os/projects` owns source snapshots, persisted immutable build records, selected/previous artifacts, and install/restart/recovery operations. The browser and companion implement the same `BuildProvider`: the browser defaults to a lazy module worker; the companion runs a cancellable worker process. Both typecheck and compile without executing project source. `src/shared/buildPolicy.ts` owns source limits, supported imports, and TypeScript options. The browser embeds the shipped SDK sources/declarations for typechecking; compiler code and assets stay out of the initial desktop load. Pairing can select the companion provider; disconnect restores the local provider for subsequent builds, without replaying in-flight work. `Platform.loadArtifact` loads persisted ESM in the host's shared runtime. Neither compilation nor Blob URLs belong in the kernel. Source Editor and shell commands use the same registered operations and revision checks.
 
-`AppInstances` owns actual launch lifetimes and window ids. The window store still owns geometry, ordering, and rendering. App contexts register cleanup and explicitly retain background work; restart disposes the old instance and launches the selected build. Component initialization errors are caught at the window and attributed to the instance. This is the lifecycle needed for app replacement, not a general process table.
+`AppInstances` owns actual launch lifetimes and window ids. The window store still owns geometry, ordering, and rendering. App contexts register cleanup and explicitly retain background work; restart disposes the old instance and launches the selected build. Component initialization errors are caught at the window and attributed to the instance. The process table (`src/os/kernel/processes.ts`) lists these instances beside the jobs shells register, so `ps` shows both and `kill` quits an app or signals a job; a job ends with its owner's kernel session.
 
 The shipped [M2 app-building slice](docs/m2-apps.md) creates, builds, runs, edits, restarts, restores, and reopens Counter after reboot. ChatGippity's M3 loop calls the same project/UI traps from the live computer; `/api/chat` is one LLM turn and does not execute them. Shell S2 and a general multi-file editor remain planned.
 
@@ -131,7 +132,7 @@ Finder is registered like any other app (`FINDER_APP_ID`): the desktop is its wi
 
 ### App processes
 
-On the web, every app runs in a process of its own when a process can give it everything it declares (`processBlocker` in `src/os/process/eligible.ts`). The exceptions are the shell apps (Finder, App Store, Icon Gallery), apps that need something a process can't serve (Spotify's `browser.loadScript`, fx's agent runtime), and apps that declare `runtime: "main"`. A platform without `processes` (headless, tests) runs every app on the OS's thread. `?processes=main` does the same on the web, and `?processes=stats` adds timing menus ([plan](docs/worker-apps-plan.md)). Force Quit is in the Apple menu.
+On the web, every app runs in a process of its own when a process can give it everything it declares (`processBlocker` in `src/os/process/eligible.ts`). The exceptions are the shell apps (Finder, App Store, Icon Gallery), apps that need something a process can't serve (Spotify's `browser.loadScript`), and apps that declare `runtime: "main"`. A platform without `processes` (headless, tests) runs every app on the OS's thread. `?processes=main` does the same on the web, and `?processes=stats` adds timing menus ([plan](docs/worker-apps-plan.md)). Force Quit is in the Apple menu.
 
 - **The worker** (`src/platform/web/process/`) loads the app from `src/appModules.ts` and runs its `onOpen`. It lays every window the app opens out in its own band of one offscreen bitmap, in its own focus scope, and draws them with the worker's own Solid, `@mockintosh/ui` and QuickDraw.
 - **`AppProcess`** (`src/os/process/host.ts`) is on the OS's side. It opens a real OS window for each window the app opens; the window's content (`ProcessWindow`) shows that window's latest picture and sends its input back. `AppProcess` answers the app's calls (`src/os/process/protocol.ts`) with the instance's real `AppContext`.
@@ -392,6 +393,27 @@ address bar / link / form  →  PageRequest  →  router ─┬─ start page (a
 - **Pictures** come through `/api/web-image` (image types only, at most 8 MB), are decoded by `useApp().images`, and are dithered to the column width.
 
 Safari keeps links and history as plain strings. It parses them with the SDK's pure `parseUrl` / `formatUrl`, because apps compile without the host's `URL`.
+
+## Terminal
+
+Terminal is a VT/xterm terminal drawn in 1 bit, a pseudo-terminal, bash, and real programs compiled to WebAssembly ([plan](docs/terminal-plan.md)). It all lives in `@mockintosh/terminal`, a shared runtime like the SDK (import map on the page, loaded lazily in app processes), so built apps can embed a terminal too.
+
+```
+TerminalView (raster, Monaco 9 in 6×11 cells)  ⇄  TerminalScreen (@xterm/headless)
+        ⇅ bytes
+Pty master ── line discipline (cooked/raw, echo, ISIG, ONLCR, SIGWINCH) ── Pty slave (Tty)
+                                                                             ⇅
+                    runShell: LineEditor at the prompt, the command as the foreground job
+                         ├─ bash (just-bash over KernelFs: /disk, /system/source; S1 commands as bash commands)
+                         └─ WASI programs, each in its own worker: lua, kilo, sqlite3, python3, `wasm file.wasm`
+```
+
+- **Screen and view** (`src/screen.ts`, `src/view/`). xterm types stay in `screen.ts`. `monochromeStyle` is the one place colour becomes ink: dark greys and faint text dither, backgrounds become a 25% pattern or black paper. Box drawing, blocks, shades, Braille and common TUI symbols are drawn by rule (`glyphs.ts`). The view's screen text is its semantic `value`, so `inspect`, MCP and agents read a terminal.
+- **Keys.** The UI kit's `rawKeys` gives a focused terminal Tab and ⌃V, and `onPaste` delivers a paste in one piece (bracketed when the program asks); both cross into app processes. ⌘ keys stay the menubar's.
+- **Bash** (`src/bash/`). just-bash runs each line; `BashSession` carries variables, aliases, options, `$?` and function definitions between lines. Files are the kernel's file traps, so the Finder and bash see the same disk. S1's Macintosh commands (`open`, `windows`, `click`, `screenshot`, `ps`, `kill`, …) are bash commands that run through `run_shell`; `mac <command>` reaches any of them.
+- **Jobs.** The shell registers itself on a new tty and each command as its child in the kernel's process table; `kill` from anywhere reaches the foreground job.
+- **WebAssembly programs** (`src/wasi/`). Each runs in its own worker; WASI system calls block on shared memory while Terminal's worker answers them from the shell's file system and the tty. Programs built here link `scripts/wasi/mactty.c` for termios and the window size, and enter `$PWD` at startup. `npm run wasi:build` builds Lua, kilo and SQLite's shell with wasi-sdk into `public/wasi/` and copies CPython's WASI build there. Needs a cross-origin-isolated page (Safari has none, so programs don't run there).
+- **fx** runs its own terminal interface through `AgentRuntime.createTerminal`: as `fx` in Terminal (attached to the tty, its workspace the current directory, `AI_GATEWAY_API_KEY` from the environment, which `~/.bashrc` can set) or in an fx window (File › New Terminal Window). App processes run fx's engine themselves. Its only tool is a shell, which runs bash on the disk; the host adds `SHELL_AGENT_BRIEF` (bash, the Macintosh's commands, how to build an app) and any `AGENTS.md` at `/disk` or the working directory to its system prompt, through the `fetch` its requests take, since the terminal core takes no instructions and has no file system in the browser. Its workspace is `allow-sandboxed`: the sandbox is ours (bash on this Macintosh), so fx runs commands without review. With `prompt` its browser build can't run any, because auto mode has no reviewer and ask mode freezes ([findings](packages/terminal/src/bash/libfx-findings.md)).
 
 ## App Store
 

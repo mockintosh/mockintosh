@@ -813,15 +813,33 @@
   "title": "Terminal",
   "icon": "terminal/icon",
   "defaultSize": {
-   "width": 460,
-   "height": 260
+   "width": 484,
+   "height": 266
   },
   "smallIcon": "terminal/icon-16x16",
   "permissions": [
    "kernel:run_shell",
-   "kernel:shell_close"
+   "kernel:shell_close",
+   "kernel:stat",
+   "kernel:list",
+   "kernel:read_bytes",
+   "kernel:write_bytes",
+   "kernel:mkdir",
+   "kernel:remove",
+   "kernel:move",
+   "kernel:copy",
+   "kernel:process_start",
+   "kernel:process_exit",
+   "kernel:process_signals",
+   "kernel:ps",
+   "kernel:kill",
+   "kernel:wait"
   ],
   "scrollable": false,
+  "minSize": {
+   "width": 124,
+   "height": 57
+  },
   "singleInstance": false,
   "sprites": {
    "terminal/icon": {
@@ -868,6 +886,23 @@
   "smallIcon": "icon/computer-16x16",
   "requires": [
    "network"
+  ],
+  "permissions": [
+   "kernel:*"
+  ]
+ },
+ "fx": {
+  "id": "fx",
+  "title": "fx",
+  "icon": "icon/chat",
+  "defaultSize": {
+   "width": 380,
+   "height": 280
+  },
+  "smallIcon": "icon/chat-16x16",
+  "requires": [
+   "network",
+   "agent-runtime"
   ],
   "permissions": [
    "kernel:*"

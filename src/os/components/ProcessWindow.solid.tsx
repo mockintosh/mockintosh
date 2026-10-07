@@ -25,6 +25,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
   const [cursor, setCursor] = createSignal<CursorSpec | undefined>(host?.cursor, { ownedWrite: true });
   const [menus, setMenus] = createSignal<MenubarDefinition[]>(host?.menus ?? [], { ownedWrite: true });
   const [bands, setBands] = createSignal(host?.bands ?? { header: 0, footer: 0 }, { ownedWrite: true });
+  const [rawKeys, setRawKeys] = createSignal(host?.rawKeys ?? false, { ownedWrite: true });
   const slots = useContext(WindowSlotsContext);
   let lastX = 0;
   let lastY = 0;
@@ -34,6 +35,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       if (what === "frame") setRevision((r) => r + 1);
       else if (what === "cursor") setCursor(() => host.cursor);
       else if (what === "bands") setBands(host.bands);
+      else if (what === "rawKeys") setRawKeys(host.rawKeys ?? false);
       else setMenus(host.menus);
     };
   }
@@ -115,6 +117,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       cursor={cursor()}
       tabIndex={0}
       autoFocus={options.body}
+      rawKeys={rawKeys()}
       semantic={options.body ? { name: "app-process", role: "canvas" } : undefined}
       onPaint={(surface) => {
         const start = app.scheduler.now();
@@ -148,6 +151,7 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       onKeyDown={(k, mods) => keyEvent("keydown", k, mods)}
       onKeyUp={(k, mods) => keyEvent("keyup", k, mods)}
       onKeyPress={(ch) => keyEvent("keypress", ch, heldModifiers())}
+      onPaste={(text) => proc.input({ t: "paste", key, text })}
     />
   );
 

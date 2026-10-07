@@ -268,6 +268,25 @@ const ICON_SAFARI_16X16 = fromGrid(16, 16, [
   "....##oooo##....",
   "......####......",
 ]);
+/** fx: the black tile with its paper bar on the left and the round bubble beside it. */
+const ICON_CHAT_16X16 = fromGrid(16, 16, [
+  "################",
+  "#oooo###########",
+  "#oooo####oooo###",
+  "#oooo##ooooooo##",
+  "#oooo#ooooooooo#",
+  "#oooo#ooooooooo#",
+  "#oooo#ooooooooo#",
+  "#oooo#ooooooooo#",
+  "#oooo#ooooooooo#",
+  "#oooo#ooooooooo#",
+  "#oooo#ooooooooo#",
+  "#oooo#oooooooo##",
+  "#oooo#ooooooo###",
+  "#ooo#ooooo######",
+  "#oooo###########",
+  "################",
+]);
 export const iconSprites: Record<string, Sprite> = {
   "icon/1bitcamera": ICON_1BITCAMERA,
   "icon/MacFlim": ICON_MACFLIM,
@@ -282,6 +301,7 @@ export const iconSprites: Record<string, Sprite> = {
   "icon/camera-16x16": ICON_CAMERA_16X16,
   "icon/camera3": ICON_CAMERA3,
   "icon/chat": ICON_CHAT,
+  "icon/chat-16x16": ICON_CHAT_16X16,
   "icon/computer": ICON_COMPUTER,
   "icon/computer-16x16": ICON_COMPUTER_16X16,
   "icon/file": ICON_FILE,

@@ -84,9 +84,89 @@ export interface AgentSession {
   close(): Promise<void>;
 }
 
+/**
+ * The terminal an agent's own full-screen interface draws on: bytes out to
+ * the screen, keys (already encoded) and the terminal's replies back.
+ * `@mockintosh/terminal`'s screen and pseudo-terminal both fit.
+ */
+export interface AgentTerminalScreen {
+  write(data: Uint8Array | string): void;
+  onData(handler: (data: string) => void): () => void;
+  readonly cols: number;
+  readonly rows: number;
+  onResize(handler: (size: { cols: number; rows: number }) => void): () => void;
+}
+
+/** One shell command the agent runs, and how long and how much it may. */
+export interface AgentWorkspaceRequest {
+  command: string;
+  cwd: string;
+  signal: AbortSignal;
+  timeoutMs: number;
+  outputLimitBytes: number;
+}
+
+/** Where the agent's shell tool runs commands: a shell on this Macintosh, not the host's. */
+export interface AgentWorkspace {
+  /** The working directory, and the agent's home. */
+  root: string;
+  exec(request: AgentWorkspaceRequest): Promise<{ exitCode: number; stdout: string; stderr: string }>;
+  /**
+   * "allow": the workspace is the agent's sandbox, so it runs commands
+   * without asking (libfx's "allow-sandboxed"). "prompt" (the default): the
+   * agent applies its own permission mode first.
+   */
+  permission?: "allow" | "prompt";
+}
+
+/** Small persistent key–value storage, as `AppStorage` gives an app. */
+export interface AgentStorage {
+  read(key: string): Promise<string | null>;
+  write(key: string, value: string): Promise<void>;
+  readBytes(key: string): Promise<Uint8Array | null>;
+  writeBytes(key: string, bytes: Uint8Array): Promise<void>;
+  remove(key: string): Promise<void>;
+}
+
+export interface AgentTerminalOptions {
+  apiKey: string;
+  model?: string;
+  /** Command-line arguments, as the agent's own CLI takes them (`--resume`, `--continue`). */
+  args?: string[];
+  /** Environment variables for the agent's CLI (`FX_MODEL`, `FX_PERMISSION_MODE`). */
+  env?: Record<string, string>;
+  /**
+   * Context the agent gets beside its own: where it is and how things work
+   * here. Added to the system prompt of every request.
+   */
+  instructions?: string;
+  screen: AgentTerminalScreen;
+  workspace?: AgentWorkspace;
+  /** Where the agent keeps its sessions, settings and prompt history between launches. */
+  storage?: AgentStorage;
+  /** Open a link (sign-in, a URL the agent shows). Resolves false when it couldn't. */
+  openUrl?(url: string): Promise<boolean>;
+  clipboard?: { writeText(text: string): Promise<void> };
+}
+
+/** An agent's interactive terminal interface, running until the user leaves it. */
+export interface AgentTerminal {
+  /** Resolves once the interface is drawn and takes keys. */
+  readonly interactive: Promise<void>;
+  /** Resolves with the exit code when the user quits. */
+  readonly exited: Promise<number>;
+  /** Stop it now. */
+  abort(): void;
+}
+
 export interface AgentRuntime {
-  /** What runs the agents, for About boxes and diagnostics ("fx 0.0.11"). */
+  /** What runs the agents, for About boxes and diagnostics ("fx 0.0.13"). */
   readonly engine: string;
   /** Start a conversation. Loading the engine may take a moment the first time. */
   createSession(options: AgentSessionOptions): Promise<AgentSession>;
+  /**
+   * Run the agent's own terminal interface (fx's TUI) on `screen`, when the
+   * runtime has one.
+   */
+  createTerminal?(options: AgentTerminalOptions): Promise<AgentTerminal>;
 }

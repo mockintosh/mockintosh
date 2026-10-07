@@ -14,6 +14,7 @@ import type { SolidApp, Sprite } from "@mockintosh/sdk";
 import { APP_MODULES } from "../../../appModules";
 import { createAppLoader } from "./loader";
 import { runProcess, type ProcessScope } from "./runtime";
+import { createWebAgentRuntime } from "../agentRuntime";
 
 const load = createAppLoader({
   shared: {
@@ -23,6 +24,10 @@ const load = createAppLoader({
     "@mockintosh/ui/renderer": renderer,
     "@mockintosh/quickdraw": quickdraw,
     "@mockintosh/agent": agent,
+    "@mockintosh/terminal": () => import("@mockintosh/terminal"),
+    "@mockintosh/terminal/view": () => import("@mockintosh/terminal/view"),
+    "@mockintosh/terminal/bash": () => import("@mockintosh/terminal/bash"),
+    "@mockintosh/terminal/wasi": () => import("@mockintosh/terminal/wasi"),
   },
   bundled: async (id) => APP_MODULES[id]?.(),
   fetchText: async (url) => {
@@ -34,9 +39,14 @@ const load = createAppLoader({
   blobUrl: (code) => URL.createObjectURL(new Blob([code], { type: "text/javascript" })),
 });
 
-runProcess(self as unknown as ProcessScope, async (source) => {
-  const module = await load(source);
-  const app = module?.default as SolidApp | undefined;
-  // A bundle's exported sprites are the app's, as the OS registers them.
-  return app && module?.sprites ? { ...app, sprites: { ...app.sprites, ...(module.sprites as Record<string, Sprite>) } } : app;
-});
+runProcess(
+  self as unknown as ProcessScope,
+  async (source) => {
+    const module = await load(source);
+    const app = module?.default as SolidApp | undefined;
+    // A bundle's exported sprites are the app's, as the OS registers them.
+    return app && module?.sprites ? { ...app, sprites: { ...app.sprites, ...(module.sprites as Record<string, Sprite>) } } : app;
+  },
+  // fx's engine runs here as well as it does on the page; libfx and its core load on first use.
+  { agentRuntime: createWebAgentRuntime() },
+);

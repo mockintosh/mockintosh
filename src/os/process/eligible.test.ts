@@ -10,6 +10,8 @@ const app = (overrides: Partial<SolidApp> = {}): SolidApp =>
 describe("processBlocker", () => {
   it("lets an app that asks for a worker and needs only what processes serve run in one", () => {
     expect(processBlocker(app({ requires: ["audio", "network"] }), processes)).toBeNull();
+    // A process runs fx's engine itself.
+    expect(processBlocker(app({ requires: ["agent-runtime"] }), processes)).toBeNull();
   });
 
   it("keeps everything else on the OS's thread, and says why", () => {
@@ -18,6 +20,6 @@ describe("processBlocker", () => {
     expect(processBlocker(app({ runtime: "main" }), { ...processes, defaultRuntime: "worker" })).toMatch(/OS's thread/);
     expect(processBlocker(app(), undefined)).toMatch(/no app processes/);
     expect(processBlocker(app({ id: "unknown" }), processes)).toMatch(/can't load/);
-    expect(processBlocker(app({ requires: ["agent-runtime"] }), processes)).toBe("agent-runtime isn't served to processes yet");
+    expect(processBlocker(app({ requires: ["sign-in"] }), processes)).toBe("sign-in isn't served to processes yet");
   });
 });

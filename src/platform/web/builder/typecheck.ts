@@ -14,6 +14,7 @@ const declarations = import.meta.glob<string>([
 const options: ts.CompilerOptions = {...compilerOptions, baseUrl: "/", paths: {
   "@mockintosh/*": ["packages/*/src/index.ts"],
   "@mockintosh/ui/renderer": ["packages/ui/src/renderer.ts"],
+  "@mockintosh/terminal/*": ["packages/terminal/src/*/index.ts"],
   "solid-js": ["node_modules/solid-js/types/index.d.ts"],
   "solid-js/jsx-runtime": ["node_modules/solid-js/types/jsx.d.ts"],
   "solid-js/*": ["node_modules/solid-js/*/types/index.d.ts"],

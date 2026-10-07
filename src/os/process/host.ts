@@ -88,13 +88,15 @@ export interface ProcessWindowHost {
   frameSeq: number;
   frameBytes: number;
   cursor?: CursorSpec;
+  /** The worker's focused control in this window takes raw keys. */
+  rawKeys?: boolean;
   menus: MenubarDefinition[];
   /** Rows at the top and bottom of the picture that are the window's header and footer bands. */
   bands: { header: number; footer: number };
   /** Shared memory the worker publishes this window's pictures in, and the last count seen. */
   shared?: { buffer: SharedArrayBuffer; count: number };
   /** Tells the window's content a new frame, cursor or menus arrived. */
-  changed?(what: "frame" | "cursor" | "menus" | "bands"): void;
+  changed?(what: "frame" | "cursor" | "menus" | "bands" | "rawKeys"): void;
 }
 
 /** A call result that moves objects (a `MessagePort`) to the worker instead of copying them. */
@@ -232,7 +234,7 @@ export class AppProcess {
   }
 
   /** Send input for window `key`, timed for the Worker menu's latency figure. */
-  input(message: Extract<HostToProcess, { t: "pointer" } | { t: "key" }> extends infer M ? M extends { seq: number } ? Omit<M, "seq"> : never : never): void {
+  input(message: Extract<HostToProcess, { t: "pointer" } | { t: "key" } | { t: "paste" }> extends infer M ? M extends { seq: number } ? Omit<M, "seq"> : never : never): void {
     const seq = ++this.seq;
     this.sentAt.set(seq, this.os.scheduler.now());
     this.send({ ...message, seq } as HostToProcess);
@@ -388,6 +390,13 @@ export class AppProcess {
         w.changed?.("cursor");
         return;
       }
+      case "rawKeys": {
+        const w = this.windows.get(msg.key);
+        if (!w) return;
+        w.rawKeys = msg.value;
+        w.changed?.("rawKeys");
+        return;
+      }
       case "menus": {
         const w = this.windows.get(msg.key);
         if (!w) return;
@@ -415,8 +424,12 @@ export class AppProcess {
         else this.send({ t: "reply", id, ok: true, value: cloneable(value) });
       },
       (error: unknown) => {
-        if (id) this.send({ t: "reply", id, ok: false, error: error instanceof Error ? error.message : String(error) });
-        else console.error(`${this.options.appId}: ${method} failed`, error);
+        if (!id) {
+          console.error(`${this.options.appId}: ${method} failed`, error);
+          return;
+        }
+        const code = (error as { code?: unknown } | null)?.code;
+        this.send({ t: "reply", id, ok: false, error: error instanceof Error ? error.message : String(error), ...(typeof code === "string" ? { code } : {}) });
       },
     );
   }

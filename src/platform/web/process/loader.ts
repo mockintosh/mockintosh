@@ -10,8 +10,12 @@
  */
 import type { AppSource } from "../../../os/process/protocol";
 
-/** The modules an app shares with the OS, by the specifier it imports them with. */
-export type SharedModules = Readonly<Record<string, Record<string, unknown>>>;
+/**
+ * The modules an app shares with the OS, by the specifier it imports them
+ * with: loaded already, or loaded the first time an app's code imports them
+ * (a terminal's emulator and shell needn't weigh on every process).
+ */
+export type SharedModules = Readonly<Record<string, Record<string, unknown> | (() => Promise<Record<string, unknown>>)>>;
 
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 const SPECIFIER = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(["'])([^"']+)\2/g;
@@ -55,14 +59,26 @@ export interface LoadedModule {
   sprites?: Record<string, unknown>;
 }
 
+/** The bare specifiers `code` imports. */
+export function importedSpecifiers(code: string): Set<string> {
+  const found = new Set<string>();
+  for (const match of code.matchAll(SPECIFIER)) found.add(match[3]!);
+  return found;
+}
+
 export function createAppLoader(options: LoaderOptions): (source: AppSource) => Promise<LoadedModule | undefined> {
-  let shims: Record<string, string> | null = null;
-  const shimUrls = (): Record<string, string> => {
-    if (shims) return shims;
-    (globalThis as Record<string, unknown>)[GLOBAL] = options.shared;
-    shims = Object.fromEntries(
-      Object.entries(options.shared).map(([specifier, exports]) => [specifier, options.blobUrl(shimSource(specifier, exports, GLOBAL))]),
-    );
+  const shims: Record<string, string> = {};
+  const loaded: Record<string, Record<string, unknown>> = {};
+  (globalThis as Record<string, unknown>)[GLOBAL] = loaded;
+  /** Shims for the shared modules `code` imports, loading any not yet loaded. */
+  const shimUrls = async (code: string): Promise<Record<string, string>> => {
+    for (const specifier of importedSpecifiers(code)) {
+      const shared = options.shared[specifier];
+      if (!shared || shims[specifier]) continue;
+      const exports = typeof shared === "function" ? await shared() : shared;
+      loaded[specifier] = exports;
+      shims[specifier] = options.blobUrl(shimSource(specifier, exports, GLOBAL));
+    }
     return shims;
   };
 
@@ -71,11 +87,12 @@ export function createAppLoader(options: LoaderOptions): (source: AppSource) => 
       case "bundled":
         return (await options.bundled(source.id)) as LoadedModule | undefined;
       case "url": {
-        const code = rewriteImports(await options.fetchText(source.url), shimUrls(), source.url);
+        const text = await options.fetchText(source.url);
+        const code = rewriteImports(text, await shimUrls(text), source.url);
         return (await options.importUrl(options.blobUrl(code))) as LoadedModule;
       }
       case "code": {
-        const code = rewriteImports(source.code, shimUrls());
+        const code = rewriteImports(source.code, await shimUrls(source.code));
         return (await options.importUrl(options.blobUrl(code))) as LoadedModule;
       }
     }

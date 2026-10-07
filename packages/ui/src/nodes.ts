@@ -135,6 +135,11 @@ export interface KeyboardEventHandlers {
   onKeyDown?: (key: string, modifiers: Modifiers) => void;
   onKeyUp?: (key: string, modifiers: Modifiers) => void;
   onKeyPress?: (char: string) => void;
+  /**
+   * Pasted text, in one piece. Without it a paste types into the focused
+   * node one key-press per character.
+   */
+  onPaste?: (text: string) => void;
 }
 
 export interface FocusEventHandlers {
@@ -142,6 +147,12 @@ export interface FocusEventHandlers {
   onBlur?: () => void;
   tabIndex?: number;
   autoFocus?: boolean;
+  /**
+   * The focused node takes every key as typed: Tab and Shift-Tab reach its
+   * `onKeyDown` instead of moving focus (⌃Tab still moves it), and ⌃V is an
+   * ordinary key rather than Paste. For terminals and editors.
+   */
+  rawKeys?: boolean;
 }
 
 export type EventHandlers = MouseEventHandlers & KeyboardEventHandlers & FocusEventHandlers;
@@ -335,6 +346,8 @@ export interface BoxProps extends LayoutStyle, EventHandlers, SemanticProps {
   inert?: boolean;
   /** Treat this node as a Tab-cycle / last-focus scope. */
   focusScope?: boolean;
+  /** Presses in this subtree leave keyboard focus where it is (a menu bar). */
+  keepsFocus?: boolean;
   /**
    * Vertical scroll offset in pixels (requires overflow="scroll"). Together
    * with `onScroll` the owner drives the offset: the wheel and touch pans
@@ -661,8 +674,8 @@ export const EVENT_PROP_NAMES = new Set<string>([
   "onClick", "onDoubleClick", "onMouseDown", "onMouseDownCapture", "onMouseUp",
   "onMouseMove", "onMouseEnter", "onMouseLeave", "onDragStart", "onDrag", "onDragEnd",
   "onScroll",
-  "onKeyDown", "onKeyUp", "onKeyPress",
-  "onFocus", "onBlur", "tabIndex", "autoFocus", "cursor",
+  "onKeyDown", "onKeyUp", "onKeyPress", "onPaste",
+  "onFocus", "onBlur", "tabIndex", "autoFocus", "rawKeys", "cursor",
 ]);
 
 export function setNodeProperty(node: CanvasNode, name: string, value: unknown): void {

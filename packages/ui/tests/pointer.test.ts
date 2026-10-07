@@ -188,6 +188,24 @@ describe("pointer capture", () => {
     ptr.dispatch("mousedown", 60, 60);
     expect(focus.focused).toBeNull();
   });
+
+  it("leaves focus and its scope alone for a press in a keepsFocus subtree", () => {
+    const { root, a, b } = tree();
+    a.props.focusScope = true;
+    a._eventHandlers.tabIndex = 0;
+    b.props.keepsFocus = true;
+    const onClick = vi.fn();
+    b._eventHandlers.onClick = onClick;
+    const focus = createFocusManager(root);
+    const ptr = createPointerDispatcher(root, focus);
+    ptr.dispatch("mousedown", 10, 10);
+    ptr.dispatch("mouseup", 10, 10);
+    ptr.dispatch("mousedown", 60, 60);
+    ptr.dispatch("mouseup", 60, 60);
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(focus.focused).toBe(a);
+    expect(focus.getActiveScope()).toBe(a);
+  });
 });
 
 /** root > outer (capture) > inner (target), inner fills outer at (10,10)-(60,60). */
