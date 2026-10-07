@@ -137,10 +137,6 @@ export function isSdkClean(entry: string): boolean {
   return (SDK_CLEAN as readonly string[]).includes(entry);
 }
 
-export function isShellApp(entry: string): boolean {
-  return (SHELL_APPS as readonly string[]).includes(entry);
-}
-
 /** Markdown table rows for the App Developer Guide, derived from the lists. */
 export function bundledAppsGuideRows(): { title: string; source: string; kind: "SDK-clean" | "Shell" }[] {
   return [

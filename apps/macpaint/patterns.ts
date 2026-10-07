@@ -54,14 +54,3 @@ const cache: Pattern[] = PATTERN_HEX.map((hex) => {
 
 export const PAINT_PATTERNS: readonly Pattern[] = cache;
 
-/** Solid black — MacPaint's first swatch, and the default ink. */
-export const BLACK_PATTERN: Pattern = cache[0];
-/** Solid white — MacPaint's twentieth swatch. */
-export const WHITE_PATTERN: Pattern = cache[19];
-/** 50% gray — the default brush/fill pattern. */
-export const GRAY50_PATTERN: Pattern = cache[3];
-
-export function patternInk(pat: Pattern, x: number, y: number): 0 | 1 {
-  const row = pat[y & 7] ?? 0;
-  return ((row >> (7 - (x & 7))) & 1) as 0 | 1;
-}

@@ -54,14 +54,6 @@ export interface OutlineGlyphSource {
   kern(left: number, right: number): number;
 }
 
-export interface DeckerTextSize {
-  width: number;
-  height: number;
-}
-
-/** Horizontal ellipsis — ordinal 127 in Decker's extended range. */
-export const DECKER_ELLIPSIS = "\u2026";
-
 const FALLBACK_GLYPH_INDEX = "?".charCodeAt(0);
 
 /**
@@ -142,11 +134,6 @@ export function getGlyphDataOffset(font: DeckerFont, glyphIndex: number): number
   return glyphIndex * font.glyphStride;
 }
 
-/** Stored rows per glyph: the cell plus any overflow above and below it. */
-export function glyphRows(font: DeckerFont): number {
-  return (font.inkAbove ?? 0) + font.glyphHeight + (font.inkBelow ?? 0);
-}
-
 export function getGlyphPixel(
   font: DeckerFont,
   glyphIndex: number,
@@ -208,9 +195,3 @@ export function charForOrdinal(ordinal: number): string | undefined {
   return extraCharForOrdinal(ordinal);
 }
 
-export function measureDeckerText(font: DeckerFont, text: string): DeckerTextSize {
-  const lines = text.split("\n");
-  let width = 0;
-  for (const line of lines) width = Math.max(width, textAdvance(font, line));
-  return { width, height: font.glyphHeight * lines.length };
-}

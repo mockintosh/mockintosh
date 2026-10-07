@@ -16,10 +16,6 @@ export function loadIconCatalog(): IconFamily[] {
   return cached;
 }
 
-export function catalogRelease(): string {
-  return file.release;
-}
-
 /**
  * What the Finder would show after the 7.5.x updates: System IDs overlaid
  * by later update bags, plus Finder, control panels, and bundled apps.

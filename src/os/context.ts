@@ -36,9 +36,6 @@ export interface IconScreenRect {
   height: number;
 }
 
-/** Drag outline rect — shared type for window drag and zoom animation. */
-export type DragRect = AnimRect;
-
 export type { DialogOptions };
 
 export interface OSServices {

@@ -43,15 +43,6 @@ export function spriteFromIcon(raw: Uint8Array): Sprite {
   return bitmapToSprite(raw.subarray(0, 128), undefined, 32, 32);
 }
 
-/** SICN — one or more 16×16 1-bit icons, 32 bytes each, no mask. */
-export function spritesFromSicn(raw: Uint8Array): Sprite[] {
-  const out: Sprite[] = [];
-  for (let off = 0; off + 32 <= raw.length; off += 32) {
-    out.push(bitmapToSprite(raw.subarray(off, off + 32), undefined, 16, 16));
-  }
-  return out;
-}
-
 function sprite2(width: number, height: number, b64: string | undefined): Sprite | undefined {
   return b64 ? defineSprite(width, height, b64) : undefined;
 }

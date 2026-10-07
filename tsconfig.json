@@ -40,7 +40,6 @@
     "packages/print/src/**/*.ts",
     "packages/terminal/src/**/*.ts",
     "packages/terminal/src/**/*.tsx",
-    "utils/**/*.ts",
     "vite-env.d.ts"
   ],
   "exclude": ["node_modules", "dist", "api", "scripts", "packages/quickdraw", "packages/ui/src/vite/**"]
