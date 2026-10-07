@@ -39,6 +39,9 @@ export {
   isFontType,
   IMAGE_TYPES,
   uniqueChildName,
+  MAX_NAME_LENGTH,
+  fitName,
+  fitNameWithSuffix,
   FONT_TYPES,
   type NodeId,
   type NodeRole,
@@ -227,6 +230,8 @@ export interface DialogOptions {
   buttons?: string[];
   showInput?: boolean;
   inputDefault?: string;
+  /** Most characters the input takes, e.g. `MAX_NAME_LENGTH` when it asks for a file name. */
+  inputMaxLength?: number;
   /** Which alert icon to show. Defaults to `stop`. */
   variant?: DialogVariant;
 }

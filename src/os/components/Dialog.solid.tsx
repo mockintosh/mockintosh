@@ -11,6 +11,7 @@ export interface DialogProps {
   buttons?: string[];
   showInput?: boolean;
   inputDefault?: string;
+  inputMaxLength?: number;
   variant?: DialogVariant;
   resolve: (value: string | null) => void;
 }
@@ -87,6 +88,7 @@ export function DialogApp(props: DialogProps): JSX.Element {
             onChange={setValue}
             onSubmit={() => finish(defaultLabel())}
             width={win.width() - PADDING * 2}
+            maxLength={props.inputMaxLength}
             autoFocus
           />
         </box>

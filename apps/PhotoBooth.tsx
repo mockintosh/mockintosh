@@ -11,6 +11,7 @@ import {
   defineApp,
   isBaselineAscii,
   renderAsciiGlyphAtlas,
+  uniqueChildName,
   useApp,
   writeSpriteFile,
   type AsciiDitherOptions,
@@ -39,6 +40,7 @@ import {
   ensurePhotoLibrary,
   findPhotoLibrary,
   listStoredPhotos,
+  photoFileName,
   storePhoto,
 } from "./photobooth/library";
 
@@ -69,11 +71,6 @@ function paintPicture(surface: RasterSurface, picture: Photo | null, view: Size,
   if (!picture) return;
   const origin = placedOrigin(picture, view, pan);
   surface.blitPixels(picture.pixels, picture.width, picture.height, origin.x, origin.y);
-}
-
-function photoDateLabel(photo: Photo): string {
-  const date = new Date(photo.timestamp);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 }
 
 function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
@@ -229,9 +226,9 @@ function PhotoBooth(_props: Record<string, unknown>): JSX.Element {
   }
 
   async function savePhoto(photo: Photo): Promise<void> {
-    const name = `Photo ${photoDateLabel(photo)}`;
     const desktop = app.fs.locate("desktop");
     if (!desktop) return;
+    const name = uniqueChildName(app.fs, desktop.id, photoFileName(photo.timestamp));
     try {
       await writeSpriteFile(
         app.fs,

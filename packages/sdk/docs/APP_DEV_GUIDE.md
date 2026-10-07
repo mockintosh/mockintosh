@@ -480,6 +480,8 @@ async function saveNote(fs: AppFileSystem, text: string) {
 
 Files have one MIME `type` (`MIME.text`, `MIME.markdown`, `MIME.sprite`, …; `inferMimeType(name)` guesses from an extension). Mutations throw `FSError` (`isFSError(err, "exists")`) on name clashes and invalid moves — show the message in a dialog rather than swallowing it.
 
+A file or folder name holds at most `MAX_NAME_LENGTH` (28) characters; a longer new name throws `FSError` with code `"invalid-name"`. Fit names you build rather than letting the save fail: `fitName("A very long photo name.png")` cuts the stem and keeps the extension, `fitNameWithSuffix(title, " copy")` keeps the suffix, and `uniqueChildName(fs, folderId, name)` does both and numbers clashes. When you ask for a name, pass `inputMaxLength: MAX_NAME_LENGTH` to `showDialog`.
+
 `<Markdown text={src} />` (and `parseMarkdown`) render markdown through the 1-bit layout tree. Import them from `@mockintosh/sdk`, not `@mockintosh/markdown`.
 
 `parseMarkdown` returns the document model, `LayoutNode[]`: headings, paragraphs of inline segments (text, bold, italic, code, link), list items, code blocks, tables, forms, images and rules. Anything that can produce that model can be drawn with `<DocumentView nodes={…} />`, which is what `<Markdown>` does. Its optional props are `onLink(href)`, `onSubmit(form, fields)` for form nodes, and `loadImage(src)` for images that aren't sprite ids. Safari draws web pages this way.

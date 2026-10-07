@@ -8,7 +8,7 @@
  * `Platform.loadModule`, or `bundled:<id>`, loaded from the host's bundled-app
  * registry. A platform without `loadModule` can still install bundled apps.
  */
-import { MIME, type FileSystem, type FSFile } from "@mockintosh/fs";
+import { MIME, fitName, type FileSystem, type FSFile } from "@mockintosh/fs";
 import { setAppSource } from "./process/sources";
 import type { AppSource } from "./process/protocol";
 import { declaredApp, type AppDeclaration } from "./appDeclaration";
@@ -256,11 +256,12 @@ export function installedAppIds(fs: FileSystem): string[] {
 async function writeManifest(fs: FileSystem, manifest: AppManifest): Promise<FSFile> {
   const apps = fs.locate("applications");
   if (!apps) throw new Error("File system has no Applications folder");
+  const name = fitName(manifest.title);
   // Replace any earlier install of the same app, whatever it was named.
   for (const f of manifestFiles(fs)) {
-    if (installedAppId(fs, f) === manifest.id && f.name !== manifest.title) await fs.remove(f.id);
+    if (installedAppId(fs, f) === manifest.id && f.name !== name) await fs.remove(f.id);
   }
-  return fs.writeJSON(apps.id, manifest.title, manifest, {
+  return fs.writeJSON(apps.id, name, manifest, {
     type: MIME.app,
     attributes: { icon: manifest.icon, appId: manifest.id },
   });
@@ -283,8 +284,9 @@ async function ensureDesktopShortcut(fs: FileSystem, manifest: AppManifest): Pro
   const desktop = fs.locate("desktop");
   if (!desktop) return;
   if ((await desktopShortcutAppIds(fs)).has(manifest.id)) return;
-  if (fs.child(desktop.id, manifest.title)) return;
-  await fs.writeJSON(desktop.id, manifest.title, { appId: manifest.id }, {
+  const name = fitName(manifest.title);
+  if (fs.child(desktop.id, name)) return;
+  await fs.writeJSON(desktop.id, name, { appId: manifest.id }, {
     type: MIME.appShortcut,
     attributes: { icon: manifest.icon },
   });

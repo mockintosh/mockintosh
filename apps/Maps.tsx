@@ -12,6 +12,7 @@ import {
   onSettled,
   showPrintDialog,
   spacedFontName,
+  fitNameWithSuffix,
   uniqueChildName,
   useApp,
   writeSpriteFile,
@@ -833,7 +834,7 @@ function Maps(_props: Record<string, unknown>): JSX.Element {
       await writeSpriteFile(
         app.fs,
         desktop.id,
-        uniqueChildName(app.fs, desktop.id, `${pictureName()} Map`.slice(0, 31)),
+        uniqueChildName(app.fs, desktop.id, fitNameWithSuffix(pictureName(), " Map")),
         { width: picture.width, height: picture.height, data: new Uint8Array(picture.pixels) },
         { attributes: { icon: "maps/icon" } },
       );

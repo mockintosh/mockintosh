@@ -5,22 +5,30 @@
  * folder. Nothing is hidden from the user — the Finder shows exactly what an
  * app has stored, and trashing the folder resets the app.
  */
-import { inferMimeType, MIME, type FileSystem, type FSDirectory } from "@mockintosh/fs";
+import { fitName, inferMimeType, MIME, type FileSystem, type FSDirectory, type FSNode } from "@mockintosh/fs";
 import type { AppStorage } from "@mockintosh/sdk";
+
+/**
+ * The app's folder in Preferences, if it has one. An id too long for a name
+ * gets a shortened folder; one made before names had a limit keeps the full id.
+ */
+function findStorageFolder(fs: FileSystem, prefsId: string, appId: string): FSNode | undefined {
+  return fs.child(prefsId, appId) ?? fs.child(prefsId, fitName(appId));
+}
 
 /** The app's storage folder, created on first use. */
 export function appStorageFolder(fs: FileSystem, appId: string): FSDirectory {
   const prefs = fs.locate("preferences");
   if (!prefs) throw new Error("File system has no Preferences folder");
-  const existing = fs.child(prefs.id, appId);
+  const existing = findStorageFolder(fs, prefs.id, appId);
   if (existing?.kind === "directory") return existing;
-  return fs.mkdir(prefs.id, appId);
+  return fs.mkdir(prefs.id, fitName(appId));
 }
 
 export function createAppStorage(fs: FileSystem, appId: string): AppStorage {
   const existingFolder = () => {
     const prefs = fs.locate("preferences");
-    return prefs ? fs.child(prefs.id, appId) : undefined;
+    return prefs ? findStorageFolder(fs, prefs.id, appId) : undefined;
   };
   const existingFile = (key: string) => {
     const folder = existingFolder();

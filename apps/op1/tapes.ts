@@ -11,7 +11,7 @@
  * settings in an `op1t` chunk that other players skip. Any audio app can
  * open it.
  */
-import { decodeWav, encodeWav, readWavChunk, setWavChunk } from "@mockintosh/sdk";
+import { MAX_NAME_LENGTH, decodeWav, encodeWav, readWavChunk, setWavChunk } from "@mockintosh/sdk";
 import { defaultQuad, sanitizeQuad, type Quad } from "./params";
 import { bounceSong, songLevels, songPans, songTapeSettings, type Song } from "./song";
 import { DEMO_SONGS } from "./songs";
@@ -39,9 +39,9 @@ export const DEMO_NAMES: readonly string[] = DEMO_SONGS.map((song) => song.name)
 /** The tape the OP-1 starts with. */
 export const DEFAULT_TAPE: TapeRef = { kind: "demo", name: DEMO_SONGS[0]!.name };
 export const UNTITLED_TAPE = "Untitled Tape";
-export const MAX_TAPE_NAME = 31;
-
 export const TAPE_SUFFIX = ".tape.wav";
+/** A tape is kept as `<name>.tape.wav`, and a file's whole name has to fit. */
+export const MAX_TAPE_NAME = MAX_NAME_LENGTH - TAPE_SUFFIX.length;
 const CHUNK = "op1t";
 /** Tracks are kept at 1/HEADROOM of their level. */
 const HEADROOM = 2;
@@ -96,7 +96,7 @@ export function tapeNameProblem(name: string): string | null {
 
 /** What Save As offers to call a tape. */
 export function suggestedName(ref: TapeRef): string {
-  if (ref.kind === "demo") return `${ref.name} copy`.slice(0, MAX_TAPE_NAME);
+  if (ref.kind === "demo") return `${ref.name.slice(0, MAX_TAPE_NAME - " copy".length).trimEnd()} copy`;
   return tapeName(ref);
 }
 

@@ -4,7 +4,7 @@ import { describeApp } from "../process/describe";
 import { declaredApp, type AppDeclaration } from "../appDeclaration";
 export { counterSource, blankSource, canvasSource, type ProjectTemplate } from "./templates";
 import {diskPath} from "./paths";
-import {MIME} from "@mockintosh/fs";
+import {MIME, fitName} from "@mockintosh/fs";
 import {Kernel, ServiceError, defineOperation, type Disk, type Execution, type KernelSession} from "../kernel";
 import {Cancellation} from "../kernel/cancellation";
 import {getApp, registerApp, unregisterApp} from "../apps";
@@ -128,7 +128,8 @@ export class ProjectService {
     return {...module.default, sprites: {...module.default.sprites, ...module.sprites}};
   }
   async create(path: string, id: string, title: string, e: Execution, template: ProjectTemplate = "counter") {
-    if (!/^[a-z][a-z0-9_-]{0,63}$/.test(id)) throw new ServiceError("invalid-argument", "Use a lowercase app id with letters, digits, underscores or hyphens");
+    // An app's id names its folder in Preferences, so it must fit a file name.
+    if (!/^[a-z][a-z0-9_-]{0,27}$/.test(id)) throw new ServiceError("invalid-argument", "Use a lowercase app id of at most 28 letters, digits, underscores or hyphens");
     if (getApp(id)) throw new ServiceError("conflict", "App id is already registered");
     await e.disk.mkdir(path);
     await e.disk.mkdir(path + "/src");
@@ -187,7 +188,8 @@ export class ProjectService {
     if (!builder) throw new ServiceError("unsupported-operation", "No build provider is available on this platform");
     if ([...this.jobs.values()].filter(job => job.value.state === "building").length >= 4) throw new ServiceError("conflict", "Too many active builds");
     const {project, manifest, files, sourceRevision} = await this.snapshot(path, e);
-    const id = `build-${this.kernel.instance}-${this.kernel.generation}-${++this.sequence}`;
+    // Unique across boots, and short enough to name the build's folder in `dist/`.
+    const id = `build-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}-${++this.sequence}`;
     const token = new Cancellation();
     const releaseOwner = this.kernel.onSessionEnd(e.caller, () => token.cancel());
     const releaseParent = e.cancellation.subscribe(() => token.cancel());
@@ -289,7 +291,7 @@ export class ProjectService {
       await this.persist();
       const desktop = this.os.fs.locate("desktop")!;
       const shortcuts = this.os.fs.children(desktop.id).filter(node => this.os.fs.attributes(node.id).projectApp === manifest.id);
-      if (!shortcuts.length) await this.os.fs.writeJSON(desktop.id, manifest.title, {appId: manifest.id}, {type: MIME.appShortcut, attributes: {icon: app.icon, projectApp: manifest.id}});
+      if (!shortcuts.length) await this.os.fs.writeJSON(desktop.id, fitName(manifest.title), {appId: manifest.id}, {type: MIME.appShortcut, attributes: {icon: app.icon, projectApp: manifest.id}});
       await this.os.fs.flush();
       this.loadErrors.delete(manifest.id);
       return selection;

@@ -362,6 +362,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
             buttons: options.buttons ?? ["OK"],
             showInput: options.showInput,
             inputDefault: options.inputDefault,
+            inputMaxLength: options.inputMaxLength,
             variant: options.variant ?? "stop",
             resolve,
           },

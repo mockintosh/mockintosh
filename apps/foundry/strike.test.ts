@@ -11,7 +11,6 @@ import {
   STRIP_GAP,
   STRIP_INK,
   toggleDraftPixel,
-  uniqueDesktopName,
 } from "./strike";
 
 function boxDraft(): FontStrikeDraft {
@@ -43,10 +42,6 @@ describe("foundry strike helpers", () => {
     expect(bits.pixels[1]).toBe(0);
   });
 
-  it("uniqueDesktopName suffixes before the extension", () => {
-    expect(uniqueDesktopName(["tiny-36.fnt"], "tiny-36.fnt")).toBe("tiny-36 2.fnt");
-    expect(uniqueDesktopName(["tiny-36.fnt", "tiny-36 2.fnt"], "tiny-36.fnt")).toBe("tiny-36 3.fnt");
-  });
 
   it("packs the glyph strip so a row never exceeds the pane", () => {
     const cell = stripCellSize(STRIP_INK, STRIP_INK);

@@ -33,7 +33,7 @@ import {
 } from "../src/os/state";
 import { registerApp } from "../src/os/apps";
 import { useWindow } from "../src/os/windowContext";
-import { ROOT_ID, isFSError, type FileSystem, type FSNode } from "@mockintosh/fs";
+import { MAX_NAME_LENGTH, ROOT_ID, isFSError, type FileSystem, type FSNode } from "@mockintosh/fs";
 import { WindowHeader, type MenubarDefinition } from "@mockintosh/sdk";
 import {
   bumpZOrder,
@@ -64,18 +64,38 @@ import { INFO_BAR_H, windowContentRect, windowTotalHeight } from "../src/os/wind
 // ---------------------------------------------------------------------------
 const DRAG_THRESHOLD      = 4;
 const LABEL_PAD           = 2;
+const LABEL_H             = 14;
+/** Height of an icon cell's box: icon, label, and a little slack below. */
+const CELL_BOX_H          = ICON_SIZE + LABEL_H + 4;
 const FONT                = "body" as const;
 const RENAME_DELAY_MS     = 350;
+
+interface LabelSpan {
+  /** The label rectangle, in cell coordinates. */
+  labelLeft: number;
+  labelW: number;
+  /** The cell widened to cover the label, in cell coordinates. */
+  left: number;
+  width: number;
+}
+
+/**
+ * Where an icon's label sits: centred under the icon, spilling past the cell
+ * on both sides when the name is wider than it. An empty name (mid-rename)
+ * keeps room for the caret.
+ */
+function labelSpan(text: string, cellW: number): LabelSpan {
+  const labelW = measureText(text || "n", FONT) + LABEL_PAD * 2;
+  const labelLeft = Math.floor((cellW - labelW) / 2);
+  return { labelLeft, labelW, left: Math.min(0, labelLeft), width: Math.max(cellW, labelW) };
+}
 
 /**
  * Map x within the icon cell to a caret index in `title`, using the same label
  * geometry and per-glyph hit logic as {@link TextInput}.
  */
 function labelClickToCharIndex(title: string, lxInCell: number, cellW: number): number {
-  const textW = measureText(title, FONT);
-  const labelW = Math.min(textW + LABEL_PAD * 2, cellW);
-  const labelLeft = Math.max(0, Math.floor((cellW - labelW) / 2));
-  const px = lxInCell - labelLeft - LABEL_PAD;
+  const px = lxInCell - labelSpan(title, cellW).labelLeft - LABEL_PAD;
   if (px <= 0) return 0;
   let accumulated = 0;
   for (let i = 0; i < title.length; i++) {
@@ -189,6 +209,15 @@ function KeyedIcons(props: {
   );
 }
 
+/**
+ * Back to front: by z-order, except the icon being renamed goes on top so a
+ * neighbour's label can't cover its widening field.
+ */
+function paintOrder(renamingId: string | null): (a: PositionedIcon, b: PositionedIcon) => number {
+  const onTop = (item: PositionedIcon) => (item.icon.nodeId === renamingId ? 1 : 0);
+  return (a, b) => onTop(a) - onTop(b) || a.icon.zOrder - b.icon.zOrder;
+}
+
 function marqueeRect(m: MarqueeState): { x: number; y: number; w: number; h: number } {
   return {
     x: Math.min(m.anchorX, m.currentX),
@@ -241,6 +270,8 @@ interface ActiveDragCompanion {
   offsetX: number;
   offsetY: number;
   outlineData: Uint8Array;
+  /** Where the outline starts, relative to the companion's cell. */
+  outlineX: number;
   outlineW: number;
   outlineH: number;
 }
@@ -256,6 +287,8 @@ interface ActiveDragState {
   ghostY: number;
   /** Pre-computed mask outline — drawn as the drag ghost. */
   outlineData: Uint8Array;
+  /** Where the outline starts, relative to the cell (left of it for a wide label). */
+  outlineX: number;
   outlineW: number;
   outlineH: number;
   companions: ActiveDragCompanion[];
@@ -297,55 +330,55 @@ function computeMaskOutline(mask: Uint8Array, w: number, h: number): Uint8Array 
 }
 
 /**
- * Build a single continuous outline that covers both the icon silhouette and
- * the label rectangle.  Where the two shapes share an edge (icon bottom ↔
- * label top), the outline is suppressed so the ghost looks like one piece.
+ * The icon's opaque pixels plus its label rectangle, over the cell widened to
+ * the label ({@link LabelSpan}): `height` rows, `span.width` columns.
  */
-function buildGhostOutline(
+function iconCellSilhouette(
   sprite: SpriteRef,
   cellW: number,
-  iconOffsetX: number,
-  labelLeft: number,
-  labelW: number,
-  labelH: number,
-): { data: Uint8Array; w: number; h: number } {
-  const totalH = ICON_SIZE + labelH;
-  const combined = new Uint8Array(cellW * totalH);
+  span: LabelSpan,
+  height: number,
+): Uint8Array {
+  const w = span.width;
+  const out = new Uint8Array(w * height);
+  const iconLeft = Math.floor((cellW - ICON_SIZE) / 2) - span.left;
 
   if (sprite) {
     const src = sprite.mask ?? sprite.data;
     const sw = Math.min(sprite.width, ICON_SIZE);
-    const sh = Math.min(sprite.height, ICON_SIZE);
+    const sh = Math.min(sprite.height, ICON_SIZE, height);
     for (let sy = 0; sy < sh; sy++) {
       for (let sx = 0; sx < sw; sx++) {
-        if (src[sy * sprite.width + sx]) {
-          const dx = iconOffsetX + sx;
-          if (dx >= 0 && dx < cellW) combined[sy * cellW + dx] = 1;
-        }
+        if (src[sy * sprite.width + sx]) out[sy * w + iconLeft + sx] = 1;
       }
     }
   } else {
-    for (let sy = 0; sy < ICON_SIZE; sy++) {
-      for (let sx = 0; sx < ICON_SIZE; sx++) {
-        const dx = iconOffsetX + sx;
-        if (dx >= 0 && dx < cellW) combined[sy * cellW + dx] = 1;
-      }
+    for (let sy = 0; sy < Math.min(ICON_SIZE, height); sy++) {
+      out.fill(1, sy * w + iconLeft, sy * w + iconLeft + ICON_SIZE);
     }
   }
 
-  for (let ly = 0; ly < labelH; ly++) {
-    for (let lx = 0; lx < labelW; lx++) {
-      const dx = labelLeft + lx;
-      const dy = ICON_SIZE + ly;
-      if (dx >= 0 && dx < cellW) combined[dy * cellW + dx] = 1;
-    }
+  const labelLeft = span.labelLeft - span.left;
+  for (let dy = ICON_SIZE; dy < Math.min(ICON_SIZE + LABEL_H, height); dy++) {
+    out.fill(1, dy * w + labelLeft, dy * w + labelLeft + span.labelW);
   }
+  return out;
+}
 
-  return {
-    data: computeMaskOutline(combined, cellW, totalH),
-    w: cellW,
-    h: totalH,
-  };
+/**
+ * Build a single continuous outline that covers both the icon silhouette and
+ * the label rectangle.  Where the two shapes share an edge (icon bottom ↔
+ * label top), the outline is suppressed so the ghost looks like one piece.
+ * `x` is where the outline starts relative to the cell, left of it for a
+ * label wider than the cell.
+ */
+function buildOutlineForItem(
+  sprite: SpriteRef, title: string, cellW: number,
+): { data: Uint8Array; x: number; w: number; h: number } {
+  const span = labelSpan(title, cellW);
+  const h = ICON_SIZE + LABEL_H;
+  const combined = iconCellSilhouette(sprite, cellW, span, h);
+  return { data: computeMaskOutline(combined, span.width, h), x: span.left, w: span.width, h };
 }
 
 // ---------------------------------------------------------------------------
@@ -516,71 +549,8 @@ function computeFolderContentHeight(positions: Iterable<IconPosition>): number {
 }
 
 // ---------------------------------------------------------------------------
-// Icon hit mask — visible sprite pixels only (label has its own hit region)
-// ---------------------------------------------------------------------------
-
-function buildIconCellHitMask(
-  sprite: SpriteRef,
-  cellW: number,
-  iconOffsetX: number,
-  labelLeft: number,
-  labelW: number,
-): HitMask {
-  const labelH = 14;
-  const totalH = ICON_SIZE + labelH + 4;
-  const mask = new Uint8Array(cellW * totalH);
-
-  if (sprite) {
-    const src = sprite.mask ?? sprite.data;
-    const sw = Math.min(sprite.width, ICON_SIZE);
-    const sh = Math.min(sprite.height, ICON_SIZE);
-    for (let sy = 0; sy < sh; sy++) {
-      for (let sx = 0; sx < sw; sx++) {
-        if (src[sy * sprite.width + sx]) {
-          const dx = iconOffsetX + sx;
-          if (dx >= 0 && dx < cellW) {
-            mask[sy * cellW + dx] = 1;
-          }
-        }
-      }
-    }
-  } else {
-    for (let sy = 0; sy < ICON_SIZE; sy++) {
-      for (let sx = 0; sx < ICON_SIZE; sx++) {
-        const dx = iconOffsetX + sx;
-        if (dx >= 0 && dx < cellW) {
-          mask[sy * cellW + dx] = 1;
-        }
-      }
-    }
-  }
-
-  for (let ly = 0; ly < labelH; ly++) {
-    for (let lx = 0; lx < labelW; lx++) {
-      const dx = labelLeft + lx;
-      const dy = ICON_SIZE + ly;
-      if (dx >= 0 && dx < cellW && dy < totalH) {
-        mask[dy * cellW + dx] = 1;
-      }
-    }
-  }
-
-  return { data: mask, width: cellW, height: totalH };
-}
-
-// ---------------------------------------------------------------------------
 // Drag helpers
 // ---------------------------------------------------------------------------
-
-function buildOutlineForItem(
-  sprite: SpriteRef, title: string, cellW: number,
-): { data: Uint8Array; w: number; h: number } {
-  const iconOffsetX = Math.floor((cellW - ICON_SIZE) / 2);
-  const textW = measureText(title, FONT);
-  const labelW = Math.min(textW + LABEL_PAD * 2, cellW);
-  const labelLeft = Math.max(0, Math.floor((cellW - labelW) / 2));
-  return buildGhostOutline(sprite, cellW, iconOffsetX, labelLeft, labelW, 14);
-}
 
 function activateDrag(
   info: PendingDragInfo,
@@ -588,7 +558,7 @@ function activateDrag(
   ghostX: number,
   ghostY: number
 ): void {
-  const { data, w, h } = buildOutlineForItem(sprite, info.title, info.cellW);
+  const { data, x, w, h } = buildOutlineForItem(sprite, info.title, info.cellW);
 
   const companions: ActiveDragCompanion[] = info.companions.map(c => {
     const outline = buildOutlineForItem(c.sprite, c.title, c.cellW);
@@ -597,6 +567,7 @@ function activateDrag(
       offsetX: c.offsetX,
       offsetY: c.offsetY,
       outlineData: outline.data,
+      outlineX: outline.x,
       outlineW: outline.w,
       outlineH: outline.h,
     };
@@ -611,6 +582,7 @@ function activateDrag(
     ghostX,
     ghostY,
     outlineData:        data,
+    outlineX:           x,
     outlineW:           w,
     outlineH:           h,
     companions,
@@ -741,7 +713,7 @@ export function FinderDesktop(): JSX.Element {
     const positions = layout.positions();
     return icons()
       .map((icon) => ({ icon, pos: positions.get(icon.nodeId)! }))
-      .sort((a, b) => a.icon.zOrder - b.icon.zOrder);
+      .sort(paintOrder(renamingNodeId()));
   });
 
   const desktopIconOffsetX = Math.floor((DESKTOP_ICON_CELL_W - ICON_SIZE) / 2);
@@ -924,7 +896,7 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
     const positions = layout.positions();
     return icons()
       .map((icon) => ({ icon, pos: positions.get(icon.nodeId)! }))
-      .sort((a, b) => a.icon.zOrder - b.icon.zOrder);
+      .sort(paintOrder(renamingNodeId()));
   });
 
   createEffect(
@@ -1118,26 +1090,26 @@ interface IconCellProps {
 
 function IconCell(props: IconCellProps): JSX.Element {
   const os = useOS();
-  const iconOffsetX = Math.floor((props.cellW - ICON_SIZE) / 2);
-  const labelH = 14;
   const icon = () => props.item().icon;
 
-  const labelGeom = createMemo(() => {
-    const textW = measureText(icon().title, FONT);
-    const labelW = Math.min(textW + LABEL_PAD * 2, props.cellW);
-    const labelLeft = Math.max(0, Math.floor((props.cellW - labelW) / 2));
-    return { labelW, labelLeft };
-  });
+  // Owned here, not by the rename field, so the cell widens as the name grows.
+  const [renameValue, setRenameValue] = createSignal(icon().title, { ownedWrite: true });
+  function startRename(caretIndex: number): void {
+    setRenameValue(icon().title);
+    props.onStartRename(caretIndex);
+  }
 
-  const hitMask = createMemo(() =>
-    buildIconCellHitMask(
-      props.sprite(),
-      props.cellW,
-      iconOffsetX,
-      labelGeom().labelLeft,
-      labelGeom().labelW,
-    ),
+  /** The label, and this cell's box widened to cover it. Children sit at `x - span().left`. */
+  const span = createMemo(() =>
+    labelSpan(props.isRenaming() ? renameValue() : icon().title, props.cellW),
   );
+  const iconLeft = () => Math.floor((props.cellW - ICON_SIZE) / 2) - span().left;
+  const labelLeft = () => span().labelLeft - span().left;
+
+  const hitMask = createMemo((): HitMask => {
+    const s = span();
+    return { data: iconCellSilhouette(props.sprite(), props.cellW, s, CELL_BOX_H), width: s.width, height: CELL_BOX_H };
+  });
 
   const isHighlighted = () => props.isSelected() || props.isDropTarget();
 
@@ -1187,19 +1159,19 @@ function IconCell(props: IconCellProps): JSX.Element {
   return (
     <box semantic={{ name: icon().title, role: "icon" }}
       tabIndex={0}
-      onKeyDown={(key) => { if (key === "Enter" && !props.isRenaming()) props.onStartRename(0); }}
+      onKeyDown={(key) => { if (key === "Enter" && !props.isRenaming()) startRename(0); }}
       position="absolute"
-      left={props.item().pos.x}
+      left={props.item().pos.x + span().left}
       top={props.item().pos.y}
-      width={props.cellW}
-      height={ICON_SIZE + labelH + 4}
+      width={span().width}
+      height={CELL_BOX_H}
       hitMask={props.isRenaming() ? undefined : hitMask()}
       onMouseDown={(lx, ly) => {
         if (props.isRenaming()) return;
         const ic = icon();
         wasSelectedBeforeMouseDown = props.isSelected();
         mouseDownLY = ly;
-        if (ly >= ICON_SIZE) lastLabelMouseDownX = lx;
+        if (ly >= ICON_SIZE) lastLabelMouseDownX = lx + span().left;
         if (!wasSelectedBeforeMouseDown) {
           props.onClick();
           bumpZOrder(os.fs, ic.nodeId);
@@ -1210,7 +1182,7 @@ function IconCell(props: IconCellProps): JSX.Element {
           img:                ic.img,
           title:              ic.title,
           cellW:              props.cellW,
-          mouseOffsetX:       lx,
+          mouseOffsetX:       lx + span().left,
           mouseOffsetY:       ly,
           firstDragX:         -Infinity,
           firstDragY:         -Infinity,
@@ -1235,7 +1207,7 @@ function IconCell(props: IconCellProps): JSX.Element {
                   lastLabelMouseDownX,
                   props.cellW,
                 );
-                props.onStartRename(idx);
+                startRename(idx);
               }
             }, RENAME_DELAY_MS);
           }
@@ -1270,7 +1242,7 @@ function IconCell(props: IconCellProps): JSX.Element {
         fallback={
           <box
             position="absolute"
-            left={iconOffsetX}
+            left={iconLeft()}
             top={0}
             width={ICON_SIZE}
             height={ICON_SIZE}
@@ -1283,7 +1255,7 @@ function IconCell(props: IconCellProps): JSX.Element {
         {(s) => (
           <image
             position="absolute"
-            left={iconOffsetX}
+            left={iconLeft()}
             top={0}
             width={ICON_SIZE}
             height={ICON_SIZE}
@@ -1299,7 +1271,7 @@ function IconCell(props: IconCellProps): JSX.Element {
         fallback={
           <text
             position="absolute"
-            left={labelGeom().labelLeft}
+            left={labelLeft()}
             top={ICON_SIZE}
             padding={LABEL_PAD}
             font={FONT}
@@ -1312,15 +1284,6 @@ function IconCell(props: IconCellProps): JSX.Element {
         }
       >
         {(_) => {
-          const [renameValue, setRenameValue] = createSignal(icon().title);
-          const renameInputW = createMemo(() => {
-            const tw = measureText(renameValue(), FONT);
-            const minTw = measureText("n", FONT);
-            return Math.min(Math.max(tw, minTw) + LABEL_PAD * 2, props.cellW);
-          });
-          const renameInputLeft = createMemo(() =>
-            Math.max(0, Math.floor((props.cellW - renameInputW()) / 2)),
-          );
           let committed = false;
 
           function commit(): void {
@@ -1346,7 +1309,7 @@ function IconCell(props: IconCellProps): JSX.Element {
           });
 
           return (
-            <box position="absolute" left={renameInputLeft()} top={ICON_SIZE} width={renameInputW()}>
+            <box position="absolute" left={labelLeft()} top={ICON_SIZE} width={span().labelW}>
               <TextInput
                 name="rename"
                 value={renameValue()}
@@ -1362,10 +1325,12 @@ function IconCell(props: IconCellProps): JSX.Element {
                 onCancel={() => { committed = true; props.onCancelRename(); }}
                 onBlur={() => commit()}
                 font={FONT}
-                width={renameInputW()}
-                height={labelH}
+                width={span().labelW}
+                height={LABEL_H}
                 padding={LABEL_PAD}
+                verticalAlign="top"
                 borderless
+                maxLength={MAX_NAME_LENGTH}
                 autoFocus
                 initialCaretIndex={props.renameCaretIndex()}
               />
@@ -1398,7 +1363,7 @@ export function FinderDragGhost(): JSX.Element {
               {(src) => (
                 <image
                   position="absolute"
-                  left={drag().ghostX}
+                  left={drag().ghostX + drag().outlineX}
                   top={drag().ghostY}
                   width={src().width}
                   height={src().height}
@@ -1417,7 +1382,7 @@ export function FinderDragGhost(): JSX.Element {
                     {(src) => (
                       <image
                         position="absolute"
-                        left={drag().ghostX + c.offsetX}
+                        left={drag().ghostX + c.offsetX + c.outlineX}
                         top={drag().ghostY + c.offsetY}
                         width={src().width}
                         height={src().height}

@@ -5,6 +5,7 @@ import {
   defineApp,
   EditableText,
   measureText,
+  MAX_NAME_LENGTH,
   MIME,
   useApp,
   type MenubarItemDef,
@@ -566,6 +567,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
       buttons: ["Cancel", "Save"],
       showInput: true,
       inputDefault: fileName() ?? DEFAULT_NAME,
+      inputMaxLength: MAX_NAME_LENGTH,
       variant: "note",
     });
     const trimmed = name?.trim();
