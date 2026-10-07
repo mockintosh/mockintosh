@@ -7,7 +7,8 @@ const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
 function walk(dir: string, visit: (abs: string) => void): void {
   for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name === "dist" || name === "mockintosh-context.generated.ts") continue;
+    // chatProtocol.ts names the removed APIs to tell the agent not to use them.
+    if (name === "node_modules" || name === "dist" || name === "mockintosh-context.generated.ts" || name === "chatProtocol.ts") continue;
     const abs = join(dir, name);
     if (statSync(abs).isDirectory()) walk(abs, visit);
     else if (/\.(ts|tsx)$/.test(name)) visit(abs);

@@ -25,12 +25,16 @@ const HEIGHT = 342;
 const MENUBAR_HEIGHT = 20;
 
 /** `<box width="100%" height="100%" background={ink} />` without JSX (this file is `.ts`). */
-function fillBox(ink: 0 | 1): JSX.Element {
+function fillNode(ink: 0 | 1) {
   const node = createElement("box");
   setProp(node, "width", "100%");
   setProp(node, "height", "100%");
   setProp(node, "background", ink);
-  return node as unknown as JSX.Element;
+  return node;
+}
+
+function fillBox(ink: 0 | 1): JSX.Element {
+  return fillNode(ink) as unknown as JSX.Element;
 }
 
 function blackBox(): JSX.Element {
@@ -698,11 +702,11 @@ describe("bootOS on the headless platform", () => {
       icon: "icon/computer",
       defaultSize: { width: 120, height: 80 },
       Component: () => {
-        const node = blackBox();
+        const node = fillNode(1);
         setProp(node, "onMouseDown", () => {
           presses++;
         });
-        return node;
+        return node as unknown as JSX.Element;
       },
     });
 
