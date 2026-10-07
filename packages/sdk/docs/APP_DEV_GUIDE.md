@@ -307,7 +307,7 @@ Two ways to use them:
 
 ## Signing in
 
-`useApp().signIn` signs the user in to an OAuth provider the way a TV does. The OS shows a QR code, the user signs in on their phone, and your app receives the provider's authorization code. Nothing is typed on the Macintosh and no browser window opens. It is present when the Macintosh can reach its sign-in relay (capability `sign-in`).
+`useApp().signIn` signs the user in to an OAuth provider the way a TV does. The OS shows a QR code, the user signs in on their phone, and your app receives the provider's authorization code. Nothing is typed on the Macintosh. Where the host has a browser, the sheet also offers to sign in there instead, which answers the same way. It is present when the Macintosh can reach its sign-in relay (capability `sign-in`).
 
 The provider must support the **authorization code flow with PKCE**. The relay only carries the code from the phone to the Macintosh: it never holds a client secret or a token.
 

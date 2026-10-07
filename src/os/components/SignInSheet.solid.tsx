@@ -9,7 +9,7 @@ import { useWindow } from "../windowContext";
 export interface SignInSheetProps {
   request: SignInSheetRequest;
   relay: SignInRelay;
-  /** Opens the QR code's link on this computer when it is clicked, where the host can. */
+  /** Opens a page in this computer's browser, where the host has one: then the user can sign in here instead of on a phone. */
   openExternal?: (url: string) => void;
   resolve: (params: Record<string, string> | null) => void;
   reject: (error: Error) => void;
@@ -17,7 +17,7 @@ export interface SignInSheetProps {
 
 type SheetState =
   | { phase: "starting" }
-  | { phase: "showing"; link: string; qr: Sprite }
+  | { phase: "showing"; link: string; browserLink: string; qr: Sprite }
   | { phase: "expired" }
   | { phase: "failed"; message: string };
 
@@ -78,7 +78,7 @@ export function SignInSheet(props: SignInSheetProps): JSX.Element {
     try {
       const pairing = await props.relay.start({ url: props.request.url, appTitle: props.request.appTitle });
       if (!live()) return;
-      setState({ phase: "showing", link: pairing.link, qr: encodeQR(pairing.link) });
+      setState({ phase: "showing", link: pairing.link, browserLink: pairing.browserLink, qr: encodeQR(pairing.link) });
       const deadline = Date.now() + pairing.expiresInMs;
       const poll = async () => {
         if (!live()) return;
@@ -148,7 +148,7 @@ export function SignInSheet(props: SignInSheetProps): JSX.Element {
                 semantic={{ name: "sign-in-qr", role: "image", value: s().link }}
                 width={size}
                 height={size}
-                onClick={() => props.openExternal?.(s().link)}
+                onClick={() => props.openExternal?.(s().browserLink)}
                 onPaint={({ blitPixels }) => blitPixels(pixels, size, size)}
               />
             );
@@ -163,6 +163,21 @@ export function SignInSheet(props: SignInSheetProps): JSX.Element {
               ? "This code has expired. Get a new one to try again."
               : `Scan the code with your phone's camera to sign in for "${props.request.appTitle}".`)}
         </text>
+        <Show when={props.openExternal && showing()}>
+          {(s) => (
+            <text
+              font="body"
+              wrap
+              width={textWidth()}
+              underline
+              cursor="pointer"
+              semantic={{ name: "sign-in-browser", role: "link" }}
+              onClick={() => props.openExternal?.(s().browserLink)}
+            >
+              Or sign in with this computer's browser
+            </text>
+          )}
+        </Show>
         <Spacer />
         <box flexDirection="row" gap={10}>
           <DialogButton label="Cancel" onClick={() => settle({ params: null })} />

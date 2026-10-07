@@ -1,8 +1,9 @@
 /**
  * Sign in to an OAuth provider from the user's phone, the way TVs do: the OS
  * shows a QR code, the user signs in on their phone, and the app receives the
- * provider's authorization code. Nothing is typed on the Macintosh and the
- * app never opens a browser window.
+ * provider's authorization code. Nothing is typed on the Macintosh. Where
+ * the host has a browser, the sheet also offers to sign in there instead;
+ * the app can't tell the difference.
  *
  * The provider must support the authorization code flow with PKCE, and the
  * app must register `redirectUri` with it. The app builds the authorize URL,

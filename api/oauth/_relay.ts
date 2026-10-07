@@ -14,6 +14,10 @@
  *      parameters (`code`, `error`, …) under the pairing.
  *   4. The OS polls `poll` with the token and receives the parameters once.
  *
+ * `start` also returns the authorize URL with `state` set, so the user can
+ * sign in in the Macintosh's own browser instead: the same pairing, minus
+ * the confirmation page, which only guards a scanned code.
+ *
  * The relay knows nothing about providers and never sees a client secret or
  * token: apps use PKCE and exchange the code themselves. Handlers may run as
  * separate stateless functions, so pairings live in a Redis REST store

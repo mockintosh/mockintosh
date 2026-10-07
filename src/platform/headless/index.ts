@@ -8,7 +8,7 @@
  * input injectors with real drivers.
  */
 import { InMemoryBackend } from "@mockintosh/fs";
-import type { AgentRuntime } from "@mockintosh/sdk";
+import type { AgentRuntime, BrowserService } from "@mockintosh/sdk";
 import type { BitMap } from "@mockintosh/quickdraw";
 import { pixelsFromBitMap } from "@mockintosh/quickdraw/bits";
 import type {
@@ -35,6 +35,8 @@ export interface HeadlessPlatformOptions {
   signInRelay?: SignInRelay;
   /** An agent runtime to hand apps; tests supply a scripted one. */
   agentRuntime?: AgentRuntime;
+  /** The host's browser; tests supply one that records what it opens. */
+  browser?: BrowserService;
 }
 
 export interface HeadlessPlatform extends Platform {
@@ -112,6 +114,7 @@ export function createHeadlessPlatform(options: HeadlessPlatformOptions): Headle
     ...(microphone ? { microphone } : {}),
     ...(options.signInRelay ? { signInRelay: options.signInRelay } : {}),
     ...(options.agentRuntime ? { agentRuntime: options.agentRuntime } : {}),
+    ...(options.browser ? { browser: options.browser } : {}),
     env: { origin: "", config: {} },
     hostCapabilities: [] as HostCapability[],
     crypto: {

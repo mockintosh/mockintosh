@@ -9,6 +9,7 @@ function loopbackLiteral(origin: string): string {
 interface StartResponse {
   id?: string;
   poll_token?: string;
+  url?: string;
   expires_in?: number;
   interval?: number;
   error?: string;
@@ -33,8 +34,10 @@ export function createWebSignInRelay(fetch: FetchFunction, origin: string): Sign
         throw new Error(data.error ?? `Sign-in relay unavailable (${resp.status})`);
       }
       const { id, poll_token: pollToken } = data;
+      const link = `${origin}/api/oauth/pair?id=${encodeURIComponent(id)}`;
       return {
-        link: `${origin}/api/oauth/pair?id=${encodeURIComponent(id)}`,
+        link,
+        browserLink: data.url ?? link,
         expiresInMs: (data.expires_in ?? 600) * 1000,
         pollIntervalMs: (data.interval ?? 2) * 1000,
         async poll(): Promise<SignInPollResult> {

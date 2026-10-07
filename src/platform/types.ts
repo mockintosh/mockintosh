@@ -115,6 +115,8 @@ export type SignInPollResult =
 export interface SignInPairing {
   /** The URL the QR code encodes, opened on the phone. */
   link: string;
+  /** The provider's sign-in for this computer's own browser, answering the same pairing. */
+  browserLink: string;
   /** How long the pairing stays open, in milliseconds. */
   expiresInMs: number;
   /** How often to call `poll`, in milliseconds. */
