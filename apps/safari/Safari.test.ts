@@ -110,7 +110,55 @@ describe("Safari", () => {
     expect(getWindows().some((w) => w.appId === "safari")).toBe(true);
     expect(await node("safari-new-tab")).toBeDefined();
     expect(await node("safari-tab:1")).toBeUndefined();
-    expect(await texts()).toContain("Bookmarks");
+    expect(await texts()).toContain("Favorites");
+  });
+
+  it("opens a favorite from the start page", async () => {
+    expect(await node("safari-favorite-Wikipedia")).toBeDefined();
+    await click("safari-favorite-Hacker News");
+    expect((await node("safari-address"))?.value).toMatch(/^news\.ycombinator\.com/);
+    expect(await texts()).toContain("30.");
+  });
+
+  async function reopen(): Promise<void> {
+    await os.kernel.invoke(session(), "menu", { menu: "File", item: "Quit" });
+    await settle();
+    expect(getWindows().some((w) => w.appId === "safari")).toBe(false);
+    os.services.openApp("safari");
+    await settle();
+  }
+
+  it("deletes a favorite while editing, and remembers it after quitting", async () => {
+    expect(await node("safari-favorite-delete-GitHub")).toBeUndefined();
+    await click("safari-favorites-edit");
+    await click("safari-favorite-delete-GitHub");
+    expect(await node("safari-favorite-GitHub")).toBeUndefined();
+    expect(await node("safari-favorite-Wikipedia")).toBeDefined();
+
+    await reopen();
+    expect(await node("safari-favorite-Wikipedia")).toBeDefined();
+    expect(await node("safari-favorite-GitHub")).toBeUndefined();
+    await expect(os.kernel.invoke(session(), "menu", { menu: "Bookmarks", item: "GitHub" })).rejects.toThrow();
+  });
+
+  it("bookmarks the page in front under the name given", async () => {
+    const dialog = vi.spyOn(os.services, "showDialog").mockResolvedValueOnce("Orange site");
+    await openBookmark("Hacker News");
+    await os.kernel.invoke(session(), "menu", { menu: "Bookmarks", item: "Add Bookmark…" });
+    await settle();
+    expect(dialog.mock.calls[0]![0].inputDefault).toBe("Hacker News");
+
+    await reopen();
+    // The front page's address is /news, so this is a second Hacker News bookmark.
+    expect(await node("safari-favorite-Orange site")).toBeDefined();
+    expect(await node("safari-favorite-Hacker News")).toBeDefined();
+  });
+
+  it("adds a favorite from the start page's Add tile", async () => {
+    vi.spyOn(os.services, "showDialog").mockResolvedValueOnce("example.org").mockResolvedValueOnce("");
+    await click("safari-favorites-edit");
+    await click("safari-favorite-add");
+    expect(await node("safari-favorite-example.org")).toBeDefined();
   });
 
   it("opens a new tab on the start page and keeps the other tab's page", async () => {
@@ -122,7 +170,7 @@ describe("Safari", () => {
     expect(await node("safari-tab:2")).toBeDefined();
     expect((await node("safari-address"))?.value).toBe("");
     expect(await texts()).toContain("Start page");
-    expect(await texts()).toContain("Bookmarks");
+    expect(await texts()).toContain("Favorites");
 
     await click("safari-tab:1");
     expect((await node("safari-address"))?.value).toBe("github.com");
@@ -140,7 +188,7 @@ describe("Safari", () => {
     expect(await node("safari-tab:1")).toBeUndefined();
     expect(await node("safari-tab:2")).toBeUndefined();
     expect((await node("safari-address"))?.value).toBe("");
-    expect(await texts()).toContain("Bookmarks");
+    expect(await texts()).toContain("Favorites");
   });
 
   it("scrolls a long page in the window, and each tab comes back where it was", async () => {

@@ -1,4 +1,4 @@
-import type { FetchFunction, LayoutNode, WebUrl } from "@mockintosh/sdk";
+import type { FetchFunction, LayoutNode, Sprite, WebUrl } from "@mockintosh/sdk";
 
 /** What Safari asks for when it goes somewhere. */
 export interface PageRequest {
@@ -31,8 +31,13 @@ export interface PicturePage extends PageBase {
   background?: 0 | 1;
 }
 
+/** `about:start`: the bookmarks as a grid of Favorites, drawn by `StartView`. */
+export interface StartPage extends PageBase {
+  kind: "start";
+}
+
 /** A page ready to draw. */
-export type WebPage = DocumentPage | PicturePage;
+export type WebPage = DocumentPage | PicturePage | StartPage;
 
 /** Settings a site adapter may read. Each is stored in the app's storage. */
 export interface SiteSettings {

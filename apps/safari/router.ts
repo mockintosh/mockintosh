@@ -2,7 +2,6 @@ import { parseUrl } from "@mockintosh/sdk";
 import { PageError, START_URL, type PageRequest, type SiteContext, type WebPage } from "./page";
 import { loadRemotePage } from "./remote";
 import { adapterFor } from "./sites";
-import { startPage } from "./start";
 
 /** What Safari shows for a request: the page, or why it couldn't be opened. */
 export type PageResult = { kind: "page"; page: WebPage } | { kind: "error"; message: string };
@@ -14,7 +13,7 @@ export type PageResult = { kind: "page"; page: WebPage } | { kind: "error"; mess
  */
 export async function loadPage(request: PageRequest, context: SiteContext): Promise<PageResult> {
   try {
-    if (request.url === START_URL) return { kind: "page", page: startPage() };
+    if (request.url === START_URL) return { kind: "page", page: { kind: "start", url: START_URL, title: "Start page" } };
     const url = parseUrl(request.url);
     if (!url) throw new PageError("That is not a web address.");
     const adapter = request.method === "get" ? adapterFor(url) : undefined;
