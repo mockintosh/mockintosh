@@ -72,6 +72,14 @@ describe("simplifyHtml", () => {
     });
   });
 
+  it("keeps a textarea as several lines, at the rows it asks for within reason", () => {
+    const page = simplify(`<form method="post"><textarea name="text" rows="40">Hi</textarea><textarea name="note"></textarea></form>`);
+    expect(page.nodes[0]).toMatchObject({
+      type: "form",
+      form: { controls: [{ kind: "textarea", name: "text", value: "Hi", rows: 12 }, { kind: "textarea", name: "note", value: "", rows: 4 }] },
+    });
+  });
+
   it("links headings that wrap one link, and turns linked images into their alt text", () => {
     const page = simplify(
       `<h2><a href="/post">A post</a></h2><p><a href="/home"><img src="logo.png" alt="Home"></a></p>

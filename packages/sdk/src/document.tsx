@@ -1,6 +1,6 @@
 import { Errored, For, Loading, Show, createMemo, createSignal, useContext } from "solid-js";
 import type { ImageFrame, JSX, TextRun } from "@mockintosh/ui";
-import { Button, Dithered, TextInput } from "@mockintosh/ui";
+import { Button, Dithered, TextEditor, TextInput } from "@mockintosh/ui";
 import type { FormControl, InlineSegment, LayoutColumn, LayoutNode, TableRow, WebForm } from "@mockintosh/markdown";
 import { AppServicesContext } from "./index";
 
@@ -25,6 +25,8 @@ export interface DocumentViewProps {
 
 const FALLBACK_WIDTH = 320;
 const BUTTON_WIDTH = 64;
+/** `TextEditor`'s line height. */
+const TEXTAREA_LINE = 14;
 /** Border plus padding on each side of a `box` card. */
 const CARD_INSET = 7;
 const BLOCK_GAP = 4;
@@ -204,11 +206,24 @@ function FormView(props: { form: WebForm; width: number; onSubmit?: (form: WebFo
   }
 
   const firstButton = form.controls.findIndex((control) => control.kind === "submit");
+  const shown = form.controls.map((control, index) => ({ control, index })).filter((entry) => entry.control.kind !== "hidden");
+  const view = (entry: { control: FormControl; index: number }, width: () => number) => (
+    <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={width()} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />
+  );
+  // With several lines to write, fields stack at the page's width and the buttons sit under them.
+  if (form.controls.some((control) => control.kind === "textarea")) {
+    return (
+      <box flexDirection="column" gap={4}>
+        <For each={shown.filter((entry) => entry.control.kind !== "submit")}>{(entry) => view(entry, () => props.width)}</For>
+        <box flexDirection="row" gap={4} justifyContent="flex-end">
+          <For each={shown.filter((entry) => entry.control.kind === "submit")}>{(entry) => view(entry, () => props.width)}</For>
+        </box>
+      </box>
+    );
+  }
   return (
     <box flexDirection="row" gap={4} alignItems="center">
-      <For each={form.controls.map((control, index) => ({ control, index })).filter((entry) => entry.control.kind !== "hidden")}>
-        {(entry) => <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={inputWidth()} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />}
-      </For>
+      <For each={shown}>{(entry) => view(entry, inputWidth)}</For>
     </box>
   );
 }
@@ -230,6 +245,17 @@ function FormControlView(props: {
         width={props.inputWidth}
         onChange={(value) => props.setValues((prev) => ({ ...prev, [index]: value }))}
         onSubmit={() => props.submit()}
+      />
+    );
+  }
+  if (control.kind === "textarea") {
+    return (
+      <TextEditor
+        name={control.name || undefined}
+        value={props.values()[index] ?? ""}
+        width={props.inputWidth}
+        height={control.rows * TEXTAREA_LINE + 8}
+        onChange={(value) => props.setValues((prev) => ({ ...prev, [index]: value }))}
       />
     );
   }

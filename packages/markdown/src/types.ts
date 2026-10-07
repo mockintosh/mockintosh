@@ -35,6 +35,8 @@ export interface TableRow {
 /** A form control. Only what a 1-bit page can show and submit. */
 export type FormControl =
   | { kind: "text"; name: string; value: string; placeholder: string }
+  /** Several lines of text; a form with one stacks its controls and spans the page. */
+  | { kind: "textarea"; name: string; value: string; rows: number }
   | { kind: "hidden"; name: string; value: string }
   | { kind: "submit"; name: string; value: string; label: string };
 
