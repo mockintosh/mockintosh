@@ -255,7 +255,7 @@ There is no DOM. Components return a tree of \`box\`, \`text\`, \`image\`, \`bit
 - Outside, build a bundle with Vite and the SDK's \`mockintoshManifest\` plugin, and publish it with its \`manifest.json\`, which the App Store reads.
 - On the web, your app runs in a Web Worker of its own.
 
-The full guide is in the repository: [APP_DEV_GUIDE.md](https://github.com/mockintosh/mockintosh/blob/master/packages/sdk/docs/APP_DEV_GUIDE.md).
+The full guide is in the repository: [APP_DEV_GUIDE.md](https://github.com/mockintosh/mockintosh/blob/main/packages/sdk/docs/APP_DEV_GUIDE.md).
 `,
   },
   {
@@ -283,7 +283,7 @@ The system asks the machine for a small set of things: a screen, a mouse and key
 
 On the web, most applications run in a Web Worker of their own and draw their windows there. The Finder, App Store and Icon Gallery are part of the shell and run with it, as do the few apps that need something a worker can't provide.
 
-For the details, read [ARCHITECTURE.md](https://github.com/mockintosh/mockintosh/blob/master/ARCHITECTURE.md).
+For the details, read [ARCHITECTURE.md](https://github.com/mockintosh/mockintosh/blob/main/ARCHITECTURE.md).
 `,
   },
 ];
