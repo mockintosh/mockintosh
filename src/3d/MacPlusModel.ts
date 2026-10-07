@@ -102,7 +102,7 @@ export async function loadMacPlusModel(
         clearcoat: 1.0,
         // clearcoatRoughness: 1,
       });
-      child.frustumCulling = false;
+      child.frustumCulled = false;
       child.renderOrder = 1;
     } else if (child.name === "twist") {
       brightnessKnob = child;

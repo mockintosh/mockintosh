@@ -414,7 +414,7 @@ function readGposKerning(view: DataView, table: Table): PairKern | undefined {
   }
   if (lookupIndices.size === 0) return undefined;
 
-  const subtables: PairKern[] = [];
+  const subtables: MaybeKern[] = [];
   const nLookups = view.getUint16(lookupList);
   for (const index of [...lookupIndices].sort((a, b) => a - b)) {
     if (index >= nLookups) continue;

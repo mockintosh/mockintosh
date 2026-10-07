@@ -117,8 +117,9 @@ export function installCompanionUI(os: BootedOS): () => void {
         return;
       }
       if (message.type !== "invoke") return;
-      if (outcomes.has(message.action)) {
-        connection.send(encodeMessage(outcomes.get(message.action)));
+      const retained = outcomes.get(message.action);
+      if (retained) {
+        connection.send(encodeMessage(retained));
         return;
       }
       if (runs.has(message.action)) return;

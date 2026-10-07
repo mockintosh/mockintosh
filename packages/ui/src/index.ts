@@ -14,7 +14,7 @@
 export { createUI } from "./ui";
 export type { UIInstance, UIConfig } from "./ui";
 export { useUIServices } from "./services";
-export type { UIServices, UIClipboard, UIImageService, ImageDecodeOptions } from "./services";
+export type { UIServices, UIClipboard, UIImageService, UIScheduler, ImageDecodeOptions } from "./services";
 export { useTheme, useRadius, themeRadius, RADIUS_SCALES, RADIUS_PX, DEFAULT_THEME } from "./theme";
 export type { UITheme, RadiusScale, RadiusStep } from "./theme";
 export { useViewport } from "./viewport";

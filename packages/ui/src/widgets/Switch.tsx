@@ -1,5 +1,6 @@
 import type { JSX } from "@mockintosh/ui";
 import { Show, createEffect, createSignal, onCleanup, untrack } from "solid-js";
+import { useUIServices } from "../services";
 
 const TRACK_W = 28;
 const TRACK_H = 16;
@@ -28,30 +29,29 @@ export interface SwitchProps {
 /** Pill track, circular thumb. Slides and fills when on. */
 export function Switch(props: SwitchProps): JSX.Element {
   const [x, setX] = createSignal(thumbX(props.checked));
-  let frame = 0;
+  let cancelFrame: (() => void) | undefined;
   let primed = false;
-  const raf = globalThis.requestAnimationFrame?.bind(globalThis);
-  const caf = globalThis.cancelAnimationFrame?.bind(globalThis);
-  onCleanup(() => caf?.(frame));
+  const { scheduler } = useUIServices();
+  onCleanup(() => cancelFrame?.());
 
   createEffect(
     () => props.checked,
     (checked) => {
       const to = thumbX(checked);
       const from = untrack(x);
-      caf?.(frame);
-      if (!primed || !raf) {
+      cancelFrame?.();
+      if (!primed || !scheduler) {
         primed = true;
         setX(to);
         return;
       }
-      const started = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const started = scheduler.now();
       const tick = (now: number) => {
         const t = Math.min(1, (now - started) / SLIDE_MS);
         setX(Math.round(from + (to - from) * easeOutCubic(t)));
-        if (t < 1) frame = raf(tick);
+        if (t < 1) cancelFrame = scheduler.requestFrame(tick);
       };
-      frame = raf(tick);
+      cancelFrame = scheduler.requestFrame(tick);
     },
   );
 

@@ -26,6 +26,7 @@ import {
   type CursorSpec,
   type JSX,
   type UIInstance,
+  type UIScheduler,
   type UIServices,
 } from "@mockintosh/ui";
 import {
@@ -54,6 +55,7 @@ import { createWorkerMedia } from "./media";
 import { createWebGpuService } from "../media/gpu";
 import { createFsMirror } from "./fsMirror";
 import { createWorkerVideo } from "./video";
+import { webFetch } from "../fetch";
 
 /** The worker's global scope, as far as a process uses it. */
 export interface ProcessScope {
@@ -184,6 +186,23 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
   let sendStats = false;
   /** Shared memory needs a cross-origin-isolated page; elsewhere (Safari) pictures go by message. */
   const canShare = typeof SharedArrayBuffer !== "undefined" && (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated === true;
+
+  /** The frame clock for both the app's context and the UI kit's animations. */
+  const scheduler: UIScheduler = {
+    now: () => performance.now(),
+    requestFrame(callback) {
+      const raf = scope.requestAnimationFrame;
+      if (raf) {
+        let live = true;
+        raf(() => live && callback(performance.now()));
+        return () => {
+          live = false;
+        };
+      }
+      const id = setTimeout(() => callback(performance.now()), 16);
+      return () => clearTimeout(id);
+    },
+  };
 
   function scheduleFrame(): void {
     if (frameScheduled) return;
@@ -332,7 +351,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         notify("window.open", key, wire);
         return key;
       },
-      fetch: capabilities.has("network") ? globalThis.fetch.bind(globalThis) : undefined,
+      fetch: capabilities.has("network") ? webFetch : undefined,
       env: start.env,
       crypto: {
         randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
@@ -379,21 +398,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         modes: () => start.fontRasterModes as ReturnType<NonNullable<AppContext["fontRaster"]>["modes"]>,
         rasterize: (bytes, options) => call("fonts.rasterize", [bytes, options]) as ReturnType<NonNullable<AppContext["fontRaster"]>["rasterize"]>,
       },
-      scheduler: {
-        now: () => performance.now(),
-        requestFrame(callback) {
-          const raf = scope.requestAnimationFrame;
-          if (raf) {
-            let live = true;
-            raf(() => live && callback(performance.now()));
-            return () => {
-              live = false;
-            };
-          }
-          const id = setTimeout(() => callback(performance.now()), 16);
-          return () => clearTimeout(id);
-        },
-      },
+      scheduler,
     };
   }
 
@@ -554,6 +559,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
       screen,
       scheduleRender: scheduleFrame,
       services: {
+        scheduler,
         clipboard: {
           readText: () => call("clipboard.readText", []) as Promise<string>,
           writeText: (text) => call("clipboard.writeText", [text]) as Promise<void>,

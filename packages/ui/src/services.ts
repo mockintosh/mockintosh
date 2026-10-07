@@ -30,9 +30,19 @@ export interface UIImageService {
   decode(source: string | Uint8Array, options?: ImageDecodeOptions): Promise<ImageFrame>;
 }
 
+/** The host's frame clock (a platform's `PlatformScheduler`). */
+export interface UIScheduler {
+  /** Run `callback` before the next display refresh; returns a cancel function. */
+  requestFrame(callback: (timeMs: number) => void): () => void;
+  /** Monotonic milliseconds, on the same clock as `requestFrame`'s `timeMs`. */
+  now(): number;
+}
+
 export interface UIServices {
   clipboard?: UIClipboard;
   images?: UIImageService;
+  /** Animations (flicks, Switch slides) run on this; without it they jump to their end. */
+  scheduler?: UIScheduler;
   /** Host journal for errors thrown from pointer/key handlers. */
   onError?(error: unknown): void;
 }

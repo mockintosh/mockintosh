@@ -180,10 +180,10 @@ export function applySelectable(node: CanvasNode, value: unknown): void {
   }
 
   const focusManager = getFocusManager();
-  const { clipboard } = useUIServices();
+  const { clipboard, scheduler } = useUIServices();
 
   // Double-click selects a word, triple-click the paragraph.
-  const clicks = createTextClicks({ third: paragraphRangeAt });
+  const clicks = createTextClicks({ third: paragraphRangeAt, now: scheduler && (() => scheduler.now()) });
   const select = ({ anchor: from, caret: to }: TextClickSelection) =>
     setCaret({ node, offset: from }, { node, offset: to });
 

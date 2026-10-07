@@ -176,7 +176,12 @@ export function createUI(config: UIConfig): UIInstance {
   const measureFunc = createMeasureFunc();
   const measureApi = { measureText };
 
-  const pointer: PointerDispatcher = createPointerDispatcher(root, focusManager, (error) => services.onError?.(error));
+  const pointer: PointerDispatcher = createPointerDispatcher(
+    root,
+    focusManager,
+    (error) => services.onError?.(error),
+    services.scheduler,
+  );
 
   // Installing or removing a font can change any text's metrics.
   onFontsChanged(() => {

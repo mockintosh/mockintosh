@@ -110,6 +110,8 @@ export function startCompanion(options: CompanionOptions) {
         }
         return;
       }
+      // Only a hello can arrive before the socket is a known peer.
+      if (!peer) return;
       if (message.type === "build_request" || message.type === "build_cancel") {
         const pending = builds.get(socket) ?? new Map<string, AbortController>();
         builds.set(socket, pending);

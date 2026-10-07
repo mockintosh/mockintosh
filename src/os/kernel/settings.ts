@@ -20,8 +20,9 @@ export function parseDesktopPattern(body: string): DesktopPattern {
   throw new ServiceError("invalid-argument", "Expected checker, white, black, pat:<16 hex>, or ppat:<id>");
 }
 export async function createDesktopSettings(fs: FileSystem) {
-  const preferences = fs.locate("preferences");
-  if (!preferences) throw new ServiceError("missing-resource", "Preferences folder is missing");
+  const located = fs.locate("preferences");
+  if (!located) throw new ServiceError("missing-resource", "Preferences folder is missing");
+  const preferences = located;
   const name = desktopPatternName;
   const [pattern, setPattern] = createSignal<DesktopPattern>("checker");
   const [diagnostic, setDiagnostic] = createSignal<string | null>(null);

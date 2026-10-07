@@ -22,9 +22,6 @@ declare function clearTimeout(id: number | null | undefined): void;
 declare function setInterval(callback: () => void, ms?: number): number;
 declare function clearInterval(id: number | null | undefined): void;
 
-/** High-resolution clock; absent on some engines, so check with `typeof` first. */
-declare const performance: { now(): number } | undefined;
-
 declare class TextEncoder {
   encode(input?: string): Uint8Array;
 }
