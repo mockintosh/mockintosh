@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FetchFunction, FetchRequest, FetchResponse, LayoutNode } from "@mockintosh/sdk";
+import type { FetchFunction, FetchRequest, FetchResponse, LayoutNode, WebForm } from "@mockintosh/sdk";
 import { pageRequest, type DocumentPage, type GithubAccount, type SiteContext } from "../../page";
 import { loadPage } from "../../router";
 
@@ -73,8 +73,12 @@ async function page(result: Awaited<ReturnType<typeof loadPage>>): Promise<Docum
   return result.page;
 }
 
-function forms(nodes: readonly LayoutNode[]) {
-  return nodes.flatMap((node) => (node.type === "form" ? [node.form] : []));
+function forms(nodes: readonly LayoutNode[]): WebForm[] {
+  return nodes.flatMap((node) => {
+    if (node.type === "form") return [node.form];
+    if (node.type === "columns") return node.columns.flatMap((column) => forms(column.nodes));
+    return [];
+  });
 }
 
 function texts(nodes: readonly LayoutNode[]): string {
@@ -175,6 +179,32 @@ describe("GitHub forms", () => {
     expect(texts(account.nodes)).toContain("signed in to GitHub as octocat");
     const home = await page(await loadPage(post("https://github.com/logout", { return_to: "" }), context(fetch, "tok", github)));
     expect(signedOut).toBe(true);
-    expect(texts(home.nodes)).toContain("Sign in to open issues");
+    expect(forms(home.nodes)[0]).toEqual({
+      action: "https://github.com/login",
+      method: "post",
+      controls: [
+        { kind: "hidden", name: "return_to", value: "https://github.com/" },
+        { kind: "submit", name: "", value: "", label: "Sign In" },
+      ],
+    });
+  });
+
+  it("heads every page with the account: a Sign In button, or the login, asked of GitHub once", async () => {
+    const { fetch, calls } = fakeGithub();
+    const signedOut = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/5"), context(fetch, "")));
+    const header = signedOut.nodes[0];
+    expect(header.type === "columns" && header.columns[1].nodes).toEqual([
+      expect.objectContaining({ form: expect.objectContaining({ controls: expect.arrayContaining([{ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/issues/5" }]) }) }),
+    ]);
+
+    const signedIn = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/5"), context(fetch, "header-token")));
+    await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "header-token"));
+    const corner = signedIn.nodes[0].type === "columns" ? signedIn.nodes[0].columns[1].nodes[0] : null;
+    expect(corner).toMatchObject({
+      type: "paragraph",
+      align: "right",
+      segments: [{ kind: "link", text: "octocat", href: "https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Foctocat%2Fhello%2Fissues%2F5" }],
+    });
+    expect(calls.filter((call) => call.url === "https://api.github.com/user")).toHaveLength(1);
   });
 });

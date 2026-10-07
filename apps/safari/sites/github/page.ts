@@ -84,10 +84,17 @@ function returnLocation(returnTo: string): GithubLocation {
 }
 
 async function loadLocation(location: GithubLocation, context: SiteContext, state: FormState): Promise<DocumentPage> {
+  const viewer = context.settings.githubToken ? viewerOf(context) : Promise.resolve(null);
+  if (location.kind === "login" || location.kind === "logout") {
+    return withHeader(loginPage(location.returnTo, await viewer, !!context.github), null, false);
+  }
+  const [who, page] = await Promise.all([viewer, loadBody(location, context, state)]);
+  return withHeader(page, who);
+}
+
+async function loadBody(location: Exclude<GithubLocation, { kind: "login" | "logout" }>, context: SiteContext, state: FormState): Promise<DocumentPage> {
   const token = context.settings.githubToken;
-  if (location.kind === "home") return homePage(token ? await viewerOrEmpty(context) : "");
-  if (location.kind === "login") return loginPage(location.returnTo, token ? await viewerOrEmpty(context) : null, token !== "", !!context.github);
-  if (location.kind === "logout") return loginPage(location.returnTo, token ? await viewerOrEmpty(context) : null, token !== "", !!context.github);
+  if (location.kind === "home") return homePage();
   if (!token && (location.kind === "discussions" || location.kind === "discussion" || location.kind === "newDiscussion")) {
     return signInFirstPage(location, "GitHub shows discussions only to people who are signed in.");
   }
@@ -99,12 +106,49 @@ async function loadLocation(location: GithubLocation, context: SiteContext, stat
   }
 }
 
-async function viewerOrEmpty(context: SiteContext): Promise<string> {
-  try {
-    return await getViewer(context.fetch, context.settings.githubToken);
-  } catch {
-    return "";
+/** Logins by token, so the header asks GitHub once rather than on every page. */
+const viewers = new Map<string, Promise<string>>();
+
+/** Whose the token is, or empty when GitHub won't say (expired, revoked, offline). */
+function viewerOf(context: SiteContext): Promise<string> {
+  const token = context.settings.githubToken;
+  let viewer = viewers.get(token);
+  if (!viewer) {
+    viewer = getViewer(context.fetch, token).catch(() => {
+      viewers.delete(token);
+      return "";
+    });
+    viewers.set(token, viewer);
   }
+  return viewer;
+}
+
+/** Width of the header's account corner, signed in (the login, right-aligned) and out (the Sign In button). */
+const ACCOUNT_WIDTH = 140;
+const SIGN_IN_WIDTH = 48;
+
+/**
+ * The band across the top of every GitHub page, as on github.com: the home
+ * link, and the account in the corner. `viewer` is the signed-in login
+ * (empty when GitHub won't say whose the token is), or null when signed out.
+ * The sign-in page leaves the corner empty: it is the account page.
+ */
+function withHeader(page: DocumentPage, viewer: string | null, account = true): DocumentPage {
+  const corner: LayoutNode[] = !account
+    ? []
+    : viewer === null
+      ? [buttonForm({ kind: "login", returnTo: page.url }, "Sign In")]
+      : [{ type: "paragraph", align: "right", segments: [link(viewer || "Account", { kind: "login", returnTo: page.url })] }];
+  const header: LayoutNode = {
+    type: "columns",
+    gap: 8,
+    minWidth: 0,
+    columns: [
+      { nodes: [heading(3, "GitHub", githubUrl({ kind: "home" }))] },
+      { width: account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
+    ],
+  };
+  return { ...page, nodes: [header, { type: "hr" }, ...page.nodes] };
 }
 
 /** Where a form posts, and the page that shows the form again if GitHub refuses it. */
@@ -187,18 +231,13 @@ function tabs(items: readonly { label: string; location: GithubLocation; current
   return paragraph(...segments);
 }
 
-/** `viewer` is the signed-in login, or empty. */
-function homePage(viewer: string): DocumentPage {
-  const account = viewer
-    ? paragraph(text("Signed in as "), link(viewer, { kind: "profile", login: viewer, tab: "repos" }), text(". "), link("Account", { kind: "login", returnTo: "" }))
-    : paragraph(link("Sign in", { kind: "login", returnTo: "" }), text(" to open issues and discussions and to comment."));
+function homePage(): DocumentPage {
   return {
     kind: "document",
     url: githubUrl({ kind: "home" }),
     title: "GitHub",
     nodes: [
       heading(1, "GitHub"),
-      account,
       paragraph(text("Look up a person, an organization or a repository, or type its github.com address in the address bar.")),
       {
         type: "form",
@@ -231,9 +270,9 @@ function homePage(viewer: string): DocumentPage {
  * who as and a button to sign out. `viewer` is null when signed out, and
  * empty when GitHub wouldn't say whose the token is.
  */
-function loginPage(returnTo: string, viewer: string | null, signedIn: boolean, canSignIn: boolean): DocumentPage {
+function loginPage(returnTo: string, viewer: string | null, canSignIn: boolean): DocumentPage {
   const url = githubUrl({ kind: "login", returnTo });
-  if (signedIn) {
+  if (viewer !== null) {
     const who = viewer
       ? paragraph(text("Safari is signed in to GitHub as "), link(viewer, { kind: "profile", login: viewer, tab: "repos" }), text("."))
       : paragraph(text("Safari has a GitHub token, but GitHub won't say whose it is. It may have expired or been revoked."));
