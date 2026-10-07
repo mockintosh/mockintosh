@@ -168,7 +168,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
 
 function createDOMInput(
   canvas: HTMLCanvasElement,
-  toScreen: (e: MouseEvent) => { x: number; y: number },
+  toScreen: (e: Pick<MouseEvent, "clientX" | "clientY">) => { x: number; y: number },
 ): PlatformInput {
   const pointerHandlers = new Set<(e: PlatformPointerEvent) => void>();
   const keyHandlers = new Set<(e: PlatformKeyEvent) => void>();
@@ -185,7 +185,21 @@ function createDOMInput(
     meta: e.metaKey,
   });
 
+  // A press on the screen owns the mouse until it is released, like a real
+  // Mac's, whose pointer cannot leave the screen: moves and the release over
+  // the page around the canvas are reported pinned to the screen's edge, so
+  // a drag that ends out there still ends.
+  let pressed = false;
+  const pinned = (e: MouseEvent) => {
+    const rect = canvas.getBoundingClientRect();
+    return toScreen({
+      clientX: Math.max(rect.left, Math.min(e.clientX, rect.right - 1)),
+      clientY: Math.max(rect.top, Math.min(e.clientY, rect.bottom - 1)),
+    });
+  };
+
   canvas.addEventListener("mousedown", (e) => {
+    pressed = true;
     canvas.focus({ preventScroll: true });
     emitPointer({ type: "down", ...toScreen(e), button: button(e), modifiers: modifiers(e) });
   });
@@ -203,6 +217,10 @@ function createDOMInput(
   // still counts as crossing the edge.
   let aboveScreen = false;
   window.addEventListener("mousemove", (e) => {
+    if (pressed) {
+      if (e.target !== canvas) emitPointer({ type: "move", ...pinned(e), modifiers: modifiers(e) });
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     const overX = e.clientX >= rect.left && e.clientX < rect.right;
     const above = overX && e.clientY < rect.top;
@@ -217,6 +235,14 @@ function createDOMInput(
       emitPointer({ type: "move", x: pos.x, y: -1 });
     } else {
       aboveScreen = false;
+    }
+  });
+
+  window.addEventListener("mouseup", (e) => {
+    if (!pressed) return;
+    pressed = false;
+    if (e.target !== canvas) {
+      emitPointer({ type: "up", ...pinned(e), button: button(e), modifiers: modifiers(e) });
     }
   });
 

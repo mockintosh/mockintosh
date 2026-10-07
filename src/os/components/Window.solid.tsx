@@ -50,6 +50,9 @@ import {
 /** Where a hidden app's windows wait: far enough left that no frame or shadow reaches the screen. */
 const HIDDEN_LEFT = -100_000;
 
+/** How far inside the desktop's edges a dragged window's grab point must stay (DragWindow's 4px inset). */
+const DRAG_INSET = 4;
+
 /** Offsets of the six title-bar stripe lines within the 11px close-box band. */
 const TITLE_BAR_STRIPE_ROWS = [0, 2, 4, 6, 8, 10];
 
@@ -309,14 +312,21 @@ export function Window(props: WindowProps): JSX.Element {
             height={barInner()}
             semantic={{ name: "titlebar", role: "titlebar" }}
             onMouseDown={(lx, ly) => {
-              dragOffsetX = lx;
-              dragOffsetY = ly;
+              // The bar sits inside the frame; measure from the window's corner.
+              dragOffsetX = lx + windowOuterFrame(props.win);
+              dragOffsetY = ly + windowOuterFrame(props.win);
             }}
             onDrag={(_lx, _ly, gx, gy) => {
               if (props.win.movable === false) return;
               const { width } = props.win;
-              const newX = Math.max(3, Math.min(gx - dragOffsetX, os.resolution.width - width - 3));
-              const newY = Math.max(os.menubarHeight + 3, Math.min(gy - dragOffsetY, os.resolution.height - 3));
+              // Like DragWindow, pin the pointer — not the window — to the desktop
+              // inset by 4px, so a window can slide off any edge as long as the
+              // spot it was grabbed by stays on screen. At most the window's top
+              // frame line goes under the menu bar, sharing its bottom border.
+              const px = Math.max(DRAG_INSET, Math.min(gx, os.resolution.width - DRAG_INSET));
+              const py = Math.max(os.menubarHeight + DRAG_INSET, Math.min(gy, os.resolution.height - DRAG_INSET));
+              const newX = px - dragOffsetX;
+              const newY = Math.max(os.menubarHeight - FRAME, py - dragOffsetY);
               setWindowOutline({ x: newX, y: newY, width, height: totalH() });
             }}
             onDragEnd={() => {
