@@ -105,6 +105,17 @@ describe("FileSystem — catalog", () => {
     expect(fs.volumeOf(trash.id)?.id).toBe(hd.id);
   });
 
+  it("usedBytes sums every file under a directory, nested folders and the Trash included", async () => {
+    const { fs, hd, desktop, trash } = await openMac();
+    expect(fs.usedBytes(hd.id)).toBe(0);
+    await fs.writeFile(desktop.id, "a.txt", "hello");
+    const docs = fs.mkdir(hd.id, "Docs");
+    await fs.writeFile(fs.mkdir(docs.id, "Deep").id, "b.bin", new Uint8Array(1000));
+    await fs.writeFile(trash.id, "c.txt", "xyz");
+    expect(fs.usedBytes(docs.id)).toBe(1000);
+    expect(fs.usedBytes(hd.id)).toBe(1008);
+  });
+
   it("roles are indexed anywhere in a volume, are unique per volume, and follow moves", async () => {
     const { fs, hd } = await openMac();
     const system = fs.mkdir(hd.id, "System Folder", { role: "system" });

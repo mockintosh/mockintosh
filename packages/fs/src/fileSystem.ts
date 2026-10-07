@@ -272,6 +272,17 @@ export class FileSystem {
     return vid ? this.directory(vid) : undefined;
   }
 
+  /** Total body size of every file under a directory, in bytes. */
+  usedBytes(dirId: NodeId): number {
+    let total = 0;
+    for (const id of this.state.childIds[dirId] ?? []) {
+      const n = this.state.nodes[id];
+      if (!n) continue;
+      total += n.kind === "file" ? n.size : this.usedBytes(id);
+    }
+    return total;
+  }
+
   attributes(id: NodeId): NodeAttributes {
     return this.state.attributes[id] ?? EMPTY_ATTRIBUTES;
   }

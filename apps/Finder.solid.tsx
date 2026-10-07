@@ -57,7 +57,8 @@ import {
   type GridIcon,
   type IconGrid,
 } from "./finder/iconGrid";
-import { INFO_BAR_H, windowContentRect, windowTotalHeight } from "../src/os/windowGeometry";
+import { INFO_BAR_H, SB_INNER, windowContentRect, windowTotalHeight } from "../src/os/windowGeometry";
+import { folderHeaderLayout } from "./finder/folderHeader";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -69,6 +70,15 @@ const LABEL_H             = 14;
 const CELL_BOX_H          = ICON_SIZE + LABEL_H + 4;
 const FONT                = "body" as const;
 const RENAME_DELAY_MS     = 350;
+/** Folder header text, placed so Geneva's baseline sits as System 6's did. */
+const HEADER_TEXT_TOP     = 4;
+/** Nominal size of a disk, for the folder header's "available" figure. */
+const DISK_CAPACITY       = 20 * 1024 * 1024;
+
+/** A byte count as the Finder states it: whole kilobytes, rounded up — "2,427K". */
+function formatK(bytes: number): string {
+  return `${Math.ceil(bytes / 1024).toLocaleString("en-US")}K`;
+}
 
 interface LabelSpan {
   /** The label rectangle, in cell coordinates. */
@@ -974,6 +984,21 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
 
   const itemCount = () => `${icons().length} item${icons().length !== 1 ? "s" : ""}`;
   const dirId = () => directoryId();
+  // Like System 6, every folder states its disk's totals, not its own.
+  const diskUsed = createMemo(() => {
+    const id = dirId();
+    const volume = id ? os.fs.volumeOf(id) : undefined;
+    return volume ? os.fs.usedBytes(volume.id) : 0;
+  });
+  const headerFigures = createMemo((): [string, string, string] => [
+    itemCount(),
+    `${formatK(diskUsed())} in disk`,
+    `${formatK(Math.max(0, DISK_CAPACITY - diskUsed()))} available`,
+  ]);
+  const header = createMemo(() => {
+    const [count, disk, free] = headerFigures().map((text) => measureText(text, FONT));
+    return folderHeaderLayout(contentW() + SB_INNER, [count, disk, free]);
+  });
 
   // This window's menus reflect its folder (Clean Up) and the trash state.
   createEffect(
@@ -988,10 +1013,17 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
 
   return (
     <>
+      {/* System 6's header: three Geneva figures over a double rule (the
+          window draws the band's bottom line; this draws the one above it). */}
       <WindowHeader height={INFO_BAR_H}>
-        <box width="100%" height="100%" paddingLeft={4} justifyContent="center">
-          <text font="menu" nowrap verticalAlign="middle">{itemCount()}</text>
+        <box position="absolute" left={0} top={0} width="100%" height={INFO_BAR_H - 3} overflow="hidden">
+          <For each={headerFigures()}>
+            {(text, i) => (
+              <text position="absolute" left={header()[i()]} top={HEADER_TEXT_TOP} font={FONT} nowrap>{text}</text>
+            )}
+          </For>
         </box>
+        <box position="absolute" left={0} top={INFO_BAR_H - 3} width="100%" height={1} background={1} />
       </WindowHeader>
       {/* Content drop zone (below icons in z-order = lower priority). It
           covers all the content, so it's under the pointer however far the
