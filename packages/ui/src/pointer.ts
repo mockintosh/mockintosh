@@ -110,8 +110,8 @@ function defaultNow(): number {
 function defaultScheduler(): PointerScheduler {
   return {
     now: defaultNow,
-    requestFrame: (cb) => requestAnimationFrame(cb),
-    cancelFrame: (id) => cancelAnimationFrame(id as number),
+    requestFrame: (cb) => globalThis.requestAnimationFrame(cb),
+    cancelFrame: (id) => globalThis.cancelAnimationFrame(id as number),
   };
 }
 

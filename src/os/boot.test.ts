@@ -25,12 +25,16 @@ const HEIGHT = 342;
 const MENUBAR_HEIGHT = 20;
 
 /** `<box width="100%" height="100%" background={ink} />` without JSX (this file is `.ts`). */
-function fillBox(ink: 0 | 1): JSX.Element {
+function fillNode(ink: 0 | 1) {
   const node = createElement("box");
   setProp(node, "width", "100%");
   setProp(node, "height", "100%");
   setProp(node, "background", ink);
-  return node as unknown as JSX.Element;
+  return node;
+}
+
+function fillBox(ink: 0 | 1): JSX.Element {
+  return fillNode(ink) as unknown as JSX.Element;
 }
 
 function blackBox(): JSX.Element {
@@ -490,6 +494,7 @@ describe("bootOS on the headless platform", () => {
     for (const hold of [false, true]) {
       let ready!: () => void;
       const loaded = new Promise<void>((resolve) => { ready = resolve; });
+      let opening!: Promise<unknown>;
       const id = `test-late-${hold}`;
       registerApp({
         id,
@@ -499,13 +504,13 @@ describe("bootOS on the headless platform", () => {
         Component: () => whiteBox(),
         onOpen(app, props) {
           const release = hold ? app.keepAlive?.() : undefined;
-          void loaded.then(() => app.openWindow({ props })).finally(() => release?.());
+          opening = loaded.then(() => app.openWindow({ props })).finally(() => release?.());
         },
       });
       os.services.openApp(id, { fileId: "f1", title: "Doc" });
       ready();
-      await loaded;
-      await Promise.resolve();
+      if (hold) await opening;
+      else await expect(opening).rejects.toThrow("App instance ended");
       platform.tick();
       expect(getWindows().some((w) => w.appId === id)).toBe(hold);
     }
@@ -726,11 +731,11 @@ describe("bootOS on the headless platform", () => {
       icon: "icon/computer",
       defaultSize: { width: 120, height: 80 },
       Component: () => {
-        const node = blackBox();
+        const node = fillNode(1);
         setProp(node, "onMouseDown", () => {
           presses++;
         });
-        return node;
+        return node as unknown as JSX.Element;
       },
     });
 

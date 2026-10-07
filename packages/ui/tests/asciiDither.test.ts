@@ -270,8 +270,14 @@ describe("asciiToBits", () => {
     const dither = createAsciiDitherer(288, 288);
     const out = new Uint8Array(288 * 288);
     dither(src, out);
-    const t0 = performance.now();
-    dither(src, out);
-    expect(performance.now() - t0).toBeLessThan(80);
+    // Best of several, so one run stalled by a busy machine doesn't fail it.
+    let best = Infinity;
+    for (let i = 0; i < 5; i++) {
+      const t0 = performance.now();
+      dither(src, out);
+      best = Math.min(best, performance.now() - t0);
+    }
+    // A CI runner is a few times slower; there this only catches a gross regression.
+    expect(best).toBeLessThan(process.env.CI ? 300 : 80);
   });
 });

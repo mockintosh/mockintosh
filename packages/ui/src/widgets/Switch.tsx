@@ -45,7 +45,7 @@ export function Switch(props: SwitchProps): JSX.Element {
         setX(to);
         return;
       }
-      const started = performance.now();
+      const started = typeof performance !== "undefined" ? performance.now() : Date.now();
       const tick = (now: number) => {
         const t = Math.min(1, (now - started) / SLIDE_MS);
         setX(Math.round(from + (to - from) * easeOutCubic(t)));

@@ -155,7 +155,11 @@ describe("bouncing", () => {
     }
     expect(bounce.progress).toBe(1);
     expect(runs).toBeGreaterThan(100);
-    for (let t = 0; t < TAPE_TRACKS; t++) expect(split[t]).toEqual(tracks[t]);
+    // Compare samples in a loop: `toEqual` on a minute of Float32Array takes seconds.
+    for (let t = 0; t < TAPE_TRACKS; t++) {
+      expect(split[t]!.length).toBe(tracks[t]!.length);
+      expect(split[t]!.findIndex((v, i) => !Object.is(v, tracks[t]![i]))).toBe(-1);
+    }
   });
 
   it("loads onto a tape track as if recorded there", () => {
