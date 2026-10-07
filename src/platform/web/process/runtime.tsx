@@ -102,6 +102,20 @@ function isNode(value: unknown): value is FSNode {
   return !!value && typeof value === "object" && "id" in value && "kind" in value && "parentId" in value;
 }
 
+/**
+ * A window's props as the OS sees them. It only matches windows by `fileId`,
+ * `directoryId` and `url` and reads a `title`; everything else is for the
+ * component, which stays here, and can hold functions and signals that can't
+ * cross to the OS (the Print dialog's props hold the function that settles it).
+ */
+function plainProps(props: Record<string, unknown> | undefined): Record<string, unknown> {
+  const plain: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(props ?? {})) {
+    if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") plain[name] = value;
+  }
+  return plain;
+}
+
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
@@ -308,13 +322,13 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
       },
       openWindow<P extends Record<string, unknown>>(spec: WindowSpec<P> = {}): string {
         const key = `window-${++nextWindow}`;
-        const { Component, onGoAway, ...rest } = spec;
+        const { Component, onGoAway, props, ...rest } = spec;
         opening.set(key, {
           Component: (Component ?? app!.Component) as ProcessWindow["Component"],
-          props: (spec.props ?? {}) as Record<string, unknown>,
+          props: (props ?? {}) as Record<string, unknown>,
           onGoAway,
         });
-        const wire: WireWindowSpec = { ...rest, hasGoAway: !!onGoAway };
+        const wire: WireWindowSpec = { ...rest, props: plainProps(props), hasGoAway: !!onGoAway };
         notify("window.open", key, wire);
         return key;
       },

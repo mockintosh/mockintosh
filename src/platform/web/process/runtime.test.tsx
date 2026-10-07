@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WindowHeader, defineApp, type AppContext } from "@mockintosh/sdk";
+import { WindowHeader, defineApp, showPrintDialog, type AppContext } from "@mockintosh/sdk";
 import { getBit, makeRect } from "@mockintosh/quickdraw/bits";
 import { PaintRect } from "@mockintosh/quickdraw";
 import type { HostToProcess, ProcessStart, ProcessToHost } from "../../../os/process/protocol";
@@ -212,6 +212,72 @@ describe("an app process", () => {
     const bits = { baseAddr: page.baseAddr, rowBytes: page.rowBytes, bounds: { top: 0, left: 0, bottom: page.height, right: page.width } };
     expect(getBit(bits, 2, 2)).toBe(1);
     expect(getBit(bits, 20, 8)).toBe(0);
+  });
+
+  describe("a window whose props hold functions", () => {
+    /** A worker scope that clones what it posts, as the real boundary does: a function can't cross it. */
+    function cloningScope() {
+      const { scope, posted, send } = fakeScope();
+      const post = scope.postMessage;
+      scope.postMessage = (message, transfer) => post(structuredClone(message), transfer);
+      return { scope, posted, send };
+    }
+
+    const windowOpen = (posted: ProcessToHost[]) =>
+      posted.find((m) => m.t === "call" && m.method === "window.open") as Extract<ProcessToHost, { t: "call" }> | undefined;
+
+    it("opens, telling the OS only the plain props it matches windows by", async () => {
+      let received: Record<string, unknown> = {};
+      const app = defineApp({
+        id: "dialog-props",
+        title: "D",
+        icon: "x",
+        defaultSize: { width: 8, height: 8 },
+        Component: () => null,
+        onOpen(ctx) {
+          ctx.openWindow({
+            title: "Settings",
+            props: { fileId: "f1", count: 2, onDone: () => {}, nested: { onDone: () => {} }, picture: new Uint8Array(4) },
+            Component: (props) => {
+              received = props;
+              return null;
+            },
+          });
+        },
+      });
+      const { scope, posted, send } = cloningScope();
+      runProcess(scope, async () => app);
+      send({ t: "start", start: { ...START, appId: app.id, source: { kind: "bundled", id: app.id } } });
+      await settle();
+
+      const request = windowOpen(posted);
+      expect(posted.some((m) => m.t === "failed")).toBe(false);
+      expect(request?.args[1]).toEqual({ title: "Settings", props: { fileId: "f1", count: 2 }, hasGoAway: false });
+      // The component keeps all of its props, functions included, in the worker.
+      send({ t: "window.attach", key: request!.args[0] as string, state: { width: 8, bandWidth: 8, height: 8, active: true, kind: "document", scrollY: 0 } });
+      await settle();
+      expect(typeof received.onDone).toBe("function");
+    });
+
+    it("opens the Print dialog, whose props hold the function that settles it", async () => {
+      const app = defineApp({
+        id: "printer-dialog",
+        title: "P",
+        icon: "x",
+        defaultSize: { width: 8, height: 8 },
+        Component: () => null,
+        onOpen(ctx) {
+          void showPrintDialog(ctx, { image: { width: 4, height: 4, data: new Uint8Array(16) }, documentName: "Map" });
+        },
+      });
+      const { scope, posted, send } = cloningScope();
+      runProcess(scope, async () => app);
+      send({ t: "start", start: { ...START, appId: app.id, source: { kind: "bundled", id: app.id }, print: { paperWidth: 64, connected: false } } });
+      await settle();
+
+      expect(posted.some((m) => m.t === "failed")).toBe(false);
+      expect((windowOpen(posted)?.args[1] as { kind?: string } | undefined)?.kind).toBe("alert");
+    });
   });
 
   it("reports an app it can't load", async () => {
