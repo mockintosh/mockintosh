@@ -4,7 +4,7 @@ Mockintosh runs fx's terminal interface (`createFxTerminal` from [libfx](https:/
 
 - **Versions tested:** libfx 0.0.11, 0.0.13 and 0.0.13-dev.1415.g607b1632fff6. The results below are the same in all three unless noted.
 - **Backend:** `wasm-jspi`, the browser build's core. The terminal surface has no native addon (`LIBFX_NATIVE_SURFACE_MISSING`), so in Node 24 libfx runs the same WebAssembly core as in Chrome.
-- **Model:** a scripted gateway passed as `fetch`, so the runs are deterministic and need no key (see [Repro](#repro)). We haven't run these against the live AI Gateway.
+- **Model:** a scripted gateway passed as `fetch`, so the runs are deterministic and need no key (see [Repro](#repro)). On 7 October 2026 we confirmed #1 against the live AI Gateway (0.0.13, model `grok-4.7`), and checked that full access works there end to end (see [Live check](#live-check)).
 
 ## Summary
 
@@ -33,6 +33,8 @@ Only two model requests are made: the turn, and its continuation with the denial
 - the reviewer can be configured with a documented option or variable.
 
 `FX_REVIEW_MODEL` appears among the core's strings but isn't documented.
+
+The live gateway gives the same result. The command was held with `review_cause: "reviewer_unconfigured"`, there were two model requests and no reviewer request, and the model's reply was "Blocked."
 
 **Impact.** fx's default can't do anything with the workspace. An embedder has to discover the problem and set `FX_PERMISSION_MODE` themselves.
 
@@ -192,3 +194,22 @@ ask          no output; still running at 100% CPU after 25 s
 ```
 
 In Mockintosh, `packages/terminal/tests/fx.test.ts` runs real fx the same way through the whole stack: Terminal, the pseudo-terminal, bash on the disk, and the `fetchWithInstructions` workaround.
+
+## Live check
+
+`packages/terminal/tests/fx.live.test.ts` is opt-in, because it spends tokens. It runs real fx with a live model through the whole stack, on a headless Macintosh with the real compiler:
+
+```bash
+FX_LIVE_KEY_FILE=/path/to/key FX_LIVE_LOG=/tmp/fx-live.log npx vitest run packages/terminal/tests/fx.live.test.ts
+```
+
+Asked to "build and launch a small Mockintosh app titled Hello Fx … whose window shows the text Hello from fx", fx (0.0.13, `grok-4.7`, full access, with our brief) did it in about 25 seconds, and did it twice:
+1. read examples under `/system/source/apps`;
+2. ran `project … blank`;
+3. wrote `src/index.tsx`;
+4. ran `check` ("No problems.");
+5. ran `build --run`;
+6. confirmed with `windows` and `inspect` (and, the second time, `logs`);
+7. reported accurately.
+
+The app's window showed the text. The brief is what told it these commands exist: the commands it ran are the ones the brief names.
