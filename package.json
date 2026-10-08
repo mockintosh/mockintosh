@@ -10,13 +10,14 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "npm run build:content && vite",
+    "dev": "tsx scripts/build-chat-context.ts && vite",
     "dev:ui": "npm run dev --prefix sites/ui",
     "build:ui": "npm run build --prefix sites/ui",
     "build": "npm run build:content && vite build",
     "preview": "vite preview",
     "dev:api": "tsx scripts/dev-api.ts",
     "build:content": "tsx scripts/build-chat-context.ts && tsx scripts/build-contributors.ts",
+    "contributors:refresh": "tsx scripts/build-contributors.ts --refresh",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.core.json && tsc -p tsconfig.host.json",
     "check:core": "tsc -p tsconfig.core.json",
     "agent:eval": "tsx scripts/agent-eval.ts",
