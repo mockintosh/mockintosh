@@ -245,6 +245,20 @@ describe("Safari", () => {
     expect(await node("safari-progress")).toBeUndefined();
   });
 
+  it("never leaves the loading bar behind: not on the start page, nor after a page that came at once", async () => {
+    await settle();
+    expect(await node("safari-progress")).toBeUndefined();
+    await click("safari-favorite-Hacker News");
+    await settle();
+    expect(await node("safari-progress")).toBeUndefined();
+    await os.kernel.invoke(session(), "menu", { menu: "History", item: "Back" });
+    await settle();
+    expect(await node("safari-progress")).toBeUndefined();
+    await click("safari-new-tab");
+    await settle();
+    expect(await node("safari-progress")).toBeUndefined();
+  });
+
   it("shows mockintosh.com as the micro desktop picture", async () => {
     const modifiers = { shift: false, ctrl: false, alt: false, meta: false };
     await click("safari-address");

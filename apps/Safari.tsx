@@ -251,21 +251,27 @@ function Safari(props: Record<string, unknown>): JSX.Element {
     progressFrame = app.scheduler.requestFrame(frame);
   }
   createEffect(
-    () => loading(),
+    // The start page is drawn here, with nothing to wait for.
+    () => loading() && wanted().request.url !== START_URL,
     (busy) => {
       if (busy) {
         animateProgress((elapsed) => {
           setProgress(PROGRESS_CEILING * (1 - Math.exp(-elapsed / PROGRESS_EASE_MS)));
           return true;
         });
-      } else if (progress() !== null) {
-        setProgress(1);
-        animateProgress((elapsed) => {
-          if (elapsed < PROGRESS_LINGER_MS) return true;
-          setProgress(null);
-          return false;
-        });
+        return;
       }
+      // Done: stop easing, even when the page came before the bar's first frame…
+      progressFrame?.();
+      progressFrame = null;
+      // …and fill a bar that showed, then let it go.
+      if (progress() === null) return;
+      setProgress(1);
+      animateProgress((elapsed) => {
+        if (elapsed < PROGRESS_LINGER_MS) return true;
+        setProgress(null);
+        return false;
+      });
     },
   );
   onCleanup(() => progressFrame?.());
