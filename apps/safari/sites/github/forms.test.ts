@@ -49,6 +49,7 @@ function fakeGithub(overrides: (call: Call) => FetchResponse | undefined = () =>
     if (path === "/repos/octocat/hello/issues/5") return reply(ISSUE);
     if (path.startsWith("/repos/octocat/hello/issues/5/comments")) return reply(call.method === "POST" ? {} : [], call.method === "POST" ? 201 : 200);
     if (path === "/user") return reply({ login: "octocat" });
+    if (path === "/user/starred/octocat/hello") return reply(null, call.method === "GET" ? 404 : 204);
     if (path === "/users/octocat") return reply({ login: "octocat", name: "The Octocat", type: "User", public_repos: 2 });
     if (path.startsWith("/users/octocat/orgs")) return reply([]);
     if (path.startsWith("/users/octocat/repos")) {
@@ -162,9 +163,42 @@ describe("GitHub repositories", () => {
     ]);
     expect(nav).toMatchObject({ type: "paragraph", segments: expect.arrayContaining([{ kind: "bold", text: "Code" }]) });
     expect(rule).toEqual({ type: "hr" });
-    const columns = shown.nodes.find((node) => node.type === "columns" && node !== header);
-    if (columns?.type !== "columns") throw new Error("no columns");
-    expect(columns.columns[1]!.nodes[0]).toMatchObject({ type: "heading", text: "About" });
+    // The name and its Star button, then the files beside About.
+    const columns = shown.nodes.filter((node) => node.type === "columns" && node !== header);
+    const [title, body] = columns;
+    if (title?.type !== "columns" || body?.type !== "columns") throw new Error("no columns");
+    expect(title.columns[0]!.nodes[0]).toMatchObject({ type: "heading", text: "hello" });
+    expect(body.columns[1]!.nodes[0]).toMatchObject({ type: "heading", text: "About" });
+  });
+});
+
+describe("GitHub stars", () => {
+  const starForm = (nodes: readonly LayoutNode[]) => forms(nodes).find((form) => form.controls.some((control) => control.kind === "submit" && /^Star/.test(control.label)));
+
+  it("puts a Star button by the repository's name that stars it, signed in", async () => {
+    const { fetch, calls } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
+    expect(starForm(shown.nodes)).toEqual({
+      action: "https://github.com/octocat/hello",
+      method: "post",
+      align: "right",
+      controls: [
+        { kind: "hidden", name: "star", value: "star" },
+        { kind: "submit", name: "", value: "", label: "Star 0" },
+      ],
+    });
+    const result = await loadPage(post("https://github.com/octocat/hello", { star: "star" }), context(fetch, "tok"));
+    expect(calls.find((call) => call.method === "PUT")).toMatchObject({ url: "https://api.github.com/user/starred/octocat/hello", auth: "Bearer tok" });
+    expect((await page(result)).url).toBe("https://github.com/octocat/hello/tree/main");
+  });
+
+  it("signs in from the Star button when signed out, and comes back to the repository", async () => {
+    const { fetch } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")));
+    expect(starForm(shown.nodes)).toMatchObject({
+      action: "https://github.com/login",
+      controls: [{ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/tree/main" }, { label: "Star 0" }],
+    });
   });
 });
 

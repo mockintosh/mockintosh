@@ -140,7 +140,8 @@ export type GithubPage =
   | { view: "search"; query: string; total: number; repos: ProfileRepo[] }
   /** `extras` is null when signed out, or when GitHub wouldn't give them. */
   | { view: "profile"; profile: ProfileInfo; tab: ProfileTab; repos: ProfileRepo[]; orgs: string[]; people: string[]; extras: ProfileExtras | null }
-  | { view: "tree"; repo: RepoInfo; ref: string; path: string; entries: DirEntry[]; commit: CommitInfo | null; readme: string | null }
+  /** `starred` is whether the signed-in user has starred the repository; null when signed out, or below its front page. */
+  | { view: "tree"; repo: RepoInfo; ref: string; path: string; entries: DirEntry[]; commit: CommitInfo | null; readme: string | null; starred: boolean | null }
   | { view: "blob"; repo: RepoInfo; ref: string; file: FileBody }
   | { view: "issues"; repo: RepoInfo; issues: IssueInfo[] }
   | { view: "issue"; repo: RepoInfo; issue: IssueInfo; comments: CommentInfo[] }
@@ -375,9 +376,10 @@ async function listLogins(fetch: FetchFunction, token: string, path: string): Pr
 
 async function loadTree(fetch: FetchFunction, token: string, repo: RepoInfo, ref: string, path: string): Promise<GithubPage> {
   const branch = ref || repo.defaultBranch;
-  const [entries, commit] = await Promise.all([
+  const [entries, commit, starred] = await Promise.all([
     getDirectory(fetch, token, repo, branch, path),
     getLatestCommit(fetch, token, repo, branch, path),
+    token && path === "" ? isStarred(fetch, token, repo.owner, repo.name).catch(() => null) : Promise.resolve(null),
   ]);
   const readmeEntry = entries.find((entry) => entry.type === "file" && /^readme(\.|$)/i.test(entry.name));
   const readme = path === ""
@@ -385,7 +387,7 @@ async function loadTree(fetch: FetchFunction, token: string, repo: RepoInfo, ref
     : readmeEntry
       ? await getFileText(fetch, token, repo, branch, readmeEntry.path)
       : null;
-  return { view: "tree", repo, ref: branch, path, entries: sortEntries(entries), commit, readme };
+  return { view: "tree", repo, ref: branch, path, entries: sortEntries(entries), commit, readme, starred };
 }
 
 async function loadBlob(fetch: FetchFunction, token: string, repo: RepoInfo, ref: string, path: string): Promise<GithubPage> {
@@ -671,14 +673,39 @@ function contentsPath(repo: RepoInfo, path: string, ref: string): string {
   return `${repoPath(repo)}/contents${suffix}?ref=${encodeURIComponent(ref)}`;
 }
 
-/** A REST call: GET, or POST with `json`. */
-async function gh(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<unknown> {
+function restHeaders(token: string): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "User-Agent": "mockintosh",
     "X-GitHub-Api-Version": "2022-11-28",
   };
   if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+function starredPath(owner: string, repo: string): string {
+  return `/user/starred/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+}
+
+/** Has the signed-in user starred the repository? GitHub answers with a status, and no body. */
+async function isStarred(fetch: FetchFunction, token: string, owner: string, repo: string): Promise<boolean> {
+  const response = await fetch(`${API}${starredPath(owner, repo)}`, { headers: restHeaders(token) });
+  if (response.status === 204) return true;
+  if (response.status === 404) return false;
+  throw new GithubError(`GitHub returned ${response.status}.`, response.status);
+}
+
+/** Stars the repository for the signed-in user, or takes the star back. */
+export async function setStarred(fetch: FetchFunction, token: string, owner: string, repo: string, starred: boolean): Promise<void> {
+  const response = await fetch(`${API}${starredPath(owner, repo)}`, { method: starred ? "PUT" : "DELETE", headers: restHeaders(token) });
+  if (response.ok) return;
+  const detail = await errorMessage(response);
+  throw new GithubError(detail || `GitHub wouldn't ${starred ? "star" : "unstar"} the repository (${response.status}).`, response.status);
+}
+
+/** A REST call: GET, or POST with `json`. */
+async function gh(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<unknown> {
+  const headers = restHeaders(token);
   if (json !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(`${API}${path}`, json === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(json) });
   if (response.status === 404) throw new GithubError("Not found on GitHub.", 404);

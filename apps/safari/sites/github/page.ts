@@ -7,6 +7,7 @@ import {
   createDiscussion,
   createIssue,
   getViewer,
+  setStarred,
   listViewerRepos,
   loadPage,
   type ApiLocation,
@@ -53,6 +54,8 @@ export const githubSite: SiteAdapter = {
       return loadLocation(await post(posted, fields, context), context, {});
     } catch (error) {
       if (!(error instanceof GithubError)) throw error;
+      // A star has no form to come back to: say why GitHub refused it.
+      if (posted.kind === "star") throw new PageError(error.message);
       // Back to the form, with what was written and why GitHub refused it.
       return loadLocation(posted.form, context, { draft: fields, error: error.message });
     }
@@ -245,6 +248,7 @@ function accountMenu(viewer: string, here: string): LayoutNode {
 
 /** Where a form posts, and the page that shows the form again if GitHub refuses it. */
 type Posted =
+  | { kind: "star"; owner: string; repo: string; starred: boolean; form: ApiLocation }
   | { kind: "issue"; owner: string; repo: string; form: ApiLocation }
   | { kind: "issueComment"; owner: string; repo: string; number: number; form: ApiLocation }
   | { kind: "discussion"; owner: string; repo: string; form: ApiLocation }
@@ -254,6 +258,10 @@ type Posted =
 function postedLocation(location: GithubLocation, fields: Record<string, string>): Posted | null {
   if (!("owner" in location)) return null;
   const { owner, repo } = location;
+  // The Star button posts to the repository's front page, saying which way.
+  if (location.kind === "tree" && (fields.star === "star" || fields.star === "unstar")) {
+    return { kind: "star", owner, repo, starred: fields.star === "star", form: { kind: "tree", owner, repo, ref: "", path: "" } };
+  }
   if (location.kind === "issues") return { kind: "issue", owner, repo, form: { kind: "newIssue", owner, repo } };
   if (location.kind === "issue" || location.kind === "pull") return { kind: "issueComment", owner, repo, number: location.number, form: location };
   if (location.kind === "discussions") {
@@ -269,6 +277,10 @@ async function post(posted: Posted, fields: Record<string, string>, context: Sit
   const token = context.settings.githubToken;
   if (!token) throw new GithubError("Sign in to GitHub first.", 401);
   const { owner, repo } = posted;
+  if (posted.kind === "star") {
+    await setStarred(fetch, token, owner, repo, posted.starred);
+    return posted.form;
+  }
   const title = (fields.title ?? "").trim();
   const body = fields.body ?? "";
   if (posted.kind === "issue") {
@@ -798,6 +810,31 @@ function repoNav(repo: RepoInfo, view: RepoPage["view"], ref: string): LayoutNod
   return tabs(sections);
 }
 
+/** Room for the Star button at the right of a repository's title: "Starred 1.2k". */
+const STAR_WIDTH = 100;
+
+/**
+ * GitHub's Star button and the count beside it. Signed in, it stars or
+ * unstars (`starred` says which it is now); signed out, it signs in and
+ * comes back.
+ */
+function starButton(repo: RepoInfo, starred: boolean | null, here: GithubLocation): LayoutNode {
+  const count = formatCount(repo.stars);
+  if (starred === null) return buttonForm({ kind: "login", returnTo: githubUrl(here) }, `Star ${count}`);
+  return {
+    type: "form",
+    form: {
+      action: githubUrl({ kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" }),
+      method: "post",
+      align: "right",
+      controls: [
+        { kind: "hidden", name: "star", value: starred ? "unstar" : "star" },
+        { kind: "submit", name: "", value: "", label: `${starred ? "Starred" : "Star"} ${count}` },
+      ],
+    },
+  };
+}
+
 /** Width of the Code page's About column. */
 const ABOUT_WIDTH = 120;
 /** Narrower than this, About goes under the files. */
@@ -862,11 +899,17 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
       main.push(card([bold("README")], resolveRelative(parseMarkdown(page.readme), repo, page.ref, page.path)));
     }
     if (page.path) return { title: page.path, body: main };
-    // The repository's front page: its name, then the files beside About.
+    // The repository's front page: its name and Star button, then the files beside About.
     return {
       title: "",
       body: [
-        heading(1, repo.name),
+        {
+          type: "columns",
+          gap: 8,
+          minWidth: 0,
+          center: true,
+          columns: [{ nodes: [heading(1, repo.name)] }, { width: STAR_WIDTH, nodes: [starButton(repo, page.starred, location)] }],
+        },
         { type: "columns", gap: 16, minWidth: CODE_COLUMNS, columns: [{ nodes: main }, { width: ABOUT_WIDTH, nodes: aboutNodes(repo) }] },
       ],
     };
