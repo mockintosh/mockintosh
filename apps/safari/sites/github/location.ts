@@ -14,6 +14,8 @@ export type GithubLocation =
   | { kind: "issues"; owner: string; repo: string; state?: "closed" }
   | { kind: "issue"; owner: string; repo: string; number: number }
   | { kind: "newIssue"; owner: string; repo: string }
+  /** "Create a new fork": name the fork before making it. */
+  | { kind: "newFork"; owner: string; repo: string }
   | { kind: "pulls"; owner: string; repo: string; state?: "closed" }
   | { kind: "pull"; owner: string; repo: string; number: number }
   | { kind: "discussions"; owner: string; repo: string }
@@ -71,6 +73,7 @@ export function parseGithubLocation(raw: string): GithubLocation | null {
     const number = issueNumber(second);
     return number === null || tail.length > 0 ? null : { kind: "discussion", owner, repo, number };
   }
+  if (head === "fork") return rest.length === 1 ? { kind: "newFork", owner, repo } : null;
   if (head === "pulls") return rest.length === 1 ? closedList({ kind: "pulls", owner, repo }, query) : null;
   if (head === "pull") {
     const number = issueNumber(second);
@@ -102,6 +105,7 @@ export function formatGithubLocation(location: GithubLocation): string {
   if (location.kind === "issues") return location.state === "closed" ? `${root}/issues?q=is%3Aissue+is%3Aclosed` : `${root}/issues`;
   if (location.kind === "issue") return `${root}/issues/${location.number}`;
   if (location.kind === "newIssue") return `${root}/issues/new`;
+  if (location.kind === "newFork") return `${root}/fork`;
   if (location.kind === "discussions") return `${root}/discussions`;
   if (location.kind === "discussion") return `${root}/discussions/${location.number}`;
   if (location.kind === "newDiscussion") {

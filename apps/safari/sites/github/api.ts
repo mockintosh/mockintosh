@@ -159,6 +159,7 @@ export type GithubPage =
   | { view: "pulls"; repo: RepoInfo; state: "open" | "closed"; counts: StateCounts; pulls: IssueInfo[] }
   | { view: "pull"; repo: RepoInfo; pull: IssueInfo; comments: CommentInfo[] }
   | { view: "newIssue"; repo: RepoInfo }
+  | { view: "newFork"; repo: RepoInfo }
   | { view: "discussions"; repo: RepoInfo; discussions: DiscussionInfo[] }
   | { view: "discussion"; repo: RepoInfo; discussion: DiscussionInfo; comments: CommentInfo[] }
   /** `category` is null until one is chosen from `categories`. */
@@ -192,6 +193,7 @@ export async function loadPage(fetch: FetchFunction, token: string, location: Ap
     return { view: "pulls", repo, state, counts, pulls };
   }
   if (location.kind === "newIssue") return { view: "newIssue", repo };
+  if (location.kind === "newFork") return { view: "newFork", repo };
   if (location.kind === "discussions") return { view: "discussions", repo, discussions: await listDiscussions(fetch, token, repo) };
   if (location.kind === "discussion") {
     const { discussion, comments } = await getDiscussion(fetch, token, repo, location.number);
@@ -742,13 +744,13 @@ export async function setStarred(fetch: FetchFunction, token: string, owner: str
 }
 
 /**
- * Forks a repository into the signed-in account; resolves with where the
- * fork is (an existing fork, if there already was one). GitHub copies the
- * files after it answers, so this waits, a few seconds at most, until the
- * fork has a commit to show.
+ * Forks a repository into the signed-in account under `name`; resolves with
+ * where the fork is (an existing fork, if there already was one). GitHub
+ * copies the files after it answers, so this waits, a few seconds at most,
+ * until the fork has a commit to show.
  */
-export async function forkRepo(fetch: FetchFunction, token: string, owner: string, repo: string, wait = FORK_WAIT): Promise<{ owner: string; name: string }> {
-  const fork = asRecord(await gh(fetch, token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/forks`, {}));
+export async function forkRepo(fetch: FetchFunction, token: string, owner: string, repo: string, name: string, wait = FORK_WAIT): Promise<{ owner: string; name: string }> {
+  const fork = asRecord(await gh(fetch, token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/forks`, { name }));
   const where = { owner: stringField(asRecord(fork.owner), "login"), name: stringField(fork, "name") };
   if (!where.owner || !where.name) throw new GithubError("GitHub didn't say where the fork is.", 502);
   for (let tries = 0; tries < wait.tries; tries++) {

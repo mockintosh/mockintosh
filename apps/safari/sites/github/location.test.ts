@@ -14,6 +14,7 @@ describe("parseGithubLocation", () => {
       ["github.com/logout", { kind: "logout", returnTo: "" }],
       ["github.com/octocat/Hello-World/issues?q=is%3Aissue+is%3Aclosed", { kind: "issues", owner: "octocat", repo: "Hello-World", state: "closed" }],
       ["github.com/octocat/Hello-World/pulls?q=is%3Apr+is%3Aclosed", { kind: "pulls", owner: "octocat", repo: "Hello-World", state: "closed" }],
+      ["github.com/octocat/Hello-World/fork", { kind: "newFork", owner: "octocat", repo: "Hello-World" }],
     ] as const;
     for (const [address, location] of cases) {
       expect(parseGithubLocation(address)).toEqual(location);

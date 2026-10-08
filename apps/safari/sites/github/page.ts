@@ -57,8 +57,8 @@ export const githubSite: SiteAdapter = {
       return loadLocation(await post(posted, fields, context), context, {});
     } catch (error) {
       if (!(error instanceof GithubError)) throw error;
-      // A star or a fork has no form to come back to: say why GitHub refused it.
-      if (posted.kind === "star" || posted.kind === "fork") throw new PageError(error.message);
+      // A star has no form to come back to: say why GitHub refused it.
+      if (posted.kind === "star") throw new PageError(error.message);
       // Back to the form, with what was written and why GitHub refused it.
       return loadLocation(posted.form, context, { draft: fields, error: error.message });
     }
@@ -76,6 +76,8 @@ interface FormState {
 /** How forms are drawn: signed in or not, and anything to put back in them. */
 export interface PageForms extends FormState {
   signedIn: boolean;
+  /** Who is signed in; empty when signed out, or when GitHub won't say. */
+  viewer?: string;
 }
 
 function locationOf(url: WebUrl): GithubLocation {
@@ -113,7 +115,8 @@ async function loadBody(location: Exclude<GithubLocation, { kind: "login" | "log
   const jump = location.kind === "search" ? /^\s*([\w.-]+)\/([\w.-]+)\s*$/.exec(location.query) : null;
   const target: ApiLocation = jump ? { kind: "tree", owner: jump[1], repo: jump[2], ref: "", path: "" } : location;
   try {
-    return githubPage(await loadPage(context.fetch, token, target), Date.now(), { signedIn: token !== "", ...state });
+    const [page, viewer] = await Promise.all([loadPage(context.fetch, token, target), token ? viewerOf(context) : null]);
+    return githubPage(page, Date.now(), { signedIn: token !== "", viewer: viewer?.login ?? "", ...state });
   } catch (error) {
     if (error instanceof GithubError) throw new PageError(error.message);
     throw error;
@@ -277,6 +280,8 @@ function accountMenu(account: Viewer, here: string): LayoutNode {
 /** Where a form posts, and the page that shows the form again if GitHub refuses it. */
 type Posted =
   | { kind: "star"; owner: string; repo: string; starred: boolean; form: ApiLocation }
+  /** The Fork button: on to "Create a new fork", where the fork is named. */
+  | { kind: "openFork"; owner: string; repo: string; form: ApiLocation }
   | { kind: "fork"; owner: string; repo: string; form: ApiLocation }
   | { kind: "issue"; owner: string; repo: string; form: ApiLocation }
   | { kind: "issueComment"; owner: string; repo: string; number: number; form: ApiLocation }
@@ -291,8 +296,9 @@ function postedLocation(location: GithubLocation, fields: Record<string, string>
   if (location.kind === "tree" && (fields.star === "star" || fields.star === "unstar")) {
     return { kind: "star", owner, repo, starred: fields.star === "star", form: { kind: "tree", owner, repo, ref: "", path: "" } };
   }
-  // The Fork button too.
-  if (location.kind === "tree" && fields.fork === "fork") return { kind: "fork", owner, repo, form: { kind: "tree", owner, repo, ref: "", path: "" } };
+  // The Fork button too; "Create a new fork" makes it.
+  if (location.kind === "tree" && fields.fork === "fork") return { kind: "openFork", owner, repo, form: { kind: "newFork", owner, repo } };
+  if (location.kind === "newFork") return { kind: "fork", owner, repo, form: location };
   if (location.kind === "issues") return { kind: "issue", owner, repo, form: { kind: "newIssue", owner, repo } };
   if (location.kind === "issue" || location.kind === "pull") return { kind: "issueComment", owner, repo, number: location.number, form: location };
   if (location.kind === "discussions") {
@@ -312,8 +318,12 @@ async function post(posted: Posted, fields: Record<string, string>, context: Sit
     await setStarred(fetch, token, owner, repo, posted.starred);
     return posted.form;
   }
+  if (posted.kind === "openFork") return posted.form;
   if (posted.kind === "fork") {
-    const fork = await forkRepo(fetch, token, owner, repo);
+    const name = (fields.name ?? "").trim();
+    if (!name) throw new GithubError("A fork needs a name.", 422);
+    if (!/^[\w.-]+$/.test(name)) throw new GithubError("A repository's name can only have letters, digits, hyphens, underscores and periods.", 422);
+    const fork = await forkRepo(fetch, token, owner, repo, name);
     return { kind: "tree", owner: fork.owner, repo: fork.name, ref: "", path: "" };
   }
   const title = (fields.title ?? "").trim();
@@ -859,6 +869,7 @@ function repoLocation(page: RepoPage): GithubLocation {
   if (page.view === "issue") return { kind: "issue", owner, repo: name, number: page.issue.number };
   if (page.view === "pull") return { kind: "pull", owner, repo: name, number: page.pull.number };
   if (page.view === "newIssue") return { kind: "newIssue", owner, repo: name };
+  if (page.view === "newFork") return { kind: "newFork", owner, repo: name };
   if (page.view === "discussions") return { kind: "discussions", owner, repo: name };
   if (page.view === "discussion") return { kind: "discussion", owner, repo: name, number: page.discussion.number };
   return { kind: "newDiscussion", owner, repo: name, category: page.category?.slug ?? "" };
@@ -930,6 +941,30 @@ function repoButtons(repo: RepoInfo, starred: boolean | null, here: GithubLocati
       ],
     },
   };
+}
+
+/**
+ * "Create a new fork", as github.com asks before forking: whose it will be,
+ * and its name (the original's, to start with). Nothing is made until
+ * Create fork is pressed; Cancel goes back.
+ */
+function newForkNodes(repo: RepoInfo, location: GithubLocation, forms: PageForms): LayoutNode[] {
+  const original: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
+  const nodes: LayoutNode[] = [
+    heading(2, "Create a new fork"),
+    paragraph(text("A fork is a copy of a repository. Forking a repository lets you freely experiment with changes without affecting the original project.")),
+  ];
+  if (!forms.signedIn) return [...nodes, paragraph(text("Sign in to fork a repository.")), signInForm(location, "Sign In")];
+  nodes.push(
+    paragraph(text("Forking "), { kind: "link", text: `${repo.owner}/${repo.name}`, href: githubUrl(original) }, text(forms.viewer ? " to " : ""), ...(forms.viewer ? [person(forms.viewer, true, true)] : []), text(".")),
+    heading(3, "Repository name"),
+    ...postForm(location, forms, [
+      { kind: "text", name: "name", value: repo.name, placeholder: "Repository name" },
+      { kind: "submit", name: "", value: "", label: "Create fork" },
+    ]),
+    paragraph(link("Cancel", original)),
+  );
+  return nodes;
 }
 
 /** Width of the Code page's About column. */
@@ -1074,6 +1109,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
     return { title: "New issue", body };
   }
   if (page.view === "newDiscussion") return { title: "New discussion", body: newDiscussionNodes(page, forms) };
+  if (page.view === "newFork") return { title: `Fork ${owner}/${name}`, body: newForkNodes(page.repo, location, forms) };
   if (page.view === "discussion") {
     const item = page.discussion;
     return {

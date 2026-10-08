@@ -218,13 +218,40 @@ describe("GitHub forks", () => {
     return undefined;
   };
 
-  it("counts the forks on the Fork button, which forks the repository and opens the fork", async () => {
+  it("counts the forks on the Fork button, which opens Create a new fork without forking anything", async () => {
     const { fetch, calls } = fakeGithub((call) => forking(call) ?? (call.url.endsWith("/repos/octocat/hello") ? reply({ default_branch: "main", forks_count: 2 }) : undefined));
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
     expect(JSON.stringify(shown.nodes)).toContain('"label":"Fork 2"');
     const result = await loadPage(post("https://github.com/octocat/hello", { fork: "fork" }), context(fetch, "tok"));
-    expect(calls.find((call) => call.method === "POST")).toMatchObject({ url: "https://api.github.com/repos/octocat/hello/forks", auth: "Bearer tok" });
-    expect((await page(result)).url).toBe("https://github.com/me/hello/tree/main");
+    expect(calls.some((call) => call.method === "POST")).toBe(false);
+    expect(result).toMatchObject({ landed: { url: "https://github.com/octocat/hello/fork", method: "get" } });
+    const create = await page(result);
+    const all = texts(create.nodes);
+    expect(all).toContain("Create a new fork");
+    expect(all).toContain("Forking octocat/hello to octocat.");
+    expect(forms(create.nodes).find((form) => form.action === "https://github.com/octocat/hello/fork")?.controls).toEqual([
+      { kind: "text", name: "name", value: "hello", placeholder: "Repository name" },
+      { kind: "submit", name: "", value: "", label: "Create fork" },
+    ]);
+  });
+
+  it("forks under the name given on Create a new fork, and opens the fork", async () => {
+    const { fetch, calls } = fakeGithub((call) => {
+      if (call.url.endsWith("/repos/octocat/hello/forks")) return reply({ name: "hello-test", owner: { login: "me" } }, 202);
+      if (call.url.endsWith("/repos/me/hello-test")) return reply({ name: "hello-test", owner: { login: "me" }, default_branch: "main", fork: true });
+      if (call.url.includes("/repos/me/hello-test/")) return reply([]);
+      return undefined;
+    });
+    const result = await loadPage(post("https://github.com/octocat/hello/fork", { name: " hello-test " }), context(fetch, "tok"));
+    expect(calls.find((call) => call.method === "POST")).toMatchObject({ url: "https://api.github.com/repos/octocat/hello/forks", auth: "Bearer tok", body: { name: "hello-test" } });
+    expect((await page(result)).url).toBe("https://github.com/me/hello-test/tree/main");
+  });
+
+  it("asks to sign in on Create a new fork when signed out", async () => {
+    const { fetch } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello/fork"), context(fetch, "")));
+    expect(texts(shown.nodes)).toContain("Sign in to fork a repository.");
+    expect(forms(shown.nodes).some((form) => form.action === "https://github.com/octocat/hello/fork")).toBe(false);
   });
 
   it("waits while GitHub copies the files, then opens the fork", async () => {
@@ -234,14 +261,18 @@ describe("GitHub forks", () => {
       return forking(call);
     });
     const pauses: number[] = [];
-    const fork = await forkRepo(fetch, "tok", "octocat", "hello", { tries: 8, every: 750, pause: async (ms) => { pauses.push(ms); } });
+    const fork = await forkRepo(fetch, "tok", "octocat", "hello", "hello", { tries: 8, every: 750, pause: async (ms: number) => { pauses.push(ms); } });
     expect(fork).toEqual({ owner: "me", name: "hello" });
     expect([looks, pauses]).toEqual([3, [750, 750]]);
   });
 
-  it("says why GitHub wouldn't fork", async () => {
-    const { fetch } = fakeGithub((call) => (call.url.endsWith("/forks") ? reply({ message: "Repository is already forked" }, 403) : undefined));
-    expect(await loadPage(post("https://github.com/octocat/hello", { fork: "fork" }), context(fetch, "tok"))).toEqual({ kind: "error", message: "Repository is already forked" });
+  it("comes back to Create a new fork with the name and why GitHub wouldn't fork, or why the name won't do", async () => {
+    const { fetch } = fakeGithub((call) => (call.url.endsWith("/forks") ? reply({ message: "Name already exists on this account" }, 422) : undefined));
+    const refused = await page(await loadPage(post("https://github.com/octocat/hello/fork", { name: "taken" }), context(fetch, "tok")));
+    expect(texts(refused.nodes)).toContain("Name already exists on this account");
+    expect(forms(refused.nodes).flatMap((form) => form.controls)).toContainEqual({ kind: "text", name: "name", value: "taken", placeholder: "Repository name" });
+    const bad = await page(await loadPage(post("https://github.com/octocat/hello/fork", { name: "no spaces" }), context(fetch, "tok")));
+    expect(texts(bad.nodes)).toContain("A repository's name can only have letters, digits, hyphens, underscores and periods.");
   });
 });
 
