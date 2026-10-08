@@ -87,7 +87,7 @@ export interface AddressFieldProps {
 }
 
 /** Height of the loading bar along the field's bottom edge. */
-const PROGRESS_H = 2;
+const PROGRESS_H = 1;
 
 /** The address field: a lock for `https` pages, then the address, and a bar along its foot while the page loads, as Safari's fills. */
 export function AddressField(props: AddressFieldProps): JSX.Element {
