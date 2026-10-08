@@ -132,9 +132,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     storage,
     env: {
       origin: location.origin,
-      config: {
-        SPOTIFY_CLIENT_ID: (import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined) ?? "",
-      },
+      config: {},
     },
     hostCapabilities,
     crypto: createWebCrypto(),

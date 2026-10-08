@@ -58,9 +58,14 @@ export interface SpotifyPlaylist {
   name: string;
   uri: string;
   images: Array<{ url: string }>;
+  owner: string;
+  /** Number of songs, when Spotify says. */
+  total: number | null;
 }
 
 export interface SpotifyTrack {
+  /** `spotify:track:…`; absent for local files. */
+  uri?: string;
   name: string;
   artists: Array<{ name: string }>;
   album: { name: string; images: Array<{ url: string }> };
@@ -178,25 +183,20 @@ export async function getValidToken(session: SpotifySession): Promise<string | n
 }
 
 async function authorized(
+  /** A path under the API, or a full `next` URL from a paged response. */
   path: string,
   session: SpotifySession,
   init?: FetchRequest
 ): Promise<FetchResponse | null> {
   const token = await getValidToken(session);
   if (!token) return null;
-  return session.fetch(`${API_BASE}${path}`, {
+  return session.fetch(path.startsWith("https://") ? path : `${API_BASE}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
       ...(init?.headers ?? {}),
     },
   });
-}
-
-export async function spotifyGet(path: string, session: SpotifySession): Promise<unknown> {
-  const resp = await authorized(path, session);
-  if (!resp?.ok) return null;
-  return resp.json();
 }
 
 export async function spotifyPut(
@@ -217,17 +217,109 @@ export async function spotifyPost(path: string, session: SpotifySession): Promis
   return !!resp && (resp.ok || resp.status === 204);
 }
 
+interface Page<T> {
+  items?: T[];
+  next?: string | null;
+}
+
+/** Every page of a paged endpoint. Rejects with a `SpotifyError` when the first page fails. */
+async function fetchAllPages<T>(path: string, session: SpotifySession): Promise<T[]> {
+  const out: T[] = [];
+  let next: string | null | undefined = path;
+  while (next) {
+    const resp = await authorized(next, session);
+    if (!resp?.ok) {
+      if (out.length) return out;
+      throw new SpotifyError(resp?.status ?? 401);
+    }
+    const page = (await resp.json()) as Page<T>;
+    out.push(...(page.items ?? []));
+    next = page.next;
+  }
+  return out;
+}
+
+/** A Web API call answered with an error status. */
+export class SpotifyError extends Error {
+  constructor(readonly status: number) {
+    super(`Spotify answered ${status}`);
+  }
+}
+
+interface RawPlaylist {
+  id: string;
+  name: string;
+  uri: string;
+  images?: Array<{ url: string }> | null;
+  owner?: { display_name?: string | null; id?: string };
+  /** `tracks` before Spotify's February 2026 rename. */
+  items?: { total?: number };
+  tracks?: { total?: number };
+}
+
 export async function fetchPlaylists(session: SpotifySession): Promise<SpotifyPlaylist[]> {
-  const data = (await spotifyGet("/me/playlists?limit=50", session)) as
-    | { items?: Array<{ id: string; name: string; uri: string; images?: Array<{ url: string }> }> }
-    | null;
-  if (!data?.items) return [];
-  return data.items.map((p) => ({
-    id: p.id,
-    name: p.name,
-    uri: p.uri,
-    images: p.images ?? [],
-  }));
+  const raw = await fetchAllPages<RawPlaylist | null>("/me/playlists?limit=50", session);
+  return raw
+    .filter((p): p is RawPlaylist => !!p)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      uri: p.uri,
+      images: p.images ?? [],
+      owner: p.owner?.display_name ?? p.owner?.id ?? "",
+      total: p.items?.total ?? p.tracks?.total ?? null,
+    }));
+}
+
+interface RawPlaylistItem {
+  /** `track` before Spotify's February 2026 rename. */
+  item?: (SpotifyTrack & { type?: string }) | null;
+  track?: (SpotifyTrack & { type?: string }) | null;
+}
+
+/**
+ * The songs in a playlist (`GET /playlists/{id}/items`). Spotify only lists
+ * playlists the user owns or collaborates on; others reject with a 403
+ * `SpotifyError`. Podcast episodes and removed tracks are left out.
+ */
+export async function fetchPlaylistTracks(playlistId: string, session: SpotifySession): Promise<SpotifyTrack[]> {
+  const raw = await fetchAllPages<RawPlaylistItem>(
+    `/playlists/${encodeURIComponent(playlistId)}/items?limit=100&additional_types=track`,
+    session,
+  );
+  const tracks: SpotifyTrack[] = [];
+  for (const entry of raw) {
+    const t = entry.item ?? entry.track;
+    if (!t || (t.type !== undefined && t.type !== "track")) continue;
+    tracks.push({
+      uri: t.uri,
+      name: t.name,
+      artists: t.artists ?? [],
+      album: { name: t.album?.name ?? "", images: t.album?.images ?? [] },
+      duration_ms: t.duration_ms ?? 0,
+    });
+  }
+  return tracks;
+}
+
+/**
+ * Start playing on `deviceId`: the whole `contextUri` (a playlist), from
+ * `trackUri` when given, or resume whatever was playing when neither is.
+ */
+export function playOn(
+  deviceId: string,
+  session: SpotifySession,
+  contextUri?: string,
+  trackUri?: string,
+): Promise<boolean> {
+  const body = contextUri ? { context_uri: contextUri, ...(trackUri ? { offset: { uri: trackUri } } : {}) } : null;
+  return spotifyPut(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, body, session);
+}
+
+/** `183000` → `"3:03"`. */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
 export async function loadSpotifySDK(browser: BrowserService): Promise<{ Player: new (opts: unknown) => unknown } | undefined> {
@@ -235,18 +327,21 @@ export async function loadSpotifySDK(browser: BrowserService): Promise<{ Player:
   return Spotify as { Player: new (opts: unknown) => unknown } | undefined;
 }
 
-export async function ditherImageFromUrl(
-  url: string,
-  targetW: number,
-  targetH: number,
-  session: SpotifySession
-): Promise<Uint8Array | null> {
+/** A dithered picture: one byte per pixel, 1 for ink. */
+export interface DitheredArt {
+  width: number;
+  height: number;
+  bits: Uint8Array;
+}
+
+/** Fetch an image and dither it to fit `size`×`size`; `null` when it can't. */
+export async function ditherImageFromUrl(url: string, size: number, session: SpotifySession): Promise<DitheredArt | null> {
   try {
     if (!session.images) return null;
     const resp = await session.fetch(url);
     const bytes = new Uint8Array(await resp.arrayBuffer());
-    const frame = await session.images.decode(bytes, undefined, { maxWidth: targetW, maxHeight: targetH });
-    return toBits(frame, "atkinson");
+    const frame = await session.images.decode(bytes, undefined, { maxWidth: size, maxHeight: size });
+    return { width: frame.width, height: frame.height, bits: toBits(frame, "atkinson") };
   } catch {
     return null;
   }
