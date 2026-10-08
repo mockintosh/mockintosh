@@ -285,35 +285,40 @@ export function Overlay(props: OverlayProps): JSX.Element {
     layerId = 0;
   });
 
+  // The outer box takes the container's alignment, so a trigger in a row
+  // that centres is centred too; where the container stretches, the trigger
+  // inside keeps its own size and sits at the start. The trigger is what the
+  // panel is placed against.
   return (
-    <box
-      ref={(el) => {
-        triggerNode = el;
-        triggerHeight = el.layout.height;
-      }}
-      alignSelf="flex-start"
-      position="relative"
-    >
-      {props.trigger}
-      <Show when={props.open && !host}>
-        <box
-          semantic={{ name: "overlay-panel", role: props.role ?? "dialog" }}
-          position="absolute"
-          left={0}
-          top={side() === "top" ? undefined : triggerHeight + offset()}
-          bottom={side() === "top" ? triggerHeight + offset() : undefined}
-          tabIndex={modal() ? 0 : undefined}
-          onKeyDown={(key: string) => {
-            if (key === "Escape") {
-              props.onDismiss?.();
-              return;
-            }
-            props.onKeyDown?.(key);
-          }}
-        >
-          {props.children}
-        </box>
-      </Show>
+    <box alignItems="flex-start">
+      <box
+        ref={(el) => {
+          triggerNode = el;
+          triggerHeight = el.layout.height;
+        }}
+        position="relative"
+      >
+        {props.trigger}
+        <Show when={props.open && !host}>
+          <box
+            semantic={{ name: "overlay-panel", role: props.role ?? "dialog" }}
+            position="absolute"
+            left={0}
+            top={side() === "top" ? undefined : triggerHeight + offset()}
+            bottom={side() === "top" ? triggerHeight + offset() : undefined}
+            tabIndex={modal() ? 0 : undefined}
+            onKeyDown={(key: string) => {
+              if (key === "Escape") {
+                props.onDismiss?.();
+                return;
+              }
+              props.onKeyDown?.(key);
+            }}
+          >
+            {props.children}
+          </box>
+        </Show>
+      </box>
     </box>
   );
 }

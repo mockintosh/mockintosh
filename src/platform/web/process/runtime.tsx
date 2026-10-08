@@ -597,7 +597,13 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
               <AppServicesContext value={w.services}>
                 <WindowSlotsContext value={w.slots}>
                   <box width={pictureWidth(w)} height={pictureHeight(w)} flexDirection="column">
-                    {w.header().view && <box width={w.bandWidth()} height={w.header().height}>{w.header().view!()}</box>}
+                    {w.header().view && (
+                      <box width={w.bandWidth()} height={w.header().height} position="relative">
+                        {w.header().view!()}
+                        {/* The band's bottom rule, as the window draws one for other apps; here, under the app's menus. */}
+                        <box position="absolute" left={0} top={w.header().height - 1} width={w.bandWidth()} height={1} background={1} />
+                      </box>
+                    )}
                     <box width={w.width()} height={w.height()} overflow="hidden" position="relative" overlayBounds>
                       {/* A scrollable window's document, moved to what the OS has scrolled to. */}
                       <box

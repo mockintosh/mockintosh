@@ -17,7 +17,12 @@ import type { JSX } from "@mockintosh/ui";
 export type WindowBandView = (() => JSX.Element) | null;
 
 export interface WindowSlots {
-  setHeader(view: WindowBandView, height: number): void;
+  /**
+   * `ruled` says the view draws the band's bottom rule itself, so the window
+   * doesn't draw one over it: a process window's picture does, under the
+   * app's open menus, which the window's own rule would cut across.
+   */
+  setHeader(view: WindowBandView, height: number, ruled?: boolean): void;
   setFooter(view: WindowBandView, height: number): void;
 }
 

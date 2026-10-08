@@ -165,6 +165,10 @@ describe("Safari", () => {
     expect((await nodes()).filter((n) => n.role === "menuitem")).toEqual([]);
 
     await openBookmark("Hacker News");
+    // Share lines up with the toolbar's other buttons, though a menu hangs from it.
+    const [share, plus] = [await node("safari-share"), await node("safari-new-tab")];
+    expect(share?.bounds.y).toBe(plus?.bounds.y);
+    expect(share?.bounds.height).toBe(plus?.bounds.height);
     await click("safari-share");
     const items = (await nodes()).filter((n) => n.role === "menuitem");
     // One menu, under the button: the header's toolbar is built once.

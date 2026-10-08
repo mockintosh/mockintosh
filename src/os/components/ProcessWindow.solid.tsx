@@ -163,7 +163,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
   createEffect(
     () => bands(),
     ({ header, footer }) => {
-      slots?.setHeader(header > 0 ? () => slice(() => 0, () => bands().header) : null, header);
+      // The worker draws the header's bottom rule into the picture, under the app's menus.
+      slots?.setHeader(header > 0 ? () => slice(() => 0, () => bands().header) : null, header, true);
       slots?.setFooter(footer > 0 ? () => slice(() => bands().header + win.height(), () => bands().footer) : null, footer);
     },
   );
