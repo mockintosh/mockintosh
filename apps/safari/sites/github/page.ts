@@ -174,7 +174,30 @@ function withHeader(page: DocumentPage, viewer: string | null, account = true): 
       { width: account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
     ],
   };
-  return { ...page, nodes: [header, { type: "hr" }, ...page.nodes] };
+  return { ...page, nodes: [header, { type: "hr" }, ...spaceSections(page.nodes)] };
+}
+
+/** Space over a section's heading, on top of the page's usual gap, so sections stand apart. */
+const SECTION_SPACE: LayoutNode = { type: "spacer", height: 8 };
+
+/** Does `node` open a section: a page or section heading, or a heading with a button beside it? */
+function opensSection(node: LayoutNode): boolean {
+  if (node.type === "heading") return node.level <= 2;
+  if (node.type === "columns" && node.center) {
+    const first = node.columns[0]?.nodes[0];
+    return first?.type === "heading" && first.level <= 2;
+  }
+  return false;
+}
+
+/** Space over every section but a column's first, through the page's columns: one rule for all of GitHub's pages. */
+function spaceSections(nodes: readonly LayoutNode[]): LayoutNode[] {
+  return nodes.flatMap((node, index): LayoutNode[] => {
+    const spaced = node.type === "columns" && !node.center
+      ? { ...node, columns: node.columns.map((column) => ({ ...column, nodes: spaceSections(column.nodes) })) }
+      : node;
+    return index > 0 && opensSection(node) ? [SECTION_SPACE, spaced] : [spaced];
+  });
 }
 
 /**
@@ -458,9 +481,6 @@ function repoList(repos: readonly ProfileRepo[], empty: string): LayoutNode {
   );
 }
 
-/** Pixels between the main column's blocks: roomier than a page's usual 4, so its sections stand apart. */
-const MAIN_GAP = 8;
-
 /** Sidebar width; the avatar fills it. Narrower than github.com's, so the main column holds the contribution graph. */
 const SIDEBAR = 150;
 /** Narrower than this, the sidebar goes above the repositories. */
@@ -698,7 +718,7 @@ function profilePage(page: Extract<GithubPage, { view: "profile" }>, now: number
       type: "columns",
       gap: 16,
       minWidth: TWO_COLUMNS,
-      columns: [{ width: SIDEBAR, nodes: profileSidebar(page) }, { gap: MAIN_GAP, nodes: profileMain(page, now, forms) }],
+      columns: [{ width: SIDEBAR, nodes: profileSidebar(page) }, { nodes: profileMain(page, now, forms) }],
     },
   ];
   return { kind: "document", url: githubUrl(location), title: profile.login, nodes };

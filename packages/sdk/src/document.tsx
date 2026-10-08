@@ -256,7 +256,7 @@ function ColumnsView(props: {
     <box flexDirection="column" gap={props.gap}>
       <For each={props.columns}>
         {(column) => (
-          <box flexDirection="column" gap={column.gap ?? BLOCK_GAP}>
+          <box flexDirection="column" gap={BLOCK_GAP}>
             <Blocks nodes={column.nodes} width={Math.min(props.width, column.width ?? props.width)} view={props.view} />
           </box>
         )}
@@ -268,7 +268,7 @@ function ColumnsView(props: {
       <box flexDirection="row" gap={props.gap} alignItems={props.center ? "center" : "flex-start"}>
         <For each={props.columns.map((column, index) => ({ column, index }))}>
           {(entry) => (
-            <box flexDirection="column" gap={entry.column.gap ?? BLOCK_GAP} width={widths()[entry.index]} flexShrink={0} minWidth={0}>
+            <box flexDirection="column" gap={BLOCK_GAP} width={widths()[entry.index]} flexShrink={0} minWidth={0}>
               <Blocks nodes={entry.column.nodes} width={widths()[entry.index] ?? 0} view={props.view} />
             </box>
           )}
