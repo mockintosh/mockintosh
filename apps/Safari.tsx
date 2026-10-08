@@ -7,7 +7,7 @@ import { AddressField, BACK_FORWARD_W, BackForward, HEADER_H, TOOLBAR_BUTTON_W, 
 import { goBack, goForward, replace, visit } from "./safari/history";
 import { backIcon, forwardIcon, plusIcon, shareIcon } from "./safari/icons";
 import { PageError, START_URL, pageRequest, type GithubAccount, type PageRequest, type WebPage } from "./safari/page";
-import { BOOKMARKS_KEY, addBookmark, bookmarkTitle, parseBookmarks, removeBookmark, serializeBookmarks, type Bookmark } from "./safari/bookmarks";
+import { BOOKMARKS_KEY, addBookmark, bookmarkTitle, moveBookmark, parseBookmarks, removeBookmark, serializeBookmarks, type Bookmark } from "./safari/bookmarks";
 import { faviconCache, type FaviconLoader } from "./safari/favicon";
 import { remoteImageLoader } from "./safari/remote";
 import { loadPage, readerApplies, type PageResult } from "./safari/router";
@@ -37,6 +37,8 @@ interface Favorites {
   editing(): boolean;
   setEditing(editing: boolean): void;
   remove(bookmark: Bookmark): void;
+  /** Put `bookmark` at `to` among the favorites. */
+  move(bookmark: Bookmark, to: number): void;
   /** Ask for an address and a name, and bookmark it. */
   add(): void;
   icons?: FaviconLoader;
@@ -143,6 +145,7 @@ function SafariView(props: SafariViewProps): JSX.Element {
                 onOpen={openLink}
                 onEditingChange={props.favorites.setEditing}
                 onDelete={props.favorites.remove}
+                onMove={props.favorites.move}
                 onAdd={props.favorites.add}
               />
             )}
@@ -344,6 +347,10 @@ function Safari(props: Record<string, unknown>): JSX.Element {
     remove: (bookmark) => {
       const current = bookmarks();
       if (current) saveBookmarks(removeBookmark(current, bookmark.url));
+    },
+    move: (bookmark, to) => {
+      const current = bookmarks();
+      if (current) saveBookmarks(moveBookmark(current, bookmark, to));
     },
     add: () => void addAddress(),
     icons,

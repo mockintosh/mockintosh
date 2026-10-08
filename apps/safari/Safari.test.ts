@@ -145,6 +145,43 @@ describe("Safari", () => {
     await expect(os.kernel.invoke(session(), "menu", { menu: "Bookmarks", item: "GitHub" })).rejects.toThrow();
   });
 
+  /** The favorites' names in the order the grid shows them: by row, then across. */
+  async function favoriteOrder(): Promise<string[]> {
+    return (await nodes())
+      .filter((n) => n.name?.startsWith("safari-favorite-") && n.role === "link")
+      .sort((a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x)
+      .map((n) => n.name!.slice("safari-favorite-".length));
+  }
+
+  async function drag(from: string, onto: string): Promise<void> {
+    const [a, b] = [(await node(from))!.bounds, (await node(onto))!.bounds];
+    const start = { x: a.x + a.width / 2, y: a.y + 20 };
+    const end = { x: b.x + b.width / 2, y: b.y + 20 };
+    platform.pointer({ type: "down", x: start.x, y: start.y });
+    for (let step = 1; step <= 8; step++) {
+      platform.pointer({ type: "move", x: start.x + ((end.x - start.x) * step) / 8, y: start.y + ((end.y - start.y) * step) / 8 });
+      await settle();
+    }
+    platform.pointer({ type: "up", x: end.x, y: end.y });
+    await settle();
+  }
+
+  it("rearranges favorites by dragging them while editing, and keeps the order", async () => {
+    const before = await favoriteOrder();
+    expect(before.slice(0, 3)).toEqual(["Mockintosh Docs", "Hacker News", "Wikipedia"]);
+    // Not editing, a drag opens nothing and moves nothing.
+    await drag("safari-favorite-Hacker News", "safari-favorite-Mockintosh Docs");
+    expect(await favoriteOrder()).toEqual(before);
+
+    await click("safari-favorites-edit");
+    await drag("safari-favorite-Wikipedia", "safari-favorite-Mockintosh Docs");
+    const after = await favoriteOrder();
+    expect(after.slice(0, 3)).toEqual(["Wikipedia", "Mockintosh Docs", "Hacker News"]);
+
+    await reopen();
+    expect(await favoriteOrder()).toEqual(after);
+  });
+
   it("bookmarks the page in front under the name given", async () => {
     const dialog = vi.spyOn(os.services, "showDialog").mockResolvedValueOnce("Orange site");
     await openBookmark("Hacker News");

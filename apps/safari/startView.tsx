@@ -1,6 +1,6 @@
 import { For, Show, createSignal, useApp } from "@mockintosh/sdk";
-import { createPress, type JSX } from "@mockintosh/ui";
-import type { Bookmark } from "./bookmarks";
+import { createPress, type CanvasNode, type JSX } from "@mockintosh/ui";
+import { moveBookmark, type Bookmark } from "./bookmarks";
 import { faviconUrl, type FaviconLoader } from "./favicon";
 import { deleteBadgeIcon, plusIcon, scaled } from "./icons";
 
@@ -31,6 +31,8 @@ export interface StartViewProps {
   onOpen(url: string): void;
   onEditingChange(editing: boolean): void;
   onDelete(bookmark: Bookmark): void;
+  /** While editing, a favorite dragged to a new place: it goes to `to` in the list. */
+  onMove?(bookmark: Bookmark, to: number): void;
   onAdd(): void;
 }
 
@@ -106,10 +108,21 @@ function TileLabel(props: { text: string; pressed: boolean }): JSX.Element {
   );
 }
 
+/** A favorite being dragged to a new place, while editing. */
+interface TileDrag {
+  onStart(bookmark: Bookmark): void;
+  onMove(bookmark: Bookmark, x: number, y: number): void;
+  onEnd(bookmark: Bookmark): void;
+}
+
 function FavoriteTile(props: {
   bookmark: Bookmark;
   editing: boolean;
+  /** Being dragged: drawn black, as a pressed tile. */
+  dragged: boolean;
   icons?: FaviconLoader;
+  drag: TileDrag;
+  node(node: CanvasNode): void;
   onOpen(url: string): void;
   onDelete(bookmark: Bookmark): void;
 }): JSX.Element {
@@ -120,18 +133,30 @@ function FavoriteTile(props: {
     },
     onClick: () => props.onOpen(props.bookmark.url),
   });
+  const dark = () => press.pressed() || props.dragged;
+  // While editing, a tile drags to a new place; the grid works out where.
   return (
     <box
       {...press.rootProps()}
+      ref={(node: CanvasNode) => props.node(node)}
       semantic={{ name: `safari-favorite-${props.bookmark.title}`, role: "link" }}
       cursor={props.editing ? undefined : "pointer"}
       width={TILE_W}
       flexDirection="column"
       alignItems="center"
       gap={4}
+      onDragStart={() => {
+        if (props.editing) props.drag.onStart(props.bookmark);
+      }}
+      onDrag={(_lx: number, _ly: number, x: number, y: number) => {
+        if (props.editing) props.drag.onMove(props.bookmark, x, y);
+      }}
+      onDragEnd={() => {
+        if (props.editing) props.drag.onEnd(props.bookmark);
+      }}
     >
-      <SiteIcon bookmark={props.bookmark} icons={props.icons} pressed={press.pressed()} />
-      <TileLabel text={props.bookmark.title} pressed={press.pressed()} />
+      <SiteIcon bookmark={props.bookmark} icons={props.icons} pressed={dark()} />
+      <TileLabel text={props.bookmark.title} pressed={dark()} />
       <Show when={props.editing}>
         <box
           semantic={{ name: `safari-favorite-delete-${props.bookmark.title}`, role: "button" }}
@@ -171,14 +196,53 @@ function AddTile(props: { onAdd(): void }): JSX.Element {
 /**
  * The start page as Safari draws it: "Favorites" over a grid of the
  * bookmarks, each the site's own icon in one bit inside a rounded square.
- * Edit puts a delete badge on each and an Add tile at the end.
+ * Edit puts a delete badge on each and an Add tile at the end, and lets a
+ * favorite be dragged to a new place: the others make room as it goes, and
+ * the order is kept when it's let go.
  */
 export function StartView(props: StartViewProps): JSX.Element {
   const columns = () => favoritesColumns(props.width);
   // One tile per bookmark for as long as it lives, so editing doesn't redraw every icon.
   const tileOf = new WeakMap<Bookmark, Tile>();
-  const tiles = (): Tile[] => {
+  const nodeOf = new Map<Bookmark, CanvasNode>();
+  /** The favorite being dragged, and where it would go. */
+  const [dragging, setDragging] = createSignal<{ bookmark: Bookmark; to: number } | null>(null);
+  /** The favorites in the order shown: while dragging, with the dragged one where it would go. */
+  const ordered = (): readonly Bookmark[] => {
     const bookmarks = props.bookmarks ?? [];
+    const drag = dragging();
+    return drag ? moveBookmark(bookmarks, drag.bookmark, drag.to) : bookmarks;
+  };
+  const drag: TileDrag = {
+    onStart(bookmark) {
+      const at = (props.bookmarks ?? []).indexOf(bookmark);
+      if (at >= 0) setDragging({ bookmark, to: at });
+    },
+    onMove(bookmark, x, y) {
+      // The place is the tile nearest the pointer, as laid out now.
+      let best = -1;
+      let bestDistance = Infinity;
+      ordered().forEach((shown, index) => {
+        const node = nodeOf.get(shown);
+        if (!node) return;
+        const cx = node.layout.x + node.layout.width / 2;
+        const cy = node.layout.y + FRAME / 2;
+        const distance = (x - cx) ** 2 + (y - cy) ** 2;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = index;
+        }
+      });
+      if (best >= 0 && best !== dragging()?.to) setDragging({ bookmark, to: best });
+    },
+    onEnd(bookmark) {
+      const drag = dragging();
+      setDragging(null);
+      if (drag && drag.bookmark === bookmark && (props.bookmarks ?? []).indexOf(bookmark) !== drag.to) props.onMove?.(bookmark, drag.to);
+    },
+  };
+  const tiles = (): Tile[] => {
+    const bookmarks = ordered();
     const out = bookmarks.map((bookmark) => {
       let tile = tileOf.get(bookmark);
       if (!tile) tileOf.set(bookmark, (tile = { kind: "bookmark", bookmark }));
@@ -216,6 +280,9 @@ export function StartView(props: StartViewProps): JSX.Element {
                     <FavoriteTile
                       bookmark={tile.bookmark}
                       editing={props.editing}
+                      dragged={dragging()?.bookmark === tile.bookmark}
+                      drag={drag}
+                      node={(node) => nodeOf.set(tile.bookmark, node)}
                       icons={props.icons}
                       onOpen={props.onOpen}
                       onDelete={props.onDelete}

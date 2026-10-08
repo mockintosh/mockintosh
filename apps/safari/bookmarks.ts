@@ -71,3 +71,11 @@ export function addBookmark(bookmarks: readonly Bookmark[], bookmark: Bookmark):
 export function removeBookmark(bookmarks: readonly Bookmark[], url: string): Bookmark[] {
   return bookmarks.filter((bookmark) => bookmark.url !== url);
 }
+
+/** `bookmark` taken out and put back at `to`, the others closing up around it. */
+export function moveBookmark(bookmarks: readonly Bookmark[], bookmark: Bookmark, to: number): Bookmark[] {
+  const rest = bookmarks.filter((existing) => existing !== bookmark);
+  if (rest.length === bookmarks.length) return [...bookmarks];
+  const at = Math.max(0, Math.min(rest.length, to));
+  return [...rest.slice(0, at), bookmark, ...rest.slice(at)];
+}

@@ -12,6 +12,7 @@ export interface PressRootProps {
   tabIndex: number | undefined;
   onMouseDown: () => void;
   onMouseUp: () => void;
+  onMouseEnter: () => void;
   onMouseLeave: () => void;
   onKeyDown: (key: string) => void;
 }
@@ -23,25 +24,42 @@ export interface Press {
 
 /**
  * Press tracking, Enter/Space, and button semantics. The skin owns the tree.
- * Fires `onClick` on mouseup (not click) so a double-click still counts twice.
+ * Fires `onClick` on mouseup (not click) so a double-click still counts twice,
+ * and only when the pointer is still over it, as the Mac's buttons do:
+ * dragging off one lets it go up, and back over it presses it again.
  */
 export function createPress(props: PressProps): Press {
   const [pressed, setPressed] = createSignal(false, { ownedWrite: true });
+  /** The button was pressed and the mouse hasn't come up yet. */
+  let held = false;
+  /** The pointer is over the button while it's held. */
+  let over = false;
 
   function activate(): void {
     if (!props.disabled) props.onClick();
   }
 
   function onMouseDown(): void {
-    if (!props.disabled) setPressed(true);
+    if (props.disabled) return;
+    held = true;
+    over = true;
+    setPressed(true);
   }
 
   function onMouseUp(): void {
+    const release = held && over;
+    held = false;
     setPressed(false);
-    activate();
+    if (release) activate();
+  }
+
+  function onMouseEnter(): void {
+    over = true;
+    if (held) setPressed(true);
   }
 
   function onMouseLeave(): void {
+    over = false;
     setPressed(false);
   }
 
@@ -56,6 +74,7 @@ export function createPress(props: PressProps): Press {
       tabIndex: props.disabled ? undefined : 0,
       onMouseDown,
       onMouseUp,
+      onMouseEnter,
       onMouseLeave,
       onKeyDown,
     }),
