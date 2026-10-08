@@ -551,6 +551,12 @@ export interface FetchRequest {
   method?: string;
   headers?: Record<string, string>;
   body?: string | Uint8Array;
+  /**
+   * How the browser's HTTP cache may answer, as `RequestInit.cache`.
+   * `"no-cache"` asks the server whether a cached copy is still current
+   * before using it, for state that may have just changed.
+   */
+  cache?: "default" | "no-store" | "reload" | "no-cache" | "force-cache";
 }
 
 /** The response surface apps may rely on — the portable subset of `Response`. */

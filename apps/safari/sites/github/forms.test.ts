@@ -19,6 +19,7 @@ interface Call {
   url: string;
   auth: string;
   body: Record<string, unknown> | null;
+  cache?: FetchRequest["cache"];
 }
 
 const ISSUE = { number: 5, title: "It broke", user: { login: "octocat" }, comments: 0, state: "open", body: "Steps", created_at: "2026-10-01T00:00:00Z" };
@@ -39,6 +40,7 @@ function fakeGithub(overrides: (call: Call) => FetchResponse | undefined = () =>
       url,
       auth: (options?.headers as Record<string, string> | undefined)?.Authorization ?? "",
       body: options?.body ? (JSON.parse(String(options.body)) as Record<string, unknown>) : null,
+      cache: options?.cache,
     };
     calls.push(call);
     const custom = overrides(call);
@@ -190,6 +192,10 @@ describe("GitHub stars", () => {
     const result = await loadPage(post("https://github.com/octocat/hello", { star: "star" }), context(fetch, "tok"));
     expect(calls.find((call) => call.method === "PUT")).toMatchObject({ url: "https://api.github.com/user/starred/octocat/hello", auth: "Bearer tok" });
     expect((await page(result)).url).toBe("https://github.com/octocat/hello/tree/main");
+    // The page after it asks GitHub afresh, not the browser's minute-old copy, so the count and the button are current.
+    const after = calls.slice(calls.findIndex((call) => call.method === "PUT") + 1);
+    expect(after.find((call) => call.url === "https://api.github.com/repos/octocat/hello")?.cache).toBe("no-cache");
+    expect(after.find((call) => call.url.endsWith("/user/starred/octocat/hello"))?.cache).toBe("no-cache");
   });
 
   it("fills the star once starred, and says what pressing it does", async () => {

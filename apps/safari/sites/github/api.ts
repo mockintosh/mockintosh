@@ -689,7 +689,7 @@ function starredPath(owner: string, repo: string): string {
 
 /** Has the signed-in user starred the repository? GitHub answers with a status, and no body. */
 async function isStarred(fetch: FetchFunction, token: string, owner: string, repo: string): Promise<boolean> {
-  const response = await fetch(`${API}${starredPath(owner, repo)}`, { headers: restHeaders(token) });
+  const response = await fetch(`${API}${starredPath(owner, repo)}`, { headers: restHeaders(token), cache: "no-cache" });
   if (response.status === 204) return true;
   if (response.status === 404) return false;
   throw new GithubError(`GitHub returned ${response.status}.`, response.status);
@@ -707,7 +707,9 @@ export async function setStarred(fetch: FetchFunction, token: string, owner: str
 async function gh(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<unknown> {
   const headers = restHeaders(token);
   if (json !== undefined) headers["Content-Type"] = "application/json";
-  const response = await fetch(`${API}${path}`, json === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(json) });
+  // GitHub lets browsers keep its answers for a minute: ask it whether they're current, so a star, an issue or a
+  // comment just made shows at once. An unchanged answer costs a 304, which doesn't count against the rate limit.
+  const response = await fetch(`${API}${path}`, json === undefined ? { headers, cache: "no-cache" } : { method: "POST", headers, body: JSON.stringify(json) });
   if (response.status === 404) throw new GithubError("Not found on GitHub.", 404);
   if (!response.ok) {
     const detail = await errorMessage(response);
