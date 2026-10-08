@@ -306,7 +306,6 @@ function homePage(repos: readonly ProfileRepo[] | null): DocumentPage {
     });
     examples.push(text("."));
     nodes.push(
-      heading(1, "GitHub"),
       paragraph(text("Search GitHub above, or type owner/repo there to go straight to a repository.")),
       paragraph(...examples),
     );
