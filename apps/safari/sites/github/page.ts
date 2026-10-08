@@ -14,6 +14,7 @@ import {
   type DiscussionInfo,
   type GithubPage,
   type IssueInfo,
+  type CalendarWeek,
   type ProfileExtras,
   type ProfileRepo,
   type RepoContributions,
@@ -520,52 +521,88 @@ function overviewMain(page: Extract<GithubPage, { view: "profile" }>, now: numbe
     }
     return nodes;
   }
-  if (extras.calendar) {
-    const total = extras.calendar.total;
-    nodes.push(
-      heading(2, `${formatCount(total)} ${total === 1 ? "contribution" : "contributions"} in the last year`),
-      { type: "box", nodes: [contributionGraph(extras.calendar.weeks)] },
-    );
-  }
+  if (extras.calendar && extras.calendar.weeks.length > 0) nodes.push(...contributionCalendar(extras.calendar.total, extras.calendar.weeks));
   if (extras.activity) nodes.push(...activityNodes(extras.activity, now));
   return nodes;
 }
 
-/** Pixels per day square, and between squares: a year is 264 pixels across. */
-const DAY = 4;
-const DAY_GAP = 1;
+/** Pixels per day square, and between squares. */
+const DAY = 8;
+const DAY_GAP = 2;
+const WEEK = DAY + DAY_GAP;
+
+/** Is (x, y) on the edge of a day's square? */
+function onEdge(x: number, y: number): boolean {
+  return x === 0 || y === 0 || x === DAY - 1 || y === DAY - 1;
+}
 
 /**
- * A day's square at each level, none to most, in the Mac's own grays: more
- * ink for more contributions, as github.com deepens its green. A day with
- * none keeps a dot, so the grid still shows.
+ * A day's square at each level, none to most. A day without contributions
+ * is a dotted outline; a day with some is outlined solid and filled with
+ * the Mac's grays, deeper for more, as github.com deepens its green.
  */
-const DAY_SQUARES: readonly (readonly string[])[] = [
-  ["....", "....", ".#..", "...."],
-  ["#.#.", "....", "#.#.", "...."],
-  ["#.#.", ".#.#", "#.#.", ".#.#"],
-  ["####", ".#.#", "####", ".#.#"],
-  ["####", "####", "####", "####"],
+const DAY_INK: readonly ((x: number, y: number) => boolean)[] = [
+  (x, y) => onEdge(x, y) && (x + y) % 2 === 0,
+  (x, y) => onEdge(x, y) || (x % 4 === 1 && y % 4 === 1) || (x % 4 === 3 && y % 4 === 3),
+  (x, y) => onEdge(x, y) || (x + y) % 2 === 0,
+  (x, y) => onEdge(x, y) || !(x % 2 === 1 && y % 2 === 0),
+  () => true,
 ];
 
-/** The year's contributions as github.com draws them: a column per week, Sunday at the top. */
-export function contributionGraph(weeks: readonly (readonly number[])[]): LayoutNode {
-  const step = DAY + DAY_GAP;
-  const width = Math.max(1, weeks.length * step - DAY_GAP);
-  const height = 7 * step - DAY_GAP;
+/** Weeks as github.com draws them: a column per week, Sunday at the top. */
+export function contributionGraph(weeks: readonly CalendarWeek[]): LayoutNode {
+  const width = Math.max(1, weeks.length * WEEK - DAY_GAP);
+  const height = 7 * WEEK - DAY_GAP;
   const data = new Uint8Array(width * height);
   weeks.forEach((week, column) => {
-    week.forEach((level, row) => {
-      const square = DAY_SQUARES[level];
-      if (!square) return;
+    week.levels.forEach((level, row) => {
+      const ink = DAY_INK[level];
+      if (!ink) return;
       for (let y = 0; y < DAY; y++) {
         for (let x = 0; x < DAY; x++) {
-          if (square[y][x] === "#") data[(row * step + y) * width + column * step + x] = 1;
+          if (ink(x, y)) data[(row * WEEK + y) * width + column * WEEK + x] = 1;
         }
       }
     });
   });
   return { type: "bitmap", width, height, data, alt: "Contribution graph" };
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** A month needs this many weeks over it for its name to fit. */
+const LABELLED_WEEKS = 3;
+
+/** The months over the weeks, each name over the weeks that start in it, as github.com labels its calendar. */
+function monthRow(weeks: readonly CalendarWeek[]): LayoutNode {
+  const runs: { month: number; weeks: number }[] = [];
+  for (const week of weeks) {
+    const month = Number(week.firstDay.slice(5, 7)) - 1;
+    const last = runs[runs.length - 1];
+    if (last && last.month === month) last.weeks++;
+    else runs.push({ month, weeks: 1 });
+  }
+  return {
+    type: "columns",
+    gap: 0,
+    minWidth: 0,
+    columns: runs.map((run) => ({
+      width: run.weeks * WEEK,
+      nodes: run.weeks >= LABELLED_WEEKS ? [paragraph(text(MONTH_NAMES[run.month] ?? ""))] : [],
+    })),
+  };
+}
+
+/**
+ * The contribution calendar: the whole year in a pane that scrolls
+ * sideways, opened on the latest weeks, with the months over them.
+ */
+export function contributionCalendar(total: number, weeks: readonly CalendarWeek[]): LayoutNode[] {
+  const graph = contributionGraph(weeks);
+  const width = weeks.length * WEEK - DAY_GAP;
+  return [
+    heading(2, `${plural(total, "contribution", "contributions")} in the last year`),
+    { type: "box", nodes: [{ type: "scroller", width, start: "end", nodes: [monthRow(weeks), graph] }] },
+  ];
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

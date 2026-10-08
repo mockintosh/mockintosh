@@ -91,5 +91,11 @@ export type LayoutNode =
    * where the page is narrower: `data` is row by row, 1 for ink, 0 for paper.
    */
   | { type: "bitmap"; width: number; height: number; data: Uint8Array; alt: string }
+  /**
+   * Content `width` wide in a pane as wide as the page, which scrolls
+   * sideways when the content is wider: drag it, or its bar. `start: "end"`
+   * opens it scrolled all the way right, for the latest end of a timeline.
+   */
+  | { type: "scroller"; width: number; nodes: LayoutNode[]; start?: "start" | "end" }
   | { type: "spacer"; height: number }
   | { type: "br" };

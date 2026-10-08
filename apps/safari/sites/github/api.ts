@@ -111,6 +111,16 @@ export interface RepoContributions {
   count: number;
 }
 
+/** A week of the contribution calendar, Sunday first. */
+export interface CalendarWeek {
+  /** The week's first day, `YYYY-MM-DD`. */
+  firstDay: string;
+  /** Each day's level, 0 (none) to 4, or -1 before the calendar starts or after today. */
+  levels: number[];
+  /** Each day's contributions, 0 where there is no day. */
+  counts: number[];
+}
+
 /**
  * What a profile shows only to someone signed in: GitHub's GraphQL API
  * alone has it, and that API always needs a token.
@@ -119,8 +129,8 @@ export interface ProfileExtras {
   pinned: ProfileRepo[];
   /** The status message a person set; empty when none (and for organizations). */
   status: string;
-  /** The last year, a week per column, each day's level 0 (none) to 4, or -1 before the first day or after today. Null for organizations. */
-  calendar: { total: number; weeks: number[][] } | null;
+  /** The last year, oldest week first. Null for organizations. */
+  calendar: { total: number; weeks: CalendarWeek[] } | null;
   /** This month so far. Null for organizations. */
   activity: { commits: RepoContributions[]; pulls: RepoContributions[]; issues: RepoContributions[] } | null;
 }
@@ -252,7 +262,9 @@ async function getProfileExtras(fetch: FetchFunction, token: string, login: stri
       ... on ProfileOwner { pinnedItems(first: 6, types: [REPOSITORY]) { nodes { ... on Repository { ${PROFILE_REPO_FIELDS} } } } }
       ... on User {
         status { message }
-        year: contributionsCollection { contributionCalendar { totalContributions weeks { contributionDays { weekday contributionLevel } } } }
+        year: contributionsCollection {
+          contributionCalendar { totalContributions weeks { firstDay contributionDays { weekday contributionCount contributionLevel } } }
+        }
         month: contributionsCollection(from: $from) {
           commitContributionsByRepository(maxRepositories: 5) { ${CONTRIBUTED_REPO} }
           pullRequestContributionsByRepository(maxRepositories: 5) { ${CONTRIBUTED_REPO} }
@@ -266,14 +278,17 @@ async function getProfileExtras(fetch: FetchFunction, token: string, login: stri
   const pinned = Array.isArray(pins) ? pins.map((node) => graphqlRepo(asRecord(node))) : [];
   const calendar = asRecord(asRecord(owner.year).contributionCalendar);
   const weeks = Array.isArray(calendar.weeks)
-    ? calendar.weeks.map((week) => {
-      const days = Array<number>(7).fill(-1);
+    ? calendar.weeks.map((week): CalendarWeek => {
+      const levels = Array<number>(7).fill(-1);
+      const counts = Array<number>(7).fill(0);
       const list = asRecord(week).contributionDays;
       for (const day of Array.isArray(list) ? list : []) {
         const record = asRecord(day);
-        days[numberField(record, "weekday")] = LEVELS[stringField(record, "contributionLevel")] ?? 0;
+        const weekday = numberField(record, "weekday");
+        levels[weekday] = LEVELS[stringField(record, "contributionLevel")] ?? 0;
+        counts[weekday] = numberField(record, "contributionCount");
       }
-      return days;
+      return { firstDay: stringField(asRecord(week), "firstDay"), levels, counts };
     })
     : null;
   const month = asRecord(owner.month);

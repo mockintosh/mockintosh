@@ -69,7 +69,7 @@ function fakeGithub(overrides: (call: Call) => FetchResponse | undefined = () =>
         return reply({ data: { repositoryOwner: {
           pinnedItems: { nodes: [{ name: "hello", owner: { login: "octocat" }, stargazerCount: 3, forkCount: 0, isFork: false }] },
           status: { message: "Shipping" },
-          year: { contributionCalendar: { totalContributions: 699, weeks: [{ contributionDays: [{ weekday: 0, contributionLevel: "FOURTH_QUARTILE" }] }] } },
+          year: { contributionCalendar: { totalContributions: 699, weeks: [{ firstDay: "2026-10-04", contributionDays: [{ weekday: 0, contributionCount: 12, contributionLevel: "FOURTH_QUARTILE" }] }] } },
           month: {
             commitContributionsByRepository: [{ repository: { name: "hello", owner: { login: "octocat" } }, contributions: { totalCount: 39 } }],
             pullRequestContributionsByRepository: [],
@@ -116,6 +116,7 @@ function texts(nodes: readonly LayoutNode[]): string {
       if (node.type === "paragraph" || node.type === "listItem") return node.segments.map((segment) => segment.text).join("");
       if (node.type === "columns") return node.columns.map((column) => texts(column.nodes)).join("\n");
       if (node.type === "box") return texts(node.nodes);
+      if (node.type === "scroller") return texts(node.nodes);
       return "";
     })
     .join("\n");

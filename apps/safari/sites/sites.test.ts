@@ -3,7 +3,7 @@ import { parseUrl, type LayoutNode } from "@mockintosh/sdk";
 import { hnText, parseHackerNewsUrl } from "./hackernews";
 import { scaled } from "../icons";
 import { microDesktopError, mockintoshSite } from "./mockintosh";
-import { avatarSrc, contributionGraph, githubPage, githubUrl, resolveRelative } from "./github/page";
+import { avatarSrc, contributionCalendar, contributionGraph, githubPage, githubUrl, resolveRelative } from "./github/page";
 import { adapterFor } from "./index";
 import { docsPage, docsSite } from "./docs/site";
 import { DOCS_PAGES } from "./docs/pages";
@@ -114,18 +114,40 @@ describe("GitHub pages", () => {
     expect(links((main!.nodes[1] as { nodes: LayoutNode[] }).nodes)).toEqual(["https://github.com/octocat/Spoon-Knife"]);
   });
 
-  it("draws the contribution graph a week per column, Sunday on top, more ink for more contributions", () => {
-    const graph = contributionGraph([[-1, -1, 0, 1, 2, 3, 4], [4, -1, -1, -1, -1, -1, -1]]);
+  it("draws the contribution graph a week per column, Sunday on top: empty days dotted, the rest outlined and filled deeper", () => {
+    const week = (levels: number[]) => ({ firstDay: "2026-10-04", levels, counts: levels.map((level) => Math.max(0, level)) });
+    const graph = contributionGraph([week([-1, -1, 0, 1, 2, 3, 4]), week([4, -1, -1, -1, -1, -1, -1])]);
     if (graph.type !== "bitmap") throw new Error("not a bitmap");
-    expect([graph.width, graph.height]).toEqual([9, 34]);
+    expect([graph.width, graph.height]).toEqual([18, 68]);
     const ink = (column: number, row: number) => {
       let count = 0;
-      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) count += graph.data[(row * 5 + y) * graph.width + column * 5 + x];
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) count += graph.data[(row * 10 + y) * graph.width + column * 10 + x];
       return count;
     };
-    expect([0, 1, 2, 3, 4, 5, 6].map((row) => ink(0, row))).toEqual([0, 0, 1, 4, 8, 12, 16]);
-    expect(ink(1, 0)).toBe(16);
-    expect(ink(1, 1)).toBe(0);
+    const levels = [0, 1, 2, 3, 4, 5, 6].map((row) => ink(0, row));
+    expect(levels.slice(0, 3)).toEqual([0, 0, 14]);
+    expect(levels[3]).toBeGreaterThan(28);
+    expect(levels[3]).toBeLessThan(levels[4]);
+    expect(levels[4]).toBeLessThan(levels[5]);
+    expect(levels[6]).toBe(64);
+    expect(ink(1, 0)).toBe(64);
+  });
+
+  it("puts the whole year under month names in a pane scrolled to the latest weeks", () => {
+    const weeks = Array.from({ length: 53 }, (_, index) => {
+      const day = new Date(Date.UTC(2025, 9, 5 + index * 7)).toISOString().slice(0, 10);
+      return { firstDay: day, levels: [1, 0, 0, 0, 0, 0, 0], counts: [1, 0, 0, 0, 0, 0, 0] };
+    });
+    const [title, box] = contributionCalendar(677, weeks);
+    expect(title).toMatchObject({ type: "heading", text: "677 contributions in the last year" });
+    const scroller = box!.type === "box" ? box.nodes[0] : null;
+    if (scroller?.type !== "scroller") throw new Error("no scroller");
+    expect(scroller).toMatchObject({ width: 528, start: "end" });
+    const [months, graph] = scroller.nodes;
+    expect(graph).toMatchObject({ type: "bitmap", width: 528 });
+    if (months?.type !== "columns") throw new Error("no month row");
+    const names = months.columns.flatMap((column) => column.nodes.map((node) => (node.type === "paragraph" ? node.segments[0]!.text : "")));
+    expect(names).toEqual(["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"]);
   });
 
   it("leaves out avatars it can't load", () => {

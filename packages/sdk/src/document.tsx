@@ -100,6 +100,9 @@ function Block(props: BlockProps): JSX.Element {
       </box>
     );
   }
+  if (node.type === "scroller") {
+    return <ScrollerView node={node} width={props.width} view={props.view} />;
+  }
   if (node.type === "spacer") {
     return <box height={node.height} />;
   }
@@ -114,6 +117,74 @@ function Block(props: BlockProps): JSX.Element {
     return <ColumnsView columns={node.columns} gap={node.gap} minWidth={node.minWidth} center={node.center ?? false} width={props.width} view={props.view} />;
   }
   return <box height={6} />;
+}
+
+/** Height of a scroller's bar. */
+const SCROLLER_BAR = 7;
+/** The bar's thumb is never narrower than this. */
+const SCROLLER_THUMB = 16;
+
+/**
+ * A pane that scrolls its content sideways: drag the content, or the
+ * thumb on the bar under it, or click the bar to jump. The offset is the
+ * view's own, since a document has no window scroll bar to give it.
+ */
+function ScrollerView(props: { node: Extract<LayoutNode, { type: "scroller" }>; width: number; view: DocumentViewProps }): JSX.Element {
+  const node = props.node;
+  const visible = () => Math.max(1, Math.min(node.width, props.width));
+  const max = () => Math.max(0, node.width - visible());
+  /** Null until the reader moves it: then it stays where they put it, whatever the width does. */
+  const [moved, setMoved] = createSignal<number | null>(null);
+  const offset = () => {
+    const at = moved();
+    return Math.max(0, Math.min(max(), at ?? (node.start === "end" ? max() : 0)));
+  };
+  const thumb = () => Math.max(SCROLLER_THUMB, Math.floor((visible() * visible()) / Math.max(1, node.width)));
+  const thumbX = () => Math.floor(((visible() - thumb()) * offset()) / Math.max(1, max()));
+  let grab: { x: number; offset: number } | null = null;
+  const startDrag = (globalX: number) => (grab = { x: globalX, offset: offset() });
+  const pan = (globalX: number) => {
+    if (grab) setMoved(grab.offset - (globalX - grab.x));
+  };
+  const slide = (globalX: number) => {
+    if (grab) setMoved(grab.offset + ((globalX - grab.x) * max()) / Math.max(1, visible() - thumb()));
+  };
+  return (
+    <box flexDirection="column" gap={3}>
+      <box
+        width={visible()}
+        overflow="scroll"
+        scrollOffsetX={offset()}
+        onDragStart={(_x, _y, globalX) => startDrag(globalX)}
+        onDrag={(_x, _y, globalX) => pan(globalX)}
+        onDragEnd={() => (grab = null)}
+      >
+        <box width={node.width} flexDirection="column" gap={BLOCK_GAP}>
+          <Blocks nodes={node.nodes} width={node.width} view={props.view} />
+        </box>
+      </box>
+      <Show when={max() > 0}>
+        <box
+          width={visible()}
+          height={SCROLLER_BAR}
+          borderColor={1}
+          onClick={(x) => setMoved(((x - thumb() / 2) * max()) / Math.max(1, visible() - thumb()))}
+        >
+          <box
+            position="absolute"
+            left={thumbX()}
+            top={0}
+            width={thumb()}
+            height={SCROLLER_BAR - 2}
+            background={1}
+            onDragStart={(_x, _y, globalX) => startDrag(globalX)}
+            onDrag={(_x, _y, globalX) => slide(globalX)}
+            onDragEnd={() => (grab = null)}
+          />
+        </box>
+      </Show>
+    </box>
+  );
 }
 
 function Blocks(props: { nodes: readonly LayoutNode[]; width: number; view: DocumentViewProps }): JSX.Element {
