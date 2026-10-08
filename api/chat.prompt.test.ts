@@ -10,7 +10,7 @@ describe("chat prompt prefix", () => {
 });
 
 describe("reasoningEffortForRequest", () => {
-  const completions = "https://api.openai.com/v1/chat/completions";
+  const completions = "https://ai-gateway.vercel.sh/v1/chat/completions";
 
   it("forces none when tools ride on chat completions", () => {
     expect(reasoningEffortForRequest({
@@ -19,6 +19,15 @@ describe("reasoningEffortForRequest", () => {
       toolCount: 3,
       apiUrl: completions,
     })).toBe("none");
+  });
+
+  it("recognises a gateway model id", () => {
+    expect(reasoningEffortForRequest({
+      model: "openai/gpt-5.6-sol",
+      thinking: "high",
+      toolCount: 0,
+      apiUrl: completions,
+    })).toBe("high");
   });
 
   it("keeps the requested effort when there are no tools", () => {

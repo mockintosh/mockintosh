@@ -21,7 +21,7 @@ function loadEnvLocal() {
     }
   } catch {
     console.warn(
-      "No .env.local found — LLM_API_KEY must be set in environment"
+      "No .env.local found — run `vercel env pull`, or set AI_GATEWAY_API_KEY in the environment"
     );
   }
 }
@@ -125,18 +125,17 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  const keySet =
-    !!process.env.LLM_API_KEY &&
-    process.env.LLM_API_KEY !== "sk-...your-key-here...";
+  const auth = process.env.AI_GATEWAY_API_KEY
+    ? "AI_GATEWAY_API_KEY"
+    : process.env.VERCEL_OIDC_TOKEN
+      ? "VERCEL_OIDC_TOKEN (expires 12 hours after `vercel env pull`)"
+      : null;
   console.log(`API server listening on http://localhost:${PORT}`);
-  console.log(`  LLM_MODEL: ${process.env.LLM_MODEL || "gpt-5.6-sol"}`);
-  console.log(
-    `  LLM_API_KEY: ${
-      keySet ? "configured" : "NOT SET — ChatGippity will return errors"
-    }`
-  );
-  if (!keySet) {
-    console.log("\n  Set your LLM key in .env.local:");
-    console.log("    LLM_API_KEY=sk-...");
+  console.log(`  LLM_MODEL: ${process.env.LLM_MODEL || "openai/gpt-5.6-sol"}`);
+  console.log(`  AI Gateway: ${auth ?? "NOT CONFIGURED — ChatGippity will return errors"}`);
+  if (!auth) {
+    console.log("\n  Link the project and pull its OIDC token:");
+    console.log("    vercel link && vercel env pull");
+    console.log("  or set AI_GATEWAY_API_KEY in .env.local.");
   }
 });
