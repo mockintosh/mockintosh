@@ -191,7 +191,15 @@ function MenuView(props: { node: Extract<LayoutNode, { type: "menu" }>; view: Do
         items={node.items.map((entry) => ({ label: entry.label, onClick: () => choose(entry) }))}
         trigger={
           <box cursor="pointer" semantic={{ name: `${node.label} menu`, role: "button" }} onClick={() => setOpen(!open())}>
-            <text font="body" nowrap runs={[{ text: node.label, underline: true }]} />
+            <Show when={node.image} fallback={<text font="body" nowrap runs={[{ text: node.label, underline: true }]} />}>
+              {(image) => (
+                <ImageView
+                  node={{ type: "image", src: image().src, alt: node.label, align: "left", width: image().size, height: image().size, borderRadius: image().size / 2 }}
+                  width={image().size}
+                  view={props.view}
+                />
+              )}
+            </Show>
           </box>
         }
       />

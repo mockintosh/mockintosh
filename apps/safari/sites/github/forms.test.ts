@@ -392,4 +392,15 @@ describe("GitHub forms", () => {
     });
     expect(calls.filter((call) => call.url === "https://api.github.com/user")).toHaveLength(1);
   });
+
+  it("opens the account menu from the avatar, 16 pixels round, when GitHub gives one", async () => {
+    const { fetch } = fakeGithub((call) => (call.url === "https://api.github.com/user" ? reply({ login: "octocat", avatar_url: "https://avatars.githubusercontent.com/u/583231?v=4" }) : undefined));
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "avatar-token")));
+    const header = shown.nodes[0];
+    if (header?.type !== "columns") throw new Error("no header");
+    expect(header.columns[3]).toMatchObject({
+      width: 16,
+      nodes: [{ type: "menu", label: "octocat", image: { src: "https://avatars.githubusercontent.com/u/583231?v=4&s=16", size: 16 } }],
+    });
+  });
 });

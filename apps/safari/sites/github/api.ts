@@ -492,8 +492,16 @@ export async function listViewerRepos(fetch: FetchFunction, token: string): Prom
 }
 
 /** The login the token belongs to. */
-export async function getViewer(fetch: FetchFunction, token: string): Promise<string> {
-  return stringField(asRecord(await gh(fetch, token, "/user")), "login");
+/** Who a token signs in as. */
+export interface Viewer {
+  login: string;
+  /** `avatars.githubusercontent.com` URL; empty when the API gave none. */
+  avatarUrl: string;
+}
+
+export async function getViewer(fetch: FetchFunction, token: string): Promise<Viewer> {
+  const user = asRecord(await gh(fetch, token, "/user"));
+  return { login: stringField(user, "login"), avatarUrl: stringField(user, "avatar_url") };
 }
 
 /** Opens an issue; resolves with its number. */

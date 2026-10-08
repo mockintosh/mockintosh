@@ -7,6 +7,7 @@ import {
   createDiscussion,
   createIssue,
   getViewer,
+  type Viewer,
   setStarred,
   listViewerRepos,
   loadPage,
@@ -94,7 +95,7 @@ function returnLocation(returnTo: string): GithubLocation {
 async function loadLocation(location: GithubLocation, context: SiteContext, state: FormState): Promise<DocumentPage> {
   const viewer = context.settings.githubToken ? viewerOf(context) : Promise.resolve(null);
   if (location.kind === "login" || location.kind === "logout") {
-    return withHeader(loginPage(location.returnTo, await viewer, !!context.github), null, false);
+    return withHeader(loginPage(location.returnTo, (await viewer)?.login ?? null, !!context.github), null, false);
   }
   const [who, page] = await Promise.all([viewer, loadBody(location, context, state)]);
   return withHeader(page, who);
@@ -126,17 +127,17 @@ async function topRepos(context: SiteContext): Promise<ProfileRepo[]> {
   }
 }
 
-/** Logins by token, so the header asks GitHub once rather than on every page. */
-const viewers = new Map<string, Promise<string>>();
+/** Who each token is, so the header asks GitHub once rather than on every page. */
+const viewers = new Map<string, Promise<Viewer>>();
 
-/** Whose the token is, or empty when GitHub won't say (expired, revoked, offline). */
-function viewerOf(context: SiteContext): Promise<string> {
+/** Whose the token is, with an empty login when GitHub won't say (expired, revoked, offline). */
+function viewerOf(context: SiteContext): Promise<Viewer> {
   const token = context.settings.githubToken;
   let viewer = viewers.get(token);
   if (!viewer) {
     viewer = getViewer(context.fetch, token).catch(() => {
       viewers.delete(token);
-      return "";
+      return { login: "", avatarUrl: "" };
     });
     viewers.set(token, viewer);
   }
@@ -173,16 +174,17 @@ function crumbs(url: string): LayoutNode[] {
  * The band across the top of every GitHub page, as on github.com: the home
  * link and where the page is, "Search or jump to…" and the account in the
  * corner, then the page's tabs, ruled off from the page. `viewer` is the
- * signed-in login (empty when GitHub won't say whose the token is), or
- * null when signed out. The sign-in page leaves the corner empty: it is
- * the account page.
+ * signed-in account (its login empty when GitHub won't say whose the
+ * token is), or null when signed out. The sign-in page leaves the corner
+ * empty: it is the account page.
  */
-function withHeader(page: GithubDocument, viewer: string | null, account = true): DocumentPage {
+function withHeader(page: GithubDocument, viewer: Viewer | null, account = true): DocumentPage {
   const corner: LayoutNode[] = !account
     ? []
     : viewer === null
       ? [buttonForm({ kind: "login", returnTo: page.url }, "Sign In")]
       : [accountMenu(viewer, page.url)];
+  const avatar = corner[0]?.type === "menu" && corner[0].image !== undefined;
   const search: LayoutNode = {
     type: "form",
     form: { action: "https://github.com/search", method: "get", controls: [{ kind: "text", name: "q", value: "", placeholder: "Search or jump to…" }] },
@@ -197,7 +199,7 @@ function withHeader(page: GithubDocument, viewer: string | null, account = true)
       { width: MARK_SIZE, nodes: [mark] },
       { nodes: crumbs(page.url) },
       { width: SEARCH_WIDTH, nodes: [search] },
-      { width: account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
+      { width: avatar ? HEADER_AVATAR : account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
     ],
   };
   const { nav, ...rest } = page;
@@ -235,12 +237,17 @@ function spaceSections(nodes: readonly LayoutNode[]): LayoutNode[] {
   });
 }
 
+/** The signed-in account's avatar in the header, round, opening its menu. */
+const HEADER_AVATAR = 16;
+
 /**
- * The signed-in corner, as github.com's avatar menu: their profile,
- * repositories and stars, and Sign out, which comes back to `here`.
- * `viewer` is empty when GitHub wouldn't say whose the token is.
+ * The signed-in corner, as github.com's avatar menu: their avatar opens
+ * their profile, repositories and stars, and Sign out, which comes back to
+ * `here`. The login stands in when there's no avatar, and its login is
+ * empty when GitHub wouldn't say whose the token is.
  */
-function accountMenu(viewer: string, here: string): LayoutNode {
+function accountMenu(account: Viewer, here: string): LayoutNode {
+  const viewer = account.login;
   const signOut = buttonForm({ kind: "logout", returnTo: here }, "Sign out");
   const items: MenuEntry[] = viewer
     ? [
@@ -250,7 +257,9 @@ function accountMenu(viewer: string, here: string): LayoutNode {
     ]
     : [{ label: "Account", href: githubUrl({ kind: "login", returnTo: here }) }];
   if (signOut.type === "form") items.push({ label: "Sign out", form: signOut.form });
-  return { type: "menu", label: viewer || "Account", items, align: "right" };
+  const avatar = viewer ? avatarSrc(account.avatarUrl, HEADER_AVATAR) : "";
+  const menu: LayoutNode = { type: "menu", label: viewer || "Account", items, align: "right" };
+  return avatar ? { ...menu, image: { src: avatar, size: HEADER_AVATAR } } : menu;
 }
 
 /** Where a form posts, and the page that shows the form again if GitHub refuses it. */
@@ -779,11 +788,11 @@ function profilePage(page: Extract<GithubPage, { view: "profile" }>, now: number
 /** Avatar size asked of GitHub, in pixels; Safari dithers what comes back. */
 const AVATAR_SIZE = SIDEBAR;
 
-/** The avatar at {@link AVATAR_SIZE} (`s=`), or "" when there is none to load. */
-export function avatarSrc(avatarUrl: string): string {
+/** The avatar at `size` pixels (`s=`, {@link AVATAR_SIZE} by default), or "" when there is none to load. */
+export function avatarSrc(avatarUrl: string, size = AVATAR_SIZE): string {
   const url = parseUrl(avatarUrl);
   if (!url || url.scheme !== "https") return "";
-  const query = [...url.query.split("&").filter((pair) => pair && !pair.startsWith("s=")), `s=${AVATAR_SIZE}`].join("&");
+  const query = [...url.query.split("&").filter((pair) => pair && !pair.startsWith("s=")), `s=${size}`].join("&");
   return formatUrl({ ...url, query });
 }
 
