@@ -534,7 +534,7 @@ function overviewMain(page: Extract<GithubPage, { view: "profile" }>, now: numbe
   const { profile, extras } = page;
   const pinned = extras?.pinned ?? [];
   const repos = pinned.length > 0 ? pinned : page.repos;
-  const nodes: LayoutNode[] = [heading(2, pinned.length > 0 ? "Pinned" : "Popular repositories")];
+  const nodes: LayoutNode[] = [SECTION_BREAK, heading(2, pinned.length > 0 ? "Pinned" : "Popular repositories")];
   nodes.push(...(repos.length > 0 ? repos.map((repo) => repoCard(repo, profile.login)) : [paragraph(text("No public repositories."))]));
   if (profile.kind === "Organization") return nodes;
   if (!extras) {
@@ -552,7 +552,7 @@ function overviewMain(page: Extract<GithubPage, { view: "profile" }>, now: numbe
 }
 
 /** Space between the Overview's sections, and between the groups of its activity. */
-const SECTION_BREAK: LayoutNode = { type: "spacer", height: 12 };
+const SECTION_BREAK: LayoutNode = { type: "spacer", height: 8 };
 const GROUP_BREAK: LayoutNode = { type: "spacer", height: 6 };
 
 /** Pixels per day square, and between squares. */
