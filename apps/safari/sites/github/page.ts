@@ -174,8 +174,11 @@ function withHeader(page: DocumentPage, viewer: string | null, account = true): 
       { width: account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
     ],
   };
-  return { ...page, nodes: [header, { type: "hr" }, ...spaceSections(page.nodes)] };
+  return { ...page, nodes: [header, { type: "hr" }, HEADER_SPACE, ...spaceSections(page.nodes)] };
 }
+
+/** Room under the header's rule, on every page. */
+const HEADER_SPACE: LayoutNode = { type: "spacer", height: 4 };
 
 /** Space over a section's heading, on top of the page's usual gap, so sections stand apart. */
 const SECTION_SPACE: LayoutNode = { type: "spacer", height: 8 };
