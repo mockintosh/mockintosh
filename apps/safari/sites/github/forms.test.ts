@@ -120,6 +120,7 @@ function texts(nodes: readonly LayoutNode[]): string {
       if (node.type === "columns") return node.columns.map((column) => texts(column.nodes)).join("\n");
       if (node.type === "box") return texts(node.nodes);
       if (node.type === "scroller") return texts(node.nodes);
+      if (node.type === "tabs") return node.items.map((tab) => tab.label).join("\n");
       return "";
     })
     .join("\n");
@@ -150,7 +151,7 @@ describe("GitHub repositories", () => {
   it("heads a repository with where it is, then its tabs over a rule, and puts About beside the files", async () => {
     const { fetch } = fakeGithub();
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")));
-    const [header, nav, rule] = shown.nodes;
+    const [header, nav] = shown.nodes;
     if (header?.type !== "columns") throw new Error("no header");
     expect(header.columns[1]!.nodes).toEqual([
       {
@@ -163,8 +164,17 @@ describe("GitHub repositories", () => {
         ],
       },
     ]);
-    expect(nav).toMatchObject({ type: "paragraph", segments: expect.arrayContaining([{ kind: "bold", text: "Code" }]) });
-    expect(rule).toEqual({ type: "hr" });
+    // The tabs draw the rule under them themselves, the current one marked on it.
+    expect(nav).toEqual({
+      type: "tabs",
+      items: [
+        { label: "Code", href: "https://github.com/octocat/hello/tree/main", current: true },
+        { label: "Issues", href: "https://github.com/octocat/hello/issues", current: false },
+        { label: "Pull requests", href: "https://github.com/octocat/hello/pulls", current: false },
+        { label: "Discussions", href: "https://github.com/octocat/hello/discussions", current: false },
+      ],
+    });
+    expect(shown.nodes.some((node) => node.type === "hr")).toBe(false);
     // The name and its Star button, then the files beside About.
     const columns = shown.nodes.filter((node) => node.type === "columns" && node !== header);
     const [title, body] = columns;

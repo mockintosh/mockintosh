@@ -63,6 +63,13 @@ export interface BitmapTip {
   label: string;
 }
 
+/** One tab of a `tabs` row. */
+export interface PageTab {
+  label: string;
+  href: string;
+  current: boolean;
+}
+
 /** One column of a `columns` block. */
 export interface LayoutColumn {
   /** Fixed width in pixels; omitted columns share the rest. */
@@ -113,5 +120,10 @@ export type LayoutNode =
   | { type: "scroller"; width: number; nodes: LayoutNode[]; start?: "start" | "end" }
   /** A pull-down menu: `label` drawn like a link opens `items` under it. `align: "right"` puts it, and hangs the menu, at the right. */
   | { type: "menu"; label: string; items: MenuEntry[]; align: Align }
+  /**
+   * A site's page tabs over a rule across the page, as github.com's: the
+   * current tab bold with a line under it on the rule, the others plain links.
+   */
+  | { type: "tabs"; items: PageTab[] }
   | { type: "spacer"; height: number }
   | { type: "br" };

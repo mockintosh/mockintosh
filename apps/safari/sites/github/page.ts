@@ -199,7 +199,8 @@ function withHeader(page: GithubDocument, viewer: string | null, account = true)
     ],
   };
   const { nav, ...rest } = page;
-  return { ...rest, nodes: [header, ...(nav ? [nav] : []), HR, HEADER_SPACE, ...spaceSections(page.nodes)] };
+  // Tabs draw their own rule, under the current tab's line.
+  return { ...rest, nodes: [header, nav ?? HR, HEADER_SPACE, ...spaceSections(page.nodes)] };
 }
 
 /** Room under the header's rule, on every page. */
@@ -726,14 +727,9 @@ function activityNodes(activity: NonNullable<ProfileExtras["activity"]>, now: nu
   return nodes;
 }
 
-/** A tab bar: links between dots (text collapses wider gaps), the current one bold instead of a link. */
+/** A tab bar, as github.com's: the current tab bold over a line, the others links, spaced apart over a rule. */
 function tabs(items: readonly { label: string; location: GithubLocation; current: boolean }[]): LayoutNode {
-  const segments: InlineSegment[] = [];
-  items.forEach((item, index) => {
-    if (index > 0) segments.push(text("  •  "));
-    segments.push(item.current ? bold(item.label) : link(item.label, item.location));
-  });
-  return paragraph(...segments);
+  return { type: "tabs", items: items.map((item) => ({ label: item.label, href: githubUrl(item.location), current: item.current })) };
 }
 
 /** A profile as github.com lays it out: its tabs across the top, then the person beside what they've made. */

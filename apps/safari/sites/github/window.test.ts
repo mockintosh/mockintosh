@@ -2,7 +2,7 @@
  * GitHub in a real Safari window, signed in: the contribution calendar is
  * wider than the page, so it opens on the latest weeks and scrolls
  * sideways; the header's account menu signs out; a starred repository's
- * Star button says it unstars.
+ * Star button says it unstars; the current tab's line sits on the rule.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchResponse } from "@mockintosh/sdk";
@@ -208,5 +208,16 @@ describe("GitHub in a Safari window", () => {
     await settle();
     const tip = (await inspect()).find((node) => node.role === "tooltip" && node.value);
     expect(tip?.value).toBe("Unstar octocat/hello");
+  });
+
+  it("marks the current tab with a line on the rule under the tabs, a 2px border under it alone", async () => {
+    const tabs = (await inspect()).filter((node) => node.role === "tab");
+    expect(tabs.map((tab) => [tab.name, tab.value])).toEqual([["Overview", "current"], ["Repositories 0", undefined], ["Stars", undefined]]);
+    await parkPointer();
+    // The two rows at each tab's foot: the line under the tab, then the rule across the page.
+    const foot = (tab: InspectionNode) => pixels({ x: tab.bounds.x, y: tab.bounds.y + tab.bounds.height - 1, width: tab.bounds.width, height: 2 }).split("\n");
+    const [overview, repositories] = tabs;
+    expect(foot(overview!)).toEqual(["1".repeat(overview!.bounds.width), "1".repeat(overview!.bounds.width)]);
+    expect(foot(repositories!)).toEqual(["0".repeat(repositories!.bounds.width), "1".repeat(repositories!.bounds.width)]);
   });
 });

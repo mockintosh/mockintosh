@@ -115,6 +115,9 @@ function Block(props: BlockProps): JSX.Element {
   if (node.type === "scroller") {
     return <ScrollerView node={node} width={props.width} view={props.view} />;
   }
+  if (node.type === "tabs") {
+    return <TabsView node={node} view={props.view} />;
+  }
   if (node.type === "spacer") {
     return <box height={node.height} />;
   }
@@ -132,6 +135,36 @@ function Block(props: BlockProps): JSX.Element {
 }
 
 /** A page's pull-down menu: its label like a link, its items in the UI kit's `Menu`. */
+/** Space between page tabs. */
+const TAB_GAP = 16;
+/** Between a tab's label and the line under the current one. */
+const TAB_UNDER = 3;
+
+/** Page tabs over a rule; the current tab's line sits on the rule, so it reads as a 2px border under it. */
+function TabsView(props: { node: Extract<LayoutNode, { type: "tabs" }>; view: DocumentViewProps }): JSX.Element {
+  return (
+    <box flexDirection="column">
+      <box flexDirection="row" gap={TAB_GAP}>
+        <For each={props.node.items}>
+          {(tab) => (
+            <box
+              flexDirection="column"
+              cursor={tab.current ? undefined : "pointer"}
+              semantic={{ name: tab.label, role: "tab", value: tab.current ? "current" : undefined }}
+              onClick={tab.current ? undefined : () => props.view.onLink?.(tab.href)}
+            >
+              <text font="body" bold={tab.current} nowrap>{tab.label}</text>
+              <box height={TAB_UNDER} />
+              <box height={1} background={tab.current ? 1 : 0} />
+            </box>
+          )}
+        </For>
+      </box>
+      <box height={1} background={1} />
+    </box>
+  );
+}
+
 function MenuView(props: { node: Extract<LayoutNode, { type: "menu" }>; view: DocumentViewProps }): JSX.Element {
   const node = props.node;
   const [open, setOpen] = createSignal(false);

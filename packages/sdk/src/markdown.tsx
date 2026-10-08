@@ -2,7 +2,7 @@ import type { JSX } from "@mockintosh/ui";
 import { parseMarkdown } from "@mockintosh/markdown";
 import { DocumentView } from "./document";
 
-export type { LayoutNode, LayoutColumn, InlineSegment, TableRow, FormControl, WebForm, BitmapTip, MenuEntry } from "@mockintosh/markdown";
+export type { LayoutNode, LayoutColumn, InlineSegment, TableRow, FormControl, WebForm, BitmapTip, MenuEntry, PageTab } from "@mockintosh/markdown";
 export { parseMarkdown } from "@mockintosh/markdown";
 
 export interface MarkdownProps {

@@ -32,6 +32,7 @@ function links(nodes: readonly LayoutNode[]): string[] {
       return node.segments.flatMap((segment) => (segment.kind === "link" ? [segment.href] : []));
     }
     if (node.type === "box") return links(node.nodes);
+    if (node.type === "tabs") return node.items.map((tab) => tab.href);
     if (node.type === "columns") return node.columns.flatMap((column) => links(column.nodes));
     return [];
   });
