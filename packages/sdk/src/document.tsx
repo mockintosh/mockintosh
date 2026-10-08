@@ -161,7 +161,7 @@ function MenuView(props: { node: Extract<LayoutNode, { type: "menu" }>; view: Do
   );
 }
 
-/** Height of a scroller's bar: a black thumb on a gray track, as thin as it can be and still be dragged. */
+/** Height of a scroller's bar: a black thumb on the windows' own scroll-track gray, as thin as it can be and still be dragged. */
 const SCROLLER_BAR = 6;
 /** The bar's thumb is never narrower than this. */
 const SCROLLER_THUMB = 16;
@@ -210,7 +210,7 @@ function ScrollerView(props: { node: Extract<LayoutNode, { type: "scroller" }>; 
         <box
           width={visible()}
           height={SCROLLER_BAR}
-          background="gray50"
+          background="gray25"
           position="relative"
           onClick={(x) => setMoved(((x - thumb() / 2) * max()) / Math.max(1, visible() - thumb()))}
         >
