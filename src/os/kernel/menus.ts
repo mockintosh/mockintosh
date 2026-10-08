@@ -42,18 +42,6 @@ export function appleMenu(os: OSServices): MenubarDefinition {
       label: "Control Panel",
       onClick: () => openControlPanel(os)
     }, {
-      label: "Icon Gallery",
-      onClick: () => os.openApp("icon_gallery")
-    }, {
-      label: "MacPaint",
-      onClick: () => os.openApp("macpaint")
-    }, {
-      label: "Trace",
-      onClick: () => os.openApp("trace")
-    }, {
-      label: "Terminal",
-      onClick: () => os.openApp("terminal")
-    }, {
       label: CHOOSER_TITLE,
       onClick: () => openChooser(os)
     }, {
@@ -66,17 +54,6 @@ export function appleMenu(os: OSServices): MenubarDefinition {
         label: CAPTURE_SELECTED_PORTION_LABEL,
         onClick: () => os.screenshots.beginPortionCapture(),
       }],
-    }, {
-      label: "Find File",
-      disabled: true
-    }, {
-      label: "Scrapbook",
-      disabled: true
-    }, {
-      type: "separator"
-    }, {
-      label: "Puzzle",
-      disabled: true
     }, {
       type: "separator"
     }, {

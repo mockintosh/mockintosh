@@ -10,6 +10,7 @@ import { createElement, setProp } from "@mockintosh/ui/renderer";
 import { bootOS, type BootedOS } from "./boot";
 import { createHeadlessPlatform, type HeadlessPlatform } from "../platform/headless";
 import { registerApp } from "./apps";
+import { registerBundledApp } from "./bundledApps";
 import { declaredApp } from "./appDeclaration";
 import { MIME } from "@mockintosh/fs";
 import { getActiveAppId, getActiveWindowId, getWindows, isAppHidden, isMenubarHidden, setWindowFullScreen } from "./state";
@@ -262,6 +263,26 @@ describe("bootOS on the headless platform", () => {
     expect(dialog.props?.message).toBe(
       '"Snapshot" needs a camera, which this Macintosh does not have.'
     );
+  });
+
+  it("says so when asked to open an app that doesn't exist", () => {
+    os.services.openApp("no-such-app");
+    platform.tick();
+
+    const dialog = getWindows().at(-1)!;
+    expect(dialog.appId).toBe("__dialog__");
+    expect(dialog.props?.message).toBe('The application "no-such-app" could not be found.');
+  });
+
+  it("points to the App Store when asked to open a bundled app that isn't installed", () => {
+    registerBundledApp({ id: "test-uninstalled-app", title: "Sketchbook", description: "", icon: "icon/computer", load: async () => ({}) });
+
+    os.services.openApp("test-uninstalled-app");
+    platform.tick();
+
+    const dialog = getWindows().at(-1)!;
+    expect(dialog.appId).toBe("__dialog__");
+    expect(dialog.props?.message).toBe(`"Sketchbook" isn't installed. You can install it from the App Store.`);
   });
 
   it("draws a dBoxProc alert: 1px / 2px white / 2px band, stop icon, default-ring OK", () => {

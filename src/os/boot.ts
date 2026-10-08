@@ -52,7 +52,7 @@ import {
 } from "./state";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
-import { bundledApps } from "./bundledApps";
+import { bundledApps, getBundledApp } from "./bundledApps";
 import { createAppContext } from "./appContext";
 import { AppProcess } from "./process/host";
 import { processBlocker } from "./process/eligible";
@@ -273,7 +273,12 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     openApp(appId, props = {}, fromRect?) {
       const app = getApp(appId);
       if (!app) {
-        console.warn(`Unknown app: ${appId}`);
+        const listing = getBundledApp(appId);
+        void osServices.showDialog({
+          message: listing
+            ? `"${listing.title}" isn't installed. You can install it from the App Store.`
+            : `The application "${appId}" could not be found.`,
+        });
         return;
       }
       const missing = missingCapabilities(app.requires, capabilities);
