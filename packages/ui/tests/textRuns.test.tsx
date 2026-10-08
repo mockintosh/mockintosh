@@ -116,4 +116,50 @@ describe("<text runs>", () => {
     expect(clicks).toEqual(["docs"]);
     dispose();
   });
+
+  it("underlines a hover-underlined link only while the pointer is over it", () => {
+    const screen = newBitMap(W, H);
+    const ui = createUI({ screen });
+    const runs: TextRun[] = [{ text: "see " }, { text: "docs", underline: "hover", onClick: () => {} }];
+    const dispose = ui.render(() => <box width={W}><text runs={runs} /></box>);
+    ui.frame();
+    const away = pixelsFromBitMap(screen);
+    const linkX = measureText("see ") + 2;
+    ui.dispatchPointer("mousemove", linkX, 4);
+    ui.frame();
+    const over = pixelsFromBitMap(screen);
+    expect(over).toEqual(paint(() => <box width={W}><text runs={[{ text: "see " }, { text: "docs", underline: true }]} /></box>));
+    ui.dispatchPointer("mousemove", 2, 4);
+    ui.frame();
+    expect(pixelsFromBitMap(screen)).toEqual(away);
+    expect(away).toEqual(paint(() => <box width={W}><text runs={[{ text: "see " }, { text: "docs" }]} /></box>));
+    dispose();
+  });
+});
+
+describe("wrapped runs beside a marker", () => {
+  it("is as tall as the lines it wraps to at the width it is drawn, so what follows clears it", () => {
+    // A list item, as a page draws one: a number, then its title and a line under it.
+    const marker = "2.";
+    const title = "Show HN: a title that fits the row but not beside its number";
+    const runs: TextRun[] = [{ text: title }, { text: "\n1 points by tosh" }];
+    const rowWidth = measureText(title) + 4;
+    const ui = createUI({ screen: newBitMap(rowWidth + 20, 120) });
+    ui.render(() => (
+      <box width={rowWidth} flexDirection="column">
+        <box flexDirection="row" gap={4}>
+          <text font="body" nowrap>{marker}</text>
+          <text semantic={{ name: "item" }} font="body" wrap flexGrow={1} flexShrink={1} runs={runs} />
+        </box>
+        <text semantic={{ name: "next" }} font="body">3. Next item</text>
+      </box>
+    ));
+    ui.frame();
+    const item = ui.inspect().find((n) => n.name === "item")!;
+    const next = ui.inspect().find((n) => n.name === "next")!;
+    const drawn = layoutRuns(FACE, runs, item.bounds.width);
+    expect(drawn.lines).toHaveLength(3);
+    expect(item.bounds.height).toBe(drawn.height);
+    expect(next.bounds.y).toBeGreaterThanOrEqual(item.bounds.y + drawn.height);
+  });
 });

@@ -125,6 +125,12 @@ export interface MouseEventHandlers {
   /** The wheel turned over this node; (localX, localY) is where the pointer was. */
   onScroll?: (deltaY: number, localX: number, localY: number) => void;
   /**
+   * A sideways wheel or trackpad swipe over this node, positive to the
+   * right. The innermost node with a handler gets it; `overflow: "scroll"`
+   * panes set `scrollOffsetX` from it themselves.
+   */
+  onScrollX?: (deltaX: number, localX: number, localY: number) => void;
+  /**
    * Semantic cursor name (`pointer`, `text`, `watch`, …) or the app's own
    * 16×16 `CursorFace`. Hosts map a name to CSS or a 1-bit face — see `cursor.ts`.
    */
@@ -153,6 +159,12 @@ export interface FocusEventHandlers {
    * ordinary key rather than Paste. For terminals and editors.
    */
   rawKeys?: boolean;
+  /**
+   * The focused node takes Tab and Shift-Tab as keys, as `rawKeys` does, but
+   * no other: for a view of another UI (a worker app's picture) whose own
+   * focus they move. ⌃Tab still moves focus here.
+   */
+  tabKeys?: boolean;
 }
 
 export type EventHandlers = MouseEventHandlers & KeyboardEventHandlers & FocusEventHandlers;
@@ -172,6 +184,7 @@ export function hasMouseHandlers(h: EventHandlers): boolean {
     h.onDrag ||
     h.onDragEnd ||
     h.onScroll ||
+    h.onScrollX ||
     h.tabIndex !== undefined
   );
 }
@@ -352,6 +365,12 @@ export interface BoxProps extends LayoutStyle, EventHandlers, SemanticProps {
   /** Presses in this subtree leave keyboard focus where it is (a menu bar). */
   keepsFocus?: boolean;
   /**
+   * Overlays opened from inside this box (a tooltip, a menu) stay within
+   * its left and right edges: a window's body, whose edge the screen
+   * doesn't show past.
+   */
+  overlayBounds?: boolean;
+  /**
    * Vertical scroll offset in pixels (requires overflow="scroll"). Together
    * with `onScroll` the owner drives the offset: the wheel and touch pans
    * only call `onScroll` and never move the pane themselves.
@@ -478,7 +497,8 @@ export interface TextRun {
   text: string;
   bold?: boolean;
   italic?: boolean;
-  underline?: boolean;
+  /** `"hover"` underlines a clickable run only while the pointer is over it. */
+  underline?: boolean | "hover";
   onClick?: () => void;
 }
 
@@ -683,9 +703,9 @@ export function shadowRaise(node: CanvasNode): number {
 export const EVENT_PROP_NAMES = new Set<string>([
   "onClick", "onDoubleClick", "onMouseDown", "onMouseDownCapture", "onMouseUp",
   "onMouseMove", "onMouseEnter", "onMouseLeave", "onDragStart", "onDrag", "onDragEnd",
-  "onScroll",
+  "onScroll", "onScrollX",
   "onKeyDown", "onKeyUp", "onKeyPress", "onPaste",
-  "onFocus", "onBlur", "tabIndex", "autoFocus", "rawKeys", "cursor",
+  "onFocus", "onBlur", "tabIndex", "autoFocus", "rawKeys", "tabKeys", "cursor",
 ]);
 
 export function setNodeProperty(node: CanvasNode, name: string, value: unknown): void {

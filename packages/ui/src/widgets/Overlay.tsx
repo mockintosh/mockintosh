@@ -1,10 +1,12 @@
 import { For, Show, createContext, createEffect, createSignal, onCleanup, onSettled, useContext } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import type { CanvasNode } from "../nodes";
+import { shadowRaise, type CanvasNode } from "../nodes";
 import { getFocusManager } from "../focusContext";
+import { scrollPaintOffset, scrollPaintOffsetX } from "../scroll";
 
 export type OverlaySide = "bottom" | "top";
-export type OverlayAlign = "start" | "end";
+/** Which edge of the trigger the panel lines up with, or its middle. */
+export type OverlayAlign = "start" | "end" | "center";
 
 export interface OverlayLayer {
   id: number;
@@ -12,6 +14,12 @@ export interface OverlayLayer {
   y: number;
   /** Inset from the host's right edge. Set when `align` is `"end"`. */
   right?: number;
+  /** `x` is the panel's middle, not its left edge. */
+  centered?: boolean;
+  /** `y` is where the panel's bottom goes: it hangs above the trigger. */
+  above?: boolean;
+  /** The left and right the panel must stay between (its trigger's `overlayBounds` box). */
+  bounds?: { left: number; right: number };
   modal: boolean;
   role?: string;
   /** `center` fills the host and flex-centers the panel. Default `anchor`. */
@@ -39,6 +47,7 @@ export function dismissOverlayModal(): boolean {
 /** Root layer after the app tree so panels paint in screen space, not inside overflow:scroll. */
 export function OverlayHost(props: { children?: JSX.Element }): JSX.Element {
   const [layers, setLayers] = createSignal<OverlayLayer[]>([]);
+  const [hostWidth, setHostWidth] = createSignal(0);
   let nextId = 1;
 
   const api: OverlayHostApi = {
@@ -75,7 +84,7 @@ export function OverlayHost(props: { children?: JSX.Element }): JSX.Element {
 
   return (
     <OverlayHostContext value={api}>
-      <box width="100%" height="100%">
+      <box width="100%" height="100%" onLayout={({ width }) => setHostWidth(width)}>
         {props.children}
         <Show when={modalTop()}>
           <box
@@ -89,7 +98,7 @@ export function OverlayHost(props: { children?: JSX.Element }): JSX.Element {
           />
         </Show>
         <For each={layers()}>
-          {(layer) => <OverlayLayerView layer={layer} />}
+          {(layer) => <OverlayLayerView layer={layer} hostWidth={hostWidth()} />}
         </For>
       </box>
     </OverlayHostContext>
@@ -115,16 +124,33 @@ function focusModal(el: CanvasNode, modal: boolean): void {
   });
 }
 
-function OverlayLayerView(props: { layer: OverlayLayer }): JSX.Element {
+/**
+ * A panel at its trigger, measured so it can sit above it or centred on it,
+ * and moved sideways as far as it must to stay inside its bounds (the
+ * trigger's window) or the host: a tooltip near an edge still shows whole.
+ */
+const OFF_SCREEN = -10000;
+
+function OverlayLayerView(props: { layer: OverlayLayer; hostWidth: number }): JSX.Element {
   const layer = () => props.layer;
   const centered = () => layer().placement === "center";
+  const [size, setSize] = createSignal({ width: 0, height: 0 });
+  const left = () => {
+    const l = layer();
+    const x = l.centered ? Math.round(l.x - size().width / 2) : l.x;
+    const bounds = l.bounds ?? (props.hostWidth > 0 ? { left: 0, right: props.hostWidth } : null);
+    return bounds ? Math.max(bounds.left, Math.min(x, bounds.right - size().width)) : x;
+  };
+  /** A panel placed by its size waits off screen for one layout, so it never shows in the wrong place. */
+  const measuring = () => (layer().above || layer().centered) && size().width === 0;
+  const top = () => (measuring() ? OFF_SCREEN : layer().above ? layer().y - size().height : layer().y);
   return (
     <box
       semantic={{ name: "overlay-panel", role: layer().role ?? "dialog" }}
       position="absolute"
-      left={centered() ? 0 : layer().right === undefined ? layer().x : undefined}
+      left={centered() ? 0 : layer().right === undefined ? left() : undefined}
       right={centered() ? undefined : layer().right}
-      top={centered() ? 0 : layer().y}
+      top={centered() ? 0 : top()}
       width={centered() ? "100%" : undefined}
       height={centered() ? "100%" : undefined}
       justifyContent={centered() ? "center" : undefined}
@@ -137,6 +163,9 @@ function OverlayLayerView(props: { layer: OverlayLayer }): JSX.Element {
       }}
       onKeyDown={(key: string) => overlayKeyDown(layer(), key)}
       ref={(el) => focusModal(el, layer().modal)}
+      onLayout={({ width, height }) => {
+        if (!centered() && (width !== size().width || height !== size().height)) setSize({ width, height });
+      }}
     >
       <box onMouseDown={() => {}}>{layer().render()}</box>
     </box>
@@ -149,9 +178,9 @@ export interface OverlayProps {
   /** Outside click + Escape. Tooltip sets false. Default true. */
   modal?: boolean;
   side?: OverlaySide;
-  /** Extra pixels away from the trigger on `side`. */
+  /** Pixels between the trigger and the panel, on `side`. */
   offset?: number;
-  /** `end` hangs the panel from the trigger's right edge. */
+  /** `end` hangs the panel from the trigger's right edge; `center` centres it on the trigger. */
   align?: OverlayAlign;
   role?: string;
   onKeyDown?: (key: string) => void;
@@ -159,22 +188,67 @@ export interface OverlayProps {
   children?: JSX.Element;
 }
 
+/** Where `node` is drawn: its layout position less the offsets of the scrolled panes around it. */
+function drawnAt(node: CanvasNode): { x: number; y: number } {
+  let x = node.layout.x;
+  let y = node.layout.y;
+  for (let n = node.parent; n; n = n.parent) {
+    if (n.style.overflow === "scroll") y -= scrollPaintOffset(n);
+    x -= scrollPaintOffsetX(n);
+  }
+  return { x, y };
+}
+
+/**
+ * How far above its layout box `node` is drawn: a box with a shadow draws
+ * its face a pixel up and left of its box (the shadow fills the box's right
+ * and bottom edges), and so does everything inside it. Only boxes along the
+ * top edge count; one not laid out yet isn't there.
+ */
+function raisedAbove(node: CanvasNode): number {
+  const top = node.layout.y;
+  let most = 0;
+  const visit = (n: CanvasNode, raised: number) => {
+    if (n.layout.y !== top) return;
+    const lift = raised + shadowRaise(n);
+    most = Math.max(most, lift);
+    for (const child of n.children) visit(child, lift);
+  };
+  visit(node, 0);
+  return most;
+}
+
+/** The left and right edges of the nearest `overlayBounds` box around `node`, as drawn. */
+function boundsOf(node: CanvasNode): { left: number; right: number } | undefined {
+  for (let n = node.parent; n; n = n.parent) {
+    if (n.props["overlayBounds"] === true) {
+      const at = drawnAt(n);
+      return { left: at.x, right: at.x + n.layout.width };
+    }
+  }
+  return undefined;
+}
+
 function place(
   node: CanvasNode | null,
   side: OverlaySide,
   offset: number,
   align: OverlayAlign,
-): { x: number; y: number; right?: number } {
+): Pick<OverlayLayer, "x" | "y" | "right" | "centered" | "above" | "bounds"> {
   if (!node) return { x: 0, y: 0 };
-  const y =
-    side === "top" ? node.layout.y - offset : node.layout.y + node.layout.height + offset;
+  const at = drawnAt(node);
+  const above = side === "top";
+  // Above, the gap is from the top of what's drawn, which a raised (shadowed) button lifts a pixel.
+  const y = above ? at.y - raisedAbove(node) - offset : at.y + node.layout.height + offset;
+  const bounds = boundsOf(node);
   if (align === "end") {
     let root: CanvasNode = node;
     while (root.parent) root = root.parent;
-    const triggerRight = node.layout.x + node.layout.width;
-    return { x: node.layout.x, y, right: Math.max(0, root.layout.width - triggerRight) };
+    const triggerRight = at.x + node.layout.width;
+    return { x: at.x, y, above, right: Math.max(0, root.layout.width - triggerRight) };
   }
-  return { x: node.layout.x, y };
+  if (align === "center") return { x: at.x + node.layout.width / 2, y, above, centered: true, bounds };
+  return { x: at.x, y, above, bounds };
 }
 
 /**
@@ -231,35 +305,40 @@ export function Overlay(props: OverlayProps): JSX.Element {
     layerId = 0;
   });
 
+  // The outer box takes the container's alignment, so a trigger in a row
+  // that centres is centred too; where the container stretches, the trigger
+  // inside keeps its own size and sits at the start. The trigger is what the
+  // panel is placed against.
   return (
-    <box
-      ref={(el) => {
-        triggerNode = el;
-        triggerHeight = el.layout.height;
-      }}
-      alignSelf="flex-start"
-      position="relative"
-    >
-      {props.trigger}
-      <Show when={props.open && !host}>
-        <box
-          semantic={{ name: "overlay-panel", role: props.role ?? "dialog" }}
-          position="absolute"
-          left={0}
-          top={side() === "top" ? undefined : triggerHeight + offset()}
-          bottom={side() === "top" ? offset() : undefined}
-          tabIndex={modal() ? 0 : undefined}
-          onKeyDown={(key: string) => {
-            if (key === "Escape") {
-              props.onDismiss?.();
-              return;
-            }
-            props.onKeyDown?.(key);
-          }}
-        >
-          {props.children}
-        </box>
-      </Show>
+    <box alignItems="flex-start">
+      <box
+        ref={(el) => {
+          triggerNode = el;
+          triggerHeight = el.layout.height;
+        }}
+        position="relative"
+      >
+        {props.trigger}
+        <Show when={props.open && !host}>
+          <box
+            semantic={{ name: "overlay-panel", role: props.role ?? "dialog" }}
+            position="absolute"
+            left={0}
+            top={side() === "top" ? undefined : triggerHeight + offset()}
+            bottom={side() === "top" ? triggerHeight + offset() : undefined}
+            tabIndex={modal() ? 0 : undefined}
+            onKeyDown={(key: string) => {
+              if (key === "Escape") {
+                props.onDismiss?.();
+                return;
+              }
+              props.onKeyDown?.(key);
+            }}
+          >
+            {props.children}
+          </box>
+        </Show>
+      </box>
     </box>
   );
 }

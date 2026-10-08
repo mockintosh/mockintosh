@@ -17,7 +17,7 @@ async function begin(url = AUTHORIZE, appTitle = "Player") {
       body: JSON.stringify({ url, appTitle }),
     })
   );
-  return { resp, body: (await resp.json()) as { id: string; poll_token: string; error?: string } };
+  return { resp, body: (await resp.json()) as { id: string; poll_token: string; url: string; error?: string } };
 }
 
 function pollFor(id: string, token: string) {
@@ -37,6 +37,8 @@ describe("OAuth sign-in relay", () => {
     expect(html).toContain("<strong>accounts.example.com</strong>");
     const href = /href="([^"]+)"/.exec(html)![1].replace(/&#38;/g, "&");
     expect(new URL(href).searchParams.get("state")).toBe(body.id);
+    // The same address, for signing in with the Macintosh's own browser.
+    expect(body.url).toBe(href);
 
     const done = await callback(new Request(`${ORIGIN}/api/oauth/callback?code=secret-code&state=${body.id}`));
     expect(await done.text()).toContain("signed in");

@@ -4,6 +4,7 @@ import { newBitMap, pixelsFromBitMap } from "@mockintosh/quickdraw/bits";
 import { TextInput } from "../src/widgets/TextInput";
 import { measureText } from "../src/fonts/bridge";
 import { createUI } from "../src/ui";
+import { fromGrid } from "../src/sprite";
 
 function type(ui: ReturnType<typeof createUI>, text: string) {
   for (const ch of text) {
@@ -78,6 +79,46 @@ describe("TextInput", () => {
     for (let y = 0; y < 16; y++) {
       expect(pixels[y * W + fieldW]).toBe(0);
     }
+    dispose();
+  });
+
+  it("insets an icon before the text, and keeps it clear of text scrolled under it", async () => {
+    const W = 80;
+    const H = 20;
+    const screen = newBitMap(W, H);
+    const ui = createUI({ screen });
+    const icon = fromGrid(4, 4, ["####", "####", "####", "####"]);
+    const [value, setValue] = createSignal("");
+    const dispose = ui.render(() =>
+      createComponent(TextInput, {
+        name: "draft",
+        get value() { return value(); },
+        onChange: setValue,
+        autoFocus: true,
+        icon,
+        width: 48,
+      }),
+    );
+    ui.frame();
+    await Promise.resolve();
+    ui.frame();
+
+    // The border, then 4px of padding, then the icon; the text starts 3px after it.
+    const columnInked = (pixels: Uint8Array, x: number) => Array.from({ length: 14 }, (_, y) => pixels[(y + 1) * W + x]).some((ink) => ink === 1);
+    const iconAt = (pixels: Uint8Array) => [0, 1, 2, 3].map((dy) => Array.from(pixels.subarray((6 + dy) * W + 5, (6 + dy) * W + 9)).join("")).join(" ");
+    type(ui, "i");
+    ui.frame();
+    let pixels = pixelsFromBitMap(screen);
+    expect(iconAt(pixels)).toBe("1111 1111 1111 1111");
+    expect(columnInked(pixels, 10) || columnInked(pixels, 11)).toBe(false);
+    expect([12, 13, 14].some((x) => columnInked(pixels, x))).toBe(true);
+
+    // Typed past the field's width, the text scrolls left under the icon's patch, which stays as it was.
+    type(ui, "WWWWWWWWWWWW");
+    ui.frame();
+    pixels = pixelsFromBitMap(screen);
+    expect(iconAt(pixels)).toBe("1111 1111 1111 1111");
+    for (const x of [1, 2, 3, 4, 9, 10, 11]) expect(columnInked(pixels, x), `column ${x}`).toBe(false);
     dispose();
   });
 

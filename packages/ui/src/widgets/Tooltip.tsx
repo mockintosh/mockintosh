@@ -5,10 +5,15 @@ import { useRadius } from "../theme";
 
 export interface TooltipProps {
   label: string;
+  /** Pixels between the trigger and the caption above it. */
+  offset?: number;
   children?: JSX.Element;
 }
 
-/** Balloon-help caption. Hover or focus. Not modal. */
+/**
+ * A caption above its trigger while the pointer is over it: white on
+ * black, centred, and kept inside the window. Not modal.
+ */
 export function Tooltip(props: TooltipProps): JSX.Element {
   const [open, setOpen] = createSignal(false);
   const radius = useRadius("sm");
@@ -18,7 +23,8 @@ export function Tooltip(props: TooltipProps): JSX.Element {
       open={open()}
       modal={false}
       side="top"
-      offset={16}
+      offset={props.offset ?? 1}
+      align="center"
       role="tooltip"
       trigger={
         <box
@@ -35,12 +41,10 @@ export function Tooltip(props: TooltipProps): JSX.Element {
         paddingRight={3}
         paddingTop={2}
         paddingBottom={2}
-        borderColor={1}
-        borderWidth={1}
         borderRadius={radius()}
-        background={0}
+        background={1}
       >
-        <text font="body" nowrap>{props.label}</text>
+        <text font="body" color={0} nowrap>{props.label}</text>
       </box>
     </Overlay>
   );

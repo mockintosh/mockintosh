@@ -373,6 +373,10 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         },
       },
       download: start.download ? { save: (file) => call("download.save", [file]) as Promise<void> } : undefined,
+      signIn: start.signIn && {
+        redirectUri: start.signIn.redirectUri,
+        authorize: (url) => call("signIn.authorize", [url]) as Promise<Record<string, string> | null>,
+      },
       audio: start.audio ? audio.service : undefined,
       video:
         start.video || start.videoPlayback
@@ -593,8 +597,14 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
               <AppServicesContext value={w.services}>
                 <WindowSlotsContext value={w.slots}>
                   <box width={pictureWidth(w)} height={pictureHeight(w)} flexDirection="column">
-                    {w.header().view && <box width={w.bandWidth()} height={w.header().height}>{w.header().view!()}</box>}
-                    <box width={w.width()} height={w.height()} overflow="hidden" position="relative">
+                    {w.header().view && (
+                      <box width={w.bandWidth()} height={w.header().height} position="relative">
+                        {w.header().view!()}
+                        {/* The band's bottom rule, as the window draws one for other apps; here, under the app's menus. */}
+                        <box position="absolute" left={0} top={w.header().height - 1} width={w.bandWidth()} height={1} background={1} />
+                      </box>
+                    )}
+                    <box width={w.width()} height={w.height()} overflow="hidden" position="relative" overlayBounds>
                       {/* A scrollable window's document, moved to what the OS has scrolled to. */}
                       <box
                         position="absolute"
@@ -661,7 +671,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
           if (!w || !ui) return;
           lastSeq = Math.max(lastSeq, msg.seq);
           const y = msg.y + w.slot * bandHeight;
-          ui.dispatchPointer(msg.kind, msg.x, y, { deltaY: msg.deltaY, modifiers: msg.modifiers });
+          ui.dispatchPointer(msg.kind, msg.x, y, { deltaY: msg.deltaY, deltaX: msg.deltaX, modifiers: msg.modifiers });
           if (msg.kind !== "scroll") trackCursor(w, msg.x, y);
           renderNow();
           return;

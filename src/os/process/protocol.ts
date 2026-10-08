@@ -67,6 +67,8 @@ export interface ProcessStart {
   /** The speaker can take a port (`AudioService.openPort`). */
   audio: boolean;
   download: boolean;
+  /** Phone sign-in (`AppContext.signIn`); absent when the Macintosh has no relay. */
+  signIn?: { redirectUri: string };
   /** The host can decode video excerpts (`VideoService.excerpt`). */
   video: boolean;
   /** The host can play video live (`VideoService.open`). */
@@ -129,7 +131,7 @@ export type HostToProcess =
   | { t: "window.goAway"; key: string }
   /** The instance is ending: run the app's cleanups, then answer `stopped`. */
   | { t: "stop" }
-  | { t: "pointer"; key: string; kind: PointerKind; x: number; y: number; deltaY?: number; modifiers: Modifiers; seq: number }
+  | { t: "pointer"; key: string; kind: PointerKind; x: number; y: number; deltaY?: number; deltaX?: number; modifiers: Modifiers; seq: number }
   | { t: "key"; key: string; kind: KeyKind; value: string; modifiers: Modifiers; seq: number }
   /** Text pasted into window `key`, in one piece (`onPaste`). */
   | { t: "paste"; key: string; text: string; seq: number }

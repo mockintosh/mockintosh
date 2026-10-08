@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppContext } from "@mockintosh/sdk";
+import type { InspectionNode } from "@mockintosh/ui";
 import { bootOS, type BootedOS } from "./boot";
 import { createHeadlessPlatform, type HeadlessPlatform } from "../platform/headless";
 import type { SignInPollResult, SignInRelay, SignInStartRequest } from "../platform/types";
@@ -18,6 +19,7 @@ function scriptedRelay() {
       started.push(request);
       return {
         link: "https://mac.example/api/oauth/pair?id=abc",
+        browserLink: `${request.url}&state=abc`,
         expiresInMs: 60_000,
         pollIntervalMs: 1000,
         poll: async () => answers.shift() ?? { status: "pending" },
@@ -43,11 +45,18 @@ describe("useApp().signIn", () => {
   let os: BootedOS;
   let script: ReturnType<typeof scriptedRelay>;
   let app: AppContext;
+  let opened: string[];
 
   beforeEach(async () => {
     vi.useFakeTimers();
     script = scriptedRelay();
-    platform = createHeadlessPlatform({ width: 512, height: 342, signInRelay: script.relay });
+    opened = [];
+    const browser = {
+      openExternal: async (url: string) => void opened.push(url),
+      authorize: async () => ({}),
+      loadScript: async () => undefined,
+    };
+    platform = createHeadlessPlatform({ width: 512, height: 342, signInRelay: script.relay, browser });
     os = await bootOS(platform);
     vi.advanceTimersByTime(1000);
     platform.tick();
@@ -102,6 +111,23 @@ describe("useApp().signIn", () => {
     await settle(1000);
     await expect(result).resolves.toEqual({ code: "the-code" });
     expect(sheets()).toHaveLength(0);
+  });
+
+  it("offers this computer's browser instead of the phone, for the same pairing", async () => {
+    const result = app.signIn!.authorize(AUTHORIZE);
+    await settle();
+    const nodes = (await os.kernel.invoke(os.kernel.createSession(), "inspect", {})) as InspectionNode[];
+    const link = nodes.find((node) => node.name === "sign-in-browser");
+    expect(link?.text).toBe("Or sign in with this computer's browser");
+    const { x, y, width, height } = link!.bounds;
+    platform.click(x + Math.floor(width / 2), y + Math.floor(height / 2));
+    await settle();
+    expect(opened).toEqual([`${AUTHORIZE}&state=abc`]);
+
+    // The sheet keeps polling, so finishing in the browser answers it.
+    script.answers.push({ status: "complete", params: { code: "the-code" } });
+    await settle(1000);
+    await expect(result).resolves.toEqual({ code: "the-code" });
   });
 
   it("rejects with the provider's error, and treats a denial as a cancel", async () => {

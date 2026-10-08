@@ -310,6 +310,27 @@ describe("mousedown capture phase", () => {
   });
 });
 
+describe("presses past hover-only nodes", () => {
+  it("gives a press, its drag and its click to the nearest node that takes presses", () => {
+    const { root, outer, inner } = nestedTree();
+    const seen: string[] = [];
+    inner._eventHandlers.onMouseEnter = () => seen.push("enter");
+    outer._eventHandlers.onDragStart = () => seen.push("dragStart");
+    outer._eventHandlers.onDrag = () => seen.push("drag");
+    outer._eventHandlers.onClick = () => seen.push("click");
+    const ptr = createPointerDispatcher(root, createFocusManager(root));
+    ptr.dispatch("mousedown", 30, 30);
+    ptr.dispatch("mousemove", 34, 30);
+    ptr.dispatch("mouseup", 34, 30);
+    // Released over the same owner: a click too, as the DOM does after a drag.
+    expect(seen).toEqual(["enter", "dragStart", "drag", "click"]);
+    seen.length = 0;
+    ptr.dispatch("mousedown", 30, 30);
+    ptr.dispatch("mouseup", 30, 30);
+    expect(seen).toEqual(["click"]);
+  });
+});
+
 describe("scroll bubbling", () => {
   it("delivers wheel to the nearest ancestor with onScroll", () => {
     const { root, outer, inner } = nestedTree();
@@ -328,6 +349,28 @@ describe("scroll bubbling", () => {
     const ptr = createPointerDispatcher(root, createFocusManager(root));
     ptr.dispatch("scroll", 30, 25, { deltaY: -4 });
     expect(seen).toEqual([[-4, 20, 15]]);
+  });
+
+  it("delivers sideways travel to the nearest onScrollX, and each axis of a diagonal swipe to its own handler", () => {
+    const { root, outer, inner } = nestedTree();
+    const sideways: number[][] = [];
+    const vertical: number[] = [];
+    inner._eventHandlers.onClick = () => {};
+    outer._eventHandlers.onScrollX = (dx, lx, ly) => sideways.push([dx, lx, ly]);
+    root._eventHandlers.onScroll = (dy) => vertical.push(dy);
+    const ptr = createPointerDispatcher(root, createFocusManager(root));
+    expect(ptr.dispatch("scroll", 30, 25, { deltaX: 12 })).toBe(true);
+    expect(sideways).toEqual([[12, 20, 15]]);
+    expect(vertical).toEqual([]);
+    ptr.dispatch("scroll", 30, 25, { deltaX: -3, deltaY: 5 });
+    expect(sideways).toEqual([[12, 20, 15], [-3, 20, 15]]);
+    expect(vertical).toEqual([5]);
+  });
+
+  it("says nobody took sideways travel when no node handles it", () => {
+    const { root } = nestedTree();
+    const ptr = createPointerDispatcher(root, createFocusManager(root));
+    expect(ptr.dispatch("scroll", 30, 25, { deltaX: 12 })).toBe(false);
   });
 
   it("wheels an overflow:scroll pane that has no onScroll", () => {

@@ -20,3 +20,10 @@ export function wheelDeltaY(e: { deltaY: number; deltaMode: number }, pageHeight
   if (e.deltaMode === 2) return e.deltaY * pageHeight;
   return e.deltaY;
 }
+
+/** A wheel event's sideways travel in pixels, by the same rules as `wheelDeltaY`. */
+export function wheelDeltaX(e: { deltaX: number; deltaMode: number }, pageWidth: number): number {
+  if (e.deltaMode === 1) return e.deltaX * LINE_PX;
+  if (e.deltaMode === 2) return e.deltaX * pageWidth;
+  return e.deltaX;
+}

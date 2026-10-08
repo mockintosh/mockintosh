@@ -1,6 +1,7 @@
 import { Errored, For, Loading, Show, createMemo, createSignal, useContext } from "solid-js";
 import type { ImageFrame, JSX, TextRun } from "@mockintosh/ui";
-import { Button, Dithered, TextInput } from "@mockintosh/ui";
+import { Button, Dithered, Menu, RichTextEditor, TextEditor, TextInput, Tooltip } from "@mockintosh/ui";
+import { parseMarkdown } from "@mockintosh/markdown";
 import type { FormControl, InlineSegment, LayoutColumn, LayoutNode, TableRow, WebForm } from "@mockintosh/markdown";
 import { AppServicesContext } from "./index";
 
@@ -25,9 +26,15 @@ export interface DocumentViewProps {
 
 const FALLBACK_WIDTH = 320;
 const BUTTON_WIDTH = 64;
+/** `TextEditor`'s line height. */
+const TEXTAREA_LINE = 14;
 /** Border plus padding on each side of a `box` card. */
 const CARD_INSET = 7;
 const BLOCK_GAP = 4;
+/** In a form of stacked fields: from a label to its field, between fields (and on to the buttons), and over a labelled form's first. */
+const LABEL_GAP = 4;
+const FIELD_GAP = 12;
+const FORM_TOP = 8;
 
 function inlineRuns(segments: readonly InlineSegment[], onLink: ((href: string) => void) | undefined): TextRun[] {
   return segments.map((segment) => {
@@ -35,9 +42,9 @@ function inlineRuns(segments: readonly InlineSegment[], onLink: ((href: string) 
     if (segment.kind === "italic") return { text: segment.text, italic: true };
     if (segment.kind === "link") {
       const href = segment.href;
-      return onLink
-        ? { text: segment.text, underline: true, onClick: () => onLink(href) }
-        : { text: segment.text, underline: true };
+      const underline = segment.underline ?? true;
+      const run: TextRun = segment.bold ? { text: segment.text, underline, bold: true } : { text: segment.text, underline };
+      return onLink ? { ...run, onClick: () => onLink(href) } : run;
     }
     return { text: segment.text };
   });
@@ -91,20 +98,188 @@ function Block(props: BlockProps): JSX.Element {
   if (node.type === "image") {
     return <ImageView node={node} width={props.width} view={props.view} />;
   }
+  if (node.type === "bitmap") {
+    return (
+      <box width={Math.min(node.width, props.width)} height={node.height} overflow="hidden" position="relative">
+        <image semantic={{ name: node.alt, role: "image" }} src={{ width: node.width, height: node.height, data: node.data }} width={node.width} height={node.height} />
+        <For each={node.tips ?? []}>
+          {(tip) => (
+            <box position="absolute" left={tip.x} top={tip.y} width={tip.width} height={tip.height}>
+              <Tooltip label={tip.label}>
+                <box width={tip.width} height={tip.height} />
+              </Tooltip>
+            </box>
+          )}
+        </For>
+      </box>
+    );
+  }
+  if (node.type === "menu") {
+    return <MenuView node={node} view={props.view} />;
+  }
+  if (node.type === "scroller") {
+    return <ScrollerView node={node} width={props.width} view={props.view} />;
+  }
+  if (node.type === "tabs") {
+    return <TabsView node={node} view={props.view} />;
+  }
   if (node.type === "spacer") {
     return <box height={node.height} />;
   }
   if (node.type === "box") {
     return (
-      <box borderColor={1} padding={CARD_INSET - 1} flexDirection="column" gap={BLOCK_GAP}>
+      <box borderColor={1} borderRadius={node.radius} padding={CARD_INSET - 1} flexDirection="column" gap={BLOCK_GAP}>
         <Blocks nodes={node.nodes} width={props.width - CARD_INSET * 2} view={props.view} />
       </box>
     );
   }
   if (node.type === "columns") {
-    return <ColumnsView columns={node.columns} gap={node.gap} minWidth={node.minWidth} width={props.width} view={props.view} />;
+    return <ColumnsView columns={node.columns} gap={node.gap} minWidth={node.minWidth} center={node.center ?? false} width={props.width} view={props.view} />;
   }
   return <box height={6} />;
+}
+
+/** A page's pull-down menu: its label like a link, its items in the UI kit's `Menu`. */
+/** Space between page tabs. */
+const TAB_GAP = 16;
+/** Between a tab's label and the line under the current one. */
+const TAB_UNDER = 3;
+
+/** Page tabs over a rule; the current tab's line, and a hovered one's, sits on the rule, so it reads as a 2px border under it. */
+function TabsView(props: { node: Extract<LayoutNode, { type: "tabs" }>; view: DocumentViewProps }): JSX.Element {
+  return (
+    <box flexDirection="column">
+      <box flexDirection="row" gap={TAB_GAP}>
+        <For each={props.node.items}>
+          {(tab) => {
+            const [hovered, setHovered] = createSignal(false);
+            return (
+              <box
+                flexDirection="column"
+                cursor={tab.current ? undefined : "pointer"}
+                semantic={{ name: tab.label, role: "tab", value: tab.current ? "current" : undefined }}
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
+                onClick={tab.current ? undefined : () => props.view.onLink?.(tab.href)}
+              >
+                <text font="body" bold={tab.current} nowrap>{tab.label}</text>
+                <box height={TAB_UNDER} />
+                <box height={1} background={tab.current || hovered() ? 1 : 0} />
+              </box>
+            );
+          }}
+        </For>
+      </box>
+      <box height={1} background={1} />
+    </box>
+  );
+}
+
+function MenuView(props: { node: Extract<LayoutNode, { type: "menu" }>; view: DocumentViewProps }): JSX.Element {
+  const node = props.node;
+  const [open, setOpen] = createSignal(false);
+  const choose = (entry: (typeof node.items)[number]) => {
+    if ("href" in entry) props.view.onLink?.(entry.href);
+    else {
+      const fields = entry.form.controls.flatMap((control) => (control.kind === "hidden" ? [{ name: control.name, value: control.value }] : []));
+      props.view.onSubmit?.(entry.form, fields);
+    }
+  };
+  const right = node.align === "right";
+  return (
+    <box flexDirection="row" justifyContent={right ? "flex-end" : node.align === "center" ? "center" : "flex-start"}>
+      <Menu
+        name={node.label}
+        open={open()}
+        onDismiss={() => setOpen(false)}
+        align={right ? "end" : "start"}
+        items={node.items.map((entry) => ({ label: entry.label, onClick: () => choose(entry) }))}
+        trigger={
+          <box cursor="pointer" semantic={{ name: `${node.label} menu`, role: "button" }} onClick={() => setOpen(!open())}>
+            <Show when={node.image} fallback={<text font="body" nowrap runs={[{ text: node.label, underline: true }]} />}>
+              {(image) => (
+                <ImageView
+                  node={{ type: "image", src: image().src, alt: node.label, align: "left", width: image().size, height: image().size, borderRadius: image().size / 2, border: image().border }}
+                  width={image().size}
+                  view={props.view}
+                />
+              )}
+            </Show>
+          </box>
+        }
+      />
+    </box>
+  );
+}
+
+/** Height of a scroller's bar: a black thumb on the windows' own scroll-track gray, thin enough to stay out of the way. */
+const SCROLLER_BAR = 4;
+/** The bar's thumb is never narrower than this. */
+const SCROLLER_THUMB = 16;
+
+/**
+ * A pane that scrolls its content sideways: drag the content, or the
+ * thumb on the bar under it, or click the bar to jump. The offset is the
+ * view's own, since a document has no window scroll bar to give it.
+ */
+function ScrollerView(props: { node: Extract<LayoutNode, { type: "scroller" }>; width: number; view: DocumentViewProps }): JSX.Element {
+  const node = props.node;
+  const visible = () => Math.max(1, Math.min(node.width, props.width));
+  const max = () => Math.max(0, node.width - visible());
+  /** Null until the reader moves it: then it stays where they put it, whatever the width does. */
+  const [moved, setMoved] = createSignal<number | null>(null);
+  const offset = () => {
+    const at = moved();
+    return Math.max(0, Math.min(max(), at ?? (node.start === "end" ? max() : 0)));
+  };
+  const thumb = () => Math.max(SCROLLER_THUMB, Math.floor((visible() * visible()) / Math.max(1, node.width)));
+  const thumbX = () => Math.floor(((visible() - thumb()) * offset()) / Math.max(1, max()));
+  let grab: { x: number; offset: number } | null = null;
+  const startDrag = (globalX: number) => (grab = { x: globalX, offset: offset() });
+  const pan = (globalX: number) => {
+    if (grab) setMoved(grab.offset - (globalX - grab.x));
+  };
+  const slide = (globalX: number) => {
+    if (grab) setMoved(grab.offset + ((globalX - grab.x) * max()) / Math.max(1, visible() - thumb()));
+  };
+  return (
+    <box flexDirection="column" gap={3}>
+      <box
+        width={visible()}
+        overflow="scroll"
+        scrollOffsetX={offset()}
+        onDragStart={(_x, _y, globalX) => startDrag(globalX)}
+        onDrag={(_x, _y, globalX) => pan(globalX)}
+        onDragEnd={() => (grab = null)}
+        onScrollX={(dx) => setMoved(offset() + dx)}
+      >
+        <box width={node.width} flexDirection="column" gap={BLOCK_GAP}>
+          <Blocks nodes={node.nodes} width={node.width} view={props.view} />
+        </box>
+      </box>
+      <Show when={max() > 0}>
+        <box
+          width={visible()}
+          height={SCROLLER_BAR}
+          background="gray25"
+          position="relative"
+          onClick={(x) => setMoved(((x - thumb() / 2) * max()) / Math.max(1, visible() - thumb()))}
+        >
+          <box
+            position="absolute"
+            left={thumbX()}
+            top={0}
+            width={thumb()}
+            height={SCROLLER_BAR}
+            background={1}
+            onDragStart={(_x, _y, globalX) => startDrag(globalX)}
+            onDrag={(_x, _y, globalX) => slide(globalX)}
+            onDragEnd={() => (grab = null)}
+          />
+        </box>
+      </Show>
+    </box>
+  );
 }
 
 function Blocks(props: { nodes: readonly LayoutNode[]; width: number; view: DocumentViewProps }): JSX.Element {
@@ -123,6 +298,7 @@ function ColumnsView(props: {
   columns: readonly LayoutColumn[];
   gap: number;
   minWidth: number;
+  center: boolean;
   width: number;
   view: DocumentViewProps;
 }): JSX.Element {
@@ -140,7 +316,7 @@ function ColumnsView(props: {
   );
   return (
     <Show when={props.width >= props.minWidth} fallback={stacked}>
-      <box flexDirection="row" gap={props.gap} alignItems="flex-start">
+      <box flexDirection="row" gap={props.gap} alignItems={props.center ? "center" : "flex-start"}>
         <For each={props.columns.map((column, index) => ({ column, index }))}>
           {(entry) => (
             <box flexDirection="column" gap={BLOCK_GAP} width={widths()[entry.index]} flexShrink={0} minWidth={0}>
@@ -204,11 +380,35 @@ function FormView(props: { form: WebForm; width: number; onSubmit?: (form: WebFo
   }
 
   const firstButton = form.controls.findIndex((control) => control.kind === "submit");
+  const shown = form.controls.map((control, index) => ({ control, index })).filter((entry) => entry.control.kind !== "hidden");
+  const view = (entry: { control: FormControl; index: number }, width: () => number) => {
+    const control = (
+      <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={width()} radius={form.radius} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />
+    );
+    const field = entry.control.kind === "text" || entry.control.kind === "textarea" ? entry.control : undefined;
+    // A labelled control has its label over it, in bold, and a plain asterisk when it must be filled in.
+    return field?.label ? (
+      <box flexDirection="column" gap={LABEL_GAP}>
+        <text font="body" nowrap runs={[{ text: field.label, bold: true }, ...(field.required ? [{ text: " *" }] : [])]} />
+        {control}
+      </box>
+    ) : control;
+  };
+  // With several lines to write, fields stack at the page's width and the buttons sit under them.
+  if (form.controls.some((control) => control.kind === "textarea")) {
+    return (
+      <box flexDirection="column" gap={FIELD_GAP} paddingTop={form.controls.some((control) => "label" in control && control.kind !== "submit" && control.label) ? FORM_TOP : 0}>
+        <For each={shown.filter((entry) => entry.control.kind !== "submit")}>{(entry) => view(entry, () => props.width)}</For>
+        <box flexDirection="row" gap={4} justifyContent="flex-end">
+          <For each={shown.filter((entry) => entry.control.kind === "submit")}>{(entry) => view(entry, () => props.width)}</For>
+        </box>
+      </box>
+    );
+  }
+  const justify = form.align === "right" ? "flex-end" : form.align === "center" ? "center" : "flex-start";
   return (
-    <box flexDirection="row" gap={4} alignItems="center">
-      <For each={form.controls.map((control, index) => ({ control, index })).filter((entry) => entry.control.kind !== "hidden")}>
-        {(entry) => <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={inputWidth()} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />}
-      </For>
+    <box flexDirection="row" gap={4} alignItems="center" justifyContent={justify}>
+      <For each={shown}>{(entry) => view(entry, inputWidth)}</For>
     </box>
   );
 }
@@ -218,13 +418,17 @@ function FormControlView(props: {
   values: () => Record<number, string>;
   setValues: (update: (prev: Record<number, string>) => Record<number, string>) => void;
   inputWidth: number;
+  radius: number | undefined;
   submit: () => void;
   press: (index: number) => void;
 }): JSX.Element {
   const { control, index } = props.entry;
   if (control.kind === "text") {
+    const icon = control.icon ? useContext(AppServicesContext)?.getSprite(control.icon) : undefined;
     return (
       <TextInput
+        icon={icon}
+        borderRadius={props.radius}
         value={props.values()[index] ?? ""}
         placeholder={control.placeholder}
         width={props.inputWidth}
@@ -233,8 +437,36 @@ function FormControlView(props: {
       />
     );
   }
+  if (control.kind === "textarea" && control.markdown) {
+    return (
+      <RichTextEditor
+        name={control.name || undefined}
+        value={props.values()[index] ?? ""}
+        width={props.inputWidth}
+        height={control.rows * TEXTAREA_LINE + 8}
+        borderRadius={props.radius}
+        onChange={(value) => props.setValues((prev) => ({ ...prev, [index]: value }))}
+        preview={(value) => <DocumentView nodes={parseMarkdown(value)} />}
+      />
+    );
+  }
+  if (control.kind === "textarea") {
+    return (
+      <TextEditor
+        name={control.name || undefined}
+        value={props.values()[index] ?? ""}
+        width={props.inputWidth}
+        height={control.rows * TEXTAREA_LINE + 8}
+        borderRadius={props.radius}
+        onChange={(value) => props.setValues((prev) => ({ ...prev, [index]: value }))}
+      />
+    );
+  }
   if (control.kind === "submit") {
-    return <Button label={control.label} onClick={() => props.press(index)} />;
+    const app = useContext(AppServicesContext);
+    const icon = control.icon ? app?.getSprite(control.icon) : undefined;
+    const button = <Button label={control.label} icon={icon} borderRadius={props.radius} onClick={() => props.press(index)} />;
+    return control.tooltip ? <Tooltip label={control.tooltip}>{button}</Tooltip> : button;
   }
   return <box />;
 }
@@ -279,14 +511,23 @@ function ImageView(props: { node: Extract<LayoutNode, { type: "image" }>; width:
     <Loading fallback={pending()}>
       <Errored fallback={() => alt()}>
         <Show when={size()} fallback={alt()}>
-          {(fit) =>
-            node.borderRadius ? (
-              <box width={fit().width} height={fit().height} borderRadius={node.borderRadius} overflow="hidden">
-                <Dithered src={fit().frame} width={fit().width} height={fit().height} />
+          {(fit) => {
+            const radius = node.borderRadius ?? 0;
+            // A border rings the picture from outside a clip one pixel in, so the picture never paints over it.
+            const inset = node.border ? 1 : 0;
+            const picture = (
+              <box width={fit().width - inset * 2} height={fit().height - inset * 2} borderRadius={Math.max(0, radius - inset)} overflow={radius ? "hidden" : undefined}>
+                <Dithered src={fit().frame} width={fit().width - inset * 2} height={fit().height - inset * 2} />
+              </box>
+            );
+            return node.border ? (
+              <box width={fit().width} height={fit().height} borderWidth={1} borderColor={1} borderRadius={radius}>
+                {picture}
               </box>
             ) : (
-              <Dithered src={fit().frame} width={fit().width} height={fit().height} />
-            )}
+              picture
+            );
+          }}
         </Show>
       </Errored>
     </Loading>,

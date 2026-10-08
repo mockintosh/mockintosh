@@ -276,6 +276,13 @@ export function createUI(config: UIConfig): UIInstance {
       uiFlush();
       applyPendingAutoFocus(root, focusManager);
       layoutIfDirty();
+      // Content that moved under a still pointer gets its leave and enter, so
+      // a tooltip closes as its trigger scrolls away; what they change lays out
+      // before this frame is drawn.
+      if (pointer.refreshHover()) {
+        uiFlush();
+        layoutIfDirty();
+      }
       drawTree(root, drawCtx);
     },
 

@@ -414,7 +414,8 @@ function controlOf(element: Element, tag: string): FormControl | null {
   const name = element.getAttribute("name") ?? "";
   if (element.hasAttribute("disabled")) return null;
   if (tag === "textarea") {
-    return { kind: "text", name, value: element.textContent ?? "", placeholder: element.getAttribute("placeholder") ?? "" };
+    const rows = Number(element.getAttribute("rows")) || 4;
+    return { kind: "textarea", name, value: element.textContent ?? "", rows: Math.min(12, Math.max(2, rows)) };
   }
   if (tag === "select") {
     const options = Array.from(element.querySelectorAll("option"));

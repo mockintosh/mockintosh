@@ -6,7 +6,10 @@ import { useRadius } from "../theme";
 import { useUIServices } from "../services";
 import { measureText } from "../fonts/bridge";
 import type { CanvasNode, Modifiers } from "../nodes";
+import type { Sprite } from "../sprite";
 import { createTextClicks, wordRangeAt, type TextClickSelection } from "../textClicks";
+import { createCaretBlink, createTextEditing } from "../textEditing";
+import { heldModifiers } from "../modifiers";
 
 export interface TextInputProps {
   name?: string;
@@ -30,6 +33,10 @@ export interface TextInputProps {
   padding?: number;
   /** Omit the field border (e.g. inline rename over a label). */
   borderless?: boolean;
+  /** Corner radius of the border; the theme's when omitted. */
+  borderRadius?: number;
+  /** Drawn inset at the field's left, before the text, as a search field's magnifying glass. */
+  icon?: Sprite;
   /**
    * Where the line sits: `"middle"` (default) centres its caps in the field;
    * `"top"` sets it at the top padding like a plain `<text>`, so a field laid
@@ -50,6 +57,9 @@ export interface TextInputProps {
   initialCaretIndex?: number;
 }
 
+/** Between an icon and the text after it. */
+const ICON_GAP = 3;
+
 export function TextInput(props: TextInputProps): JSX.Element {
   let rootNode: CanvasNode | null = null;
 
@@ -64,30 +74,25 @@ export function TextInput(props: TextInputProps): JSX.Element {
     props.initialCaretIndex !== undefined
       ? Math.max(0, Math.min(initialLen, Math.floor(props.initialCaretIndex)))
       : initialLen;
-  // Locals stay current across staged Solid 2 writes so sequential keystrokes
-  // (keydown select-all, then keypress insert) see the caret we just moved.
-  let cursorAt = initialCaret;
-  let selLo: number | null = null;
-  let selHi: number | null = null;
-  let draft: string | null = null;
-  const valueNow = () => draft ?? props.value;
+  const editing = createTextEditing({
+    value: () => props.value,
+    onChange: (value) => props.onChange(value),
+    disabled: () => props.disabled === true,
+    // A password field keeps what's in it off the clipboard.
+    clipboard: props.password ? undefined : clipboard,
+    maxLength: () => props.maxLength,
+    initialCaret,
+    // One line: a pasted line break or tab is a space.
+    clean: (text) => text.replace(/\r\n?|\n|\t/g, " "),
+  });
+  const valueNow = editing.valueNow;
+  const cursorPos = editing.caret;
+  /** The selection's ends, or null for a bare caret. */
+  const selStart = () => (editing.anchor() === editing.caret() ? null : Math.min(editing.anchor(), editing.caret()));
+  const selEnd = () => (editing.anchor() === editing.caret() ? null : Math.max(editing.anchor(), editing.caret()));
   const signalOpts = { ownedWrite: true as const };
-  const [cursorPos, setCursorPos] = createSignal(initialCaret, signalOpts);
-  const [selStart, setSelStart] = createSignal<number | null>(null, signalOpts);
-  const [selEnd, setSelEnd] = createSignal<number | null>(null, signalOpts);
-
-  function writeCursor(n: number): void {
-    cursorAt = n;
-    setCursorPos(n);
-  }
-  function writeSel(start: number | null, end: number | null): void {
-    selLo = start;
-    selHi = end;
-    setSelStart(start);
-    setSelEnd(end);
-  }
-  const [cursorVisible, setCursorVisible] = createSignal(true, signalOpts);
   const [isFocused, setIsFocused] = createSignal(false, signalOpts);
+  const cursorVisible = createCaretBlink(isFocused, editing.caret);
 
   const fontName = () => props.font ?? "body";
   const fontSize = () => props.size;
@@ -98,9 +103,11 @@ export function TextInput(props: TextInputProps): JSX.Element {
   const fieldWidth = () => props.width ?? 120;
   const fieldHeight = () => props.height ?? 16;
   const innerTextH = () => Math.max(1, fieldHeight() - (padY() + borderW()) * 2);
-  const contentWidth = () => Math.max(1, fieldWidth() - (padX() + borderW()) * 2);
+  /** The left padding: an icon sits in it, before the text. */
+  const padLeft = () => padX() + (props.icon ? props.icon.width + ICON_GAP : 0);
+  const contentWidth = () => Math.max(1, fieldWidth() - padLeft() - padX() - borderW() * 2);
   /** Pointer x (border-box local) → x within the content box. */
-  const localToContentX = (lx: number) => lx - borderW() - padX();
+  const localToContentX = (lx: number) => lx - borderW() - padLeft();
   /** Horizontal pan so the caret stays inside the clipped content box. */
   const [scrollX, setScrollX] = createSignal(0, signalOpts);
 
@@ -115,13 +122,9 @@ export function TextInput(props: TextInputProps): JSX.Element {
 
   function handleFocus(): void {
     setIsFocused(true);
-    setCursorVisible(true);
     if (props.selectAllOnFocus && isInitialFocus) {
       isInitialFocus = false;
-      if (props.initialCaretIndex === undefined) {
-        writeSel(0, props.value.length);
-        writeCursor(props.value.length);
-      }
+      if (props.initialCaretIndex === undefined) editing.select(valueNow().length, 0);
     }
     props.onFocus?.();
   }
@@ -138,46 +141,6 @@ export function TextInput(props: TextInputProps): JSX.Element {
       });
     }
   });
-
-  // Cursor blink — the signal update triggers setProperty in the renderer,
-  // which calls the repaint hook automatically. No explicit scheduleRender needed.
-  createEffect(
-    () => isFocused(),
-    (focused) => {
-      if (!focused) return;
-      const id = setInterval(() => setCursorVisible((v) => !v), 530);
-      return () => clearInterval(id);
-    },
-  );
-
-  const resetBlink = () => setCursorVisible(true);
-
-  /**
-   * Parents may replace `value` without remounting (ChatGippity send,
-   * Terminal submit). The caret is local state — clamp it so Backspace
-   * still deletes instead of walking phantom positions past the end.
-   */
-  createEffect(
-    () => ({
-      value: props.value,
-      len: props.value.length,
-      cursor: cursorPos(),
-      ss: selStart(),
-      se: selEnd(),
-    }),
-    ({ value, len, cursor, ss, se }) => {
-      if (draft === value) draft = null;
-      else if (draft !== null && draft.length !== len) draft = null;
-      if (cursor > len) writeCursor(len);
-      if (ss === null || se === null) return;
-      if (Math.min(ss, se) >= len || ss === se) {
-        writeSel(null, null);
-        return;
-      }
-      if (ss > len) writeSel(len, se > len ? len : se);
-      else if (se > len) writeSel(ss, len);
-    },
-  );
 
   // --- Display text ---
   const displayValue = () =>
@@ -200,144 +163,20 @@ export function TextInput(props: TextInputProps): JSX.Element {
     return text.length;
   }
 
-  // --- Text insertion ---
-  function insertText(chars: string): void {
-    if (props.disabled) return;
-    resetBlink();
-    const text = valueNow();
-    const cur = cursorAt;
-    const ss = selLo;
-    const se = selHi;
-
-    if (props.maxLength !== undefined) {
-      const replaced = ss !== null && se !== null ? Math.abs(se - ss) : 0;
-      chars = chars.slice(0, Math.max(0, props.maxLength - (text.length - replaced)));
-      if (!chars) return;
-    }
-
-    if (ss !== null && se !== null) {
-      const lo = Math.min(ss, se), hi = Math.max(ss, se);
-      const next = text.slice(0, lo) + chars + text.slice(hi);
-      draft = next;
-      props.onChange(next);
-      writeCursor(lo + chars.length);
-      writeSel(null, null);
-    } else {
-      const next = text.slice(0, cur) + chars + text.slice(cur);
-      draft = next;
-      props.onChange(next);
-      writeCursor(cur + chars.length);
-    }
-  }
-
   // --- Keyboard ---
   function handleKeyDown(key: string, mod: Modifiers): void {
     if (props.onInterrupt && mod.ctrl && key.toLowerCase() === "c") { props.onInterrupt(); return; }
-    if (!props.disabled && props.onHistory && (key === "ArrowUp" || key === "ArrowDown")) { props.onHistory(key === "ArrowUp" ? -1 : 1); writeCursor(props.value.length); writeSel(null, null); resetBlink(); return; }
+    if (!props.disabled && props.onHistory && (key === "ArrowUp" || key === "ArrowDown")) { props.onHistory(key === "ArrowUp" ? -1 : 1); editing.select(props.value.length); return; }
     if (props.disabled) return;
-    resetBlink();
-    const text = valueNow();
-    const cur = cursorAt;
-    const ss = selLo;
-    const se = selHi;
-
-    if (key === "ArrowLeft") {
-      if (mod.shift) {
-        const anchor = ss ?? cur;
-        const newCur = Math.max(0, cur - 1);
-        if (newCur < anchor) writeSel(newCur, anchor);
-        else writeSel(anchor, newCur);
-        writeCursor(newCur);
-      } else {
-        writeSel(null, null);
-        writeCursor(ss !== null ? Math.min(ss, se ?? ss) : Math.max(0, cur - 1));
-      }
-      return;
-    }
-    if (key === "ArrowRight") {
-      if (mod.shift) {
-        const anchor = ss ?? cur;
-        const newCur = Math.min(text.length, cur + 1);
-        if (newCur > anchor) writeSel(anchor, newCur);
-        else writeSel(newCur, anchor);
-        writeCursor(newCur);
-      } else {
-        writeSel(null, null);
-        writeCursor(se !== null ? Math.max(ss ?? se, se) : Math.min(text.length, cur + 1));
-      }
-      return;
-    }
-    if (key === "Home") {
-      writeSel(null, null); writeCursor(0);
-      return;
-    }
-    if (key === "End") {
-      writeSel(null, null); writeCursor(text.length);
-      return;
-    }
-    if (key === "Backspace") {
-      if (ss !== null && se !== null) {
-        const lo = Math.min(ss, se), hi = Math.max(ss, se);
-        const next = text.slice(0, lo) + text.slice(hi);
-        draft = next;
-        props.onChange(next);
-        writeCursor(lo);
-        writeSel(null, null);
-      } else if (cur > 0) {
-        const next = text.slice(0, cur - 1) + text.slice(cur);
-        draft = next;
-        props.onChange(next);
-        writeCursor(cur - 1);
-      }
-      return;
-    }
-    if (key === "Delete") {
-      if (ss !== null && se !== null) {
-        const lo = Math.min(ss, se), hi = Math.max(ss, se);
-        const next = text.slice(0, lo) + text.slice(hi);
-        draft = next;
-        props.onChange(next);
-        writeCursor(lo);
-        writeSel(null, null);
-      } else if (cur < text.length) {
-        const next = text.slice(0, cur) + text.slice(cur + 1);
-        draft = next;
-        props.onChange(next);
-      }
-      return;
-    }
-    if ((mod.ctrl || mod.meta) && key.toLowerCase() === "a") {
-      writeSel(0, text.length); writeCursor(text.length);
-      return;
-    }
-    if ((mod.ctrl || mod.meta) && key.toLowerCase() === "c") {
-      if (ss !== null && se !== null) {
-        const lo = Math.min(ss, se), hi = Math.max(ss, se);
-        clipboard?.writeText(text.slice(lo, hi)).catch(() => {});
-      }
-      return;
-    }
-
-    if (key === "Enter" || key === "Return") {
-      props.onSubmit?.(valueNow());
-      return;
-    }
-    if (key === "Escape") {
-      props.onCancel?.();
-      return;
-    }
-
-    // Skip modifier-key combos (Ctrl+X, Meta+X, etc.)
-    if (mod.ctrl || mod.meta) return;
-
-    // Printable characters: host sends `keypress` after `keydown` (see solidMain);
-    // insert only there so each key yields one character.
+    if (editing.key(key, mod)) return;
+    if (key === "Enter" || key === "Return") props.onSubmit?.(valueNow());
+    else if (key === "Escape") props.onCancel?.();
   }
 
+  /** Typed characters, and pasted text one character at a time; the host sends a keypress after each keydown. */
   function handleKeyPress(char: string): void {
-    if (props.disabled) return;
-    if (char.length !== 1) return;
-    insertText(char);
+    if (props.disabled || char.length !== 1) return;
+    editing.insert(char);
   }
 
   // --- Mouse ---
@@ -346,14 +185,13 @@ export function TextInput(props: TextInputProps): JSX.Element {
   }
 
   function select({ anchor, caret }: TextClickSelection): void {
-    writeSel(anchor === caret ? null : Math.min(anchor, caret), anchor === caret ? null : Math.max(anchor, caret));
-    writeCursor(caret);
+    editing.select(caret, anchor);
   }
 
   function handleMouseDown(lx: number, ly: number): void {
     if (props.disabled) return;
     if (rootNode) focusManager.focus(rootNode);
-    select(clicks.down(lx, ly, valueNow(), indexAtPointer(lx)));
+    select(clicks.down(lx, ly, valueNow(), indexAtPointer(lx), heldModifiers().shift ? editing.anchor() : undefined));
   }
 
   function handleDoubleClick(lx: number, ly: number): void {
@@ -388,11 +226,11 @@ export function TextInput(props: TextInputProps): JSX.Element {
   // --- Computed pixel positions ---
   // Nudge 1px left so the bar sits in the gap between glyphs (metrics skew it right).
   const cursorPixelX = () =>
-    Math.max(padX(), charOffsetToPixels(cursorPos()) + padX() - 1) - scrollX();
+    Math.max(padLeft(), charOffsetToPixels(cursorPos()) + padLeft() - 1) - scrollX();
   const selPixelStart = () => {
     const ss = selStart(), se = selEnd();
     if (ss === null || se === null) return 0;
-    return charOffsetToPixels(Math.min(ss, se)) + padX() - scrollX();
+    return charOffsetToPixels(Math.min(ss, se)) + padLeft() - scrollX();
   };
   const selPixelWidth = () => {
     const ss = selStart(), se = selEnd();
@@ -421,7 +259,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
   });
   const selectedSliceLeft = createMemo(() => {
     const r = selectionRange();
-    return r ? padX() + charOffsetToPixels(r.lo) - scrollX() : 0;
+    return r ? padLeft() + charOffsetToPixels(r.lo) - scrollX() : 0;
   });
 
   return (
@@ -434,10 +272,10 @@ export function TextInput(props: TextInputProps): JSX.Element {
       borderColor={bordered() ? 1 : undefined}
       borderStyle={bordered() ? "solid" : undefined}
       borderWidth={bordered() ? 1 : 0}
-      borderRadius={bordered() ? radius() : undefined}
+      borderRadius={bordered() ? props.borderRadius ?? radius() : undefined}
       paddingTop={padY()}
       paddingBottom={padY()}
-      paddingLeft={padX()}
+      paddingLeft={padLeft()}
       paddingRight={padX()}
       justifyContent="center"
       overflow="hidden"
@@ -450,6 +288,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
       onDrag={(lx) => handleDrag(lx)}
       onKeyDown={(key: string, mod: Modifiers) => handleKeyDown(key, mod)}
       onKeyPress={(char: string) => handleKeyPress(char)}
+      onPaste={(text: string) => editing.insert(text, "other")}
     >
       <Show when={selStart() !== null}>
         <box
@@ -465,7 +304,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
       <Show when={!!displayValue()}>
         <text
           position="absolute"
-          left={padX() - scrollX()}
+          left={padLeft() - scrollX()}
           top={padY()}
           height={innerTextH()}
           font={fontName()}
@@ -509,7 +348,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
       <Show when={showPlaceholder()}>
         <text
           position="absolute"
-          left={padX()}
+          left={padLeft()}
           top={padY()}
           height={innerTextH()}
           font={fontName()}
@@ -520,6 +359,15 @@ export function TextInput(props: TextInputProps): JSX.Element {
         >
           {props.placeholder}
         </text>
+      </Show>
+
+      {/* The icon on white over its padding, so text scrolled left slides under it. */}
+      <Show when={props.icon}>
+        {(icon) => (
+          <box position="absolute" left={0} top={padY()} width={padLeft()} height={innerTextH()} background={0} paddingLeft={padX()} justifyContent="center">
+            <image src={icon()} width={icon().width} height={icon().height} />
+          </box>
+        )}
       </Show>
     </box>
   );

@@ -89,7 +89,7 @@ import { faceMetrics, middleCellTop } from "./fonts/metrics";
 import { fontFromProps, fontNameFromProps, fontStyleFromProps, textFace } from "./fonts/style";
 import { drawUnderline } from "./fonts/underline";
 import { layoutNodeRuns, runFont, runLineLeft, runStyle } from "./fonts/runLayout";
-import { nodeRuns, runFaceOf } from "./textRuns";
+import { hoveredRun, nodeRuns, runFaceOf } from "./textRuns";
 import { drawUiText, fontFamilyId } from "./fonts/strike";
 import { drawStyledLine } from "./fonts/bridge";
 import { textSelectionOf } from "./selectable";
@@ -570,7 +570,8 @@ function drawText(
         const runStyleValue = runStyle(face.style, run);
         TextFace(textFace(runStyleValue));
         drawUiText(runFace, fragment.text, lineX + fragment.x, lineY + runFace.glyphHeight);
-        if (runStyleValue.underline) drawUnderline(runFace, fragment.text, lineX + fragment.x, lineY, color);
+        const underline = runStyleValue.underline || (run.underline === "hover" && fragment.run === hoveredRun(node));
+        if (underline) drawUnderline(runFace, fragment.text, lineX + fragment.x, lineY, color);
       }
       lineY += block.lineHeight;
     }

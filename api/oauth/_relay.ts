@@ -14,6 +14,10 @@
  *      parameters (`code`, `error`, …) under the pairing.
  *   4. The OS polls `poll` with the token and receives the parameters once.
  *
+ * `start` also returns the authorize URL with `state` set, so the user can
+ * sign in in the Macintosh's own browser instead: the same pairing, minus
+ * the confirmation page, which only guards a scanned code.
+ *
  * The relay knows nothing about providers and never sees a client secret or
  * token: apps use PKCE and exchange the code themselves. Handlers may run as
  * separate stateless functions, so pairings live in a Redis REST store
@@ -137,7 +141,17 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-/** A page for the phone. `body` is trusted HTML; interpolate through `html`. */
+/**
+ * The script that redraws a page in 1-bit (`src/relay/main.tsx`): the
+ * built file on a deployment, the source through Vite in development.
+ */
+const PAGE_SCRIPT = process.env.VERCEL ? "/relay.js" : "/src/relay/main.tsx";
+
+/**
+ * A page for the phone. `body` is trusted HTML; interpolate through `html`.
+ * Keep it to paragraphs and `a.button` links: the page script redraws
+ * those in 1-bit, and the HTML stays for screen readers.
+ */
 export function page(body: string, status = 200): Response {
   const doc = `<!DOCTYPE html>
 <html>
@@ -150,9 +164,13 @@ export function page(body: string, status = 200): Response {
   body { font: 18px/1.45 -apple-system, system-ui, sans-serif; margin: 3em 1.5em; text-align: center; color: #000; background: #fff; }
   a.button { display: inline-block; margin: 1em 0; padding: .6em 1.4em; border: 2px solid #000; border-radius: 10px; color: #000; text-decoration: none; font-weight: 600; }
   .small { font-size: 14px; color: #555; }
+  #screen { position: fixed; inset: 0; display: none; }
+  .drawn #screen { display: block; }
+  /* Drawn in 1-bit over the page; still read aloud. */
+  .drawn #content { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 </style>
 </head>
-<body>${body}</body>
+<body><div id="content">${body}</div><div id="screen" aria-hidden="true"></div><script type="module" src="${PAGE_SCRIPT}"></script></body>
 </html>`;
   return new Response(doc, {
     status,
@@ -165,4 +183,4 @@ export function html(strings: TemplateStringsArray, ...values: Array<string | nu
   return strings.reduce((out, s, i) => out + s + (i < values.length ? escapeHtml(String(values[i])) : ""), "");
 }
 
-export const EXPIRED_PAGE = html`<p>This code has expired. Show a new one on your Macintosh and scan again.</p>`;
+export const EXPIRED_PAGE = html`<p>This code has expired. Show a new one on your Mockintosh and scan again.</p>`;

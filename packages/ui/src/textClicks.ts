@@ -42,8 +42,12 @@ export function paragraphRangeAt(text: string, index: number): TextRange {
 const wholeText = (text: string): TextRange => ({ start: 0, end: text.length });
 
 export interface TextClicks {
-  /** A press: 1st places the caret, 2nd selects a word, 3rd the `third` unit. */
-  down(lx: number, ly: number, text: string, index: number): TextClickSelection;
+  /**
+   * A press: 1st places the caret, 2nd selects a word, 3rd the `third` unit.
+   * With `extendFrom` (a ⇧-press, the selection's anchor) it extends the
+   * selection from there instead.
+   */
+  down(lx: number, ly: number, text: string, index: number, extendFrom?: number): TextClickSelection;
   /** Drag after a press, extending by the unit the press selected. */
   drag(text: string, index: number): TextClickSelection;
   /**
@@ -85,7 +89,15 @@ export function createTextClicks(options?: {
   };
 
   return {
-    down(lx, ly, text, index) {
+    down(lx, ly, text, index, extendFrom) {
+      if (extendFrom !== undefined) {
+        count = 1;
+        lastAt = now();
+        lastX = lx;
+        lastY = ly;
+        anchor = { start: extendFrom, end: extendFrom };
+        return { anchor: extendFrom, caret: index };
+      }
       const repeat =
         now() - lastAt < DOUBLE_CLICK_MS &&
         Math.abs(lx - lastX) < DOUBLE_CLICK_DIST &&

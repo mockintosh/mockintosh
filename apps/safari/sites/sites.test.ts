@@ -3,7 +3,7 @@ import { parseUrl, type LayoutNode } from "@mockintosh/sdk";
 import { hnText, parseHackerNewsUrl } from "./hackernews";
 import { scaled } from "../icons";
 import { microDesktopError, mockintoshSite } from "./mockintosh";
-import { avatarSrc, githubPage, githubUrl, resolveRelative } from "./github/page";
+import { avatarSrc, contributionCalendar, contributionGraph, githubPage, githubUrl, resolveRelative } from "./github/page";
 import { adapterFor } from "./index";
 import { docsPage, docsSite } from "./docs/site";
 import { DOCS_PAGES } from "./docs/pages";
@@ -22,6 +22,7 @@ const REPO: RepoInfo = {
   license: "MIT",
   homepage: "",
   topics: [],
+  hasDiscussions: false,
 };
 
 function links(nodes: readonly LayoutNode[]): string[] {
@@ -30,6 +31,9 @@ function links(nodes: readonly LayoutNode[]): string[] {
     if (node.type === "paragraph" || node.type === "listItem") {
       return node.segments.flatMap((segment) => (segment.kind === "link" ? [segment.href] : []));
     }
+    if (node.type === "box") return links(node.nodes);
+    if (node.type === "tabs") return node.items.map((tab) => tab.href);
+    if (node.type === "columns") return node.columns.flatMap((column) => links(column.nodes));
     return [];
   });
 }
@@ -48,14 +52,14 @@ describe("GitHub pages", () => {
         ],
         commit: null,
         readme: "See [the guide](docs/guide.md) and ![logo](logo.png).",
+        starred: null,
       },
       0,
     );
     expect(page.url).toBe("https://github.com/octocat/Hello-World/tree/main");
+    // The tabs go in the header, with "owner / repo" beside the mark.
+    expect(links(page.nav ? [page.nav] : [])).toContain("https://github.com/octocat/Hello-World/issues");
     expect(links(page.nodes)).toEqual(expect.arrayContaining([
-      "https://github.com/octocat/Hello-World",
-      "https://github.com/octocat",
-      "https://github.com/octocat/Hello-World/issues",
       "https://github.com/octocat/Hello-World/tree/main/src",
       "https://github.com/octocat/Hello-World/blob/main/README.md",
       "https://github.com/octocat/Hello-World/blob/main/docs/guide.md",
@@ -89,21 +93,22 @@ describe("GitHub pages", () => {
         repos: [{ owner: "octocat", name: "Spoon-Knife", description: "", language: "HTML", stars: 13000, forks: 150000, fork: false }],
         orgs: [],
         people: [],
+        extras: null,
       },
       0,
     );
     const columns = page.nodes.find((node) => node.type === "columns");
     if (columns?.type !== "columns") throw new Error("no columns");
     const [sidebar, main] = columns.columns;
-    expect(sidebar!.width).toBe(200);
+    expect(sidebar!.width).toBe(150);
     expect(sidebar!.nodes[0]).toEqual({
       type: "image",
-      src: "https://avatars.githubusercontent.com/u/583231?v=4&s=200",
+      src: "https://avatars.githubusercontent.com/u/583231?v=4&s=150",
       alt: "octocat",
       align: "left",
-      width: 200,
-      height: 200,
-      borderRadius: 100,
+      width: 150,
+      height: 150,
+      borderRadius: 75,
     });
     expect(sidebar!.nodes[1]).toMatchObject({ type: "heading", text: "The Octocat" });
     expect(links(sidebar!.nodes)).toContain("https://github.blog");
@@ -111,10 +116,46 @@ describe("GitHub pages", () => {
     expect(links((main!.nodes[1] as { nodes: LayoutNode[] }).nodes)).toEqual(["https://github.com/octocat/Spoon-Knife"]);
   });
 
+  it("draws the contribution graph a week per column, Sunday on top: empty days dotted, the rest outlined and filled deeper", () => {
+    const week = (levels: number[]) => ({ firstDay: "2026-10-04", levels, counts: levels.map((level) => Math.max(0, level)) });
+    const graph = contributionGraph([week([-1, -1, 0, 1, 2, 3, 4]), week([4, -1, -1, -1, -1, -1, -1])]);
+    if (graph.type !== "bitmap") throw new Error("not a bitmap");
+    expect([graph.width, graph.height]).toEqual([18, 68]);
+    const ink = (column: number, row: number) => {
+      let count = 0;
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) count += graph.data[(row * 10 + y) * graph.width + column * 10 + x];
+      return count;
+    };
+    const levels = [0, 1, 2, 3, 4, 5, 6].map((row) => ink(0, row));
+    expect(levels.slice(0, 3)).toEqual([0, 0, 14]);
+    expect(levels[3]).toBeGreaterThan(28);
+    expect(levels[3]).toBeLessThan(levels[4]);
+    expect(levels[4]).toBeLessThan(levels[5]);
+    expect(levels[6]).toBe(64);
+    expect(ink(1, 0)).toBe(64);
+  });
+
+  it("puts the whole year under month names in a pane scrolled to the latest weeks", () => {
+    const weeks = Array.from({ length: 53 }, (_, index) => {
+      const day = new Date(Date.UTC(2025, 9, 5 + index * 7)).toISOString().slice(0, 10);
+      return { firstDay: day, levels: [1, 0, 0, 0, 0, 0, 0], counts: [1, 0, 0, 0, 0, 0, 0] };
+    });
+    const [title, box] = contributionCalendar(677, weeks);
+    expect(title).toMatchObject({ type: "heading", text: "677 contributions in the last year" });
+    const scroller = box!.type === "box" ? box.nodes[0] : null;
+    if (scroller?.type !== "scroller") throw new Error("no scroller");
+    expect(scroller).toMatchObject({ width: 528, start: "end" });
+    const [months, graph] = scroller.nodes;
+    expect(graph).toMatchObject({ type: "bitmap", width: 528 });
+    if (months?.type !== "columns") throw new Error("no month row");
+    const names = months.columns.flatMap((column) => column.nodes.map((node) => (node.type === "paragraph" ? node.segments[0]!.text : "")));
+    expect(names).toEqual(["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"]);
+  });
+
   it("leaves out avatars it can't load", () => {
     expect(avatarSrc("")).toBe("");
     expect(avatarSrc("http://avatars.githubusercontent.com/u/1")).toBe("");
-    expect(avatarSrc("https://avatars.githubusercontent.com/u/1?s=460&v=4")).toBe("https://avatars.githubusercontent.com/u/1?v=4&s=200");
+    expect(avatarSrc("https://avatars.githubusercontent.com/u/1?s=460&v=4")).toBe("https://avatars.githubusercontent.com/u/1?v=4&s=150");
   });
 
   it("round-trips search URLs", () => {

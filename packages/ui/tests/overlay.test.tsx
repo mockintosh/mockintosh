@@ -14,6 +14,15 @@ const OPTIONS = [
   { value: "b", label: "Pear" },
 ] as const;
 
+/** Frames until `onLayout` measurements (delivered in microtasks) have been laid out. */
+async function settle(ui: ReturnType<typeof createUI>): Promise<void> {
+  for (let i = 0; i < 4; i++) {
+    ui.frame();
+    await Promise.resolve();
+  }
+  ui.frame();
+}
+
 function click(ui: ReturnType<typeof createUI>, name: string): void {
   const node = ui.inspect().find((n) => n.name === name)!;
   ui.dispatchPointer("mousedown", node.bounds.x + 4, node.bounds.y + 4);
@@ -97,6 +106,132 @@ describe("Tooltip", () => {
     ui.dispatchPointer("mousemove", 2, 2);
     ui.frame();
     expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(false);
+  });
+
+  it("leaves its 1px gap above a raised button's face, which draws a pixel above its box", async () => {
+    const screen = newBitMap(200, 80);
+    const ui = createUI({ screen });
+    ui.render(() => (
+      <box padding={40} flexDirection="row">
+        <Tooltip label="Fork it">
+          <Button name="fork" label="Fork" onClick={() => {}} />
+        </Tooltip>
+      </box>
+    ));
+    await settle(ui);
+    const button = ui.inspect().find((n) => n.name === "fork")!;
+    ui.dispatchPointer("mousemove", button.bounds.x + 8, button.bounds.y + 6);
+    await settle(ui);
+    const tip = ui.inspect().find((n) => n.name === "tooltip")!;
+    const row = (y: number) => Array.from({ length: 20 }, (_, i) => (getBit(screen, button.bounds.x + 8 + i, y) ? "#" : ".")).join("");
+    const faceTop = button.bounds.y - 1;
+    expect(row(faceTop)).toBe("#".repeat(20));
+    expect(row(faceTop - 1)).toBe(".".repeat(20));
+    expect(tip.bounds.y + tip.bounds.height).toBe(faceTop - 1);
+  });
+
+  it("closes when its trigger moves out from under a still pointer, as a scrolled window's content does", () => {
+    const ui = createUI({ screen: newBitMap(240, 120) });
+    // The window's scroll, as the OS gives it to a worker app: the content moves, the pointer doesn't.
+    const [scrolled, setScrolled] = createSignal(0);
+    ui.render(() => (
+      <box width={240} height={120} overflow="hidden" position="relative">
+        <box position="absolute" left={0} top={20 - scrolled()} width={240}>
+          <Tooltip label="Save the file">
+            <box semantic={{ name: "save" }} width={40} height={16}>
+              <text font="body">Save</text>
+            </box>
+          </Tooltip>
+        </box>
+      </box>
+    ));
+    ui.frame();
+    const save = ui.inspect().find((n) => n.name === "save")!;
+    ui.dispatchPointer("mousemove", save.bounds.x + 4, save.bounds.y + 4);
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(true);
+
+    setScrolled(30);
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(false);
+
+    // Scrolled back under the pointer, it shows again.
+    setScrolled(0);
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(true);
+  });
+
+  it("closes when the wheel scrolls its pane out from under the pointer", () => {
+    const ui = createUI({ screen: newBitMap(240, 80) });
+    ui.render(() => (
+      <box width={240} height={60} overflow="scroll">
+        <box height={8} />
+        <Tooltip label="Save the file">
+          <box semantic={{ name: "save" }} width={40} height={16}>
+            <text font="body">Save</text>
+          </box>
+        </Tooltip>
+        <box height={200} />
+      </box>
+    ));
+    ui.frame();
+    const save = ui.inspect().find((n) => n.name === "save")!;
+    const at = { x: save.bounds.x + 4, y: save.bounds.y + 4 };
+    ui.dispatchPointer("mousemove", at.x, at.y);
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(true);
+    ui.dispatchPointer("scroll", at.x, at.y, { deltaY: 40 });
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(false);
+  });
+});
+
+describe("Tooltip in a scrolled pane", () => {
+  it("hangs the caption over the trigger where it is drawn, not where it would be unscrolled", async () => {
+    const ui = createUI({ screen: newBitMap(240, 80) });
+    ui.render(() => (
+      <box padding={20}>
+        <box overflow="scroll" width={100} height={40} scrollOffsetX={40}>
+          <box width={300} height={40} flexDirection="row">
+            <box width={60} />
+            <Tooltip label="Day">
+              <box semantic={{ name: "day" }} width={8} height={8} onClick={() => {}} />
+            </Tooltip>
+          </box>
+        </box>
+      </box>
+    ));
+    ui.frame();
+    const day = ui.inspect().find((n) => n.name === "day")!;
+    // 20 padding + 60 in, less 40 scrolled: drawn at x 40.
+    expect(day.bounds.x).toBe(40);
+    ui.dispatchPointer("mousemove", day.bounds.x + 2, day.bounds.y + 2);
+    await settle(ui);
+    const panel = ui.inspect().find((n) => n.name === "overlay-panel")!;
+    // Centred on the day where it is drawn, its bottom 1px above it.
+    expect(Math.abs(panel.bounds.x + panel.bounds.width / 2 - (day.bounds.x + 4))).toBeLessThanOrEqual(1);
+    expect(panel.bounds.y + panel.bounds.height).toBe(day.bounds.y - 1);
+  });
+});
+
+describe("Tooltip at the edge", () => {
+  it("moves left to stay on screen when its trigger is near the right edge", async () => {
+    const ui = createUI({ screen: newBitMap(120, 60) });
+    ui.render(() => (
+      <box width={120} height={60} flexDirection="row" justifyContent="flex-end" paddingTop={30}>
+        <Tooltip label="2 contributions on October 4, 2026">
+          <box semantic={{ name: "day" }} width={8} height={8} onClick={() => {}} />
+        </Tooltip>
+      </box>
+    ));
+    ui.frame();
+    const day = ui.inspect().find((n) => n.name === "day")!;
+    ui.dispatchPointer("mousemove", day.bounds.x + 2, day.bounds.y + 2);
+    await settle(ui);
+    const panel = ui.inspect().find((n) => n.name === "overlay-panel")!;
+    expect(panel.bounds.width).toBeGreaterThan(60);
+    expect(panel.bounds.x + panel.bounds.width).toBeLessThanOrEqual(120);
+    expect(panel.bounds.x).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -226,5 +361,52 @@ describe("Menu", () => {
     click(ui, "edit:cut");
     expect(cut).toBe(true);
     expect(ui.inspect().some((n) => n.name === "overlay-panel")).toBe(false);
+  });
+
+  it("hangs 1px below its trigger", () => {
+    const [open, setOpen] = createSignal(false);
+    const ui = createUI({ screen: newBitMap(240, 160) });
+    ui.render(() => (
+      <box padding={10}>
+        <Menu name="edit" open={open()} onDismiss={() => {}} trigger={<box semantic={{ name: "trigger" }} width={20} height={10} />} items={[{ label: "Cut" }]} />
+      </box>
+    ));
+    ui.frame();
+    setOpen(true);
+    ui.frame();
+    const trigger = ui.inspect().find((n) => n.name === "trigger")!;
+    const menu = ui.inspect().find((n) => n.name === "edit" && n.role === "menu")!;
+    expect(menu.bounds.y).toBe(trigger.bounds.y + trigger.bounds.height + 1);
+  });
+
+  it("inverts the item under the pointer, as the menu bar does, but never a disabled one", () => {
+    const ui = createUI({ screen: newBitMap(240, 160) });
+    ui.render(() => (
+      <Menu
+        name="edit"
+        open
+        onDismiss={() => {}}
+        trigger={<box width={20} height={10} />}
+        items={[
+          { id: "cut", label: "Cut" },
+          { id: "paste", label: "Paste", disabled: true },
+        ]}
+      />
+    ));
+    ui.frame();
+    // A pixel in an item's left padding: paper, or ink when the item is lit.
+    const padding = (name: string) => {
+      const item = ui.inspect().find((n) => n.name === name)!;
+      return { x: item.bounds.x + 2, y: item.bounds.y + 2 };
+    };
+    const lit = (name: string) => getBit(ui.port.portBits, padding(name).x, padding(name).y) === 1;
+    expect(lit("edit:cut")).toBe(false);
+    ui.dispatchPointer("mousemove", padding("edit:cut").x, padding("edit:cut").y);
+    ui.frame();
+    expect(lit("edit:cut")).toBe(true);
+    ui.dispatchPointer("mousemove", padding("edit:paste").x, padding("edit:paste").y);
+    ui.frame();
+    expect(lit("edit:cut")).toBe(false);
+    expect(lit("edit:paste")).toBe(false);
   });
 });

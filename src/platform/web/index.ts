@@ -23,7 +23,7 @@ import type {
 } from "../types";
 import { browserBuilder } from "./builder";
 import { webFetch } from "./fetch";
-import { CanvasPresenter, createScreenCanvas, wheelDeltaY, wheelIsPinchZoom } from "@mockintosh/ui/web";
+import { CanvasPresenter, createScreenCanvas, wheelDeltaX, wheelDeltaY, wheelIsPinchZoom } from "@mockintosh/ui/web";
 import { bitMapHeight, bitMapWidth } from "@mockintosh/quickdraw/bits";
 import { createHostDisplay, initialScreenSize } from "./hostDisplay";
 import { createWebDownloadService } from "./download";
@@ -252,7 +252,7 @@ function createDOMInput(
     (e) => {
       e.preventDefault();
       if (wheelIsPinchZoom(e)) return;
-      emitPointer({ type: "scroll", ...toScreen(e), deltaX: e.deltaX, deltaY: wheelDeltaY(e, canvas.clientHeight) });
+      emitPointer({ type: "scroll", ...toScreen(e), deltaX: wheelDeltaX(e, canvas.clientWidth), deltaY: wheelDeltaY(e, canvas.clientHeight) });
     },
     { passive: false }
   );
@@ -262,7 +262,12 @@ function createDOMInput(
     key: e.key,
     modifiers: modifiers(e),
   });
-  window.addEventListener("keydown", (e) => emitKey(keyEvent("down", e)));
+  window.addEventListener("keydown", (e) => {
+    // Tab moves focus inside the Macintosh, not the browser's focus off it,
+    // when the keys are the Macintosh's (not a field of the page around it).
+    if (e.key === "Tab" && (e.target === canvas || e.target === document.body)) e.preventDefault();
+    emitKey(keyEvent("down", e));
+  });
   window.addEventListener("keyup", (e) => emitKey(keyEvent("up", e)));
 
   const allowDrop = (e: DragEvent) => {

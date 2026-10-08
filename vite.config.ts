@@ -72,6 +72,8 @@ function solidJsx(): Plugin[] {
         /src\/os\/.*\.[tj]sx?$/,
         // The app-process runtime: the worker half of an app, which mounts it with JSX.
         /src\/platform\/web\/process\/.*\.[tj]sx?$/,
+        // The sign-in relay's pages, redrawn in 1-bit.
+        /src\/relay\/.*\.[tj]sx?$/,
       ],
       solid: {
         generate: "universal",
@@ -175,9 +177,14 @@ export default defineConfig({
       // The *-runtime entries are served to third-party bundles through the
       // import map, so their public export names must survive minification.
       preserveEntrySignatures: "strict",
+      output: {
+        entryFileNames: (chunk) => (chunk.name === "relay" ? "relay.js" : "assets/[name]-[hash].js"),
+      },
       input: {
         main: resolve(__dirname, "index.html"),
         "3d": resolve(__dirname, "3d.html"),
+        // Loaded by name from the sign-in relay's pages (api/oauth/_relay.ts), so it keeps a fixed path.
+        relay: resolve(__dirname, "src/relay/main.tsx"),
         "ui-runtime": resolve(__dirname, "packages/ui/src/index.ts"),
         "ui-renderer-runtime": resolve(__dirname, "packages/ui/src/renderer.ts"),
         "sdk-runtime": resolve(__dirname, "packages/sdk/src/index.ts"),
@@ -192,6 +199,8 @@ export default defineConfig({
     },
   },
   server: {
+    // Where the sign-in relay's loopback redirect lands (src/platform/web/signInRelay.ts); localhost still reaches it.
+    host: "127.0.0.1",
     headers: isolationHeaders,
     proxy: {
       "/api": {

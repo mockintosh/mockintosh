@@ -131,9 +131,10 @@ export function createFocusManager(root: CanvasNode): FocusManager {
     ): void {
       const current = focusedNode();
 
-      // Tab / Shift+Tab move focus, unless the focused node takes raw keys;
-      // ⌃Tab always moves it, so a keyboard user can leave a terminal.
-      if (type === "keydown" && key === "Tab" && (modifiers.ctrl || !current?._eventHandlers.rawKeys)) {
+      // Tab / Shift+Tab move focus, unless the focused node takes raw keys or
+      // Tab; ⌃Tab always moves it, so a keyboard user can leave a terminal.
+      const ownsTab = current?._eventHandlers.rawKeys || current?._eventHandlers.tabKeys;
+      if (type === "keydown" && key === "Tab" && (modifiers.ctrl || !ownsTab)) {
         if (modifiers.shift) {
           manager.focusPrev();
         } else {

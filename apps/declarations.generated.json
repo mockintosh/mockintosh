@@ -103,6 +103,11 @@
   "requires": [
    "network"
   ],
+  "signIn": {
+   "hosts": [
+    "github.com"
+   ]
+  },
   "scrollable": true,
   "resizable": true,
   "minSize": {
@@ -111,6 +116,33 @@
   },
   "about": {
    "description": "Browses the web the way it looked in 1996: text, links, pictures and forms, without style sheets or scripts. GitHub and Hacker News are drawn from their APIs."
+  },
+  "sprites": {
+   "safari/github-mark-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "ACqoAAKqqoAKaqmgKmqpqCpVVaiqVVWqqVVVaqlVVWqpVVVqqVVVaqpVVaoqpVqoKaVaqApVWqACpVqAACVYAA=="
+   },
+   "safari/github-star": {
+    "width": 11,
+    "height": 11,
+    "data": "ACAAAiAACIAqgKqAAAiAAICACAIAICAgIIIggqAqAA=="
+   },
+   "safari/github-starred": {
+    "width": 11,
+    "height": 11,
+    "data": "ACAAAqAACoAqqqqqqqiqqoCqqAKqoCqqoKoqgqAqAA=="
+   },
+   "safari/github-search": {
+    "width": 11,
+    "height": 10,
+    "data": "CqAAgCAIACAgAICAAgIACAIAgAKooAAAoAAAoA=="
+   },
+   "safari/github-fork": {
+    "width": 10,
+    "height": 11,
+    "data": "KAKIIIKCCCKAKAgCACCAAKAACgACCAAggACgAA=="
+   }
   }
  },
  "maps": {

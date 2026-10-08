@@ -102,6 +102,8 @@ export function Window(props: WindowProps): JSX.Element {
   const [headerView, setHeaderView] = createSignal<(() => JSX.Element) | null>(null, {
     ownedWrite: true,
   });
+  /** The header view draws the band's bottom rule itself. */
+  const [headerRuled, setHeaderRuled] = createSignal(false, { ownedWrite: true });
   const [footerView, setFooterView] = createSignal<(() => JSX.Element) | null>(null, {
     ownedWrite: true,
   });
@@ -509,17 +511,20 @@ export function Window(props: WindowProps): JSX.Element {
           width={contentW()}
           height={props.win.height}
           overflow="scroll"
+          overlayBounds
           scrollOffset={Math.min(props.win.scrollY, maxScrollY())}
           scrollOffsetX={scrollX()}
           onScroll={(dy) => {
             updateOSWindow(props.win.id, { scrollY: Math.max(0, Math.min(maxScrollY(), props.win.scrollY + dy)) });
           }}
+          onScrollX={(dx) => scrollXBy(dx)}
         >
           <WindowContent
             win={props.win}
             slots={{
-              setHeader: (view, height) => {
+              setHeader: (view, height, ruled) => {
                 setHeaderView((prev) => (view === null ? null : (prev ?? view)));
+                setHeaderRuled(view !== null && ruled === true);
                 applyBandHeight("headerHeight", height);
               },
               setFooter: (view, height) => {
@@ -543,14 +548,16 @@ export function Window(props: WindowProps): JSX.Element {
             <Show when={headerView()} fallback={<DefaultInfoBar win={props.win} />}>
               {(view) => view()()}
             </Show>
-            <box
-              position="absolute"
-              left={0}
-              top={bandH() - 1}
-              width={innerW()}
-              height={1}
-              background={1}
-            />
+            <Show when={!headerRuled()}>
+              <box
+                position="absolute"
+                left={0}
+                top={bandH() - 1}
+                width={innerW()}
+                height={1}
+                background={1}
+              />
+            </Show>
           </box>
         </Show>
 

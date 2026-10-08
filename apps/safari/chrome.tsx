@@ -4,10 +4,12 @@ import { closeIcon, dimmed, lockIcon } from "./icons";
 
 export const TOOLBAR_H = 24;
 export const TAB_BAR_H = 17;
-/** Toolbar and the header band's own bottom rule (no tab bar). */
-export const TOOLBAR_HEADER_H = TOOLBAR_H + 1;
-/** Toolbar, rule, tab bar, and the header band's own bottom rule. */
-export const HEADER_H = TOOLBAR_H + 1 + TAB_BAR_H + 1;
+/** The double rule under the header, as a Finder folder's: a black line and a white one over the band's own bottom rule. */
+export const DOUBLE_RULE_H = 2;
+/** Toolbar, the double rule, and the header band's own bottom rule (no tab bar). */
+export const TOOLBAR_HEADER_H = TOOLBAR_H + DOUBLE_RULE_H + 1;
+/** Toolbar, rule, tab bar, the double rule, and the header band's own bottom rule. */
+export const HEADER_H = TOOLBAR_H + 1 + TAB_BAR_H + DOUBLE_RULE_H + 1;
 const FACE_H = 18;
 const TAB_FONT = "body";
 const ARROW_W = 23;
@@ -22,6 +24,8 @@ interface FaceProps {
   icon: Sprite;
   onClick: () => void;
   disabled?: boolean;
+  /** Drawn pressed, as while its menu is open. */
+  active?: boolean;
   width: number;
   height: number;
 }
@@ -30,16 +34,17 @@ interface FaceProps {
 function IconFace(props: FaceProps): JSX.Element {
   const press = createPress(props);
   const icon = () => (props.disabled ? dimmed(props.icon) : props.icon);
+  const dark = () => press.pressed() || !!props.active;
   return (
     <box
       {...press.rootProps()}
       width={props.width}
       height={props.height}
-      background={press.pressed() ? 1 : 0}
+      background={dark() ? 1 : 0}
       justifyContent="center"
       alignItems="center"
     >
-      <image src={icon()} width={props.icon.width} height={props.icon.height} mode={press.pressed() ? "inverted" : "normal"} />
+      <image src={icon()} width={props.icon.width} height={props.icon.height} mode={dark() ? "inverted" : "normal"} />
     </box>
   );
 }
@@ -49,6 +54,8 @@ export interface ToolbarButtonProps {
   icon: Sprite;
   onClick: () => void;
   disabled?: boolean;
+  /** Drawn pressed, as while its menu is open. */
+  active?: boolean;
 }
 
 /** A framed toolbar button with a drop shadow. */
@@ -82,13 +89,19 @@ export interface AddressFieldProps {
   onSubmit: () => void;
   secure: boolean;
   width: number;
+  /** How far the page in front has loaded, 0 to 1; null when it isn't loading. */
+  progress: number | null;
 }
 
-/** The address field: a lock for `https` pages, then the address. */
+/** Height of the loading bar along the field's bottom edge. */
+const PROGRESS_H = 1;
+
+/** The address field: a lock for `https` pages, then the address, and a bar along its foot while the page loads, as Safari's fills. */
 export function AddressField(props: AddressFieldProps): JSX.Element {
   const lockW = () => (props.secure ? lockIcon.width + LOCK_GAP : 0);
+  const fill = () => (props.progress === null ? 0 : Math.round(props.progress * (props.width - 2)));
   return (
-    <box width={props.width} height={FACE_H} borderWidth={1} borderColor={1} shadow flexDirection="row" alignItems="center" paddingLeft={3} gap={LOCK_GAP}>
+    <box width={props.width} height={FACE_H} borderWidth={1} borderColor={1} shadow flexDirection="row" alignItems="center" paddingLeft={3} gap={LOCK_GAP} position="relative">
       <Show when={props.secure}>
         <image src={lockIcon} width={lockIcon.width} height={lockIcon.height} />
       </Show>
@@ -104,6 +117,17 @@ export function AddressField(props: AddressFieldProps): JSX.Element {
         borderless
         selectAllOnFocus
       />
+      <Show when={props.progress !== null}>
+        <box
+          semantic={{ name: "safari-progress", role: "progressbar", value: String(props.progress ?? 0) }}
+          position="absolute"
+          left={0}
+          bottom={0}
+          width={fill()}
+          height={PROGRESS_H}
+          background={1}
+        />
+      </Show>
     </box>
   );
 }

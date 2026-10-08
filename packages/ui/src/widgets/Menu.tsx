@@ -1,6 +1,6 @@
-import { For } from "solid-js";
+import { For, createSignal } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Overlay } from "./Overlay";
+import { Overlay, type OverlayAlign } from "./Overlay";
 import { useRadius } from "../theme";
 
 export interface MenuItem {
@@ -17,13 +17,18 @@ export interface MenuProps {
   onDismiss: () => void;
   trigger: JSX.Element;
   items: readonly MenuItem[];
+  /** `end` hangs the menu from the trigger's right edge, for a trigger at the right of a bar. */
+  align?: OverlayAlign;
+  /** Pixels between the trigger and the menu below it. */
+  offset?: number;
 }
 
-/** In-window menu. Not the OS menubar. */
+/** In-window menu. Not the OS menubar, but highlights the item under the pointer as it does: inverted. */
 export function Menu(props: MenuProps): JSX.Element {
   const radius = useRadius("md");
+  const [hovered, setHovered] = createSignal<MenuItem | null>(null);
   return (
-    <Overlay open={props.open} onDismiss={props.onDismiss} role="menu" trigger={props.trigger}>
+    <Overlay open={props.open} onDismiss={props.onDismiss} role="menu" align={props.align} offset={props.offset ?? 1} trigger={props.trigger}>
       <box
         semantic={{ name: props.name ?? "menu", role: "menu" }}
         minWidth={100}
@@ -36,6 +41,7 @@ export function Menu(props: MenuProps): JSX.Element {
         <For each={props.items}>
           {(item) => {
             const id = () => item.id ?? item.label;
+            const lit = () => !item.disabled && hovered() === item;
             return (
               <box
                 semantic={{
@@ -48,14 +54,20 @@ export function Menu(props: MenuProps): JSX.Element {
                 paddingRight={8}
                 paddingTop={2}
                 paddingBottom={2}
+                background={lit() ? 1 : 0}
                 cursor={item.disabled ? "default" : "pointer"}
+                onMouseEnter={() => setHovered(item)}
+                onMouseLeave={() => {
+                  if (hovered() === item) setHovered(null);
+                }}
                 onClick={() => {
                   if (item.disabled) return;
+                  setHovered(null);
                   item.onClick?.();
                   props.onDismiss();
                 }}
               >
-                <text font="body" color={1} stipple={item.disabled} nowrap>
+                <text font="body" color={lit() ? 0 : 1} stipple={item.disabled} nowrap>
                   {`${item.checked ? "✓ " : ""}${item.label}`}
                 </text>
               </box>

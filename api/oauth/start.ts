@@ -1,9 +1,11 @@
 /**
  * POST /api/oauth/start  { url, appTitle }
- *   → { id, poll_token, expires_in, interval }
+ *   → { id, poll_token, url, expires_in, interval }
  *
  * `url` is the provider's authorize URL with `redirect_uri` pointing at this
- * relay's callback. The relay sets `state` to the new pairing id. See `_relay.ts`.
+ * relay's callback. The relay sets `state` to the new pairing id and returns
+ * the URL, for signing in with the Macintosh's own browser instead of the
+ * phone. See `_relay.ts`.
  */
 
 import {
@@ -57,7 +59,7 @@ export default async function handler(req: Request): Promise<Response> {
   const pollToken = randomId();
   url.searchParams.set("state", id);
   await store.put(id, { status: "pending", url: url.toString(), appTitle, pollToken }, PAIRING_TTL_SECONDS);
-  return json({ id, poll_token: pollToken, expires_in: PAIRING_TTL_SECONDS, interval: POLL_INTERVAL_SECONDS });
+  return json({ id, poll_token: pollToken, url: url.toString(), expires_in: PAIRING_TTL_SECONDS, interval: POLL_INTERVAL_SECONDS });
 }
 
 export const config = { runtime: "edge" };

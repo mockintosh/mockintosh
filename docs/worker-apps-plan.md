@@ -109,7 +109,6 @@ The idle page went from 7.0 MB to 4.6 MB, and from 11.9 MB to 8.7 MB with Showre
 
 ## Next
 
-- **`signIn`** in processes. Only Spotify signs in, and it stays on the OS's thread for its player.
 - **Bundles split into chunks** that import shared modules themselves.
 - **App-to-app drag and Apple Events**, then the Finder can move too.
 
@@ -155,6 +154,7 @@ Everything an app declares or reaches for through `useApp()` works in a process,
 - **Sprites:** the whole registry.
 - **Kernel sessions:** traps with streamed output and cancellation.
 - **Agents:** the process runs fx's engine itself (`AgentRuntime`, libfx with JSPI), so fx and Terminal's `fx` run in processes.
+- **Sign-in:** `signIn.authorize` puts up the OS's sheet and answers when it closes. Safari signs in to GitHub from its process.
 - **Windows:** scrolling windows, `WindowHeader` / `WindowFooter` bands (drawn in the process's band), full screen, custom About boxes (drawn by the OS from its copy of the module).
 
 ### Still on the OS's thread
@@ -163,8 +163,6 @@ Everything an app declares or reaches for through `useApp()` works in a process,
 | --- | --- |
 | Finder, App Store, Icon Gallery | Shell apps (see above) |
 | Spotify | `browser.loadScript` hands the app a live object from a script in the page (the Web Playback SDK); it can't cross into a worker |
-
-`signIn` isn't served yet, so an app that signs in stays on the OS's thread.
 
 ## Risks
 

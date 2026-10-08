@@ -37,6 +37,8 @@ describe("Safari", () => {
   let platform: HeadlessPlatform;
   let os: BootedOS;
   let hangFetch = false;
+  /** What the host clipboard holds. */
+  let copied = "";
   let finishHang: ((value: FetchResponse) => void) | undefined;
 
   beforeEach(async () => {
@@ -44,6 +46,8 @@ describe("Safari", () => {
     hangFetch = false;
     finishHang = undefined;
     platform = createHeadlessPlatform({ width: 640, height: 480 });
+    copied = "";
+    platform.clipboard = { readText: async () => copied, writeText: async (text) => { copied = text; } };
     platform.fetch = async (url) => {
       if (hangFetch) return new Promise<FetchResponse>((resolve) => { finishHang = resolve; });
       if (!String(url).startsWith("https://hn.algolia.com/")) throw new Error("no network in this test");
@@ -141,6 +145,68 @@ describe("Safari", () => {
     await expect(os.kernel.invoke(session(), "menu", { menu: "Bookmarks", item: "GitHub" })).rejects.toThrow();
   });
 
+  /** The favorites' names in the order the grid shows them: by row, then across. */
+  async function favoriteOrder(): Promise<string[]> {
+    return (await nodes())
+      .filter((n) => n.name?.startsWith("safari-favorite-") && n.role === "link")
+      .sort((a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x)
+      .map((n) => n.name!.slice("safari-favorite-".length));
+  }
+
+  async function drag(from: string, onto: string): Promise<void> {
+    const [a, b] = [(await node(from))!.bounds, (await node(onto))!.bounds];
+    const start = { x: a.x + a.width / 2, y: a.y + 20 };
+    const end = { x: b.x + b.width / 2, y: b.y + 20 };
+    platform.pointer({ type: "down", x: start.x, y: start.y });
+    for (let step = 1; step <= 8; step++) {
+      platform.pointer({ type: "move", x: start.x + ((end.x - start.x) * step) / 8, y: start.y + ((end.y - start.y) * step) / 8 });
+      await settle();
+    }
+    platform.pointer({ type: "up", x: end.x, y: end.y });
+    await settle();
+  }
+
+  it("rearranges favorites by dragging them while editing, and keeps the order", async () => {
+    const before = await favoriteOrder();
+    expect(before.slice(0, 3)).toEqual(["Mockintosh Docs", "Hacker News", "Wikipedia"]);
+    // Not editing, a drag opens nothing and moves nothing.
+    await drag("safari-favorite-Hacker News", "safari-favorite-Mockintosh Docs");
+    expect(await favoriteOrder()).toEqual(before);
+
+    await click("safari-favorites-edit");
+    await drag("safari-favorite-Wikipedia", "safari-favorite-Mockintosh Docs");
+    const after = await favoriteOrder();
+    expect(after.slice(0, 3)).toEqual(["Wikipedia", "Mockintosh Docs", "Hacker News"]);
+
+    await reopen();
+    expect(await favoriteOrder()).toEqual(after);
+  });
+
+  it("moves a dragged favorite with the pointer, and the others aside to make room", async () => {
+    await click("safari-favorites-edit");
+    const [docs, news, wiki] = [(await node("safari-favorite-Mockintosh Docs"))!.bounds, (await node("safari-favorite-Hacker News"))!.bounds, (await node("safari-favorite-Wikipedia"))!.bounds];
+    const grab = { x: wiki.x + 10, y: wiki.y + 20 };
+    platform.pointer({ type: "down", x: grab.x, y: grab.y });
+    // Halfway to Mockintosh Docs: the tile is where the pointer took it, not in a slot.
+    const half = { x: grab.x + Math.round((docs.x - wiki.x) / 2), y: grab.y + 7 };
+    for (let step = 1; step <= 4; step++) {
+      platform.pointer({ type: "move", x: grab.x + ((half.x - grab.x) * step) / 4, y: grab.y + ((half.y - grab.y) * step) / 4 });
+      await settle();
+    }
+    let held = (await node("safari-favorite-Wikipedia"))!.bounds;
+    expect([held.x - wiki.x, held.y - wiki.y]).toEqual([half.x - grab.x, half.y - grab.y]);
+    // Over Mockintosh Docs: it would land first, so Docs glides over to the next slot, and Hacker News on to Wikipedia's.
+    platform.pointer({ type: "move", x: docs.x + 10, y: docs.y + 20 });
+    for (let i = 0; i < 4; i++) await settle();
+    expect((await node("safari-favorite-Mockintosh Docs"))!.bounds.x).toBe(news.x);
+    expect((await node("safari-favorite-Hacker News"))!.bounds.x).toBe(wiki.x);
+    // Let go: it glides into the first slot.
+    platform.pointer({ type: "up", x: docs.x + 10, y: docs.y + 20 });
+    for (let i = 0; i < 4; i++) await settle();
+    held = (await node("safari-favorite-Wikipedia"))!.bounds;
+    expect([held.x, held.y]).toEqual([docs.x, docs.y]);
+  });
+
   it("bookmarks the page in front under the name given", async () => {
     const dialog = vi.spyOn(os.services, "showDialog").mockResolvedValueOnce("Orange site");
     await openBookmark("Hacker News");
@@ -152,6 +218,32 @@ describe("Safari", () => {
     // The front page's address is /news, so this is a second Hacker News bookmark.
     expect(await node("safari-favorite-Orange site")).toBeDefined();
     expect(await node("safari-favorite-Hacker News")).toBeDefined();
+  });
+
+  it("copies the page's address, or bookmarks it, from the Share button's menu", async () => {
+    const dialog = vi.spyOn(os.services, "showDialog").mockResolvedValueOnce("Orange site");
+    // On the start page there is nothing to share.
+    await click("safari-share");
+    expect((await nodes()).filter((n) => n.role === "menuitem")).toEqual([]);
+
+    await openBookmark("Hacker News");
+    // Share lines up with the toolbar's other buttons, though a menu hangs from it.
+    const [share, plus] = [await node("safari-share"), await node("safari-new-tab")];
+    expect(share?.bounds.y).toBe(plus?.bounds.y);
+    expect(share?.bounds.height).toBe(plus?.bounds.height);
+    await click("safari-share");
+    const items = (await nodes()).filter((n) => n.role === "menuitem");
+    // One menu, under the button: the header's toolbar is built once.
+    expect(items.map((item) => [item.name, item.enabled])).toEqual([["safari-share-menu:Copy URL", true], ["safari-share-menu:Add to Bookmarks…", true]]);
+    await click("safari-share-menu:Copy URL");
+    expect(copied).toMatch(/^https:\/\/news\.ycombinator\.com\//);
+    expect((await nodes()).some((n) => n.role === "menuitem")).toBe(false);
+
+    await click("safari-share");
+    await click("safari-share-menu:Add to Bookmarks…");
+    expect(dialog.mock.calls[0]![0].inputDefault).toBe("Hacker News");
+    await reopen();
+    expect(await node("safari-favorite-Orange site")).toBeDefined();
   });
 
   it("adds a favorite from the start page's Add tile", async () => {
@@ -215,6 +307,48 @@ describe("Safari", () => {
     const inRepo = (await os.kernel.invoke(session(), "inspect", { window: repo!.id })) as InspectionNode[];
     expect(inRepo.some((n) => n.name === "safari-address")).toBe(true);
     expect(inRepo.some((n) => n.text.includes("Loading…"))).toBe(true);
+  });
+
+  it("keeps the page on screen while the next one loads, with the new address and a loading bar in the field", async () => {
+    await click("safari-favorite-Hacker News");
+    await settle();
+    expect(await texts()).toContain("30.");
+    // The bar filled and went once the stories were in.
+    expect(await node("safari-progress")).toBeUndefined();
+
+    hangFetch = true;
+    await os.kernel.invoke(session(), "menu", { menu: "Bookmarks", item: "Wikipedia" });
+    await settle();
+    // Where it's going, at once; what it showed, until the next page is in: no Loading… in between.
+    expect((await node("safari-address"))?.value).toMatch(/wikipedia\.org/);
+    expect(await texts()).toContain("30.");
+    expect((await texts()).some((text) => text.includes("Loading…"))).toBe(false);
+    const bar = await node("safari-progress");
+    expect(Number(bar?.value)).toBeGreaterThan(0);
+    expect(Number(bar?.value)).toBeLessThan(1);
+
+    finishHang?.(reply({ url: "https://en.wikipedia.org/", title: "Wikipedia", nodes: [{ type: "paragraph", align: "left", segments: [{ kind: "text", text: "The free encyclopedia" }] }] }));
+    hangFetch = false;
+    await settle();
+    await settle();
+    // The new page is in: the stories are gone, and so is the bar.
+    expect(await texts()).not.toContain("30.");
+    expect((await node("safari-address"))?.value).toBe("en.wikipedia.org");
+    expect(await node("safari-progress")).toBeUndefined();
+  });
+
+  it("never leaves the loading bar behind: not on the start page, nor after a page that came at once", async () => {
+    await settle();
+    expect(await node("safari-progress")).toBeUndefined();
+    await click("safari-favorite-Hacker News");
+    await settle();
+    expect(await node("safari-progress")).toBeUndefined();
+    await os.kernel.invoke(session(), "menu", { menu: "History", item: "Back" });
+    await settle();
+    expect(await node("safari-progress")).toBeUndefined();
+    await click("safari-new-tab");
+    await settle();
+    expect(await node("safari-progress")).toBeUndefined();
   });
 
   it("shows mockintosh.com as the micro desktop picture", async () => {

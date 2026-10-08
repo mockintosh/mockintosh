@@ -5,7 +5,6 @@ import { createUI } from "../src/ui";
 import { EditableText } from "../src/widgets/EditableText";
 import { TextEditor } from "../src/widgets/TextEditor";
 import { requireFont } from "../src/fonts/registry";
-import { measureText } from "../src/fonts/bridge";
 import { caretPoint, layoutText } from "../src/fonts/textLayout";
 import { paragraphRangeAt, wordRangeAt } from "../src/textClicks";
 
@@ -53,18 +52,22 @@ async function editableText() {
   return { ui, value, dispose, at };
 }
 
-async function textEditor() {
-  const ui = createUI({ screen: newBitMap(W, H) });
-  const [value, setValue] = createSignal(TEXT);
-  const dispose = ui.render(() => <TextEditor name="edit" value={value()} onChange={setValue} width={W} height={H} />);
-  await mount(ui);
-  const charWidth = measureText("M", "mono");
-  // Index → a point inside that character's cell (4px inset, 14px rows).
-  const at = (index: number) => {
-    const before = TEXT.slice(0, index).split("\n");
-    return { x: 4 + (before[before.length - 1]!.length + 0.3) * charWidth, y: 4 + (before.length - 1) * 14 + 7 };
+/** A TextEditor, prose (`body`, wrapped) or code (`mono`, unwrapped); points from the same layout it draws. */
+function textEditor(font: "body" | "mono") {
+  return async () => {
+    const ui = createUI({ screen: newBitMap(W, H) });
+    const [value, setValue] = createSignal(TEXT);
+    const dispose = ui.render(() => <TextEditor name="edit" value={value()} onChange={setValue} width={W} height={H} font={font} wrap={font === "body"} />);
+    await mount(ui);
+    const face = requireFont(font);
+    // Inside the border (1px) and the inset (4px): a point just inside the character's cell.
+    const inner = W - 2 - 8;
+    const at = (index: number) => {
+      const p = caretPoint(layoutText(face, TEXT, font === "body" ? inner : undefined), face, index, "left", inner);
+      return { x: 1 + 4 + p.x + 1, y: 1 + 4 + p.y + 2 };
+    };
+    return { ui, value, dispose, at };
   };
-  return { ui, value, dispose, at };
 }
 
 describe("text click ranges", () => {
@@ -84,7 +87,7 @@ describe("text click ranges", () => {
   });
 });
 
-for (const [name, setup] of [["EditableText", editableText], ["TextEditor", textEditor]] as const) {
+for (const [name, setup] of [["EditableText", editableText], ["TextEditor", textEditor("body")], ["TextEditor (code)", textEditor("mono")]] as const) {
   describe(`${name} clicks`, () => {
     it("selects the word under a double-click", async () => {
       const { ui, value, dispose, at } = await setup();

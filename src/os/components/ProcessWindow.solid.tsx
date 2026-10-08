@@ -88,8 +88,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
   };
   createEffect(menus, (list) => app.setMenus(props.stats ? [...list, statsMenu] : list));
 
-  function pointer(kind: PointerKind, x: number, y: number, deltaY?: number): void {
-    proc.input({ t: "pointer", key, kind, x, y, deltaY, modifiers: heldModifiers() });
+  function pointer(kind: PointerKind, x: number, y: number, deltaY?: number, deltaX?: number): void {
+    proc.input({ t: "pointer", key, kind, x, y, deltaY, deltaX, modifiers: heldModifiers() });
   }
 
   function keyEvent(kind: KeyKind, value: string, modifiers: Modifiers): void {
@@ -118,6 +118,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       tabIndex={0}
       autoFocus={options.body}
       rawKeys={rawKeys()}
+      // Tab moves focus among the app's own controls, in the worker.
+      tabKeys
       semantic={options.body ? { name: "app-process", role: "canvas" } : undefined}
       onPaint={(surface) => {
         const start = app.scheduler.now();
@@ -149,6 +151,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       onMouseUp={(x, y) => pointer("mouseup", x, top() + y)}
       // A scrollable window's wheel scrolls the window, as the OS does for any app.
       onScroll={options.body && osWin.scrollable ? undefined : (deltaY, x, y) => pointer("scroll", x, top() + y, deltaY)}
+      // Sideways travel goes to the app, whose content may scroll sideways (a page's wide table or graph).
+      onScrollX={(deltaX, x, y) => pointer("scroll", x, top() + y, 0, deltaX)}
       onKeyDown={(k, mods) => keyEvent("keydown", k, mods)}
       onKeyUp={(k, mods) => keyEvent("keyup", k, mods)}
       onKeyPress={(ch) => keyEvent("keypress", ch, heldModifiers())}
@@ -161,7 +165,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
   createEffect(
     () => bands(),
     ({ header, footer }) => {
-      slots?.setHeader(header > 0 ? () => slice(() => 0, () => bands().header) : null, header);
+      // The worker draws the header's bottom rule into the picture, under the app's menus.
+      slots?.setHeader(header > 0 ? () => slice(() => 0, () => bands().header) : null, header, true);
       slots?.setFooter(footer > 0 ? () => slice(() => bands().header + win.height(), () => bands().footer) : null, footer);
     },
   );
