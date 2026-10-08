@@ -141,8 +141,12 @@ describe("contribution calendar", () => {
     const weekday = week % 7;
     platform.pointer({ type: "move", x: pane.x + pane.width - 4, y: pane.y + weekday * 10 + 4 });
     await settle();
+    await settle();
     const nodes = (await os.kernel.invoke(os.kernel.createSession(), "inspect", {})) as InspectionNode[];
     const tip = nodes.find((node) => node.role === "tooltip" && node.value);
     expect(tip?.value).toBe("1 contribution on October 7, 2026");
+    // At the window's right edge, the caption moves left to stay inside the window's body, clear of its scroll bar.
+    const window = nodes.find((node) => node.role === "window")!;
+    expect(tip!.bounds.x + tip!.bounds.width).toBeLessThanOrEqual(window.bounds.x + window.bounds.width - 15);
   });
 });

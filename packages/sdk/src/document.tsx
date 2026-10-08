@@ -128,8 +128,8 @@ function Block(props: BlockProps): JSX.Element {
   return <box height={6} />;
 }
 
-/** Height of a scroller's bar. */
-const SCROLLER_BAR = 7;
+/** Height of a scroller's bar: a black thumb on a gray track, as thin as it can be and still be dragged. */
+const SCROLLER_BAR = 6;
 /** The bar's thumb is never narrower than this. */
 const SCROLLER_THUMB = 16;
 
@@ -177,7 +177,8 @@ function ScrollerView(props: { node: Extract<LayoutNode, { type: "scroller" }>; 
         <box
           width={visible()}
           height={SCROLLER_BAR}
-          borderColor={1}
+          background="gray50"
+          position="relative"
           onClick={(x) => setMoved(((x - thumb() / 2) * max()) / Math.max(1, visible() - thumb()))}
         >
           <box
@@ -185,7 +186,7 @@ function ScrollerView(props: { node: Extract<LayoutNode, { type: "scroller" }>; 
             left={thumbX()}
             top={0}
             width={thumb()}
-            height={SCROLLER_BAR - 2}
+            height={SCROLLER_BAR}
             background={1}
             onDragStart={(_x, _y, globalX) => startDrag(globalX)}
             onDrag={(_x, _y, globalX) => slide(globalX)}
