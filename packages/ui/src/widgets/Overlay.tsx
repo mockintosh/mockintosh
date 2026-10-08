@@ -2,6 +2,7 @@ import { For, Show, createContext, createEffect, createSignal, onCleanup, onSett
 import type { JSX } from "@mockintosh/ui";
 import type { CanvasNode } from "../nodes";
 import { getFocusManager } from "../focusContext";
+import { scrollPaintOffset, scrollPaintOffsetX } from "../scroll";
 
 export type OverlaySide = "bottom" | "top";
 export type OverlayAlign = "start" | "end";
@@ -39,6 +40,7 @@ export function dismissOverlayModal(): boolean {
 /** Root layer after the app tree so panels paint in screen space, not inside overflow:scroll. */
 export function OverlayHost(props: { children?: JSX.Element }): JSX.Element {
   const [layers, setLayers] = createSignal<OverlayLayer[]>([]);
+  const [hostWidth, setHostWidth] = createSignal(0);
   let nextId = 1;
 
   const api: OverlayHostApi = {
@@ -75,7 +77,7 @@ export function OverlayHost(props: { children?: JSX.Element }): JSX.Element {
 
   return (
     <OverlayHostContext value={api}>
-      <box width="100%" height="100%">
+      <box width="100%" height="100%" onLayout={({ width }) => setHostWidth(width)}>
         {props.children}
         <Show when={modalTop()}>
           <box
@@ -89,7 +91,7 @@ export function OverlayHost(props: { children?: JSX.Element }): JSX.Element {
           />
         </Show>
         <For each={layers()}>
-          {(layer) => <OverlayLayerView layer={layer} />}
+          {(layer) => <OverlayLayerView layer={layer} hostWidth={hostWidth()} />}
         </For>
       </box>
     </OverlayHostContext>
@@ -115,14 +117,20 @@ function focusModal(el: CanvasNode, modal: boolean): void {
   });
 }
 
-function OverlayLayerView(props: { layer: OverlayLayer }): JSX.Element {
+/**
+ * A panel hung from its trigger's left edge moves left as far as it must to
+ * stay inside the host: a tooltip near the right edge still shows whole.
+ */
+function OverlayLayerView(props: { layer: OverlayLayer; hostWidth: number }): JSX.Element {
   const layer = () => props.layer;
   const centered = () => layer().placement === "center";
+  const [width, setWidth] = createSignal(0);
+  const left = () => (props.hostWidth > 0 ? Math.max(0, Math.min(layer().x, props.hostWidth - width())) : layer().x);
   return (
     <box
       semantic={{ name: "overlay-panel", role: layer().role ?? "dialog" }}
       position="absolute"
-      left={centered() ? 0 : layer().right === undefined ? layer().x : undefined}
+      left={centered() ? 0 : layer().right === undefined ? left() : undefined}
       right={centered() ? undefined : layer().right}
       top={centered() ? 0 : layer().y}
       width={centered() ? "100%" : undefined}
@@ -137,6 +145,9 @@ function OverlayLayerView(props: { layer: OverlayLayer }): JSX.Element {
       }}
       onKeyDown={(key: string) => overlayKeyDown(layer(), key)}
       ref={(el) => focusModal(el, layer().modal)}
+      onLayout={({ width: measured }) => {
+        if (!centered()) setWidth(measured);
+      }}
     >
       <box onMouseDown={() => {}}>{layer().render()}</box>
     </box>
@@ -159,6 +170,17 @@ export interface OverlayProps {
   children?: JSX.Element;
 }
 
+/** Where `node` is drawn: its layout position less the offsets of the scrolled panes around it. */
+function drawnAt(node: CanvasNode): { x: number; y: number } {
+  let x = node.layout.x;
+  let y = node.layout.y;
+  for (let n = node.parent; n; n = n.parent) {
+    if (n.style.overflow === "scroll") y -= scrollPaintOffset(n);
+    x -= scrollPaintOffsetX(n);
+  }
+  return { x, y };
+}
+
 function place(
   node: CanvasNode | null,
   side: OverlaySide,
@@ -166,15 +188,15 @@ function place(
   align: OverlayAlign,
 ): { x: number; y: number; right?: number } {
   if (!node) return { x: 0, y: 0 };
-  const y =
-    side === "top" ? node.layout.y - offset : node.layout.y + node.layout.height + offset;
+  const at = drawnAt(node);
+  const y = side === "top" ? at.y - offset : at.y + node.layout.height + offset;
   if (align === "end") {
     let root: CanvasNode = node;
     while (root.parent) root = root.parent;
-    const triggerRight = node.layout.x + node.layout.width;
-    return { x: node.layout.x, y, right: Math.max(0, root.layout.width - triggerRight) };
+    const triggerRight = at.x + node.layout.width;
+    return { x: at.x, y, right: Math.max(0, root.layout.width - triggerRight) };
   }
-  return { x: node.layout.x, y };
+  return { x: at.x, y };
 }
 
 /**

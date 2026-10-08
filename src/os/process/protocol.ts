@@ -131,7 +131,7 @@ export type HostToProcess =
   | { t: "window.goAway"; key: string }
   /** The instance is ending: run the app's cleanups, then answer `stopped`. */
   | { t: "stop" }
-  | { t: "pointer"; key: string; kind: PointerKind; x: number; y: number; deltaY?: number; modifiers: Modifiers; seq: number }
+  | { t: "pointer"; key: string; kind: PointerKind; x: number; y: number; deltaY?: number; deltaX?: number; modifiers: Modifiers; seq: number }
   | { t: "key"; key: string; kind: KeyKind; value: string; modifiers: Modifiers; seq: number }
   /** Text pasted into window `key`, in one piece (`onPaste`). */
   | { t: "paste"; key: string; text: string; seq: number }

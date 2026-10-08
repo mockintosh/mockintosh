@@ -665,7 +665,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
           if (!w || !ui) return;
           lastSeq = Math.max(lastSeq, msg.seq);
           const y = msg.y + w.slot * bandHeight;
-          ui.dispatchPointer(msg.kind, msg.x, y, { deltaY: msg.deltaY, modifiers: msg.modifiers });
+          ui.dispatchPointer(msg.kind, msg.x, y, { deltaY: msg.deltaY, deltaX: msg.deltaX, modifiers: msg.modifiers });
           if (msg.kind !== "scroll") trackCursor(w, msg.x, y);
           renderNow();
           return;

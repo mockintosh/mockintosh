@@ -514,6 +514,7 @@ export function Window(props: WindowProps): JSX.Element {
           onScroll={(dy) => {
             updateOSWindow(props.win.id, { scrollY: Math.max(0, Math.min(maxScrollY(), props.win.scrollY + dy)) });
           }}
+          onScrollX={(dx) => scrollXBy(dx)}
         >
           <WindowContent
             win={props.win}

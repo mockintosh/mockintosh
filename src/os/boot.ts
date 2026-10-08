@@ -787,7 +787,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       case "scroll":
         cursorX = e.x;
         cursorY = e.y;
-        ui.dispatchPointer("scroll", e.x, e.y, { deltaY: e.deltaY ?? 0 });
+        ui.dispatchPointer("scroll", e.x, e.y, { deltaY: e.deltaY ?? 0, deltaX: e.deltaX ?? 0 });
         scheduleRepaint();
         return;
     }

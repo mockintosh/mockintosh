@@ -125,6 +125,12 @@ export interface MouseEventHandlers {
   /** The wheel turned over this node; (localX, localY) is where the pointer was. */
   onScroll?: (deltaY: number, localX: number, localY: number) => void;
   /**
+   * A sideways wheel or trackpad swipe over this node, positive to the
+   * right. The innermost node with a handler gets it; `overflow: "scroll"`
+   * panes set `scrollOffsetX` from it themselves.
+   */
+  onScrollX?: (deltaX: number, localX: number, localY: number) => void;
+  /**
    * Semantic cursor name (`pointer`, `text`, `watch`, …) or the app's own
    * 16×16 `CursorFace`. Hosts map a name to CSS or a 1-bit face — see `cursor.ts`.
    */
@@ -172,6 +178,7 @@ export function hasMouseHandlers(h: EventHandlers): boolean {
     h.onDrag ||
     h.onDragEnd ||
     h.onScroll ||
+    h.onScrollX ||
     h.tabIndex !== undefined
   );
 }
@@ -683,7 +690,7 @@ export function shadowRaise(node: CanvasNode): number {
 export const EVENT_PROP_NAMES = new Set<string>([
   "onClick", "onDoubleClick", "onMouseDown", "onMouseDownCapture", "onMouseUp",
   "onMouseMove", "onMouseEnter", "onMouseLeave", "onDragStart", "onDrag", "onDragEnd",
-  "onScroll",
+  "onScroll", "onScrollX",
   "onKeyDown", "onKeyUp", "onKeyPress", "onPaste",
   "onFocus", "onBlur", "tabIndex", "autoFocus", "rawKeys", "cursor",
 ]);

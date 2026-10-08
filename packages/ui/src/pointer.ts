@@ -36,6 +36,8 @@ export type PointerKind = "mouse" | "touch" | "pen";
 
 export interface PointerExtras {
   deltaY?: number;
+  /** Sideways wheel or trackpad travel, positive to the right. */
+  deltaX?: number;
   kind?: PointerKind;
   /** `mouseup` that must not click — `pointercancel`, or a pan that already consumed the press. */
   cancel?: boolean;
@@ -276,6 +278,33 @@ function applyWheel(node: CanvasNode, dy: number): boolean {
   return true;
 }
 
+/** Does `node` do anything with a press: click, hold, drag, or take focus? */
+function handlesPress(node: CanvasNode): boolean {
+  const h = node._eventHandlers;
+  return !!(
+    h.onClick ||
+    h.onDoubleClick ||
+    h.onMouseDown ||
+    h.onMouseUp ||
+    h.onDragStart ||
+    h.onDrag ||
+    h.onDragEnd ||
+    h.tabIndex !== undefined
+  );
+}
+
+/**
+ * The node a press under `hit` belongs to: `hit`, unless it only watches
+ * the pointer go by (hover, wheel). Then the nearest ancestor that takes
+ * presses, as a DOM press bubbles past a hover-only element to its owner.
+ */
+function pressTarget(hit: CanvasNode): CanvasNode {
+  for (let node: CanvasNode | null = hit; node; node = node.parent) {
+    if (handlesPress(node)) return node;
+  }
+  return hit;
+}
+
 function localOf(node: CanvasNode, gx: number, gy: number): { lx: number; ly: number } {
   // Walk ancestors to accumulate scroll offsets and shadow raises so local
   // coords match the visual position used by layout + draw.
@@ -473,6 +502,21 @@ export function createPointerDispatcher(
     return false;
   }
 
+  /** Sideways travel goes to the innermost node under the pointer that handles it. */
+  function applyScrollX(x: number, y: number, dx: number): boolean {
+    let node = nodeAt(root, x, y) ?? hitTest(root, x, y);
+    while (node) {
+      const handler = node._eventHandlers.onScrollX;
+      if (handler) {
+        const { lx, ly } = localOf(node, x, y);
+        handler(dx, lx, ly);
+        return true;
+      }
+      node = node.parent;
+    }
+    return false;
+  }
+
   function panBy(x: number, y: number, dy: number): void {
     if (dy === 0) return;
     applyScroll(x, y, dy);
@@ -520,7 +564,12 @@ export function createPointerDispatcher(
   function dispatchInner(type: PointerType, x: number, y: number, extras?: PointerExtras): boolean {
       if (type === "scroll") {
         stopFlick();
-        return applyScroll(x, y, extras?.deltaY ?? 0);
+        const dx = extras?.deltaX ?? 0;
+        const dy = extras?.deltaY ?? 0;
+        // A swipe can carry both: each axis goes to whatever takes it.
+        const vertical = dy !== 0 || dx === 0 ? applyScroll(x, y, dy) : false;
+        const sideways = dx !== 0 ? applyScrollX(x, y, dx) : false;
+        return vertical || sideways;
       }
 
       if (type === "mousemove") {
@@ -594,9 +643,9 @@ export function createPointerDispatcher(
           return false;
         }
 
-        captured = hit;
-        const { lx, ly } = localOf(hit, x, y);
-        hit._eventHandlers.onMouseDown?.(lx, ly);
+        captured = pressTarget(hit);
+        const { lx, ly } = localOf(captured, x, y);
+        captured._eventHandlers.onMouseDown?.(lx, ly);
         if (keep) return false;
         const focusable = nearestFocusable(hit);
         if (focusable) focusManager.focus(focusable);
@@ -621,7 +670,7 @@ export function createPointerDispatcher(
             target._eventHandlers.onDragEnd?.(lx, ly, x, y);
           }
           target._eventHandlers.onMouseUp?.(lx, ly);
-          if (hit === target) {
+          if (hit && pressTarget(hit) === target) {
             target._eventHandlers.onClick?.(lx, ly);
           }
         }
@@ -635,8 +684,9 @@ export function createPointerDispatcher(
       if (type === "dblclick") {
         const hit = hitTest(root, x, y);
         if (hit) {
-          const { lx, ly } = localOf(hit, x, y);
-          hit._eventHandlers.onDoubleClick?.(lx, ly);
+          const target = pressTarget(hit);
+          const { lx, ly } = localOf(target, x, y);
+          target._eventHandlers.onDoubleClick?.(lx, ly);
         }
       }
       return false;

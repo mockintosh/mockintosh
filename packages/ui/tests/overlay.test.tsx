@@ -100,6 +100,53 @@ describe("Tooltip", () => {
   });
 });
 
+describe("Tooltip in a scrolled pane", () => {
+  it("hangs the caption over the trigger where it is drawn, not where it would be unscrolled", () => {
+    const ui = createUI({ screen: newBitMap(240, 80) });
+    ui.render(() => (
+      <box padding={20}>
+        <box overflow="scroll" width={100} height={40} scrollOffsetX={40}>
+          <box width={300} height={40} flexDirection="row">
+            <box width={60} />
+            <Tooltip label="Day">
+              <box semantic={{ name: "day" }} width={8} height={8} onClick={() => {}} />
+            </Tooltip>
+          </box>
+        </box>
+      </box>
+    ));
+    ui.frame();
+    const day = ui.inspect().find((n) => n.name === "day")!;
+    // 20 padding + 60 in, less 40 scrolled: drawn at x 40.
+    expect(day.bounds.x).toBe(40);
+    ui.dispatchPointer("mousemove", day.bounds.x + 2, day.bounds.y + 2);
+    ui.frame();
+    const panel = ui.inspect().find((n) => n.name === "overlay-panel")!;
+    expect(panel.bounds.x).toBe(40);
+  });
+});
+
+describe("Tooltip at the edge", () => {
+  it("moves left to stay on screen when its trigger is near the right edge", () => {
+    const ui = createUI({ screen: newBitMap(120, 60) });
+    ui.render(() => (
+      <box width={120} height={60} flexDirection="row" justifyContent="flex-end" paddingTop={30}>
+        <Tooltip label="2 contributions on October 4, 2026">
+          <box semantic={{ name: "day" }} width={8} height={8} onClick={() => {}} />
+        </Tooltip>
+      </box>
+    ));
+    ui.frame();
+    const day = ui.inspect().find((n) => n.name === "day")!;
+    ui.dispatchPointer("mousemove", day.bounds.x + 2, day.bounds.y + 2);
+    ui.frame();
+    ui.frame();
+    const panel = ui.inspect().find((n) => n.name === "overlay-panel")!;
+    expect(panel.bounds.x + panel.bounds.width).toBeLessThanOrEqual(120);
+    expect(panel.bounds.x).toBeGreaterThanOrEqual(0);
+  });
+});
+
 describe("Popover", () => {
   it("opens from the trigger and dismisses outside", () => {
     const [open, setOpen] = createSignal(false);

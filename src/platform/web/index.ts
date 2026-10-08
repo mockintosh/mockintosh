@@ -23,7 +23,7 @@ import type {
 } from "../types";
 import { browserBuilder } from "./builder";
 import { webFetch } from "./fetch";
-import { CanvasPresenter, createScreenCanvas, wheelDeltaY, wheelIsPinchZoom } from "@mockintosh/ui/web";
+import { CanvasPresenter, createScreenCanvas, wheelDeltaX, wheelDeltaY, wheelIsPinchZoom } from "@mockintosh/ui/web";
 import { bitMapHeight, bitMapWidth } from "@mockintosh/quickdraw/bits";
 import { createHostDisplay, initialScreenSize } from "./hostDisplay";
 import { createWebDownloadService } from "./download";
@@ -252,7 +252,7 @@ function createDOMInput(
     (e) => {
       e.preventDefault();
       if (wheelIsPinchZoom(e)) return;
-      emitPointer({ type: "scroll", ...toScreen(e), deltaX: e.deltaX, deltaY: wheelDeltaY(e, canvas.clientHeight) });
+      emitPointer({ type: "scroll", ...toScreen(e), deltaX: wheelDeltaX(e, canvas.clientWidth), deltaY: wheelDeltaY(e, canvas.clientHeight) });
     },
     { passive: false }
   );

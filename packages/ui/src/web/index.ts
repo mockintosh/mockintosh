@@ -1,7 +1,7 @@
 export { decodeImage, createWebImageService } from "./decode";
 export { CanvasPresenter } from "./CanvasPresenter";
 export { hostPresentsCursor, pointerKind } from "./hostPointer";
-export { wheelDeltaY, wheelIsPinchZoom } from "./hostWheel";
+export { wheelDeltaX, wheelDeltaY, wheelIsPinchZoom } from "./hostWheel";
 export { createScreenCanvas, viewportLogicalSize } from "./screenCanvas";
 export type { ScreenCanvas, ScreenCanvasSize, CreateScreenCanvasOptions } from "./screenCanvas";
 export { mountCanvasUI } from "./mount";
