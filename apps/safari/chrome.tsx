@@ -82,13 +82,19 @@ export interface AddressFieldProps {
   onSubmit: () => void;
   secure: boolean;
   width: number;
+  /** How far the page in front has loaded, 0 to 1; null when it isn't loading. */
+  progress: number | null;
 }
 
-/** The address field: a lock for `https` pages, then the address. */
+/** Height of the loading bar along the field's bottom edge. */
+const PROGRESS_H = 2;
+
+/** The address field: a lock for `https` pages, then the address, and a bar along its foot while the page loads, as Safari's fills. */
 export function AddressField(props: AddressFieldProps): JSX.Element {
   const lockW = () => (props.secure ? lockIcon.width + LOCK_GAP : 0);
+  const fill = () => (props.progress === null ? 0 : Math.round(props.progress * (props.width - 2)));
   return (
-    <box width={props.width} height={FACE_H} borderWidth={1} borderColor={1} shadow flexDirection="row" alignItems="center" paddingLeft={3} gap={LOCK_GAP}>
+    <box width={props.width} height={FACE_H} borderWidth={1} borderColor={1} shadow flexDirection="row" alignItems="center" paddingLeft={3} gap={LOCK_GAP} position="relative">
       <Show when={props.secure}>
         <image src={lockIcon} width={lockIcon.width} height={lockIcon.height} />
       </Show>
@@ -104,6 +110,17 @@ export function AddressField(props: AddressFieldProps): JSX.Element {
         borderless
         selectAllOnFocus
       />
+      <Show when={props.progress !== null}>
+        <box
+          semantic={{ name: "safari-progress", role: "progressbar", value: String(props.progress ?? 0) }}
+          position="absolute"
+          left={0}
+          bottom={0}
+          width={fill()}
+          height={PROGRESS_H}
+          background={1}
+        />
+      </Show>
     </box>
   );
 }

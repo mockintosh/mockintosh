@@ -1,4 +1,4 @@
-import { Show, WindowHeader, createEffect, createMemo, createSignal } from "@mockintosh/sdk";
+import { Show, WindowHeader, createEffect, createMemo, createSignal, onCleanup } from "@mockintosh/sdk";
 import { useUIServices, type JSX } from "@mockintosh/ui";
 import { DocumentView, useApp, defineApp, type AppWindow, type FormField, type MenubarItemDef, type WebForm } from "@mockintosh/sdk";
 import type { ImageFrame } from "@mockintosh/ui";
@@ -24,6 +24,12 @@ const TOOLBAR_GAP = 5;
 /** Everything in the toolbar but the address field, and the field's shadow. */
 const TOOLBAR_FIXED = BACK_FORWARD_W + TOOLBAR_BUTTON_W * 3 + TOOLBAR_GAP * 4 + TOOLBAR_PAD * 2 + 1;
 const PAGE_PADDING = 6;
+/** The loading bar eases towards this share of the field: with no length to go by, it never claims to be done… */
+const PROGRESS_CEILING = 0.9;
+/** …covering about two thirds of the way there in this long. */
+const PROGRESS_EASE_MS = 900;
+/** How long a full bar stays once the page is in. */
+const PROGRESS_LINGER_MS = 150;
 
 /** The start page's grid of bookmarks, and what it can do to them. */
 interface Favorites {
@@ -228,6 +234,41 @@ function Safari(props: Record<string, unknown>): JSX.Element {
     return page && page.tabId === next.tabId && page.request === next.request ? page : undefined;
   };
   const loading = () => ready() === undefined;
+
+  /**
+   * The address field's loading bar. Pages don't report how far along they
+   * are, so it eases towards 90% while one loads, as Safari's does without a
+   * length to go by, fills when the page arrives, and then goes.
+   */
+  const [progress, setProgress] = createSignal<number | null>(null);
+  let progressFrame: (() => void) | null = null;
+  function animateProgress(step: (elapsed: number) => boolean): void {
+    progressFrame?.();
+    const start = app.scheduler.now();
+    const frame = () => {
+      progressFrame = step(app.scheduler.now() - start) ? app.scheduler.requestFrame(frame) : null;
+    };
+    progressFrame = app.scheduler.requestFrame(frame);
+  }
+  createEffect(
+    () => loading(),
+    (busy) => {
+      if (busy) {
+        animateProgress((elapsed) => {
+          setProgress(PROGRESS_CEILING * (1 - Math.exp(-elapsed / PROGRESS_EASE_MS)));
+          return true;
+        });
+      } else if (progress() !== null) {
+        setProgress(1);
+        animateProgress((elapsed) => {
+          if (elapsed < PROGRESS_LINGER_MS) return true;
+          setProgress(null);
+          return false;
+        });
+      }
+    },
+  );
+  onCleanup(() => progressFrame?.());
   /**
    * What the page area shows: the page wanted, or while it loads, the tab's
    * previous page, as a browser keeps it until the next one is ready, so a
@@ -500,6 +541,7 @@ function Safari(props: Record<string, unknown>): JSX.Element {
               onSubmit={() => go(pageRequest(addressToUrl(front().address)))}
               secure={isSecure(pageUrl())}
               width={Math.max(60, barWidth() - TOOLBAR_FIXED)}
+              progress={progress()}
             />
             <ToolbarButton name="safari-copy-link" icon={shareIcon} disabled={!canCopyLink()} onClick={copyLink} />
             <ToolbarButton name="safari-new-tab" icon={plusIcon} onClick={newTab} />
@@ -522,13 +564,7 @@ function Safari(props: Record<string, unknown>): JSX.Element {
         fallback={<box width={win.width()} height={win.height()} padding={PAGE_PADDING} onLayout={reportHeight}>{message("Loading…")}</box>}
       >
         {(page) => (
-          <box position="relative">
-            <SafariView shown={page} loadImage={loadImage} favorites={favorites} go={go} setTabs={setTabs} win={win} scrolledTo={scrolledTo} landed={landed} />
-            {/* The watch over the previous page while the next loads. It has no handlers, so clicks still reach the page. */}
-            <Show when={loading()}>
-              <box semantic={{ name: "safari-loading", role: "presentation" }} position="absolute" left={0} top={0} width="100%" height="100%" cursor="watch" />
-            </Show>
-          </box>
+          <SafariView shown={page} loadImage={loadImage} favorites={favorites} go={go} setTabs={setTabs} win={win} scrolledTo={scrolledTo} landed={landed} />
         )}
       </Show>
     </>

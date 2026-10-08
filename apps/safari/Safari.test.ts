@@ -217,24 +217,32 @@ describe("Safari", () => {
     expect(inRepo.some((n) => n.text.includes("Loading…"))).toBe(true);
   });
 
-  it("keeps the page on screen, under the watch, while the next one loads", async () => {
+  it("keeps the page on screen while the next one loads, with the new address and a loading bar in the field", async () => {
     await click("safari-favorite-Hacker News");
+    await settle();
     expect(await texts()).toContain("30.");
+    // The bar filled and went once the stories were in.
+    expect(await node("safari-progress")).toBeUndefined();
 
     hangFetch = true;
-    await os.kernel.invoke(session(), "menu", { menu: "View", item: "Reload" });
+    await os.kernel.invoke(session(), "menu", { menu: "Bookmarks", item: "Wikipedia" });
     await settle();
-    // Still the stories, with the watch over them: no Loading… in between.
+    // Where it's going, at once; what it showed, until the next page is in: no Loading… in between.
+    expect((await node("safari-address"))?.value).toMatch(/wikipedia\.org/);
     expect(await texts()).toContain("30.");
     expect((await texts()).some((text) => text.includes("Loading…"))).toBe(false);
-    expect(await node("safari-loading")).toBeDefined();
+    const bar = await node("safari-progress");
+    expect(Number(bar?.value)).toBeGreaterThan(0);
+    expect(Number(bar?.value)).toBeLessThan(1);
 
-    finishHang?.(reply({ hits: STORIES.slice(0, 3) }));
+    finishHang?.(reply({ url: "https://en.wikipedia.org/", title: "Wikipedia", nodes: [{ type: "paragraph", align: "left", segments: [{ kind: "text", text: "The free encyclopedia" }] }] }));
     hangFetch = false;
     await settle();
+    await settle();
+    // The new page is in: the stories are gone, and so is the bar.
     expect(await texts()).not.toContain("30.");
-    expect(await texts()).toContain("3.");
-    expect(await node("safari-loading")).toBeUndefined();
+    expect((await node("safari-address"))?.value).toBe("en.wikipedia.org");
+    expect(await node("safari-progress")).toBeUndefined();
   });
 
   it("shows mockintosh.com as the micro desktop picture", async () => {
