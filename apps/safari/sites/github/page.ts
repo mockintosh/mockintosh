@@ -23,7 +23,7 @@ import {
   type RepoInfo,
 } from "./api";
 import { commitSubject, formatAge, formatBytes, formatCount } from "./format";
-import { GITHUB_MARK, GITHUB_STAR, GITHUB_STARRED } from "./icons";
+import { GITHUB_MARK, GITHUB_SEARCH, GITHUB_STAR, GITHUB_STARRED } from "./icons";
 import { formatGithubLocation, parseGithubLocation, type GithubLocation, type ProfileTab } from "./location";
 
 /**
@@ -187,7 +187,7 @@ function withHeader(page: GithubDocument, viewer: Viewer | null, account = true)
   const avatar = corner[0]?.type === "menu" && corner[0].image !== undefined;
   const search: LayoutNode = {
     type: "form",
-    form: { action: "https://github.com/search", method: "get", controls: [{ kind: "text", name: "q", value: "", placeholder: "Search or jump to…" }] },
+    form: { action: "https://github.com/search", method: "get", controls: [{ kind: "text", name: "q", value: "", placeholder: "Search or jump to…", icon: GITHUB_SEARCH }] },
   };
   const mark: LayoutNode = { type: "image", src: GITHUB_MARK, alt: "GitHub", align: "left", width: MARK_SIZE, height: MARK_SIZE, href: githubUrl({ kind: "home" }) };
   const header: LayoutNode = {

@@ -60,4 +60,21 @@ const starred: Sprite = fromGrid(11, 11, [
   ".###...###.",
 ]);
 
-export const githubSprites: Record<string, Sprite> = { [GITHUB_MARK]: githubMark, [GITHUB_STAR]: star, [GITHUB_STARRED]: starred };
+/** The sprite name of the header search field's magnifying glass. */
+export const GITHUB_SEARCH = "safari/github-search";
+
+/** The magnifying glass Maps insets in its search field, 11 × 10: an 8-pixel lens, its handle leaving the lower right. */
+const search: Sprite = fromGrid(11, 10, [
+  "..####.....",
+  ".#....#....",
+  "#......#...",
+  "#......#...",
+  "#......#...",
+  "#......#...",
+  ".#....#....",
+  "..####.##..",
+  "........##.",
+  ".........##",
+]);
+
+export const githubSprites: Record<string, Sprite> = { [GITHUB_MARK]: githubMark, [GITHUB_STAR]: star, [GITHUB_STARRED]: starred, [GITHUB_SEARCH]: search };

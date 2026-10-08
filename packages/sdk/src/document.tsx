@@ -408,8 +408,10 @@ function FormControlView(props: {
 }): JSX.Element {
   const { control, index } = props.entry;
   if (control.kind === "text") {
+    const icon = control.icon ? useContext(AppServicesContext)?.getSprite(control.icon) : undefined;
     return (
       <TextInput
+        icon={icon}
         value={props.values()[index] ?? ""}
         placeholder={control.placeholder}
         width={props.inputWidth}

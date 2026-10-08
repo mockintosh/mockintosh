@@ -6,6 +6,7 @@ import { useRadius } from "../theme";
 import { useUIServices } from "../services";
 import { measureText } from "../fonts/bridge";
 import type { CanvasNode, Modifiers } from "../nodes";
+import type { Sprite } from "../sprite";
 import { createTextClicks, wordRangeAt, type TextClickSelection } from "../textClicks";
 
 export interface TextInputProps {
@@ -30,6 +31,8 @@ export interface TextInputProps {
   padding?: number;
   /** Omit the field border (e.g. inline rename over a label). */
   borderless?: boolean;
+  /** Drawn inset at the field's left, before the text, as a search field's magnifying glass. */
+  icon?: Sprite;
   /**
    * Where the line sits: `"middle"` (default) centres its caps in the field;
    * `"top"` sets it at the top padding like a plain `<text>`, so a field laid
@@ -49,6 +52,9 @@ export interface TextInputProps {
    */
   initialCaretIndex?: number;
 }
+
+/** Between an icon and the text after it. */
+const ICON_GAP = 3;
 
 export function TextInput(props: TextInputProps): JSX.Element {
   let rootNode: CanvasNode | null = null;
@@ -98,9 +104,11 @@ export function TextInput(props: TextInputProps): JSX.Element {
   const fieldWidth = () => props.width ?? 120;
   const fieldHeight = () => props.height ?? 16;
   const innerTextH = () => Math.max(1, fieldHeight() - (padY() + borderW()) * 2);
-  const contentWidth = () => Math.max(1, fieldWidth() - (padX() + borderW()) * 2);
+  /** The left padding: an icon sits in it, before the text. */
+  const padLeft = () => padX() + (props.icon ? props.icon.width + ICON_GAP : 0);
+  const contentWidth = () => Math.max(1, fieldWidth() - padLeft() - padX() - borderW() * 2);
   /** Pointer x (border-box local) → x within the content box. */
-  const localToContentX = (lx: number) => lx - borderW() - padX();
+  const localToContentX = (lx: number) => lx - borderW() - padLeft();
   /** Horizontal pan so the caret stays inside the clipped content box. */
   const [scrollX, setScrollX] = createSignal(0, signalOpts);
 
@@ -388,11 +396,11 @@ export function TextInput(props: TextInputProps): JSX.Element {
   // --- Computed pixel positions ---
   // Nudge 1px left so the bar sits in the gap between glyphs (metrics skew it right).
   const cursorPixelX = () =>
-    Math.max(padX(), charOffsetToPixels(cursorPos()) + padX() - 1) - scrollX();
+    Math.max(padLeft(), charOffsetToPixels(cursorPos()) + padLeft() - 1) - scrollX();
   const selPixelStart = () => {
     const ss = selStart(), se = selEnd();
     if (ss === null || se === null) return 0;
-    return charOffsetToPixels(Math.min(ss, se)) + padX() - scrollX();
+    return charOffsetToPixels(Math.min(ss, se)) + padLeft() - scrollX();
   };
   const selPixelWidth = () => {
     const ss = selStart(), se = selEnd();
@@ -421,7 +429,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
   });
   const selectedSliceLeft = createMemo(() => {
     const r = selectionRange();
-    return r ? padX() + charOffsetToPixels(r.lo) - scrollX() : 0;
+    return r ? padLeft() + charOffsetToPixels(r.lo) - scrollX() : 0;
   });
 
   return (
@@ -437,7 +445,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
       borderRadius={bordered() ? radius() : undefined}
       paddingTop={padY()}
       paddingBottom={padY()}
-      paddingLeft={padX()}
+      paddingLeft={padLeft()}
       paddingRight={padX()}
       justifyContent="center"
       overflow="hidden"
@@ -465,7 +473,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
       <Show when={!!displayValue()}>
         <text
           position="absolute"
-          left={padX() - scrollX()}
+          left={padLeft() - scrollX()}
           top={padY()}
           height={innerTextH()}
           font={fontName()}
@@ -509,7 +517,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
       <Show when={showPlaceholder()}>
         <text
           position="absolute"
-          left={padX()}
+          left={padLeft()}
           top={padY()}
           height={innerTextH()}
           font={fontName()}
@@ -520,6 +528,15 @@ export function TextInput(props: TextInputProps): JSX.Element {
         >
           {props.placeholder}
         </text>
+      </Show>
+
+      {/* The icon on white over its padding, so text scrolled left slides under it. */}
+      <Show when={props.icon}>
+        {(icon) => (
+          <box position="absolute" left={0} top={padY()} width={padLeft()} height={innerTextH()} background={0} paddingLeft={padX()} justifyContent="center">
+            <image src={icon()} width={icon().width} height={icon().height} />
+          </box>
+        )}
       </Show>
     </box>
   );
