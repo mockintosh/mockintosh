@@ -38,7 +38,8 @@ export type FormControl =
   /** Several lines of text; a form with one stacks its controls and spans the page. */
   | { kind: "textarea"; name: string; value: string; rows: number }
   | { kind: "hidden"; name: string; value: string }
-  | { kind: "submit"; name: string; value: string; label: string };
+  /** A button; `icon` names a sprite drawn before the label, and `tooltip` captions it when hovered. */
+  | { kind: "submit"; name: string; value: string; label: string; icon?: string; tooltip?: string };
 
 /** A form: submitting it sends its controls' `name=value` pairs to `action`. */
 export interface WebForm {

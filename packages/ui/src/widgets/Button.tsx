@@ -1,16 +1,22 @@
+import { Show } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import type { CursorName } from "../cursor";
 import type { Ink, LayoutStyle, PatternName } from "../nodes";
+import type { Sprite } from "../sprite";
 import { createPress } from "../primitives/press";
 import { useRadius } from "../theme";
 
 /** Control Manager default-button ring — outside the face, not inside it. */
 const RING = { pen: 3, gap: 1, radius: 8 };
 const FACE = { height: 16, padX: 8 };
+/** Between an icon and the label after it. */
+const ICON_GAP = 4;
 
 export interface ButtonProps {
   name?: string;
   label: string;
+  /** Drawn before the label, inverted with it while pressed. */
+  icon?: Sprite;
   onClick: () => void;
   disabled?: boolean;
   /** Face type. Defaults to `"body"`. */
@@ -105,9 +111,14 @@ export function Button(props: ButtonProps): JSX.Element {
             borderStyle={borderStyle()}
             borderRadius={props.borderRadius ?? radius()}
             shadow={shadow() && !press.pressed()}
+            flexDirection="row"
+            gap={ICON_GAP}
             justifyContent="center"
             alignItems="center"
           >
+            <Show when={props.icon}>
+              {(icon) => <image src={icon()} width={icon().width} height={icon().height} mode={press.pressed() ? "inverted" : "normal"} />}
+            </Show>
             <text font={props.font ?? "body"} size={props.size} bold={props.bold} italic={props.italic} color={press.pressed() ? 0 : 1} align="center" verticalAlign="middle" nowrap>
               {props.label}
             </text>

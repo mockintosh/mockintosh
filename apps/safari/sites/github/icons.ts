@@ -26,4 +26,38 @@ const githubMark: Sprite = fromGrid(16, 16, [
   ".....#oooo#.....",
 ]);
 
-export const githubSprites: Record<string, Sprite> = { [GITHUB_MARK]: githubMark };
+/** The sprite names of the Star button's star: an outline to star with, filled once starred. */
+export const GITHUB_STAR = "safari/github-star";
+export const GITHUB_STARRED = "safari/github-starred";
+
+/** Octicons' `star`, cut down to sit beside a button's label: a five-pointed outline. */
+const star: Sprite = fromGrid(11, 11, [
+  ".....#.....",
+  "....#.#....",
+  "....#.#....",
+  "####...####",
+  "#.........#",
+  ".#.......#.",
+  "..#.....#..",
+  "..#.....#..",
+  ".#...#...#.",
+  ".#..#.#..#.",
+  ".###...###.",
+]);
+
+/** Octicons' `star-fill`: the same star, filled. */
+const starred: Sprite = fromGrid(11, 11, [
+  ".....#.....",
+  "....###....",
+  "....###....",
+  "###########",
+  "###########",
+  ".#########.",
+  "..#######..",
+  "..#######..",
+  ".#########.",
+  ".####.####.",
+  ".###...###.",
+]);
+
+export const githubSprites: Record<string, Sprite> = { [GITHUB_MARK]: githubMark, [GITHUB_STAR]: star, [GITHUB_STARRED]: starred };

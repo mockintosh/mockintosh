@@ -384,7 +384,10 @@ function FormControlView(props: {
     );
   }
   if (control.kind === "submit") {
-    return <Button label={control.label} onClick={() => props.press(index)} />;
+    const app = useContext(AppServicesContext);
+    const icon = control.icon ? app?.getSprite(control.icon) : undefined;
+    const button = <Button label={control.label} icon={icon} onClick={() => props.press(index)} />;
+    return control.tooltip ? <Tooltip label={control.tooltip}>{button}</Tooltip> : button;
   }
   return <box />;
 }

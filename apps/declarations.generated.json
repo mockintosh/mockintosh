@@ -122,6 +122,16 @@
     "width": 16,
     "height": 16,
     "data": "ACqoAAKqqoAKaqmgKmqpqCpVVaiqVVWqqVVVaqlVVWqpVVVqqVVVaqpVVaoqpVqoKaVaqApVWqACpVqAACVYAA=="
+   },
+   "safari/github-star": {
+    "width": 11,
+    "height": 11,
+    "data": "ACAAAiAACIAqgKqAAAiAAICACAIAICAgIIIggqAqAA=="
+   },
+   "safari/github-starred": {
+    "width": 11,
+    "height": 11,
+    "data": "ACAAAqAACoAqqqqqqqiqqoCqqAKqoCqqoKoqgqAqAA=="
    }
   }
  },

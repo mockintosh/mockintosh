@@ -22,7 +22,7 @@ import {
   type RepoInfo,
 } from "./api";
 import { commitSubject, formatAge, formatBytes, formatCount } from "./format";
-import { GITHUB_MARK } from "./icons";
+import { GITHUB_MARK, GITHUB_STAR, GITHUB_STARRED } from "./icons";
 import { formatGithubLocation, parseGithubLocation, type GithubLocation, type ProfileTab } from "./location";
 
 /**
@@ -440,8 +440,8 @@ function signInFirstPage(location: GithubLocation, why: string): DocumentPage {
   };
 }
 
-/** A form that is only a button, posting to `location`. */
-function buttonForm(location: Extract<GithubLocation, { kind: "login" | "logout" }>, label: string): LayoutNode {
+/** A form that is only a button, posting to `location`; `icon` names a sprite before the label. */
+function buttonForm(location: Extract<GithubLocation, { kind: "login" | "logout" }>, label: string, icon?: string): LayoutNode {
   return {
     type: "form",
     form: {
@@ -450,7 +450,7 @@ function buttonForm(location: Extract<GithubLocation, { kind: "login" | "logout"
       align: "right",
       controls: [
         { kind: "hidden", name: "return_to", value: location.returnTo },
-        { kind: "submit", name: "", value: "", label },
+        { kind: "submit", name: "", value: "", label, icon },
       ],
     },
   };
@@ -810,17 +810,17 @@ function repoNav(repo: RepoInfo, view: RepoPage["view"], ref: string): LayoutNod
   return tabs(sections);
 }
 
-/** Room for the Star button at the right of a repository's title: "Starred 1.2k". */
-const STAR_WIDTH = 100;
+/** Room for the Star button at the right of a repository's title: a star and "Starred 1.2k". */
+const STAR_WIDTH = 115;
 
 /**
- * GitHub's Star button and the count beside it. Signed in, it stars or
- * unstars (`starred` says which it is now); signed out, it signs in and
- * comes back.
+ * GitHub's Star button and the count beside it: an outline star to star
+ * with, a filled one once starred. Signed in, it stars or unstars
+ * (`starred` says which it is now); signed out, it signs in and comes back.
  */
 function starButton(repo: RepoInfo, starred: boolean | null, here: GithubLocation): LayoutNode {
   const count = formatCount(repo.stars);
-  if (starred === null) return buttonForm({ kind: "login", returnTo: githubUrl(here) }, `Star ${count}`);
+  if (starred === null) return buttonForm({ kind: "login", returnTo: githubUrl(here) }, `Star ${count}`, GITHUB_STAR);
   return {
     type: "form",
     form: {
@@ -829,7 +829,9 @@ function starButton(repo: RepoInfo, starred: boolean | null, here: GithubLocatio
       align: "right",
       controls: [
         { kind: "hidden", name: "star", value: starred ? "unstar" : "star" },
-        { kind: "submit", name: "", value: "", label: `${starred ? "Starred" : "Star"} ${count}` },
+        starred
+          ? { kind: "submit", name: "", value: "", label: `Starred ${count}`, icon: GITHUB_STARRED, tooltip: `Unstar ${repo.owner}/${repo.name}` }
+          : { kind: "submit", name: "", value: "", label: `Star ${count}`, icon: GITHUB_STAR },
       ],
     },
   };

@@ -1,7 +1,8 @@
 /**
  * GitHub in a real Safari window, signed in: the contribution calendar is
  * wider than the page, so it opens on the latest weeks and scrolls
- * sideways; the header's account menu signs out.
+ * sideways; the header's account menu signs out; a starred repository's
+ * Star button says it unstars.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchResponse } from "@mockintosh/sdk";
@@ -12,10 +13,10 @@ import { createAppStorage } from "@/src/os/appStorage";
 import { createHeadlessPlatform, type HeadlessPlatform } from "@/src/platform/headless";
 import Safari from "../../../Safari";
 
-function reply(body: unknown): FetchResponse {
+function reply(body: unknown, status = 200): FetchResponse {
   return {
     ok: true,
-    status: 200,
+    status,
     headers: { get: () => "application/json" },
     text: async () => JSON.stringify(body),
     json: async () => body,
@@ -28,6 +29,21 @@ const WEEKS = Array.from({ length: 53 }, (_, index) => ({
   firstDay: new Date(Date.UTC(2025, 9, 5 + index * 7)).toISOString().slice(0, 10),
   contributionDays: [{ weekday: index % 7, contributionCount: 1, contributionLevel: "FIRST_QUARTILE" }],
 }));
+
+/** The filled star as the screen draws it: 1 is black. */
+const FILLED_STAR = [
+  "00000100000",
+  "00001110000",
+  "00001110000",
+  "11111111111",
+  "11111111111",
+  "01111111110",
+  "00111111100",
+  "00111111100",
+  "01111111110",
+  "01111011110",
+  "01110001110",
+].join("\n");
 
 describe("GitHub in a Safari window", () => {
   let platform: HeadlessPlatform;
@@ -47,13 +63,16 @@ describe("GitHub in a Safari window", () => {
         } } });
       }
       if (path.endsWith("/users/octocat")) return reply({ login: "octocat", type: "User", public_repos: 0 });
+      if (path.endsWith("/repos/octocat/hello")) return reply({ name: "hello", owner: { login: "octocat" }, default_branch: "main", stargazers_count: 7 });
+      if (path.endsWith("/user/starred/octocat/hello")) return reply(null, 204);
       if (path.endsWith("/user")) return reply({ login: "octocat" });
       return reply([]);
     };
+    // Registered before boot, as bundled apps are, so boot registers its sprites too.
+    registerApp(Safari);
     os = await bootOS(platform);
     vi.advanceTimersByTime(1000);
     platform.tick();
-    registerApp(Safari);
     await createAppStorage((os.services as unknown as { fs: never }).fs, "safari").write("github-token.txt", "token");
     os.services.openApp("safari", { url: "https://github.com/octocat" });
     await settle();
@@ -173,5 +192,21 @@ describe("GitHub in a Safari window", () => {
     const after = await inspect();
     expect(after.some((node) => node.role === "button" && node.text === "Sign In")).toBe(true);
     expect(after.some((node) => node.name === "octocat menu")).toBe(false);
+  });
+
+  it("fills a starred repository's star, and says over it that pressing it unstars", async () => {
+    os.services.openApp("safari", { url: "https://github.com/octocat/hello" });
+    await settle();
+    const button = (await inspect()).find((node) => node.role === "button" && node.text === "Starred 7");
+    expect(button, "the Starred button").toBeDefined();
+    const { x, y, width, height } = button!.bounds;
+    // The filled star is drawn before the label.
+    await parkPointer();
+    expect(pixels({ x: x + 8, y: y + 1, width: 11, height: 11 })).toBe(FILLED_STAR);
+    platform.pointer({ type: "move", x: x + Math.floor(width / 2), y: y + Math.floor(height / 2) });
+    await settle();
+    await settle();
+    const tip = (await inspect()).find((node) => node.role === "tooltip" && node.value);
+    expect(tip?.value).toBe("Unstar octocat/hello");
   });
 });
