@@ -29,12 +29,12 @@
  "preview": {
   "id": "preview",
   "title": "Preview",
-  "icon": "icon/camera",
+  "icon": "preview/icon",
   "defaultSize": {
    "width": 256,
    "height": 256
   },
-  "smallIcon": "icon/camera-16x16",
+  "smallIcon": "preview/icon-16x16",
   "scrollable": true,
   "resizable": true,
   "minSize": {
@@ -55,6 +55,18 @@
   "about": {
    "version": "1.0",
    "description": "Shows pictures. Open them in another app to change them."
+  },
+  "sprites": {
+   "preview/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAKqqqqqqqAAAlVVVVVVYAACVVVVVVVgAAJVVVVVVWAAAlVVVVVVYKqqqqqqqVVglVVVVVVZVWCVVVVVVVlVYJVVVVapWVVglVVVVqlZVWCVVVVWqVlVYJVVVVapWVVglVVVVVVZVWCVVZVVVVlVYJVWpVVVWVVglValVVaqlWCVWqlVWqqlYJVqqlVqValglWqqVqVVWqCVqqqappVagJWqqpqWVVaAlqqqqpVVVoCaqqqqlVVWgJqqqqqVVVaAqqqqqqVVWoCqqqqqpVVaAAAAAAAqVaoAAAAAAAqqqoAAAAAAAqqCoAAAAAAAAACgAAAAAAAAAAA=="
+   },
+   "preview/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AKqqqgCVVVYAlVVWqqqqVpVVVlaVVpZWlVaWVpVVVlaVlVqWlqVlapallViaqZVYmqmVWKqqZWCqqqqKAAAACg=="
+   }
   }
  },
  "video": {

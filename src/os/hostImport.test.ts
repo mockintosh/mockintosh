@@ -62,7 +62,7 @@ describe("hostImport", () => {
     expect(file.type).toBe("image/png");
     expect(file.size).toBe(3);
     expect(fs.attributes(file.id)).toMatchObject({
-      icon: "icon/camera",
+      icon: "icon/picture",
       position: { x: 12, y: 24 },
     });
     expect(await fs.readBytes(file.id)).toEqual(new Uint8Array([9, 8, 7]));

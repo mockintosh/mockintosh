@@ -185,9 +185,7 @@ function Dither(props: DitherProps): JSX.Element {
     const { width, height } = view();
     const base = props.title ? stem(String(props.title)) : "Dither";
     try {
-      await writeSpriteFile(app.fs, desktop.id, fitNameWithSuffix(base, " 1-bit"), { width, height, data: pixels }, {
-        attributes: { icon: "icon/camera" },
-      });
+      await writeSpriteFile(app.fs, desktop.id, fitNameWithSuffix(base, " 1-bit"), { width, height, data: pixels });
     } catch (e) {
       console.error("Failed to save dithered image:", e);
     }

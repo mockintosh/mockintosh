@@ -326,7 +326,6 @@ function Surface(_props: Record<string, unknown>): JSX.Element {
         desktop.id,
         uniqueChildName(app.fs, desktop.id, "Surface Plot"),
         { width: picture.width, height: picture.height, data: new Uint8Array(picture.pixels) },
-        { attributes: { icon: "icon/camera" } },
       );
     } catch (err) {
       await app.os.showDialog({

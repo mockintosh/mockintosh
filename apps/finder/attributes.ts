@@ -23,11 +23,11 @@ export interface FinderNodeAttributes {
 }
 
 const ICON_BY_MIME: Readonly<Record<string, string>> = {
-  [MIME.sprite]: "icon/camera",
-  "image/png": "icon/camera",
-  "image/jpeg": "icon/camera",
-  "image/gif": "icon/camera",
-  "image/webp": "icon/camera",
+  [MIME.sprite]: "icon/picture",
+  "image/png": "icon/picture",
+  "image/jpeg": "icon/picture",
+  "image/gif": "icon/picture",
+  "image/webp": "icon/picture",
   [MIME.canvas]: "canvas/icon",
   [MIME.paint]: "macpaint/document",
   [MIME.app]: "icon/appstore-smr-32x32",

@@ -17,6 +17,7 @@ import {
   type PrintableImage,
   type PrintDialogChoice,
 } from "@mockintosh/sdk";
+import { sprites } from "./preview/icons";
 
 /**
  * Preview — the default viewer for pictures. Sprite files (the native 1-bit
@@ -175,8 +176,9 @@ function Preview(props: PreviewProps): JSX.Element {
 export default defineApp<PreviewProps>({
   id: APP_ID,
   title: "Preview",
-  icon: "icon/camera",
-  smallIcon: "icon/camera-16x16",
+  icon: "preview/icon",
+  smallIcon: "preview/icon-16x16",
+  sprites,
   about: {
     version: "1.0",
     description: "Shows pictures. Open them in another app to change them.",

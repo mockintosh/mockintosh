@@ -12,7 +12,7 @@ import { windowContentRect, windowTotalHeight } from "./windowGeometry";
 export const DITHER_APP_ID = "dither";
 export const TRACE_APP_ID = "trace";
 export const FOUNDRY_APP_ID = "foundry";
-export const IMPORTED_IMAGE_ICON = "icon/camera";
+export const IMPORTED_IMAGE_ICON = "icon/picture";
 export const IMPORTED_FONT_ICON = "foundry/icon";
 
 export interface ImportTarget {

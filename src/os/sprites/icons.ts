@@ -40,11 +40,6 @@ const ICON_CAMERA_32 = defineSprite(
   32,
   "ACqqqqqqqAAClVVVVVVWgAlmpqampqlgJqpqampqapgmpqampqammKpqampqampqpqampqampqaqaqqqaqqqaqapVlqpVVqmqqVVVVaqpqqpmqVVWpWpqqqVWlaaVmmqmpqllmpqaZqqmqmWmmlpqqmaaZValamqqpqZlVaqpqqampmVWVVamqqammVWZmaqqpqaZVVVVqqqmpplVVVWqqqaamVVVVaqqpqqZVVVVqqqmqpmqqqmqqqlVVVVVVqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqKqqqqqqqqqgqqqqqqqqqqAqqqqqqqqqgAqqqqqqqqoAAKqqqqqqoAA=="
 );
-const ICON_CAMERA = defineSprite(
-  32,
-  32,
-  "AAAAAAAAAAAAAAAAIAAAAAAAAgAgAgAAAAAAgCAIAAAAAAAgICAAAAAAAAgggAAAAAAAAgIAAAAAACgAAACgAAAAAoqqigAAAAAACWWAAAAAAAAJqYAAAAAAKompiqAAAKAACWWAAAACqgCqqqoqoAJWKJVVViVgKqqqqqqqqqglVVVVVVVVWCVaqqqqqqpYJVlVVapVVlglaVVaVaVWmCVpVWWqWVaYJWlVZlWZVpglaVWZVWZWmCVpaZlVZlaYJWlpmVVmVpglaaWZVWZWmCVpVWZVmVaYJWlVZapZVpglaVVaVaVWmCVpVVWqVVaYJVqqqqqqqlgqqqqqqqqqqA=="
-);
 const ICON_CAMERA3 = defineSprite(
   32,
   32,
@@ -192,24 +187,59 @@ const ICON_FILE_16X16 = fromGrid(16, 16, [
   "..#oooooooooo#..",
   "..############..",
 ]);
-/** Flash camera: burst rays over the flash, a wide body and a two-ring lens. */
-const ICON_CAMERA_16X16 = fromGrid(16, 16, [
-  "...#...##...#...",
-  "....#......#....",
-  "....########....",
-  ".##.#oooooo#.##.",
-  "################",
-  "#oooooooooooooo#",
-  "#ooooo####ooooo#",
-  "#oooo##oo##oooo#",
-  "#ooo##oooo##ooo#",
-  "#ooo#oo##oo#ooo#",
-  "#ooo#oo##oo#ooo#",
-  "#ooo##oooo##ooo#",
-  "#oooo##oo##oooo#",
-  "#ooooo####ooooo#",
-  "#oooooooooooooo#",
-  "################",
+/** A picture document: the document page with a landscape photo where its text would be. */
+const ICON_PICTURE = fromGrid(32, 32, [
+  "...###################..........",
+  "...#ooooooooooooooooo##.........",
+  "...#ooooooooooooooooo#o#........",
+  "...#ooooooooooooooooo#oo#.......",
+  "...#ooooooooooooooooo#ooo#......",
+  "...#ooooooooooooooooo#oooo#.....",
+  "...#ooooooooooooooooo#######....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#oo###################oo#....",
+  "...#oo#ooooooooooooooooo#oo#....",
+  "...#oo#oooooooooooo###oo#oo#....",
+  "...#oo#oooooooooooo###oo#oo#....",
+  "...#oo#oooooooooooo###oo#oo#....",
+  "...#oo#oooooooooooo###oo#oo#....",
+  "...#oo#ooooooooooooooooo#oo#....",
+  "...#oo#ooooooooooooooooo#oo#....",
+  "...#oo#ooooo#ooooooooooo#oo#....",
+  "...#oo#oooo###oooooooooo#oo#....",
+  "...#oo#oooo####ooooooooo#oo#....",
+  "...#oo#ooo######ooo#oooo#oo#....",
+  "...#oo#oo#######oo###ooo#oo#....",
+  "...#oo#o###############o#oo#....",
+  "...#oo#o#################oo#....",
+  "...#oo###################oo#....",
+  "...#oo###################oo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#########################....",
+]);
+/** The picture document for 16×16 views: the page and a small mountain. */
+const ICON_PICTURE_16X16 = fromGrid(16, 16, [
+  "..########......",
+  "..#oooooo##.....",
+  "..#oooooo#o#....",
+  "..#oooooo#oo#...",
+  "..#oooooo#####..",
+  "..#oooooooooo#..",
+  "..#o########o#..",
+  "..#o#oooooo#o#..",
+  "..#o#oooo#o#o#..",
+  "..#o#oooooo#o#..",
+  "..#o#oo#ooo#o#..",
+  "..#o#o###oo#o#..",
+  "..#o########o#..",
+  "..#o########o#..",
+  "..#oooooooooo#..",
+  "..############..",
 ]);
 /** Solid black disc with a white play triangle. */
 const ICON_MACFLIM_16X16 = fromGrid(16, 16, [
@@ -309,8 +339,10 @@ export const iconSprites: Record<string, Sprite> = {
   "icon/appstore2": ICON_APPSTORE2,
   "icon/finder-16x16": ICON_FINDER_16X16,
   "icon/camera-32": ICON_CAMERA_32,
-  "icon/camera": ICON_CAMERA,
-  "icon/camera-16x16": ICON_CAMERA_16X16,
+  "icon/picture": ICON_PICTURE,
+  "icon/picture-16x16": ICON_PICTURE_16X16,
+  // Pictures saved before "icon/picture" stored this name as their icon.
+  "icon/camera": ICON_PICTURE,
   "icon/camera3": ICON_CAMERA3,
   "icon/chat": ICON_CHAT,
   "icon/chat-16x16": ICON_CHAT_16X16,
