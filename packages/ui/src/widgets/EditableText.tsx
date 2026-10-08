@@ -16,6 +16,9 @@ import {
 } from "../fonts/textLayout";
 import type { CanvasNode, Modifiers, TextAlign } from "../nodes";
 import { createTextClicks, paragraphRangeAt, type TextClickSelection } from "../textClicks";
+import { createCaretBlink, createTextEditing } from "../textEditing";
+import { heldModifiers } from "../modifiers";
+import { blockLines } from "../fonts/textLines";
 
 export interface EditableTextProps {
   name?: string;
@@ -54,18 +57,7 @@ export function EditableText(props: EditableTextProps): JSX.Element {
   const { clipboard } = useUIServices();
   let node: CanvasNode | null = null;
 
-  // Locals stay current across staged Solid 2 writes so keydown + keypress in
-  // one turn see the caret and text we just wrote.
-  let caretAt = props.value.length;
-  let anchorAt = caretAt;
-  let draft: string | null = null;
-  const valueNow = () => draft ?? props.value;
-
-  const signalOpts = { ownedWrite: true as const };
-  const [caret, setCaret] = createSignal(caretAt, signalOpts);
-  const [anchor, setAnchor] = createSignal(anchorAt, signalOpts);
-  const [focused, setFocused] = createSignal(false, signalOpts);
-  const [blinkOn, setBlinkOn] = createSignal(true, signalOpts);
+  const [focused, setFocused] = createSignal(false, { ownedWrite: true });
   let firstFocus = true;
 
   const align = (): TextAlign => props.align ?? "left";
@@ -73,117 +65,35 @@ export function EditableText(props: EditableTextProps): JSX.Element {
   const layoutOf = (text: string): TextBlock => layoutText(font(), text, props.width);
   const block = createMemo(() => layoutOf(props.value));
 
-  function place(nextCaret: number, extend: boolean): void {
-    const len = valueNow().length;
-    caretAt = Math.max(0, Math.min(len, nextCaret));
-    if (!extend) anchorAt = caretAt;
-    setCaret(caretAt);
-    setAnchor(anchorAt);
-    setBlinkOn(true);
-  }
-
-  const range = () => ({ lo: Math.min(caretAt, anchorAt), hi: Math.max(caretAt, anchorAt) });
-
-  createEffect(
-    () => props.value,
-    (value) => {
-      if (draft === value) draft = null;
-      else if (draft !== null && draft.length !== value.length) draft = null;
-      if (caretAt > value.length || anchorAt > value.length) place(Math.min(caretAt, value.length), false);
-    },
-  );
-
-  function replaceRange(text: string): void {
-    if (props.disabled) return;
-    const { lo, hi } = range();
-    const cur = valueNow();
-    const next = cur.slice(0, lo) + text + cur.slice(hi);
-    draft = next;
-    props.onChange(next);
-    place(lo + text.length, false);
-  }
-
-  function verticalIndex(from: number, rows: -1 | 1): number {
-    const text = valueNow();
-    const laid = layoutOf(text);
-    const row = lineOfIndex(laid, from) + rows;
-    if (row < 0) return 0;
-    if (row >= laid.lines.length) return text.length;
-    const at = caretPoint(laid, font(), from, align(), props.width);
-    return indexAtPoint(laid, font(), at.x, lineTop(laid, row), align(), props.width);
-  }
-
-  function lineBounds(index: number): { start: number; end: number } {
-    const laid = layoutOf(valueNow());
-    const line = laid.lines[lineOfIndex(laid, index)]!;
-    return { start: line.start, end: line.start + line.text.length };
-  }
+  const editing = createTextEditing({
+    value: () => props.value,
+    onChange: (value) => props.onChange(value),
+    disabled: () => props.disabled === true,
+    clipboard,
+    lines: () => blockLines(layoutOf(editing.valueNow()), font(), align(), props.width),
+    // Pasted text comes a character at a time: `\r\n` keeps only the `\n`, a tab is a space.
+    clean: (text) => text.replace(/\r\n?/g, "\n").replace(/\t/g, " "),
+  });
+  const { caret, anchor } = editing;
+  const blinkOn = createCaretBlink(focused, caret);
 
   /** Double-click selects a word, triple-click the paragraph. */
   const clicks = createTextClicks({ third: paragraphRangeAt });
 
   function select({ anchor, caret }: TextClickSelection): void {
-    anchorAt = anchor;
-    place(caret, true);
+    editing.select(caret, anchor);
   }
 
   function onKeyDown(key: string, mod: Modifiers): void {
     if (props.disabled) return;
-    const command = mod.meta || mod.ctrl;
-    const { lo, hi } = range();
-    const collapsed = lo === hi;
-    if (command) {
-      const k = key.toLowerCase();
-      if (k === "a") {
-        anchorAt = 0;
-        place(valueNow().length, true);
-      } else if ((k === "c" || k === "x") && !collapsed) {
-        void clipboard?.writeText(valueNow().slice(lo, hi)).catch(() => {});
-        if (k === "x") replaceRange("");
-      }
-      return;
-    }
-    switch (key) {
-      case "ArrowLeft":
-        place(mod.shift || collapsed ? caretAt - 1 : lo, mod.shift);
-        return;
-      case "ArrowRight":
-        place(mod.shift || collapsed ? caretAt + 1 : hi, mod.shift);
-        return;
-      case "ArrowUp":
-        place(verticalIndex(caretAt, -1), mod.shift);
-        return;
-      case "ArrowDown":
-        place(verticalIndex(caretAt, 1), mod.shift);
-        return;
-      case "Home":
-        place(lineBounds(caretAt).start, mod.shift);
-        return;
-      case "End":
-        place(lineBounds(caretAt).end, mod.shift);
-        return;
-      case "Backspace":
-        if (collapsed) anchorAt = Math.max(0, caretAt - 1);
-        replaceRange("");
-        return;
-      case "Delete":
-        if (collapsed) anchorAt = Math.min(valueNow().length, caretAt + 1);
-        replaceRange("");
-        return;
-      case "Enter":
-      case "Return":
-        replaceRange("\n");
-        return;
-      case "Escape":
-        props.onCancel?.();
-        return;
-    }
+    if (editing.key(key, mod)) return;
+    if (key === "Enter" || key === "Return") editing.insert("\n", "other");
+    else if (key === "Escape") props.onCancel?.();
   }
 
-  /** Typed characters, and pasted text one character at a time (`\r\n` keeps only the `\n`). */
   function onKeyPress(char: string): void {
     if (props.disabled || !char || char === "\r") return;
-    replaceRange(char === "\t" ? " " : char);
+    editing.insert(char);
   }
 
   const indexAt = (lx: number, ly: number) =>
@@ -191,11 +101,7 @@ export function EditableText(props: EditableTextProps): JSX.Element {
 
   function onFocus(): void {
     setFocused(true);
-    setBlinkOn(true);
-    if (props.selectAllOnFocus && firstFocus) {
-      anchorAt = 0;
-      place(valueNow().length, true);
-    }
+    if (props.selectAllOnFocus && firstFocus) editing.select(editing.valueNow().length, 0);
     firstFocus = false;
   }
 
@@ -210,15 +116,6 @@ export function EditableText(props: EditableTextProps): JSX.Element {
       if (node) focusManager.focus(node);
     });
   });
-
-  createEffect(
-    () => focused(),
-    (on) => {
-      if (!on) return;
-      const id = setInterval(() => setBlinkOn((v) => !v), 530);
-      return () => clearInterval(id);
-    },
-  );
 
   const caretBox = createMemo(() => {
     const laid = block();
@@ -263,15 +160,16 @@ export function EditableText(props: EditableTextProps): JSX.Element {
       onBlur={onBlur}
       onMouseDown={(lx: number, ly: number) => {
         if (node) focusManager.focus(node);
-        select(clicks.down(lx, ly, valueNow(), indexAt(lx, ly)));
+        select(clicks.down(lx, ly, editing.valueNow(), indexAt(lx, ly), heldModifiers().shift ? anchor() : undefined));
       }}
-      onDrag={(lx: number, ly: number) => select(clicks.drag(valueNow(), indexAt(lx, ly)))}
+      onDrag={(lx: number, ly: number) => select(clicks.drag(editing.valueNow(), indexAt(lx, ly)))}
       onDoubleClick={(lx: number, ly: number) => {
-        const sel = clicks.doubleClick(lx, ly, valueNow(), indexAt(lx, ly));
+        const sel = clicks.doubleClick(lx, ly, editing.valueNow(), indexAt(lx, ly));
         if (sel) select(sel);
       }}
       onKeyDown={onKeyDown}
       onKeyPress={onKeyPress}
+      onPaste={(text: string) => editing.insert(text, "other")}
     >
       <text font={props.font ?? "body"} size={props.size} align={align()} wrap>
         {props.value}

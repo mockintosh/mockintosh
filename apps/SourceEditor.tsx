@@ -82,7 +82,7 @@ function SourceEditor(props: {path?: string}): JSX.Element {
         await invoke("app_restore", {app: manifest.id}); setStatus("Previous build restored");
       })} />
     </box>
-    <TextEditor name="source-code" value={text()} onChange={setText} disabled={busy()} line={line()} width={app.window.width() - 12} height={Math.max(40, app.window.height() - 100)} />
+    <TextEditor name="source-code" font="mono" wrap={false} value={text()} onChange={setText} disabled={busy()} line={line()} width={app.window.width() - 12} height={Math.max(40, app.window.height() - 100)} />
     <text wrap>{`${text() !== saved() ? "Modified. " : ""}${status()}`}</text>
   </box>;
 }
