@@ -19,6 +19,8 @@ export interface MenuProps {
   items: readonly MenuItem[];
   /** `end` hangs the menu from the trigger's right edge, for a trigger at the right of a bar. */
   align?: OverlayAlign;
+  /** Pixels between the trigger and the menu below it. */
+  offset?: number;
 }
 
 /** In-window menu. Not the OS menubar, but highlights the item under the pointer as it does: inverted. */
@@ -26,7 +28,7 @@ export function Menu(props: MenuProps): JSX.Element {
   const radius = useRadius("md");
   const [hovered, setHovered] = createSignal<MenuItem | null>(null);
   return (
-    <Overlay open={props.open} onDismiss={props.onDismiss} role="menu" align={props.align} trigger={props.trigger}>
+    <Overlay open={props.open} onDismiss={props.onDismiss} role="menu" align={props.align} offset={props.offset ?? 1} trigger={props.trigger}>
       <box
         semantic={{ name: props.name ?? "menu", role: "menu" }}
         minWidth={100}

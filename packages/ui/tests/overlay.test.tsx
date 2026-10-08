@@ -286,6 +286,22 @@ describe("Menu", () => {
     expect(ui.inspect().some((n) => n.name === "overlay-panel")).toBe(false);
   });
 
+  it("hangs 1px below its trigger", () => {
+    const [open, setOpen] = createSignal(false);
+    const ui = createUI({ screen: newBitMap(240, 160) });
+    ui.render(() => (
+      <box padding={10}>
+        <Menu name="edit" open={open()} onDismiss={() => {}} trigger={<box semantic={{ name: "trigger" }} width={20} height={10} />} items={[{ label: "Cut" }]} />
+      </box>
+    ));
+    ui.frame();
+    setOpen(true);
+    ui.frame();
+    const trigger = ui.inspect().find((n) => n.name === "trigger")!;
+    const menu = ui.inspect().find((n) => n.name === "edit" && n.role === "menu")!;
+    expect(menu.bounds.y).toBe(trigger.bounds.y + trigger.bounds.height + 1);
+  });
+
   it("inverts the item under the pointer, as the menu bar does, but never a disabled one", () => {
     const ui = createUI({ screen: newBitMap(240, 160) });
     ui.render(() => (
