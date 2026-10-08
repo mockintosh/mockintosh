@@ -97,6 +97,13 @@ export interface PointerDispatcher {
   ): boolean;
   /** Cancel a running flick. Safe when idle. */
   stopFlick(): void;
+  /**
+   * Hover what is under the pointer now, where it last was: content that
+   * moved under a still pointer (a scroll, a relayout) gets its leave and
+   * enter as if the pointer had moved. Not while a press is held. Returns
+   * whether the hovered box changed.
+   */
+  refreshHover(): boolean;
 }
 
 /** The host's frame clock, which a flick coasts on. Without one, a flick stops where the finger lifts. */
@@ -378,6 +385,8 @@ export function createPointerDispatcher(
   scheduler?: PointerScheduler,
 ): PointerDispatcher {
   let hovered: CanvasNode | null = null;
+  /** Where a mouse pointer last was; null for none (never seen, or a finger that lifted). */
+  let pointerAt: { x: number; y: number } | null = null;
   let captured: CanvasNode | null = null;
   let dragging = false;
   let pressKind: PointerKind = "mouse";
@@ -559,9 +568,20 @@ export function createPointerDispatcher(
       }
     },
     stopFlick,
+    refreshHover() {
+      if (!pointerAt || pressing) return false;
+      const before = hovered;
+      try {
+        setHovered(hitTest(root, pointerAt.x, pointerAt.y));
+      } catch (error) {
+        onError?.(error);
+      }
+      return hovered !== before;
+    },
   };
 
   function dispatchInner(type: PointerType, x: number, y: number, extras?: PointerExtras): boolean {
+      pointerAt = { x, y };
       if (type === "scroll") {
         stopFlick();
         const dx = extras?.deltaX ?? 0;
@@ -657,6 +677,7 @@ export function createPointerDispatcher(
         const cancel = extras?.cancel === true;
         const flick = panning && !cancel ? velocity.release(now()) : 0;
         if (cancel || panning) {
+          if (pressKind === "touch") pointerAt = null;
           setHovered(null);
           endPress();
           if (flick !== 0) startFlick(flick, x, y);
@@ -677,6 +698,7 @@ export function createPointerDispatcher(
         const kind = pressKind;
         endPress();
         // A finger leaves no pointer. Do not keep the last box hovered.
+        if (kind === "touch") pointerAt = null;
         setHovered(kind === "touch" ? null : hit);
         return false;
       }

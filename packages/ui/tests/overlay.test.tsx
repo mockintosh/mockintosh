@@ -107,6 +107,61 @@ describe("Tooltip", () => {
     ui.frame();
     expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(false);
   });
+
+  it("closes when its trigger moves out from under a still pointer, as a scrolled window's content does", () => {
+    const ui = createUI({ screen: newBitMap(240, 120) });
+    // The window's scroll, as the OS gives it to a worker app: the content moves, the pointer doesn't.
+    const [scrolled, setScrolled] = createSignal(0);
+    ui.render(() => (
+      <box width={240} height={120} overflow="hidden" position="relative">
+        <box position="absolute" left={0} top={20 - scrolled()} width={240}>
+          <Tooltip label="Save the file">
+            <box semantic={{ name: "save" }} width={40} height={16}>
+              <text font="body">Save</text>
+            </box>
+          </Tooltip>
+        </box>
+      </box>
+    ));
+    ui.frame();
+    const save = ui.inspect().find((n) => n.name === "save")!;
+    ui.dispatchPointer("mousemove", save.bounds.x + 4, save.bounds.y + 4);
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(true);
+
+    setScrolled(30);
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(false);
+
+    // Scrolled back under the pointer, it shows again.
+    setScrolled(0);
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(true);
+  });
+
+  it("closes when the wheel scrolls its pane out from under the pointer", () => {
+    const ui = createUI({ screen: newBitMap(240, 80) });
+    ui.render(() => (
+      <box width={240} height={60} overflow="scroll">
+        <box height={8} />
+        <Tooltip label="Save the file">
+          <box semantic={{ name: "save" }} width={40} height={16}>
+            <text font="body">Save</text>
+          </box>
+        </Tooltip>
+        <box height={200} />
+      </box>
+    ));
+    ui.frame();
+    const save = ui.inspect().find((n) => n.name === "save")!;
+    const at = { x: save.bounds.x + 4, y: save.bounds.y + 4 };
+    ui.dispatchPointer("mousemove", at.x, at.y);
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(true);
+    ui.dispatchPointer("scroll", at.x, at.y, { deltaY: 40 });
+    ui.frame();
+    expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(false);
+  });
 });
 
 describe("Tooltip in a scrolled pane", () => {
