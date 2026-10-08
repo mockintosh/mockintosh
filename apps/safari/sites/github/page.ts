@@ -362,14 +362,22 @@ function heading(level: 1 | 2 | 3, value: string, href?: string): LayoutNode {
 }
 
 /** Facts on one line, the way github.com runs them together. Empty ones drop out. */
-function facts(...items: Array<InlineSegment | string | false | undefined>): LayoutNode {
+function facts(...items: Array<InlineSegment | InlineSegment[] | string | false | undefined>): LayoutNode {
   const segments: InlineSegment[] = [];
   for (const item of items) {
     if (!item) continue;
     if (segments.length > 0) segments.push(text("  •  "));
-    segments.push(typeof item === "string" ? text(item) : item);
+    if (typeof item === "string") segments.push(text(item));
+    else if (Array.isArray(item)) segments.push(...item);
+    else segments.push(item);
   }
   return paragraph(...segments);
+}
+
+/** A GitHub user's login, linked to their profile; `bold` where github.com sets it bold. */
+function person(login: string, bold = false): InlineSegment {
+  const href = githubUrl({ kind: "profile", login, tab: "overview" });
+  return bold ? { kind: "link", text: login, href, bold } : { kind: "link", text: login, href };
 }
 
 const HR: LayoutNode = { type: "hr" };
@@ -640,7 +648,7 @@ function profileSidebar(page: Extract<GithubPage, { view: "profile" }>): LayoutN
 function profileMain(page: Extract<GithubPage, { view: "profile" }>, now: number, forms: PageForms): LayoutNode[] {
   const login = page.profile.login;
   if (page.tab === "people") {
-    const people = page.people.map((person) => [paragraph(link(person, { kind: "profile", login: person, tab: "overview" }))]);
+    const people = page.people.map((login) => [paragraph(person(login))]);
     return [heading(2, "People"), list(people, "No public members.", false)];
   }
   if (page.tab === "overview") return overviewMain(page, now, forms);
@@ -950,7 +958,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
     const files = list(rows, "This folder is empty.", false);
     const commit = page.commit;
     const box: LayoutNode = commit && files.type === "box"
-      ? { ...files, nodes: [facts(bold(commit.author), commitSubject(commit.message), commit.sha, formatAge(commit.date, now)), HR, ...files.nodes] }
+      ? { ...files, nodes: [facts(commit.login ? person(commit.login, true) : bold(commit.author), commitSubject(commit.message), commit.sha, formatAge(commit.date, now)), HR, ...files.nodes] }
       : files;
     const main: LayoutNode[] = [pathBar(repo, page.ref, page.path), box];
     if (page.readme) {
@@ -992,8 +1000,8 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
     const rows = items.map((item): LayoutNode[] => {
       const target: GithubLocation = pulls ? { kind: "pull", owner, repo: name, number: item.number } : { kind: "issue", owner, repo: name, number: item.number };
       const when = closed
-        ? `#${item.number} by ${item.user} was ${item.state === "merged" ? "merged" : "closed"} ${formatAge(item.closedAt || item.createdAt, now)}`
-        : `#${item.number} opened ${formatAge(item.createdAt, now)} by ${item.user}`;
+        ? [text(`#${item.number} by `), person(item.user), text(` was ${item.state === "merged" ? "merged" : "closed"} ${formatAge(item.closedAt || item.createdAt, now)}`)]
+        : [text(`#${item.number} opened ${formatAge(item.createdAt, now)} by `), person(item.user)];
       return [heading(3, item.title, githubUrl(target)), facts(when, commentCount(item.comments))];
     });
     const noun = pulls ? "pull requests" : "issues";
@@ -1008,7 +1016,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
   if (page.view === "discussions") {
     const rows = page.discussions.map((item): LayoutNode[] => [
       heading(3, item.title, githubUrl({ kind: "discussion", owner, repo: name, number: item.number })),
-      facts(item.category, `${item.user} started ${formatAge(item.createdAt, now)}`, commentCount(item.comments), item.answered && "✓ Answered"),
+      facts(item.category, [person(item.user), text(` started ${formatAge(item.createdAt, now)}`)], commentCount(item.comments), item.answered && "✓ Answered"),
     ]);
     return {
       title: "Discussions",
@@ -1041,7 +1049,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
       title: item.title,
       body: [
         heading(1, `${item.title} #${item.number}`),
-        facts(item.category, `${item.user} started this discussion ${formatAge(item.createdAt, now)}`, commentCount(item.comments), item.answered && "✓ Answered"),
+        facts(item.category, [person(item.user), text(` started this discussion ${formatAge(item.createdAt, now)}`)], commentCount(item.comments), item.answered && "✓ Answered"),
         ...conversation(item, page.comments, repo, now),
         commentForm(location, forms),
       ],
@@ -1053,7 +1061,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
     title: item.title,
     body: [
       heading(1, `${item.title} #${item.number}`),
-      facts(bold(stateLabel(item.state)), `${item.user} opened this ${kind} ${formatAge(item.createdAt, now)}`, commentCount(item.comments)),
+      facts(bold(stateLabel(item.state)), [person(item.user), text(` opened this ${kind} ${formatAge(item.createdAt, now)}`)], commentCount(item.comments)),
       ...conversation(item, page.comments, repo, now),
       commentForm(location, forms),
     ],
@@ -1080,7 +1088,7 @@ function conversation(item: IssueInfo, comments: readonly CommentInfo[], repo: R
 
 /** A comment as github.com draws it: "user commented 3d ago" over the text, a discussion's replies in cards inside. */
 function commentCard(comment: CommentInfo, repo: RepoInfo, now: number, empty: string): LayoutNode {
-  const header = [bold(comment.user), text(` commented ${formatAge(comment.createdAt, now)}`), ...(comment.answer ? [text("  •  "), bold("✓ Answer")] : [])];
+  const header = [person(comment.user, true), text(` commented ${formatAge(comment.createdAt, now)}`), ...(comment.answer ? [text("  •  "), bold("✓ Answer")] : [])];
   const replies = (comment.replies ?? []).map((reply) => commentCard(reply, repo, now, ""));
   return card(header, [...markdownOr(comment.body, repo, empty), ...replies]);
 }

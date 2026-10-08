@@ -208,6 +208,37 @@ describe("GitHub issue and pull request lists", () => {
   });
 });
 
+describe("GitHub usernames", () => {
+  const profileLink = (login: string, bold = false) =>
+    JSON.stringify(bold ? { kind: "link", text: login, href: `https://github.com/${login}`, bold } : { kind: "link", text: login, href: `https://github.com/${login}` });
+
+  it("links who made a commit, an issue and a comment to their profiles", async () => {
+    const { fetch } = fakeGithub((call) => {
+      if (call.url.includes("/commits")) {
+        return reply([{ sha: "0760fe7aaaa", commit: { message: "Fix it", author: { name: "Gustav", date: "2026-10-07T00:00:00Z" } }, author: { login: "gustavlrsn" } }]);
+      }
+      if (call.url.includes("/issues/5/comments")) return reply([{ user: { login: "hubot" }, body: "Me too", created_at: "2026-10-02T00:00:00Z" }]);
+      if (call.url.includes("/issues?state=")) return reply([ISSUE]);
+      return undefined;
+    });
+    const repo = JSON.stringify((await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")))).nodes);
+    expect(repo).toContain(profileLink("gustavlrsn", true));
+    const list = JSON.stringify((await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues"), context(fetch, "")))).nodes);
+    expect(list).toContain(profileLink("octocat"));
+    const issue = JSON.stringify((await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/5"), context(fetch, "")))).nodes);
+    expect(issue).toContain(profileLink("octocat"));
+    expect(issue).toContain(profileLink("hubot", true));
+  });
+
+  it("leaves a commit's author plain when no GitHub account matches their git name", async () => {
+    const { fetch } = fakeGithub((call) => (call.url.includes("/commits")
+      ? reply([{ sha: "0760fe7aaaa", commit: { message: "Fix it", author: { name: "Someone Else", date: "2026-10-07T00:00:00Z" } }, author: null }])
+      : undefined));
+    const repo = JSON.stringify((await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")))).nodes);
+    expect(repo).toContain(JSON.stringify({ kind: "bold", text: "Someone Else" }));
+  });
+});
+
 describe("GitHub repositories", () => {
   it("heads a repository with where it is, then its tabs over a rule, and puts About beside the files", async () => {
     const { fetch } = fakeGithub();

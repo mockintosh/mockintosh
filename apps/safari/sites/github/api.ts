@@ -34,7 +34,10 @@ export interface DirEntry {
 export interface CommitInfo {
   sha: string;
   message: string;
+  /** The author's login, or their git name when no GitHub account matches it. */
   author: string;
+  /** The author's login; empty when the commit isn't tied to a GitHub account. */
+  login: string;
   date: string;
 }
 
@@ -677,6 +680,7 @@ function commitInfo(record: Record<string, unknown>): CommitInfo {
     sha: stringField(record, "sha").slice(0, 7),
     message: stringField(commit, "message"),
     author: stringField(user, "login") || stringField(author, "name"),
+    login: stringField(user, "login"),
     date: stringField(author, "date"),
   };
 }
