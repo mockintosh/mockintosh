@@ -151,7 +151,8 @@ describe("GitHub repositories", () => {
   it("heads a repository with where it is, then its tabs over a rule, and puts About beside the files", async () => {
     const { fetch } = fakeGithub();
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")));
-    const [header, nav] = shown.nodes;
+    const [header, space, nav] = shown.nodes;
+    expect(space).toEqual({ type: "spacer", height: 0 });
     if (header?.type !== "columns") throw new Error("no header");
     expect(header.columns[1]!.nodes).toEqual([
       {

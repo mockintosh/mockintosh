@@ -200,8 +200,12 @@ function withHeader(page: GithubDocument, viewer: string | null, account = true)
   };
   const { nav, ...rest } = page;
   // Tabs draw their own rule, under the current tab's line.
-  return { ...rest, nodes: [header, nav ?? HR, HEADER_SPACE, ...spaceSections(page.nodes)] };
+  const top = nav ? [header, TABS_SPACE, nav] : [header, HR];
+  return { ...rest, nodes: [...top, HEADER_SPACE, ...spaceSections(page.nodes)] };
 }
+
+/** 4px more between the header and the tabs: an empty spacer adds one more of the page's 4px gaps. */
+const TABS_SPACE: LayoutNode = { type: "spacer", height: 0 };
 
 /** Room under the header's rule, on every page. */
 const HEADER_SPACE: LayoutNode = { type: "spacer", height: 4 };
