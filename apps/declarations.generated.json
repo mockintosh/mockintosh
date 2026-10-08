@@ -935,46 +935,17 @@
   ],
   "singleInstance": false
  },
- "chatgippity": {
-  "id": "chatgippity",
-  "title": "ChatGippity",
-  "icon": "chatgippity/icon",
+ "assistant": {
+  "id": "assistant",
+  "title": "Assistant",
+  "icon": "icon/chat",
   "defaultSize": {
    "width": 360,
    "height": 260
   },
-  "smallIcon": "chatgippity/icon-16x16",
-  "requires": [
-   "network"
-  ],
-  "permissions": [
-   "kernel:*"
-  ],
-  "sprites": {
-   "chatgippity/icon": {
-    "width": 32,
-    "height": 32,
-    "data": "ACqqqqqqqAACqqqqqqqqgAqqqqqqqqqgKqqqqqqqaqgqqqqqqqpqqKqqqqqqqmqqqqqqqqqpWqqqqqqqqlVVaqqqqqqqqVqqqqqqqqqqaqqqqqqWqqpqqqqqqpaqqmqqqqqqVaqqqqqqqqpVqqqqqqqqqVVqqqqqqqqlVVqqqqqqqlVVVaqqqqqlVVVVWqqqqqVVVVVaqqqqqlVVVaqqqqqqpVVaqqqqqqqpVWqqqqqqqqpVqqqqqqqqqlWqqqqqqqqqlqqqqqqqqqqWqqqqqqqqqqqqqqqqKqqqqqqqqqgqqqqqqqqqqAqqqqqqqqqgAqqqqqqqqoAAKqqqqqqoAA=="
-   },
-   "chatgippity/icon-16x16": {
-    "width": 16,
-    "height": 16,
-    "data": "CqqqoCqqqqiqqqpqqqqpWqqqqmqqqqqqqqaqqqqmqqqqlaqqqVVaqqqVqqqqpqqqqqaqqqqqqqoqqqqoCqqqoA=="
-   }
-  }
- },
- "fx": {
-  "id": "fx",
-  "title": "fx",
-  "icon": "icon/chat",
-  "defaultSize": {
-   "width": 380,
-   "height": 280
-  },
   "smallIcon": "icon/chat-16x16",
   "requires": [
-   "network",
-   "agent-runtime"
+   "network"
   ],
   "permissions": [
    "kernel:*"

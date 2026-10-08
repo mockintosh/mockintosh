@@ -29,8 +29,7 @@ export const SDK_CLEAN = [
   "PhotoBooth.tsx",
   "SourceEditor.tsx",
   "Terminal.tsx",
-  "ChatGippity.tsx",
-  "Fx.tsx",
+  "Assistant.tsx",
   "SpotifyPlayer.tsx",
 ] as const;
 
@@ -67,8 +66,7 @@ export const BUNDLED_APPS = [
   "SpotifyPlayer.tsx",
   "SourceEditor.tsx",
   "Terminal.tsx",
-  "ChatGippity.tsx",
-  "Fx.tsx",
+  "Assistant.tsx",
   "Finder.solid.tsx",
   "AppStore.tsx",
   "IconGallery.tsx",
@@ -97,10 +95,8 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "Pchkraft.tsx": ["pchkraft", "synth", "chord"],
   "Visualizer.tsx": ["visualizer", "showreel", "surface", "synth"],
   "Earth.tsx": ["earth", "showreel"],
-  "ChatGippity.tsx": ["chatgippity"],
   "Preview.tsx": ["preview"],
   "Terminal.tsx": ["terminal"],
-  "Fx.tsx": ["fx"],
 };
 
 export const APP_TITLES: Record<BundledAppEntry, string> = {
@@ -128,8 +124,7 @@ export const APP_TITLES: Record<BundledAppEntry, string> = {
   "SpotifyPlayer.tsx": "Spotify",
   "SourceEditor.tsx": "Source Editor",
   "Terminal.tsx": "Terminal",
-  "ChatGippity.tsx": "ChatGippity",
-  "Fx.tsx": "fx",
+  "Assistant.tsx": "Assistant",
   "Finder.solid.tsx": "Finder",
   "AppStore.tsx": "App Store",
   "IconGallery.tsx": "Icon Gallery",

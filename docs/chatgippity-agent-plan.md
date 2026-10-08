@@ -2,7 +2,7 @@
 
 Written 15 September 2026. Companion to the [M2 app-building slice](m2-apps.md), the [kernel plan](kernel-plan.md) and the [server infrastructure plan](server-infrastructure-plan.md). This document diagnoses why the in-OS ChatGippity agent produces markedly weaker apps than an agent running in Cursor against this repository when given the same instruction (for example "build a drawing app"), and proposes a phased plan to close that gap.
 
-The comparison is grounded in the current pipeline (`apps/ChatGippity.tsx` → `src/os/agent/*` → `/api/chat` → kernel traps → builder) and in what a Cursor agent actually used to produce `apps/MacPaint.tsx` (657 lines plus four helper modules and a test file, about 1500 lines in total).
+The comparison is grounded in the current pipeline (`apps/Assistant.tsx` → `src/os/agent/*` → `/api/chat` → kernel traps → builder) and in what a Cursor agent actually used to produce `apps/MacPaint.tsx` (657 lines plus four helper modules and a test file, about 1500 lines in total).
 
 ## Why the output differs
 
@@ -84,7 +84,7 @@ Add `scripts/agent-eval.ts`: run the real LLM through `runAgent` against `withHe
 - *Web provider:* a build-time manifest (paths, sizes, commit SHA) plus per-file static assets under `public/source/`, or a non-eager `import.meta.glob` so Vite code-splits one chunk per file. Reuse the glob set the compiler worker already embeds in `src/platform/web/builder/typecheck.ts`, so there is one definition of "the shipped source" and it cannot disagree with what the typechecker sees. **Nothing loads at boot**: static assets and split chunks cost nothing until read, the same rule the ~12 MB compiler worker already follows. The manifest (~10–20 KB) loads on first access to `/system/source`. Deployment size grows by a few hundred KB gzipped; page weight does not.
 - *Headless provider:* read from the repository checkout, so the Phase 0 eval harness and the browser agent see the same volume.
 - *Contents:* `packages/sdk`, `packages/ui`, the public surface of `packages/quickdraw`, `ARCHITECTURE.md`, `packages/sdk/docs/APP_DEV_GUIDE.md`, and `apps/*` as exemplars. Keep `src/os` internals out at first: the agent needs the SDK surface, and the shell's internals add the most bytes for the least value. Exclude tests.
-- *Exemplar hygiene:* some bundled apps import OS internals (`apps/ChatGippity.tsx` uses `../src/os/context` and the kernel) and would fail the project compiler if copied. The manifest flags each app as SDK-clean or not, and the agent prompt says to model only on SDK-clean apps. `apps/MacPaint.tsx` is SDK-clean and is exactly the reference a drawing-app builder needs.
+- *Exemplar hygiene:* some bundled apps import OS internals (`apps/Assistant.tsx` uses `../src/os/context` and the kernel) and would fail the project compiler if copied. The manifest flags each app as SDK-clean or not, and the agent prompt says to model only on SDK-clean apps. `apps/MacPaint.tsx` is SDK-clean and is exactly the reference a drawing-app builder needs.
 - *Search:* the `search` trap below must cover `/system/source`; without it the agent is guessing paths, which is worse than the guide. The in-browser index is built lazily on first search (~300 KB gzipped once, then cached) or shipped as a small pre-built index.
 - *Beyond the agent:* the existing `read`/`stat`/`list` traps work unchanged; Source Editor can open system files read-only; Finder can grow a "System Folder ▸ Source" later. This is an OS feature with the agent as one consumer, which is the right layering.
 
@@ -127,7 +127,7 @@ Keep the guide, but the agent should be able to answer "what does `onDrag` recei
   - *Auto-compact*: at a context threshold, summarise the run so far and re-inject only the current source files and the user's request.
   - *Reactive compact*: on a "context length exceeded" error from the gateway, compact and retry instead of surfacing the error.
   This is what lets 80 steps fit in context.
-- **Write-ahead history.** Persist `history` to `Preferences/chatgippity/<session>.json` *before* each `complete()` call. A reload mid-run is resumable, "continue" resumes the same run rather than starting a new budget, and this is the checkpoint seam the durable-jobs work in the [server infrastructure plan](server-infrastructure-plan.md) needs later.
+- **Write-ahead history.** Persist `history` to `Preferences/assistant/<session>.json` *before* each `complete()` call. A reload mid-run is resumable, "continue" resumes the same run rather than starting a new budget, and this is the checkpoint seam the durable-jobs work in the [server infrastructure plan](server-infrastructure-plan.md) needs later.
 
 ### Phase 5 — Model routing and durability (later)
 

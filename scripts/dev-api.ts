@@ -132,7 +132,7 @@ server.listen(PORT, () => {
       : null;
   console.log(`API server listening on http://localhost:${PORT}`);
   console.log(`  LLM_MODEL: ${process.env.LLM_MODEL || "openai/gpt-5.6-sol"}`);
-  console.log(`  AI Gateway: ${auth ?? "NOT CONFIGURED — ChatGippity will return errors"}`);
+  console.log(`  AI Gateway: ${auth ?? "NOT CONFIGURED — Assistant will return errors"}`);
   if (!auth) {
     console.log("\n  Link the project and pull its OIDC token:");
     console.log("    vercel link && vercel env pull");

@@ -32,7 +32,7 @@ Not in the table: **About This Macintosh** and **Control Panel**. As on System 7
 | `SpotifyPlayer.tsx` (+ `spotify/*`, `sprites/spotify.ts`) | **Clean**, `requires: ["network", "browser"]` | — | `crypto`, `encodeQR`, `env.config`, `browser.authorize` / `loadScript`, `images` + `toBits`. |
 | `SourceEditor.tsx` | **Clean** | — | Granted `kernel` (`stat`/`read`/`write`/`build_*`/`app_*`/`project_create`). |
 | `Terminal.tsx` | **Clean** | — | Granted `run_shell` / `shell_close` with streams and `keepAlive()`. |
-| `ChatGippity.tsx` | **Clean** | — | `permissions: ["kernel:*"]` + `@mockintosh/agent`. |
+| `Assistant.tsx` | **Clean** | — | `permissions: ["kernel:*"]` + `@mockintosh/agent`. |
 | `AppStore.tsx` | Shell, by design | `useOS().installer`, `installedAppIds(os.fs)` | Installing apps is a shell privilege (`ARCHITECTURE.md`). |
 | `Finder.solid.tsx` (+ `finder/*`, including `AboutBox.tsx` and `ControlPanel.tsx`) | Shell, by design | `src/os/state` (`openOSWindow`, `updateOSWindow`, `setAppMenus`, `getWindows`), `src/os/apps.registerApp`, `src/os/windowContext`, `src/os/windowGeometry`, `src/os/systemWindows`, `src/os/kernel/settings`, `src/os/resourceCatalog`, `package.json`, full `FileSystem` from `@mockintosh/fs`, `os.sprites`, `os.resolution`, `os.menubarHeight`, `os.playWindowOpenAnimation`, `os.openFSNode`, `os.openFolderWindow` | The Finder *is* the shell, and About / Control Panel are its windows. |
 | `IconGallery.tsx` | Shell, by design | `src/os/iconCatalog/{catalog,decode,types}` and `system753.json` | Developer tool over the OS's own icon catalog. Excluded. |

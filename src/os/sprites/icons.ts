@@ -329,23 +329,23 @@ const ICON_SAFARI_16X16 = fromGrid(16, 16, [
   "....##oooo##....",
   "......####......",
 ]);
-/** fx: the black tile with its paper bar on the left and the round bubble beside it. */
+/** The chat for 16×16 views: the black tile, its paper bar with the tick, and the round bubble whose tail meets the bar. */
 const ICON_CHAT_16X16 = fromGrid(16, 16, [
   "################",
   "#oooo###########",
-  "#oooo####oooo###",
-  "#oooo##ooooooo##",
+  "#oooo###ooooo###",
+  "#o#oo#ooooooooo#",
+  "#o#oo#ooooooooo#",
+  "#o#oo#ooooooooo#",
   "#oooo#ooooooooo#",
   "#oooo#ooooooooo#",
   "#oooo#ooooooooo#",
   "#oooo#ooooooooo#",
-  "#oooo#ooooooooo#",
-  "#oooo#ooooooooo#",
-  "#oooo#ooooooooo#",
-  "#oooo#oooooooo##",
-  "#oooo#ooooooo###",
-  "#ooo#ooooo######",
-  "#oooo###########",
+  "#ooo##oooooooo##",
+  "#ooo##ooooooo###",
+  "#ooo#oooooo#####",
+  "#o####oo########",
+  "#ooo############",
   "################",
 ]);
 /** System 7.5.3: System Full Trash -3984 · ICN# */

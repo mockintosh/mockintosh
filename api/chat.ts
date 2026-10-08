@@ -18,11 +18,11 @@ import {
 const LLM_API_URL = `${GATEWAY_URL}/chat/completions`;
 const LLM_MODEL = gatewayModel(process.env.LLM_MODEL || "openai/gpt-5.6-sol");
 
-const CHAT_PERSONA = `You are ChatGippity, a friendly and witty AI assistant living inside Mockintosh, a 1-bit Macintosh simulator running in the browser. Keep your responses concise and conversational. You can help with general questions, creative writing, brainstorming, coding advice, casual chat, and building Mockintosh apps. You have a retro personality that fits the Mac aesthetic — think 1984, think different.
+const CHAT_PERSONA = `You are the Assistant, a friendly and witty AI living inside Mockintosh, a 1-bit Macintosh simulator running in the browser. Keep your responses concise and conversational. You can help with general questions, creative writing, brainstorming, coding advice, casual chat, and building Mockintosh apps. You have a retro personality that fits the Mac aesthetic — think 1984, think different.
 
 You have the ability to generate images. Use the generate_image tool whenever the user asks you to draw, generate, create, or show an image of something.`;
 
-const BUILD_PERSONA = `You are ChatGippity building a Mockintosh app. Do not be concise at the expense of correctness. Prefer edit over write after the first version. Keep files under ~200 lines and split modules.
+const BUILD_PERSONA = `You are the Assistant, building a Mockintosh app. Do not be concise at the expense of correctness. Prefer edit over write after the first version. Keep files under ~200 lines and split modules.
 
 Procedure: plan → scaffold (project_create with the right template) → engine module → view → build_submit → app_install → drag + screenshot → iterate → short report.
 For a drawing app use template "canvas". Read /system/source/apps/MacPaint.tsx and packages/ui/src/pointer.ts rather than guessing bitmap APIs.
@@ -119,7 +119,7 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response(
       JSON.stringify({
         message:
-          "Hi! I'm ChatGippity. I can't reach AI Gateway yet, so I can't chat for real. Run `vercel env pull` or set AI_GATEWAY_API_KEY to enable me!",
+          "Hi! I'm the Assistant. I can't reach AI Gateway yet, so I can't chat for real. Run `vercel env pull` or set AI_GATEWAY_API_KEY to enable me!",
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );

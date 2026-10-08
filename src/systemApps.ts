@@ -28,7 +28,6 @@ import { sprites as tp7Sprites } from "@/apps/tp7/icons";
 import { sprites as pchkraftSprites } from "@/apps/pchkraft/icons";
 import { sprites as visualizerSprites } from "@/apps/visualizer/icons";
 import { sprites as earthSprites } from "@/apps/earth/icons";
-import { sprites as chatgippitySprites } from "@/apps/chatgippity/icons";
 import { sprites as foundrySprites } from "@/apps/foundry/icons";
 
 const declared = declarations as Record<string, AppDeclaration>;
@@ -62,27 +61,14 @@ registerBundledApp({
 });
 
 registerBundledApp({
-  id: "chatgippity",
-  declaration: declared["chatgippity"],
-  title: "ChatGippity",
+  id: "assistant",
+  declaration: declared["assistant"],
+  title: "Assistant",
   description: "A chat window onto a language model that can use this Macintosh.",
-  icon: "chatgippity/icon",
-  sprites: chatgippitySprites,
+  icon: "icon/chat",
   requires: ["network"],
   permissions: ["kernel:*"],
-  load: () => import("@/apps/ChatGippity"),
-});
-
-registerBundledApp({
-  id: "fx",
-  declaration: declared["fx"],
-  title: "fx",
-  description:
-    "The fx coding agent from Vercel Labs, running on this Macintosh. It reads and edits files, builds apps, and clicks around to check its work. Bring your own Vercel AI Gateway key.",
-  icon: "icon/chat",
-  requires: ["network", "agent-runtime"],
-  permissions: ["kernel:*"],
-  load: () => import("@/apps/Fx"),
+  load: () => import("@/apps/Assistant"),
 });
 
 registerBundledApp({

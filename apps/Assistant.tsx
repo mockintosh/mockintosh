@@ -2,7 +2,6 @@ import { For, createSignal, createMemo, createEffect, onCleanup } from "solid-js
 import type { JSX } from "@mockintosh/ui";
 import { Button, TextInput } from "@mockintosh/ui";
 import { useApp, defineApp } from "@mockintosh/sdk";
-import { sprites } from "./chatgippity/icons";
 import { allAgentTools, runAgent } from "@mockintosh/agent";
 import type { ChatMessage, CompleteResult, OpenAITool } from "@mockintosh/sdk";
 
@@ -14,7 +13,7 @@ interface Line {
 const HISTORY_KEY = "session.json";
 const BUILD_INTENT = /\b(build|create|make|write)\b.*\b(app|counter|drawing|notes)\b/i;
 
-function ChatGippity(_props: Record<string, unknown>): JSX.Element {
+function Assistant(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
   const win = app.window;
   createEffect(() => true, () => {
@@ -189,13 +188,12 @@ function ChatGippity(_props: Record<string, unknown>): JSX.Element {
 }
 
 export default defineApp({
-  id: "chatgippity",
+  id: "assistant",
   requires: ["network"],
-  title: "ChatGippity",
-  icon: "chatgippity/icon",
-  smallIcon: "chatgippity/icon-16x16",
-  sprites,
+  title: "Assistant",
+  icon: "icon/chat",
+  smallIcon: "icon/chat-16x16",
   defaultSize: { width: 360, height: 260 },
   permissions: ["kernel:*"],
-  Component: ChatGippity,
+  Component: Assistant,
 });

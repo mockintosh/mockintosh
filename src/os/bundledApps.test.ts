@@ -9,8 +9,7 @@ describe("bundled app listings", () => {
     expect(listings.map((listing) => listing.id)).toEqual([
       "dither",
       "trace",
-      "chatgippity",
-      "fx",
+      "assistant",
       "spotify",
       "macpaint",
       "canvas",

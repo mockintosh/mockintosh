@@ -31,7 +31,7 @@ const APP_ROSTER: readonly (readonly [label: string, sprite: string])[] = [
   ["Trace", "trace/icon"],
   ["Canvas", "canvas/icon"],
   ["Safari", "icon/safari"],
-  ["ChatGippity", "icon/chat"],
+  ["Assistant", "icon/chat"],
   ["App Store", "icon/appstore-smr-32x32"],
   ["Spotify", "icon/spotify"],
   ["1984.mp4", "icon/MacFlim"],

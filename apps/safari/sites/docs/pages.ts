@@ -122,8 +122,7 @@ Some applications are always there. The rest are listed in the **App Store**, wh
 - **pchkraft**: A pocket groovebox: hum a melody and it becomes the loop.
 - **Visualizer**: Draws whatever the system is playing.
 - **Spotify Player**: Plays your Spotify library.
-- **ChatGippity**: A chat with a language model that can use this Macintosh.
-- **fx**: A coding agent that reads and edits files, builds apps and checks its work.
+- **Assistant**: A chat with a language model that can use this Macintosh.
 
 ## When an application can't run
 
@@ -210,7 +209,7 @@ Everything you can do with the mouse, a program can do too. The system is driven
 
 ## Agents on the Macintosh
 
-**ChatGippity** is a chat with a language model that can use this Macintosh through the same operations. **fx** is a coding agent that reads and edits files, builds apps and clicks around to check its work.
+**Assistant** is a chat with a language model that can use this Macintosh through the same operations. **fx**, run from the Terminal, is a coding agent that reads and edits files and runs commands in the shell.
 `,
   },
   {

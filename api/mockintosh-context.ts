@@ -24,7 +24,7 @@ Mockintosh is a mock operating system in the style of an early Macintosh (1984-e
 - **Who built it:** Open source at https://github.com/gustavlrsn/mockintosh. Say it was built by the Mockintosh project / community and point users to the repo for contributors and setup.
 
 ### App types
-- **Bundled apps:** Ship with the OS (Finder, Safari, ChatGippity, PhotoBooth, Picture, App Store, Spotify Player, …). Apart from the Finder and the App Store they are written against the public SDK exactly like third-party apps.
+- **Bundled apps:** Ship with the OS (Finder, Safari, Assistant, PhotoBooth, Picture, App Store, Spotify Player, …). Apart from the Finder and the App Store they are written against the public SDK exactly like third-party apps.
 - **Third-party apps:** ES modules built against \`@mockintosh/sdk\` v3 (Solid 2 components), installed from the App Store and loaded at runtime with dynamic \`import()\`. Apps declare the capabilities they need (\`requires\`: network, clipboard, printer, camera, video, images, browser); the OS refuses to run an app on a machine that lacks one and explains why. SDK 2 bundles are refused with a rebuild prompt.
 - **Not supported:** the retired v1 SDK (\`App.render\`, \`AppBuilder\`, \`AppContext\` drawing calls, \`useState\`-style hooks). Never suggest it. The current API is documented in full below.
 

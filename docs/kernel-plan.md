@@ -98,7 +98,7 @@ The following table records the starting point of the experience rewrite. Its M1
 | [app template](../templates/app/vite.config.ts), root import map | Universal Solid compilation and shared runtime imports | Build from VFS source and load resulting artifacts |
 | [AppInstaller](../src/os/installedApps.ts), [openers](../src/os/openers.ts) | Manifest installation and document launching | Directory bundles, build replacement, Open Source |
 | [FileViewer](../apps/FileViewer.tsx), UI TextInput | Read-only text display; single-line editing | A usable multiline source editor |
-| [ChatGippity](../apps/ChatGippity.tsx), [chat endpoint](../api/chat.ts) | Chat UI, provider proxy, a limited tool round | Matching request schema and repeated OS/build tool loop |
+| [Assistant](../apps/Assistant.tsx), [chat endpoint](../api/chat.ts) | Chat UI, provider proxy, a limited tool round | Matching request schema and repeated OS/build tool loop |
 | [generated chat context](../scripts/build-chat-context.ts) | Developer guide already embedded in the prompt | Serve exact runtime SDK/version/types/examples to both clients |
 | [Control Panel](../apps/finder/ControlPanel.tsx), [Desktop](../src/os/components/Desktop.solid.tsx) | Place to expose desktop pattern | Persistent setting and editable control |
 

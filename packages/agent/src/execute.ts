@@ -13,7 +13,7 @@ export const RESULT_BUDGETS: Record<string, number> = {
   logs: 4000,
 };
 const EXEMPT = new Set(["read", "read_lines", "search", "build_submit", "build_status", "project_check"]);
-const SPILL_DIR = "/disk/System Folder/Preferences/chatgippity/tool-results";
+const SPILL_DIR = "/disk/System Folder/Preferences/assistant/tool-results";
 
 export type AgentInvoke = (
   name: string,
@@ -229,7 +229,7 @@ async function settleResult(invoke: AgentInvoke, callId: string, name: string, v
 
 async function ensureSpillDir(invoke: AgentInvoke): Promise<void> {
   for (const path of [
-    "/disk/System Folder/Preferences/chatgippity",
+    "/disk/System Folder/Preferences/assistant",
     SPILL_DIR,
   ]) {
     try { await invoke("mkdir", { path }); } catch { /* exists */ }

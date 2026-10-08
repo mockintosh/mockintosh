@@ -12,7 +12,7 @@ import AppStore from "@/apps/AppStore";
 import IconGallery from "@/apps/IconGallery";
 
 /** Apps whose 32×32 is a full square (no transparent edge). Remove an id when its mask is fixed. */
-const UNMASKED = new Set(["dither", "foundry", "fx"]);
+const UNMASKED = new Set(["dither", "foundry", "assistant"]);
 
 it("every app has a masked 32×32 icon and a hand-drawn 16×16", async () => {
   const apps = [AppStore, IconGallery];
