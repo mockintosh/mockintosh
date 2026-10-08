@@ -19,7 +19,7 @@ export default async function handler(req: Request): Promise<Response> {
   const host = new URL(record.url).host;
   return page(html`
 <p><strong>${record.appTitle}</strong> on your Macintosh wants you to sign in at <strong>${host}</strong>.</p>
-<a class="button" href="${record.url}">Continue to ${host}</a>
+<a class="button" href="${record.url}">Continue</a>
 <p class="small">Only continue if you just scanned this code on your own Macintosh.</p>`);
 }
 

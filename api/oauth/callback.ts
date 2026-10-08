@@ -42,7 +42,7 @@ export default async function handler(req: Request): Promise<Response> {
         : html`<p>Sign-in failed: ${params.error_description ?? params.error}</p>`
     );
   }
-  return page(html`<p>You’re signed in. You can close this page and return to your Macintosh.</p>`);
+  return page(html`<p>You’re signed in. You can close this page and return to your Mockintosh.</p>`);
 }
 
 export const config = { runtime: "edge" };
