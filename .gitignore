@@ -46,4 +46,6 @@ yarn-error.log*
 
 # Local icon-find previews (not committed)
 /.icon-previews/
-.tmp-template-*
+
+# Scratch files that have to live inside the repo (e.g. scripts importing its packages)
+.tmp-*
