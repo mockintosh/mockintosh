@@ -377,9 +377,19 @@ function FormView(props: { form: WebForm; width: number; onSubmit?: (form: WebFo
 
   const firstButton = form.controls.findIndex((control) => control.kind === "submit");
   const shown = form.controls.map((control, index) => ({ control, index })).filter((entry) => entry.control.kind !== "hidden");
-  const view = (entry: { control: FormControl; index: number }, width: () => number) => (
-    <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={width()} radius={form.radius} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />
-  );
+  const view = (entry: { control: FormControl; index: number }, width: () => number) => {
+    const control = (
+      <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={width()} radius={form.radius} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />
+    );
+    const label = entry.control.kind === "text" || entry.control.kind === "textarea" ? entry.control.label : undefined;
+    // A labelled control has its label over it, in bold.
+    return label ? (
+      <box flexDirection="column" gap={3}>
+        <text font="body" bold nowrap>{label}</text>
+        {control}
+      </box>
+    ) : control;
+  };
   // With several lines to write, fields stack at the page's width and the buttons sit under them.
   if (form.controls.some((control) => control.kind === "textarea")) {
     return (

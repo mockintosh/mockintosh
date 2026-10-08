@@ -36,15 +36,18 @@ export interface TableRow {
   cells: InlineSegment[][];
 }
 
-/** A form control. Only what a 1-bit page can show and submit. */
+/**
+ * A form control. Only what a 1-bit page can show and submit. A text
+ * control's `label` is drawn in bold above it ("Add a title *").
+ */
 export type FormControl =
   /** One line of text; `icon` names a sprite inset before it, as a search field's magnifying glass. */
-  | { kind: "text"; name: string; value: string; placeholder: string; icon?: string }
+  | { kind: "text"; name: string; value: string; placeholder: string; icon?: string; label?: string }
   /**
    * Several lines of text; a form with one stacks its controls and spans
    * the page. `markdown` gives it a formatting toolbar and a Preview tab.
    */
-  | { kind: "textarea"; name: string; value: string; rows: number; markdown?: boolean }
+  | { kind: "textarea"; name: string; value: string; rows: number; markdown?: boolean; label?: string }
   | { kind: "hidden"; name: string; value: string }
   /** A button; `icon` names a sprite drawn before the label, and `tooltip` captions it when hovered. */
   | { kind: "submit"; name: string; value: string; label: string; icon?: string; tooltip?: string };
