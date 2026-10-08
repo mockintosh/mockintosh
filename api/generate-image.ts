@@ -1,7 +1,7 @@
 import { envLimit, guardRequest, type RouteLimits } from "./_guard";
+import { GATEWAY_URL, gatewayToken } from "./_gateway";
 
-const IMAGE_API_URL = "https://api.openai.com/v1/images/generations";
-const LLM_API_KEY = process.env.LLM_API_KEY || "";
+const IMAGE_API_URL = `${GATEWAY_URL}/images/generations`;
 
 /** Each image costs far more than a chat turn. */
 const IMAGE_LIMITS: RouteLimits = {
@@ -17,10 +17,11 @@ export default async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, IMAGE_LIMITS);
   if (!guard.ok) return guard.response;
 
-  if (!LLM_API_KEY) {
+  const token = gatewayToken(req);
+  if (!token) {
     return new Response(
       JSON.stringify({
-        error: "Image generation requires an LLM_API_KEY to be configured.",
+        error: "Image generation needs AI Gateway: run `vercel env pull` or set AI_GATEWAY_API_KEY.",
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
     );
@@ -51,14 +52,16 @@ export default async function handler(req: Request): Promise<Response> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LLM_API_KEY}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        model: "gpt-image-1.5",
+        model: "openai/gpt-image-1.5",
         prompt: prompt.trim(),
         n: 1,
         size: "1024x1024",
         quality: "low",
+        // Low quality is what keeps an image cheap; say it the gateway's way too.
+        providerOptions: { openai: { quality: "low" } },
       }),
     });
 

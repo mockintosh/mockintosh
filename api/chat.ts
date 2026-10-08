@@ -1,5 +1,6 @@
 import { MOCKINTOSH_CHAT_CONTEXT } from "./mockintosh-context.js";
 import { envLimit, guardRequest, type RouteLimits } from "./_guard.js";
+import { GATEWAY_URL, gatewayModel, gatewayToken } from "./_gateway.js";
 import { TYPE_DIGEST, SOURCE_MAP } from "./mockintosh-context.generated.js";
 import {
   AGENT_BRIEF,
@@ -14,10 +15,8 @@ import {
   type OpenAITool,
 } from "../src/shared/chatProtocol.js";
 
-const LLM_API_URL =
-  process.env.LLM_API_URL || "https://api.openai.com/v1/chat/completions";
-const LLM_API_KEY = process.env.LLM_API_KEY || "";
-const LLM_MODEL = process.env.LLM_MODEL || "gpt-5.6-sol";
+const LLM_API_URL = `${GATEWAY_URL}/chat/completions`;
+const LLM_MODEL = gatewayModel(process.env.LLM_MODEL || "openai/gpt-5.6-sol");
 
 const CHAT_PERSONA = `You are ChatGippity, a friendly and witty AI assistant living inside Mockintosh, a 1-bit Macintosh simulator running in the browser. Keep your responses concise and conversational. You can help with general questions, creative writing, brainstorming, coding advice, casual chat, and building Mockintosh apps. You have a retro personality that fits the Mac aesthetic — think 1984, think different.
 
@@ -58,7 +57,7 @@ export function thinkingLevel(messages: ChatMessage[], requested?: "low" | "medi
   return undefined;
 }
 
-const usesCompletionTokens = (model: string) => /^gpt-5/i.test(model) || /^o\d/i.test(model);
+const usesCompletionTokens = (model: string) => /^(openai\/)?(gpt-5|o\d)/i.test(model);
 
 /**
  * `gpt-5.6-sol` (and likely other reasoning models) reject function tools
@@ -115,11 +114,12 @@ export default async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, CHAT_LIMITS);
   if (!guard.ok) return guard.response;
 
-  if (!LLM_API_KEY) {
+  const token = gatewayToken(req);
+  if (!token) {
     return new Response(
       JSON.stringify({
         message:
-          "Hi! I'm ChatGippity. The LLM API key isn't configured yet, so I can't chat for real. Set LLM_API_KEY in your environment to enable me!",
+          "Hi! I'm ChatGippity. I can't reach AI Gateway yet, so I can't chat for real. Run `vercel env pull` or set AI_GATEWAY_API_KEY to enable me!",
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
@@ -175,7 +175,7 @@ export default async function handler(req: Request): Promise<Response> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LLM_API_KEY}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
     });

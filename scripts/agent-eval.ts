@@ -1,6 +1,7 @@
 /**
  * Phase 0 eval: run the real LLM through runAgent on the headless OS.
- * Skips when LLM_API_KEY or API_ACCESS_TOKEN is unset.
+ * Skips when there is no AI Gateway credential (AI_GATEWAY_API_KEY or
+ * VERCEL_OIDC_TOKEN) or API_ACCESS_TOKEN is unset.
  *
  *   npm run agent:eval
  *   npm run agent:eval -- --task notes
@@ -74,8 +75,8 @@ async function tryInvoke(
 }
 
 async function main() {
-  if (!process.env.LLM_API_KEY) {
-    console.log("agent:eval skipped (no LLM_API_KEY)");
+  if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) {
+    console.log("agent:eval skipped (no AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN)");
     return;
   }
   if (!process.env.API_ACCESS_TOKEN) {
