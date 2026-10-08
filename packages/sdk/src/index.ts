@@ -885,7 +885,7 @@ export {
 export { showPrintDialog, PrintScaleSelect, PrintPreview, printDotsToMillimetres, printScaleLabel } from "./printDialog";
 export type { PrintDialogRequest, PrintDialogChoice, PrintScale, PrintScaleSelectProps, PrintPreviewProps } from "./printDialog";
 export { Markdown, parseMarkdown } from "./markdown";
-export type { MarkdownProps, LayoutNode, LayoutColumn, InlineSegment, TableRow, FormControl, WebForm } from "./markdown";
+export type { MarkdownProps, LayoutNode, LayoutColumn, InlineSegment, TableRow, FormControl, WebForm, BitmapTip } from "./markdown";
 export { DocumentView } from "./document";
 export { encodeQuery, formatUrl, parseUrl, queryParam, queryParams } from "./url";
 export type { QueryParam, WebUrl } from "./url";

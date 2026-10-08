@@ -1,4 +1,4 @@
-import { formatUrl, parseMarkdown, parseUrl, queryParams, type FormControl, type InlineSegment, type LayoutNode, type WebUrl } from "@mockintosh/sdk";
+import { formatUrl, parseMarkdown, parseUrl, queryParams, type BitmapTip, type FormControl, type InlineSegment, type LayoutNode, type WebUrl } from "@mockintosh/sdk";
 import { PageError, type DocumentPage, type SiteContext, type SiteAdapter } from "../../page";
 import {
   GithubError,
@@ -549,15 +549,26 @@ const DAY_INK: readonly ((x: number, y: number) => boolean)[] = [
   () => true,
 ];
 
-/** Weeks as github.com draws them: a column per week, Sunday at the top. */
+/** "3 contributions on October 5, 2026", as github.com names a day of its calendar. */
+function dayTip(week: CalendarWeek, weekday: number): string {
+  const [year, month, day] = week.firstDay.split("-").map(Number);
+  const date = new Date(Date.UTC(year!, month! - 1, day! + weekday));
+  const count = week.counts[weekday] ?? 0;
+  const what = count === 0 ? "No contributions" : plural(count, "contribution", "contributions");
+  return `${what} on ${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+}
+
+/** Weeks as github.com draws them: a column per week, Sunday at the top. Each day names itself when hovered. */
 export function contributionGraph(weeks: readonly CalendarWeek[]): LayoutNode {
   const width = Math.max(1, weeks.length * WEEK - DAY_GAP);
   const height = 7 * WEEK - DAY_GAP;
   const data = new Uint8Array(width * height);
+  const tips: BitmapTip[] = [];
   weeks.forEach((week, column) => {
     week.levels.forEach((level, row) => {
       const ink = DAY_INK[level];
       if (!ink) return;
+      tips.push({ x: column * WEEK, y: row * WEEK, width: DAY, height: DAY, label: dayTip(week, row) });
       for (let y = 0; y < DAY; y++) {
         for (let x = 0; x < DAY; x++) {
           if (ink(x, y)) data[(row * WEEK + y) * width + column * WEEK + x] = 1;
@@ -565,7 +576,7 @@ export function contributionGraph(weeks: readonly CalendarWeek[]): LayoutNode {
       }
     });
   });
-  return { type: "bitmap", width, height, data, alt: "Contribution graph" };
+  return { type: "bitmap", width, height, data, alt: "Contribution graph", tips };
 }
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

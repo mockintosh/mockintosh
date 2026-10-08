@@ -50,6 +50,15 @@ export interface WebForm {
   align?: Align;
 }
 
+/** A rectangle of a `bitmap`, in its pixels, that names itself when hovered. */
+export interface BitmapTip {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+}
+
 /** One column of a `columns` block. */
 export interface LayoutColumn {
   /** Fixed width in pixels; omitted columns share the rest. */
@@ -89,8 +98,9 @@ export type LayoutNode =
   /**
    * 1-bit pixels a page makes itself, drawn at their own size and cut off
    * where the page is narrower: `data` is row by row, 1 for ink, 0 for paper.
+   * Hovering one of `tips`' rectangles shows its label in a tooltip.
    */
-  | { type: "bitmap"; width: number; height: number; data: Uint8Array; alt: string }
+  | { type: "bitmap"; width: number; height: number; data: Uint8Array; alt: string; tips?: BitmapTip[] }
   /**
    * Content `width` wide in a pane as wide as the page, which scrolls
    * sideways when the content is wider: drag it, or its bar. `start: "end"`

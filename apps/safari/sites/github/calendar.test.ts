@@ -120,4 +120,29 @@ describe("contribution calendar", () => {
     await drag(middle, -100);
     expect(pixels(pane)).toBe(opened);
   });
+
+  it("scrolls sideways with a sideways wheel or trackpad swipe", async () => {
+    const pane = (await graph()).bounds;
+    await parkPointer();
+    const opened = pixels(pane);
+    const over = { x: pane.x + 20, y: pane.y + 10 };
+    platform.pointer({ type: "scroll", x: over.x, y: over.y, deltaX: -120 });
+    await parkPointer();
+    expect(pixels(pane)).not.toBe(opened);
+    platform.pointer({ type: "scroll", x: over.x, y: over.y, deltaX: 120 });
+    await parkPointer();
+    expect(pixels(pane)).toBe(opened);
+  });
+
+  it("names the day under the pointer: its contributions and its date", async () => {
+    const pane = (await graph()).bounds;
+    // The latest week sits at the pane's right edge; its one contribution is on Wednesday.
+    const week = WEEKS.length - 1;
+    const weekday = week % 7;
+    platform.pointer({ type: "move", x: pane.x + pane.width - 4, y: pane.y + weekday * 10 + 4 });
+    await settle();
+    const nodes = (await os.kernel.invoke(os.kernel.createSession(), "inspect", {})) as InspectionNode[];
+    const tip = nodes.find((node) => node.role === "tooltip" && node.value);
+    expect(tip?.value).toBe("1 contribution on October 7, 2026");
+  });
 });

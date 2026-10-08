@@ -1,6 +1,6 @@
 import { Errored, For, Loading, Show, createMemo, createSignal, useContext } from "solid-js";
 import type { ImageFrame, JSX, TextRun } from "@mockintosh/ui";
-import { Button, Dithered, TextEditor, TextInput } from "@mockintosh/ui";
+import { Button, Dithered, TextEditor, TextInput, Tooltip } from "@mockintosh/ui";
 import type { FormControl, InlineSegment, LayoutColumn, LayoutNode, TableRow, WebForm } from "@mockintosh/markdown";
 import { AppServicesContext } from "./index";
 
@@ -95,8 +95,17 @@ function Block(props: BlockProps): JSX.Element {
   }
   if (node.type === "bitmap") {
     return (
-      <box width={Math.min(node.width, props.width)} height={node.height} overflow="hidden">
+      <box width={Math.min(node.width, props.width)} height={node.height} overflow="hidden" position="relative">
         <image semantic={{ name: node.alt, role: "image" }} src={{ width: node.width, height: node.height, data: node.data }} width={node.width} height={node.height} />
+        <For each={node.tips ?? []}>
+          {(tip) => (
+            <box position="absolute" left={tip.x} top={tip.y} width={tip.width} height={tip.height}>
+              <Tooltip label={tip.label}>
+                <box width={tip.width} height={tip.height} />
+              </Tooltip>
+            </box>
+          )}
+        </For>
       </box>
     );
   }
@@ -158,6 +167,7 @@ function ScrollerView(props: { node: Extract<LayoutNode, { type: "scroller" }>; 
         onDragStart={(_x, _y, globalX) => startDrag(globalX)}
         onDrag={(_x, _y, globalX) => pan(globalX)}
         onDragEnd={() => (grab = null)}
+        onScrollX={(dx) => setMoved(offset() + dx)}
       >
         <box width={node.width} flexDirection="column" gap={BLOCK_GAP}>
           <Blocks nodes={node.nodes} width={node.width} view={props.view} />
