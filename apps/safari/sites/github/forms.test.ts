@@ -49,6 +49,14 @@ function fakeGithub(overrides: (call: Call) => FetchResponse | undefined = () =>
     if (path === "/repos/octocat/hello/issues/5") return reply(ISSUE);
     if (path.startsWith("/repos/octocat/hello/issues/5/comments")) return reply(call.method === "POST" ? {} : [], call.method === "POST" ? 201 : 200);
     if (path === "/user") return reply({ login: "octocat" });
+    if (path === "/users/octocat") return reply({ login: "octocat", name: "The Octocat", type: "User", public_repos: 2 });
+    if (path.startsWith("/users/octocat/orgs")) return reply([]);
+    if (path.startsWith("/users/octocat/repos")) {
+      return reply([
+        { name: "small", owner: { login: "octocat" }, stargazers_count: 1 },
+        { name: "hello", owner: { login: "octocat" }, stargazers_count: 3 },
+      ]);
+    }
     if (path.startsWith("/repos/octocat/hello/contents") || path.startsWith("/repos/octocat/hello/commits")) return reply([]);
     if (path.startsWith("/user/repos")) return reply([{ name: "hello", owner: { login: "octocat" }, stargazers_count: 3 }]);
     if (path === "/repos/octocat/hello/pulls/8" || path === "/repos/octocat/hello/issues/8") {
@@ -57,6 +65,18 @@ function fakeGithub(overrides: (call: Call) => FetchResponse | undefined = () =>
     if (path.startsWith("/repos/octocat/hello/issues/8/comments")) return reply([]);
     if (path === "/graphql") {
       const query = String(call.body?.query);
+      if (query.includes("pinnedItems")) {
+        return reply({ data: { repositoryOwner: {
+          pinnedItems: { nodes: [{ name: "hello", owner: { login: "octocat" }, stargazerCount: 3, forkCount: 0, isFork: false }] },
+          status: { message: "Shipping" },
+          year: { contributionCalendar: { totalContributions: 699, weeks: [{ contributionDays: [{ weekday: 0, contributionLevel: "FOURTH_QUARTILE" }] }] } },
+          month: {
+            commitContributionsByRepository: [{ repository: { name: "hello", owner: { login: "octocat" } }, contributions: { totalCount: 39 } }],
+            pullRequestContributionsByRepository: [],
+            issueContributionsByRepository: [],
+          },
+        } } });
+      }
       if (query.includes("createDiscussion")) return reply({ data: { createDiscussion: { discussion: { number: 9 } } } });
       if (query.includes("addDiscussionComment")) return reply({ data: { addDiscussionComment: { comment: { id: "DC_2" } } } });
       if (query.includes("discussionCategories")) return reply({ data: CATEGORIES });
@@ -119,6 +139,27 @@ describe("GitHub pages", () => {
     const home = await page(await loadPage(pageRequest("https://github.com/"), context(fetch, "home-token")));
     expect(texts(home.nodes)).toContain("Top repositories");
     expect(texts(home.nodes)).toContain("octocat / hello");
+  });
+});
+
+describe("GitHub profiles", () => {
+  it("shows the Overview signed in: pinned repositories, the contribution graph and this month's activity", async () => {
+    const { fetch } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat"), context(fetch, "profile-token")));
+    const all = texts(shown.nodes);
+    for (const expected of ["Overview", "Repositories 2", "Stars", "Pinned", "Shipping", "699 contributions in the last year", "Contribution activity", "Created 39 commits in 1 repository"]) {
+      expect(all).toContain(expected);
+    }
+  });
+
+  it("shows popular repositories signed out, most starred first, and asks to sign in for the rest", async () => {
+    const { fetch } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat"), context(fetch, "")));
+    const all = texts(shown.nodes);
+    expect(all).toContain("Popular repositories");
+    expect(all.indexOf("hello")).toBeLessThan(all.indexOf("small"));
+    expect(all).toContain("Sign in to see pinned repositories and contributions.");
+    expect(all).not.toContain("contributions in the last year");
   });
 });
 

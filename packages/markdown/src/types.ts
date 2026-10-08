@@ -86,5 +86,10 @@ export type LayoutNode =
   | { type: "columns"; columns: LayoutColumn[]; gap: number; minWidth: number; center?: boolean }
   /** A bordered card around its nodes. */
   | { type: "box"; nodes: LayoutNode[] }
+  /**
+   * 1-bit pixels a page makes itself, drawn at their own size and cut off
+   * where the page is narrower: `data` is row by row, 1 for ink, 0 for paper.
+   */
+  | { type: "bitmap"; width: number; height: number; data: Uint8Array; alt: string }
   | { type: "spacer"; height: number }
   | { type: "br" };

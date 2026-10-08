@@ -1,7 +1,8 @@
 import { queryParam } from "@mockintosh/sdk";
 
 /** A place on github.com that the app can show. */
-export type ProfileTab = "repos" | "stars" | "people";
+/** A profile's tabs: Overview is its front page; Repositories is `?tab=repositories`. */
+export type ProfileTab = "overview" | "repos" | "stars" | "people";
 
 export type GithubLocation =
   | { kind: "home" }
@@ -49,7 +50,7 @@ export function parseGithubLocation(raw: string): GithubLocation | null {
     const section = parts[2];
     if (parts.length > 3) return null;
     if (section && section !== "people" && section !== "repositories" && section !== "repos") return null;
-    return { kind: "profile", login: parts[1], tab: section === "people" ? "people" : tab };
+    return { kind: "profile", login: parts[1], tab: section === "people" ? "people" : section ? "repos" : tab };
   }
   if (parts.length < 2) return null;
   const [owner, repo, ...rest] = parts;
@@ -92,7 +93,8 @@ export function formatGithubLocation(location: GithubLocation): string {
   if (location.kind === "search") return `github.com/search?q=${encodeURIComponent(location.query)}`;
   if (location.kind === "profile") {
     const root = `github.com/${location.login}`;
-    return location.tab === "repos" ? root : `${root}?tab=${location.tab}`;
+    if (location.tab === "overview") return root;
+    return `${root}?tab=${location.tab === "repos" ? "repositories" : location.tab}`;
   }
   const root = `github.com/${location.owner}/${location.repo}`;
   if (location.kind === "issues") return `${root}/issues`;
@@ -122,7 +124,8 @@ function profileTab(raw: string): ProfileTab {
   const tab = raw.match(/[?&]tab=([^&#]+)/i)?.[1] ?? "";
   if (tab === "stars") return "stars";
   if (tab === "people" || tab === "members") return "people";
-  return "repos";
+  if (tab === "repositories" || tab === "repos") return "repos";
+  return "overview";
 }
 
 function issueNumber(segment: string | undefined): number | null {

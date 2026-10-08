@@ -1,6 +1,6 @@
 import { decodeBase64 } from "@mockintosh/ui";
 import type { FetchFunction } from "@mockintosh/sdk";
-import type { GithubLocation } from "./location";
+import type { GithubLocation, ProfileTab } from "./location";
 
 export class GithubError extends Error {
   constructor(message: string, readonly status: number) {
@@ -104,10 +104,32 @@ export interface ProfileRepo {
   fork: boolean;
 }
 
+/** Contributions to one repository in a month. */
+export interface RepoContributions {
+  owner: string;
+  name: string;
+  count: number;
+}
+
+/**
+ * What a profile shows only to someone signed in: GitHub's GraphQL API
+ * alone has it, and that API always needs a token.
+ */
+export interface ProfileExtras {
+  pinned: ProfileRepo[];
+  /** The status message a person set; empty when none (and for organizations). */
+  status: string;
+  /** The last year, a week per column, each day's level 0 (none) to 4, or -1 before the first day or after today. Null for organizations. */
+  calendar: { total: number; weeks: number[][] } | null;
+  /** This month so far. Null for organizations. */
+  activity: { commits: RepoContributions[]; pulls: RepoContributions[]; issues: RepoContributions[] } | null;
+}
+
 export type GithubPage =
   /** `total` counts every match; `repos` holds the first page of them. */
   | { view: "search"; query: string; total: number; repos: ProfileRepo[] }
-  | { view: "profile"; profile: ProfileInfo; tab: "repos" | "stars" | "people"; repos: ProfileRepo[]; orgs: string[]; people: string[] }
+  /** `extras` is null when signed out, or when GitHub wouldn't give them. */
+  | { view: "profile"; profile: ProfileInfo; tab: ProfileTab; repos: ProfileRepo[]; orgs: string[]; people: string[]; extras: ProfileExtras | null }
   | { view: "tree"; repo: RepoInfo; ref: string; path: string; entries: DirEntry[]; commit: CommitInfo | null; readme: string | null }
   | { view: "blob"; repo: RepoInfo; ref: string; file: FileBody }
   | { view: "issues"; repo: RepoInfo; issues: IssueInfo[] }
@@ -189,27 +211,102 @@ export function fileText(content: string, encoding: string, size: number): { tex
   return { text: text.slice(0, MAX_TEXT), note: "Showing the first part of this file." };
 }
 
-async function loadProfile(
-  fetch: FetchFunction,
-  token: string,
-  login: string,
-  tab: "repos" | "stars" | "people",
-): Promise<GithubPage> {
+/** Repositories the Overview shows when it has no pins: the most starred, as github.com's "Popular repositories". */
+const POPULAR = 6;
+
+async function loadProfile(fetch: FetchFunction, token: string, login: string, tab: ProfileTab): Promise<GithubPage> {
   const profile = await getProfile(fetch, token, login);
   const orgs = profile.kind === "User" ? await listLogins(fetch, token, `/users/${encodeURIComponent(login)}/orgs`) : [];
+  const page = { view: "profile" as const, profile, orgs, people: [] as string[], extras: null };
   if (profile.kind === "Organization" && tab === "people") {
     const people = await listLogins(fetch, token, `/orgs/${encodeURIComponent(login)}/public_members`);
-    return { view: "profile", profile, tab, repos: [], orgs, people };
+    return { ...page, tab, repos: [], people };
   }
   if (profile.kind === "User" && tab === "stars") {
     const repos = await listProfileRepos(fetch, token, `/users/${encodeURIComponent(login)}/starred?per_page=30`);
-    return { view: "profile", profile, tab, repos, orgs, people: [] };
+    return { ...page, tab, repos };
   }
+  const overview = tab === "overview" || tab === "people" || tab === "stars";
   const reposUrl = profile.kind === "Organization"
-    ? `/orgs/${encodeURIComponent(login)}/repos?sort=updated&per_page=30`
-    : `/users/${encodeURIComponent(login)}/repos?sort=updated&per_page=30&type=owner`;
-  const repos = await listProfileRepos(fetch, token, reposUrl);
-  return { view: "profile", profile, tab: "repos", repos, orgs, people: [] };
+    ? `/orgs/${encodeURIComponent(login)}/repos?sort=updated&per_page=${overview ? 100 : 30}`
+    : `/users/${encodeURIComponent(login)}/repos?sort=updated&per_page=${overview ? 100 : 30}&type=owner`;
+  if (!overview) return { ...page, tab: "repos", repos: await listProfileRepos(fetch, token, reposUrl) };
+  const [repos, extras] = await Promise.all([
+    listProfileRepos(fetch, token, reposUrl),
+    token ? getProfileExtras(fetch, token, login, Date.now()).catch(() => null) : Promise.resolve(null),
+  ]);
+  const popular = repos.filter((repo) => !repo.fork).sort((a, b) => b.stars - a.stars).slice(0, POPULAR);
+  return { ...page, tab: "overview", repos: popular, extras };
+}
+
+const PROFILE_REPO_FIELDS = "name owner { login } description primaryLanguage { name } stargazerCount forkCount isFork";
+const CONTRIBUTED_REPO = "repository { name owner { login } } contributions { totalCount }";
+const LEVELS: Record<string, number> = { NONE: 0, FIRST_QUARTILE: 1, SECOND_QUARTILE: 2, THIRD_QUARTILE: 3, FOURTH_QUARTILE: 4 };
+
+/** Pins, status, the year's contribution calendar and this month's activity, in one request. */
+async function getProfileExtras(fetch: FetchFunction, token: string, login: string, now: number): Promise<ProfileExtras> {
+  const date = new Date(now);
+  const monthStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)).toISOString();
+  const data = await graphql(fetch, token, `query($login: String!, $from: DateTime!) {
+    repositoryOwner(login: $login) {
+      ... on ProfileOwner { pinnedItems(first: 6, types: [REPOSITORY]) { nodes { ... on Repository { ${PROFILE_REPO_FIELDS} } } } }
+      ... on User {
+        status { message }
+        year: contributionsCollection { contributionCalendar { totalContributions weeks { contributionDays { weekday contributionLevel } } } }
+        month: contributionsCollection(from: $from) {
+          commitContributionsByRepository(maxRepositories: 5) { ${CONTRIBUTED_REPO} }
+          pullRequestContributionsByRepository(maxRepositories: 5) { ${CONTRIBUTED_REPO} }
+          issueContributionsByRepository(maxRepositories: 5) { ${CONTRIBUTED_REPO} }
+        }
+      }
+    }
+  }`, { login, from: monthStart });
+  const owner = asRecord(asRecord(data).repositoryOwner);
+  const pins = asRecord(owner.pinnedItems).nodes;
+  const pinned = Array.isArray(pins) ? pins.map((node) => graphqlRepo(asRecord(node))) : [];
+  const calendar = asRecord(asRecord(owner.year).contributionCalendar);
+  const weeks = Array.isArray(calendar.weeks)
+    ? calendar.weeks.map((week) => {
+      const days = Array<number>(7).fill(-1);
+      const list = asRecord(week).contributionDays;
+      for (const day of Array.isArray(list) ? list : []) {
+        const record = asRecord(day);
+        days[numberField(record, "weekday")] = LEVELS[stringField(record, "contributionLevel")] ?? 0;
+      }
+      return days;
+    })
+    : null;
+  const month = asRecord(owner.month);
+  const contributed = (key: string): RepoContributions[] => {
+    const list = month[key];
+    return Array.isArray(list)
+      ? list.map((item) => {
+        const record = asRecord(item);
+        const repo = asRecord(record.repository);
+        return { owner: stringField(asRecord(repo.owner), "login"), name: stringField(repo, "name"), count: numberField(asRecord(record.contributions), "totalCount") };
+      })
+      : [];
+  };
+  return {
+    pinned,
+    status: stringField(asRecord(owner.status), "message"),
+    calendar: weeks ? { total: numberField(calendar, "totalContributions"), weeks } : null,
+    activity: owner.month
+      ? { commits: contributed("commitContributionsByRepository"), pulls: contributed("pullRequestContributionsByRepository"), issues: contributed("issueContributionsByRepository") }
+      : null,
+  };
+}
+
+function graphqlRepo(record: Record<string, unknown>): ProfileRepo {
+  return {
+    owner: stringField(asRecord(record.owner), "login"),
+    name: stringField(record, "name"),
+    description: stringField(record, "description"),
+    language: stringField(asRecord(record.primaryLanguage), "name"),
+    stars: numberField(record, "stargazerCount"),
+    forks: numberField(record, "forkCount"),
+    fork: record.isFork === true,
+  };
 }
 
 async function getProfile(fetch: FetchFunction, token: string, login: string): Promise<ProfileInfo> {

@@ -93,6 +93,13 @@ function Block(props: BlockProps): JSX.Element {
   if (node.type === "image") {
     return <ImageView node={node} width={props.width} view={props.view} />;
   }
+  if (node.type === "bitmap") {
+    return (
+      <box width={Math.min(node.width, props.width)} height={node.height} overflow="hidden">
+        <image semantic={{ name: node.alt, role: "image" }} src={{ width: node.width, height: node.height, data: node.data }} width={node.width} height={node.height} />
+      </box>
+    );
+  }
   if (node.type === "spacer") {
     return <box height={node.height} />;
   }

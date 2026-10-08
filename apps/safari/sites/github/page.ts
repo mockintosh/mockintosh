@@ -14,12 +14,14 @@ import {
   type DiscussionInfo,
   type GithubPage,
   type IssueInfo,
+  type ProfileExtras,
   type ProfileRepo,
+  type RepoContributions,
   type RepoInfo,
 } from "./api";
 import { commitSubject, formatAge, formatBytes, formatCount } from "./format";
 import { GITHUB_MARK } from "./icons";
-import { formatGithubLocation, parseGithubLocation, type GithubLocation } from "./location";
+import { formatGithubLocation, parseGithubLocation, type GithubLocation, type ProfileTab } from "./location";
 
 /**
  * github.com drawn from api.github.com: profiles, repositories, files,
@@ -287,10 +289,10 @@ function linkButton(label: string, location: GithubLocation): LayoutNode {
 }
 
 const EXAMPLES: ReadonlyArray<readonly [string, GithubLocation]> = [
-  ["octocat", { kind: "profile", login: "octocat", tab: "repos" }],
+  ["octocat", { kind: "profile", login: "octocat", tab: "overview" }],
   ["torvalds/linux", { kind: "tree", owner: "torvalds", repo: "linux", ref: "", path: "" }],
   ["mockintosh/mockintosh", { kind: "tree", owner: "mockintosh", repo: "mockintosh", ref: "", path: "" }],
-  ["apple", { kind: "profile", login: "apple", tab: "repos" }],
+  ["apple", { kind: "profile", login: "apple", tab: "overview" }],
 ];
 
 /** Signed out, a way in; signed in, `repos` holds the dashboard's top repositories. */
@@ -322,7 +324,7 @@ function loginPage(returnTo: string, viewer: string | null, canSignIn: boolean):
   const url = githubUrl({ kind: "login", returnTo });
   if (viewer !== null) {
     const who = viewer
-      ? paragraph(text("Safari is signed in to GitHub as "), link(viewer, { kind: "profile", login: viewer, tab: "repos" }), text("."))
+      ? paragraph(text("Safari is signed in to GitHub as "), link(viewer, { kind: "profile", login: viewer, tab: "overview" }), text("."))
       : paragraph(text("Safari has a GitHub token, but GitHub won't say whose it is. It may have expired or been revoked."));
     return {
       kind: "document",
@@ -414,7 +416,7 @@ export function githubPage(page: GithubPage, now: number, forms: PageForms = { s
       nodes: [heading(2, results), repoList(page.repos, `No repositories matched “${page.query}”.`)],
     };
   }
-  if (page.view === "profile") return profilePage(page);
+  if (page.view === "profile") return profilePage(page, now, forms);
   return repoPage(page, now, forms);
 }
 
@@ -426,15 +428,15 @@ function repoList(repos: readonly ProfileRepo[], empty: string): LayoutNode {
       return [
         heading(3, `${repo.owner} / ${repo.name}`, githubUrl(location)),
         ...(repo.description ? [paragraph(text(repo.description))] : []),
-        facts(repo.fork && "Fork", repo.language, `${formatCount(repo.stars)} stars`),
+        facts(repo.fork && "Fork", repo.language, plural(repo.stars, "star", "stars")),
       ];
     }),
     empty,
   );
 }
 
-/** Sidebar width, as on github.com; the avatar fills it. */
-const SIDEBAR = 200;
+/** Sidebar width; the avatar fills it. Narrower than github.com's, so the main column holds the contribution graph. */
+const SIDEBAR = 150;
 /** Narrower than this, the sidebar goes above the repositories. */
 const TWO_COLUMNS = SIDEBAR + 16 + 220;
 
@@ -447,7 +449,7 @@ function repoCard(repo: ProfileRepo, owner: string): LayoutNode {
     nodes: [
       paragraph({ kind: "link", text: name, href: githubUrl(location) }, text(repo.fork ? "  Fork" : "  Public")),
       ...(repo.description ? [paragraph(text(repo.description))] : []),
-      facts(repo.language, `${formatCount(repo.stars)} stars`, repo.forks > 0 && `${formatCount(repo.forks)} forks`),
+      facts(repo.language, plural(repo.stars, "star", "stars"), repo.forks > 0 && plural(repo.forks, "fork", "forks")),
     ],
   };
 }
@@ -467,6 +469,7 @@ function profileSidebar(page: Extract<GithubPage, { view: "profile" }>): LayoutN
   }
   nodes.push(heading(1, profile.name || profile.login));
   if (profile.name) nodes.push(paragraph(text(profile.login)));
+  if (page.extras?.status) nodes.push(paragraph(italic(page.extras.status)));
   if (profile.bio) nodes.push(paragraph(text(profile.bio)));
   nodes.push(
     isOrg
@@ -482,23 +485,112 @@ function profileSidebar(page: Extract<GithubPage, { view: "profile" }>): LayoutN
     const segments: InlineSegment[] = [];
     page.orgs.forEach((login, index) => {
       if (index > 0) segments.push(text(", "));
-      segments.push(link(login, { kind: "profile", login, tab: "repos" }));
+      segments.push(link(login, { kind: "profile", login, tab: "overview" }));
     });
     nodes.push(paragraph(...segments));
   }
   return nodes;
 }
 
-function profileMain(page: Extract<GithubPage, { view: "profile" }>): LayoutNode[] {
+function profileMain(page: Extract<GithubPage, { view: "profile" }>, now: number, forms: PageForms): LayoutNode[] {
   const login = page.profile.login;
   if (page.tab === "people") {
-    const people = page.people.map((person) => [paragraph(link(person, { kind: "profile", login: person, tab: "repos" }))]);
+    const people = page.people.map((person) => [paragraph(link(person, { kind: "profile", login: person, tab: "overview" }))]);
     return [heading(2, "People"), list(people, "No public members.", false)];
   }
+  if (page.tab === "overview") return overviewMain(page, now, forms);
   const title = page.tab === "stars" ? "Starred repositories" : "Repositories";
   const empty = page.tab === "stars" ? "No starred repositories." : "No public repositories.";
   if (page.repos.length === 0) return [heading(2, title), paragraph(text(empty))];
   return [heading(2, title), ...page.repos.map((repo) => repoCard(repo, login))];
+}
+
+/** Pinned (or popular) repositories, then, signed in, the contribution graph and this month's activity. */
+function overviewMain(page: Extract<GithubPage, { view: "profile" }>, now: number, forms: PageForms): LayoutNode[] {
+  const { profile, extras } = page;
+  const pinned = extras?.pinned ?? [];
+  const repos = pinned.length > 0 ? pinned : page.repos;
+  const nodes: LayoutNode[] = [heading(2, pinned.length > 0 ? "Pinned" : "Popular repositories")];
+  nodes.push(...(repos.length > 0 ? repos.map((repo) => repoCard(repo, profile.login)) : [paragraph(text("No public repositories."))]));
+  if (profile.kind === "Organization") return nodes;
+  if (!extras) {
+    if (!forms.signedIn) {
+      const here: GithubLocation = { kind: "profile", login: profile.login, tab: "overview" };
+      nodes.push(paragraph(text("Sign in to see pinned repositories and contributions.")), signInForm(here, "Sign In"));
+    }
+    return nodes;
+  }
+  if (extras.calendar) {
+    const total = extras.calendar.total;
+    nodes.push(
+      heading(2, `${formatCount(total)} ${total === 1 ? "contribution" : "contributions"} in the last year`),
+      { type: "box", nodes: [contributionGraph(extras.calendar.weeks)] },
+    );
+  }
+  if (extras.activity) nodes.push(...activityNodes(extras.activity, now));
+  return nodes;
+}
+
+/** Pixels per day square, and between squares: a year is 264 pixels across. */
+const DAY = 4;
+const DAY_GAP = 1;
+
+/**
+ * A day's square at each level, none to most, in the Mac's own grays: more
+ * ink for more contributions, as github.com deepens its green. A day with
+ * none keeps a dot, so the grid still shows.
+ */
+const DAY_SQUARES: readonly (readonly string[])[] = [
+  ["....", "....", ".#..", "...."],
+  ["#.#.", "....", "#.#.", "...."],
+  ["#.#.", ".#.#", "#.#.", ".#.#"],
+  ["####", ".#.#", "####", ".#.#"],
+  ["####", "####", "####", "####"],
+];
+
+/** The year's contributions as github.com draws them: a column per week, Sunday at the top. */
+export function contributionGraph(weeks: readonly (readonly number[])[]): LayoutNode {
+  const step = DAY + DAY_GAP;
+  const width = Math.max(1, weeks.length * step - DAY_GAP);
+  const height = 7 * step - DAY_GAP;
+  const data = new Uint8Array(width * height);
+  weeks.forEach((week, column) => {
+    week.forEach((level, row) => {
+      const square = DAY_SQUARES[level];
+      if (!square) return;
+      for (let y = 0; y < DAY; y++) {
+        for (let x = 0; x < DAY; x++) {
+          if (square[y][x] === "#") data[(row * step + y) * width + column * step + x] = 1;
+        }
+      }
+    });
+  });
+  return { type: "bitmap", width, height, data, alt: "Contribution graph" };
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function plural(count: number, one: string, many: string): string {
+  return `${formatCount(count)} ${count === 1 ? one : many}`;
+}
+
+/** "Contribution activity" for this month: commits, pull requests and issues, each by repository. */
+function activityNodes(activity: NonNullable<ProfileExtras["activity"]>, now: number): LayoutNode[] {
+  const date = new Date(now);
+  const nodes: LayoutNode[] = [heading(2, "Contribution activity"), paragraph(bold(`${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`))];
+  const group = (verb: string, one: string, many: string, items: readonly RepoContributions[]) => {
+    if (items.length === 0) return;
+    const total = items.reduce((sum, item) => sum + item.count, 0);
+    const rows = items.map((item): LayoutNode[] => [
+      paragraph(link(`${item.owner}/${item.name}`, { kind: "tree", owner: item.owner, repo: item.name, ref: "", path: "" }), text(`  ${plural(item.count, one, many)}`)),
+    ]);
+    nodes.push(heading(3, `${verb} ${plural(total, one, many)} in ${plural(items.length, "repository", "repositories")}`), list(rows, "", false));
+  };
+  group("Created", "commit", "commits", activity.commits);
+  group("Opened", "pull request", "pull requests", activity.pulls);
+  group("Opened", "issue", "issues", activity.issues);
+  if (nodes.length === 2) nodes.push(paragraph(text("No activity yet this month.")));
+  return nodes;
 }
 
 /** A tab bar: links between dots (text collapses wider gaps), the current one bold instead of a link. */
@@ -511,10 +603,11 @@ function tabs(items: readonly { label: string; location: GithubLocation; current
   return paragraph(...segments);
 }
 
-function profilePage(page: Extract<GithubPage, { view: "profile" }>): DocumentPage {
+/** A profile as github.com lays it out: its tabs across the top, then the person beside what they've made. */
+function profilePage(page: Extract<GithubPage, { view: "profile" }>, now: number, forms: PageForms): DocumentPage {
   const profile = page.profile;
   const location: GithubLocation = { kind: "profile", login: profile.login, tab: page.tab };
-  const tab = (label: string, name: "repos" | "stars" | "people") => ({
+  const tab = (label: string, name: ProfileTab) => ({
     label,
     location: { kind: "profile", login: profile.login, tab: name } as GithubLocation,
     current: page.tab === name,
@@ -522,14 +615,14 @@ function profilePage(page: Extract<GithubPage, { view: "profile" }>): DocumentPa
   const repositories = `Repositories ${formatCount(profile.publicRepos)}`;
   const nodes: LayoutNode[] = [
     tabs(profile.kind === "Organization"
-      ? [tab(repositories, "repos"), tab("People", "people")]
-      : [tab(repositories, "repos"), tab("Stars", "stars")]),
+      ? [tab("Overview", "overview"), tab(repositories, "repos"), tab("People", "people")]
+      : [tab("Overview", "overview"), tab(repositories, "repos"), tab("Stars", "stars")]),
     HR,
     {
       type: "columns",
       gap: 16,
       minWidth: TWO_COLUMNS,
-      columns: [{ width: SIDEBAR, nodes: profileSidebar(page) }, { nodes: profileMain(page) }],
+      columns: [{ width: SIDEBAR, nodes: profileSidebar(page) }, { nodes: profileMain(page, now, forms) }],
     },
   ];
   return { kind: "document", url: githubUrl(location), title: profile.login, nodes };
@@ -582,7 +675,7 @@ function repoHeader(repo: RepoInfo, view: RepoPage["view"], ref: string, about: 
     heading(1, `${repo.owner} / ${repo.name}`, githubUrl(root)),
     facts(
       repo.visibility,
-      link(repo.owner, { kind: "profile", login: repo.owner, tab: "repos" }),
+      link(repo.owner, { kind: "profile", login: repo.owner, tab: "overview" }),
       `${formatCount(repo.stars)} stars`,
       `${formatCount(repo.forks)} forks`,
     ),

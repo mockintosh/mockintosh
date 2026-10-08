@@ -3,7 +3,7 @@ import { parseUrl, type LayoutNode } from "@mockintosh/sdk";
 import { hnText, parseHackerNewsUrl } from "./hackernews";
 import { scaled } from "../icons";
 import { microDesktopError, mockintoshSite } from "./mockintosh";
-import { avatarSrc, githubPage, githubUrl, resolveRelative } from "./github/page";
+import { avatarSrc, contributionGraph, githubPage, githubUrl, resolveRelative } from "./github/page";
 import { adapterFor } from "./index";
 import { docsPage, docsSite } from "./docs/site";
 import { DOCS_PAGES } from "./docs/pages";
@@ -91,21 +91,22 @@ describe("GitHub pages", () => {
         repos: [{ owner: "octocat", name: "Spoon-Knife", description: "", language: "HTML", stars: 13000, forks: 150000, fork: false }],
         orgs: [],
         people: [],
+        extras: null,
       },
       0,
     );
     const columns = page.nodes.find((node) => node.type === "columns");
     if (columns?.type !== "columns") throw new Error("no columns");
     const [sidebar, main] = columns.columns;
-    expect(sidebar!.width).toBe(200);
+    expect(sidebar!.width).toBe(150);
     expect(sidebar!.nodes[0]).toEqual({
       type: "image",
-      src: "https://avatars.githubusercontent.com/u/583231?v=4&s=200",
+      src: "https://avatars.githubusercontent.com/u/583231?v=4&s=150",
       alt: "octocat",
       align: "left",
-      width: 200,
-      height: 200,
-      borderRadius: 100,
+      width: 150,
+      height: 150,
+      borderRadius: 75,
     });
     expect(sidebar!.nodes[1]).toMatchObject({ type: "heading", text: "The Octocat" });
     expect(links(sidebar!.nodes)).toContain("https://github.blog");
@@ -113,10 +114,24 @@ describe("GitHub pages", () => {
     expect(links((main!.nodes[1] as { nodes: LayoutNode[] }).nodes)).toEqual(["https://github.com/octocat/Spoon-Knife"]);
   });
 
+  it("draws the contribution graph a week per column, Sunday on top, more ink for more contributions", () => {
+    const graph = contributionGraph([[-1, -1, 0, 1, 2, 3, 4], [4, -1, -1, -1, -1, -1, -1]]);
+    if (graph.type !== "bitmap") throw new Error("not a bitmap");
+    expect([graph.width, graph.height]).toEqual([9, 34]);
+    const ink = (column: number, row: number) => {
+      let count = 0;
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) count += graph.data[(row * 5 + y) * graph.width + column * 5 + x];
+      return count;
+    };
+    expect([0, 1, 2, 3, 4, 5, 6].map((row) => ink(0, row))).toEqual([0, 0, 1, 4, 8, 12, 16]);
+    expect(ink(1, 0)).toBe(16);
+    expect(ink(1, 1)).toBe(0);
+  });
+
   it("leaves out avatars it can't load", () => {
     expect(avatarSrc("")).toBe("");
     expect(avatarSrc("http://avatars.githubusercontent.com/u/1")).toBe("");
-    expect(avatarSrc("https://avatars.githubusercontent.com/u/1?s=460&v=4")).toBe("https://avatars.githubusercontent.com/u/1?v=4&s=200");
+    expect(avatarSrc("https://avatars.githubusercontent.com/u/1?s=460&v=4")).toBe("https://avatars.githubusercontent.com/u/1?v=4&s=150");
   });
 
   it("round-trips search URLs", () => {

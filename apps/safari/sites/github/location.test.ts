@@ -67,9 +67,11 @@ describe("parseGithubLocation", () => {
     expect(parseGithubLocation("octocat/Hello-World/issues/nope")).toBeNull();
   });
 
-  it("reads a user or organization, including the stars and people tabs", () => {
-    expect(parseGithubLocation("octocat")).toEqual({ kind: "profile", login: "octocat", tab: "repos" });
-    expect(parseGithubLocation("https://github.com/github")).toEqual({ kind: "profile", login: "github", tab: "repos" });
+  it("reads a user or organization, its Overview first, and the repositories, stars and people tabs", () => {
+    expect(parseGithubLocation("octocat")).toEqual({ kind: "profile", login: "octocat", tab: "overview" });
+    expect(parseGithubLocation("https://github.com/github")).toEqual({ kind: "profile", login: "github", tab: "overview" });
+    expect(parseGithubLocation("github.com/octocat?tab=repositories")).toEqual({ kind: "profile", login: "octocat", tab: "repos" });
+    expect(parseGithubLocation("github.com/orgs/github/repositories")).toEqual({ kind: "profile", login: "github", tab: "repos" });
     expect(parseGithubLocation("github.com/octocat?tab=stars")).toEqual({ kind: "profile", login: "octocat", tab: "stars" });
     expect(parseGithubLocation("github.com/orgs/github/people")).toEqual({ kind: "profile", login: "github", tab: "people" });
   });
@@ -86,6 +88,7 @@ describe("formatGithubLocation", () => {
       "github.com/octocat/Hello-World/pulls",
       "github.com/octocat/Hello-World/pull/3",
       "github.com/octocat",
+      "github.com/octocat?tab=repositories",
       "github.com/octocat?tab=stars",
       "github.com/github?tab=people",
     ];
