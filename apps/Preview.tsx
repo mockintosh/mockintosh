@@ -157,6 +157,7 @@ function Preview(props: PreviewProps): JSX.Element {
                 justifyContent="center"
                 alignItems="center"
                 background={0}
+                onLayout={({ width, height }) => win.setContentSize(width, height)}
               >
                 <raster
                   width={picture.width}

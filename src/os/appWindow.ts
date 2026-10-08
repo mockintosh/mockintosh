@@ -87,8 +87,8 @@ export function buildAppWindow<P extends Record<string, unknown>>(
     props,
     scrollY: 0,
     scrollX: 0,
-    contentHeight: scrollable ? Math.max(bounds.height, 200) : bounds.height,
-    // Nothing overflows sideways until the content reports its size.
+    // Nothing overflows until the content reports its size.
+    contentHeight: bounds.height,
     contentWidth: 0,
     scrollable,
     resizable,

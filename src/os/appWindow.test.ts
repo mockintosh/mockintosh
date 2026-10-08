@@ -56,4 +56,10 @@ describe("app window placement", () => {
       x: 0, y: 0, width: 512, height: 342,
     });
   });
+
+  it("gives a short scrollable window nothing to scroll until its content reports a size", () => {
+    const win = buildAppWindow(app, { scrollable: true, size: { width: 160, height: 120 } }, env);
+    expect(win.contentHeight).toBe(win.height);
+    expect(win.contentWidth).toBe(0);
+  });
 });
