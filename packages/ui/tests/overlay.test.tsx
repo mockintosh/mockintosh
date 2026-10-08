@@ -285,4 +285,35 @@ describe("Menu", () => {
     expect(cut).toBe(true);
     expect(ui.inspect().some((n) => n.name === "overlay-panel")).toBe(false);
   });
+
+  it("inverts the item under the pointer, as the menu bar does, but never a disabled one", () => {
+    const ui = createUI({ screen: newBitMap(240, 160) });
+    ui.render(() => (
+      <Menu
+        name="edit"
+        open
+        onDismiss={() => {}}
+        trigger={<box width={20} height={10} />}
+        items={[
+          { id: "cut", label: "Cut" },
+          { id: "paste", label: "Paste", disabled: true },
+        ]}
+      />
+    ));
+    ui.frame();
+    // A pixel in an item's left padding: paper, or ink when the item is lit.
+    const padding = (name: string) => {
+      const item = ui.inspect().find((n) => n.name === name)!;
+      return { x: item.bounds.x + 2, y: item.bounds.y + 2 };
+    };
+    const lit = (name: string) => getBit(ui.port.portBits, padding(name).x, padding(name).y) === 1;
+    expect(lit("edit:cut")).toBe(false);
+    ui.dispatchPointer("mousemove", padding("edit:cut").x, padding("edit:cut").y);
+    ui.frame();
+    expect(lit("edit:cut")).toBe(true);
+    ui.dispatchPointer("mousemove", padding("edit:paste").x, padding("edit:paste").y);
+    ui.frame();
+    expect(lit("edit:cut")).toBe(false);
+    expect(lit("edit:paste")).toBe(false);
+  });
 });
