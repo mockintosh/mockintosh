@@ -554,7 +554,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     if (!parentId) return;
     const file = await app.fs.writeJSON(parentId, name, doc(), {
       type: MIME.canvas,
-      attributes: { icon: "canvas/icon" },
+      attributes: { icon: "canvas/document" },
     });
     setFileId(file.id);
     setFileName(name);
