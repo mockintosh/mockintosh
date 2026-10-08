@@ -449,7 +449,7 @@ describe("GitHub forms", () => {
     const shown = await page(await loadPage(post("https://github.com/octocat/hello/issues/5", { body: "Me too" }), context(fetch, "tok")));
     expect(shown.url).toBe("https://github.com/octocat/hello/issues/5");
     expect(texts(shown.nodes)).toContain("You can't comment at this time.");
-    expect(forms(shown.nodes).at(-1)!.controls).toContainEqual({ kind: "textarea", name: "body", value: "Me too", rows: 5 });
+    expect(forms(shown.nodes).at(-1)!.controls).toContainEqual({ kind: "textarea", name: "body", value: "Me too", rows: 5, markdown: true, label: "Add a comment" });
 
     const untitled = await page(await loadPage(post("https://github.com/octocat/hello/issues", { title: "", body: "Body" }), context(fetch, "tok")));
     expect(untitled.url).toBe("https://github.com/octocat/hello/issues/new");

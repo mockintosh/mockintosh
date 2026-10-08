@@ -554,21 +554,15 @@ function postForm(location: GithubLocation, forms: PageForms, controls: FormCont
 }
 
 /** The box at the foot of a conversation: write a comment, or sign in to. */
-function commentForm(location: GithubLocation, forms: PageForms): LayoutNode {
+function commentForm(location: GithubLocation, forms: PageForms): LayoutNode[] {
   if (!forms.signedIn) {
-    return { type: "box", radius: CARD_RADIUS, nodes: [paragraph(text("Sign in to join this conversation on GitHub.")), signInForm(location, "Sign In")] };
+    return [{ type: "box", radius: CARD_RADIUS, nodes: [paragraph(text("Sign in to join this conversation on GitHub.")), signInForm(location, "Sign In")] }];
   }
-  return {
-    type: "box",
-    radius: CARD_RADIUS,
-    nodes: [
-      paragraph(bold("Add a comment")),
-      ...postForm(location, forms, [
-        { kind: "textarea", name: "body", value: "", rows: 5 },
-        { kind: "submit", name: "", value: "", label: "Comment" },
-      ]),
-    ],
-  };
+  // The editor is a box of its own, as on github.com: no card around it.
+  return postForm(location, forms, [
+    { kind: "textarea", name: "body", value: "", rows: 5, markdown: true, label: "Add a comment" },
+    { kind: "submit", name: "", value: "", label: "Comment" },
+  ]);
 }
 
 export function githubPage(page: GithubPage, now: number, forms: PageForms = { signedIn: false }): GithubDocument {
@@ -1117,7 +1111,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
         heading(1, `${item.title} #${item.number}`),
         facts(item.category, [person(item.user), text(` started this discussion ${formatAge(item.createdAt, now)}`)], commentCount(item.comments), item.answered && "✓ Answered"),
         ...conversation(item, page.comments, repo, now),
-        commentForm(location, forms),
+        ...commentForm(location, forms),
       ],
     };
   }
@@ -1129,7 +1123,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
       heading(1, `${item.title} #${item.number}`),
       facts(bold(stateLabel(item.state)), [person(item.user), text(` opened this ${kind} ${formatAge(item.createdAt, now)}`)], commentCount(item.comments)),
       ...conversation(item, page.comments, repo, now),
-      commentForm(location, forms),
+      ...commentForm(location, forms),
     ],
   };
 }
