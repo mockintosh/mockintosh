@@ -254,7 +254,7 @@ describe("GitHub in a Safari window", () => {
     const title = (await fields()).filter((n) => n.bounds.y < description!.bounds.y).sort((a, b) => b.bounds.y - a.bounds.y)[0]!;
     platform.click(title.bounds.x + 10, title.bounds.y + 5);
     await settle();
-    const type = (key: string, modifiers = {}) => {
+    const type = (key: string, modifiers = { shift: false, ctrl: false, alt: false, meta: false }) => {
       platform.key({ type: "down", key, modifiers });
       platform.key({ type: "up", key, modifiers });
     };
