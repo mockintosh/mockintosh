@@ -66,6 +66,8 @@ export interface BitmapTip {
 export interface LayoutColumn {
   /** Fixed width in pixels; omitted columns share the rest. */
   width?: number;
+  /** Pixels between the column's blocks, in place of the page's usual 4. */
+  gap?: number;
   nodes: LayoutNode[];
 }
 

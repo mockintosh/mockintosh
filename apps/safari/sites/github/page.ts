@@ -458,6 +458,9 @@ function repoList(repos: readonly ProfileRepo[], empty: string): LayoutNode {
   );
 }
 
+/** Pixels between the main column's blocks: roomier than a page's usual 4, so its sections stand apart. */
+const MAIN_GAP = 8;
+
 /** Sidebar width; the avatar fills it. Narrower than github.com's, so the main column holds the contribution graph. */
 const SIDEBAR = 150;
 /** Narrower than this, the sidebar goes above the repositories. */
@@ -534,26 +537,22 @@ function overviewMain(page: Extract<GithubPage, { view: "profile" }>, now: numbe
   const { profile, extras } = page;
   const pinned = extras?.pinned ?? [];
   const repos = pinned.length > 0 ? pinned : page.repos;
-  const nodes: LayoutNode[] = [SECTION_BREAK, heading(2, pinned.length > 0 ? "Pinned" : "Popular repositories")];
+  const nodes: LayoutNode[] = [heading(2, pinned.length > 0 ? "Pinned" : "Popular repositories")];
   nodes.push(...(repos.length > 0 ? repos.map((repo) => repoCard(repo, profile.login)) : [paragraph(text("No public repositories."))]));
   if (profile.kind === "Organization") return nodes;
   if (!extras) {
     if (!forms.signedIn) {
       const here: GithubLocation = { kind: "profile", login: profile.login, tab: "overview" };
-      nodes.push(SECTION_BREAK, paragraph(text("Sign in to see pinned repositories and contributions.")), signInForm(here, "Sign In"));
+      nodes.push(paragraph(text("Sign in to see pinned repositories and contributions.")), signInForm(here, "Sign In"));
     }
     return nodes;
   }
   if (extras.calendar && extras.calendar.weeks.length > 0) {
-    nodes.push(SECTION_BREAK, ...contributionCalendar(extras.calendar.total, extras.calendar.weeks));
+    nodes.push(...contributionCalendar(extras.calendar.total, extras.calendar.weeks));
   }
-  if (extras.activity) nodes.push(SECTION_BREAK, ...activityNodes(extras.activity, now));
+  if (extras.activity) nodes.push(...activityNodes(extras.activity, now));
   return nodes;
 }
-
-/** Space between the Overview's sections, and between the groups of its activity. */
-const SECTION_BREAK: LayoutNode = { type: "spacer", height: 8 };
-const GROUP_BREAK: LayoutNode = { type: "spacer", height: 6 };
 
 /** Pixels per day square, and between squares. */
 const DAY = 8;
@@ -661,7 +660,7 @@ function activityNodes(activity: NonNullable<ProfileExtras["activity"]>, now: nu
     const rows = items.map((item): LayoutNode[] => [
       paragraph(link(`${item.owner}/${item.name}`, { kind: "tree", owner: item.owner, repo: item.name, ref: "", path: "" }), text(`  ${plural(item.count, one, many)}`)),
     ]);
-    nodes.push(GROUP_BREAK, heading(3, `${verb} ${plural(total, one, many)} in ${plural(items.length, "repository", "repositories")}`), list(rows, "", false));
+    nodes.push(heading(3, `${verb} ${plural(total, one, many)} in ${plural(items.length, "repository", "repositories")}`), list(rows, "", false));
   };
   group("Created", "commit", "commits", activity.commits);
   group("Opened", "pull request", "pull requests", activity.pulls);
@@ -699,7 +698,7 @@ function profilePage(page: Extract<GithubPage, { view: "profile" }>, now: number
       type: "columns",
       gap: 16,
       minWidth: TWO_COLUMNS,
-      columns: [{ width: SIDEBAR, nodes: profileSidebar(page) }, { nodes: profileMain(page, now, forms) }],
+      columns: [{ width: SIDEBAR, nodes: profileSidebar(page) }, { gap: MAIN_GAP, nodes: profileMain(page, now, forms) }],
     },
   ];
   return { kind: "document", url: githubUrl(location), title: profile.login, nodes };
