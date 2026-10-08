@@ -540,14 +540,20 @@ function overviewMain(page: Extract<GithubPage, { view: "profile" }>, now: numbe
   if (!extras) {
     if (!forms.signedIn) {
       const here: GithubLocation = { kind: "profile", login: profile.login, tab: "overview" };
-      nodes.push(paragraph(text("Sign in to see pinned repositories and contributions.")), signInForm(here, "Sign In"));
+      nodes.push(SECTION_BREAK, paragraph(text("Sign in to see pinned repositories and contributions.")), signInForm(here, "Sign In"));
     }
     return nodes;
   }
-  if (extras.calendar && extras.calendar.weeks.length > 0) nodes.push(...contributionCalendar(extras.calendar.total, extras.calendar.weeks));
-  if (extras.activity) nodes.push(...activityNodes(extras.activity, now));
+  if (extras.calendar && extras.calendar.weeks.length > 0) {
+    nodes.push(SECTION_BREAK, ...contributionCalendar(extras.calendar.total, extras.calendar.weeks));
+  }
+  if (extras.activity) nodes.push(SECTION_BREAK, ...activityNodes(extras.activity, now));
   return nodes;
 }
+
+/** Space between the Overview's sections, and between the groups of its activity. */
+const SECTION_BREAK: LayoutNode = { type: "spacer", height: 12 };
+const GROUP_BREAK: LayoutNode = { type: "spacer", height: 6 };
 
 /** Pixels per day square, and between squares. */
 const DAY = 8;
@@ -655,7 +661,7 @@ function activityNodes(activity: NonNullable<ProfileExtras["activity"]>, now: nu
     const rows = items.map((item): LayoutNode[] => [
       paragraph(link(`${item.owner}/${item.name}`, { kind: "tree", owner: item.owner, repo: item.name, ref: "", path: "" }), text(`  ${plural(item.count, one, many)}`)),
     ]);
-    nodes.push(heading(3, `${verb} ${plural(total, one, many)} in ${plural(items.length, "repository", "repositories")}`), list(rows, "", false));
+    nodes.push(GROUP_BREAK, heading(3, `${verb} ${plural(total, one, many)} in ${plural(items.length, "repository", "repositories")}`), list(rows, "", false));
   };
   group("Created", "commit", "commits", activity.commits);
   group("Opened", "pull request", "pull requests", activity.pulls);
