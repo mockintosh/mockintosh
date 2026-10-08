@@ -338,11 +338,17 @@ describe("GitHub repositories", () => {
         { label: "Discussions", href: "https://github.com/octocat/hello/discussions", current: false },
       ],
     });
-    expect(shown.nodes.some((node) => node.type === "hr")).toBe(false);
-    // The name and its Star button, then the files beside About.
+    // The only rule is the dotted one, with room around it, under the name and its Star button, then the files beside About.
+    expect(shown.nodes.filter((node) => node.type === "hr")).toEqual([{ type: "hr", dotted: true }]);
     const columns = shown.nodes.filter((node) => node.type === "columns" && node !== header);
     const [title, body] = columns;
     if (title?.type !== "columns" || body?.type !== "columns") throw new Error("no columns");
+    const at = shown.nodes.indexOf(title);
+    expect(shown.nodes.slice(at + 1, at + 4)).toEqual([
+      { type: "spacer", height: 0 },
+      { type: "hr", dotted: true },
+      { type: "spacer", height: 0 },
+    ]);
     expect(title.columns[0]!.nodes[0]).toMatchObject({ type: "heading", text: "hello" });
     expect(body.columns[1]!.nodes[0]).toMatchObject({ type: "heading", text: "About" });
   });

@@ -99,7 +99,8 @@ export type LayoutNode =
   | { type: "code"; text: string }
   | { type: "table"; rows: TableRow[] }
   | { type: "form"; form: WebForm }
-  | { type: "hr" }
+  /** A rule across the column; `dotted` breaks it into dots. */
+  | { type: "hr"; dotted?: boolean }
   | {
       type: "image";
       src: string;

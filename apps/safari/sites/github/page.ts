@@ -961,6 +961,9 @@ function newForkNodes(repo: RepoInfo, location: GithubLocation, forms: PageForms
   return nodes;
 }
 
+/** Room above and below the rule under a repository's name: even at 0 high, a spacer adds a gap between blocks. */
+const RULE_GAP: LayoutNode = { type: "spacer", height: 0 };
+
 /** Width of the Code page's About column. */
 const ABOUT_WIDTH = 120;
 /** Narrower than this, About goes under the files. */
@@ -1025,7 +1028,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
       main.push(card([bold("README")], resolveRelative(parseMarkdown(page.readme), repo, page.ref, page.path)));
     }
     if (page.path) return { title: page.path, body: main };
-    // The repository's front page: its name and its Fork and Star buttons, then the files beside About.
+    // The repository's front page: its name and its Fork and Star buttons, a dotted rule with room around it, then the files beside About.
     return {
       title: "",
       body: [
@@ -1036,6 +1039,9 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
           center: true,
           columns: [{ nodes: [heading(1, repo.name)] }, { width: REPO_BUTTONS_WIDTH, nodes: [repoButtons(repo, page.starred, location)] }],
         },
+        RULE_GAP,
+        { type: "hr", dotted: true },
+        RULE_GAP,
         { type: "columns", gap: 16, minWidth: CODE_COLUMNS, columns: [{ nodes: main }, { width: ABOUT_WIDTH, nodes: aboutNodes(repo) }] },
       ],
     };
