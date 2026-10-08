@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchFunction, FetchRequest, FetchResponse, LayoutNode, WebForm } from "@mockintosh/sdk";
 import { pageRequest, type DocumentPage, type GithubAccount, type SiteContext } from "../../page";
 import { loadPage } from "../../router";
+import { forkRepo } from "./api";
 
 function reply(body: unknown, status = 200): FetchResponse {
   return {
@@ -208,9 +209,48 @@ describe("GitHub issue and pull request lists", () => {
   });
 });
 
+describe("GitHub forks", () => {
+  /** GitHub forking octocat/hello into "me": the fork, then its page. */
+  const forking = (call: Call) => {
+    if (call.url.endsWith("/repos/octocat/hello/forks") && call.method === "POST") return reply({ name: "hello", owner: { login: "me" } }, 202);
+    if (call.url.endsWith("/repos/me/hello")) return reply({ name: "hello", owner: { login: "me" }, default_branch: "main", fork: true });
+    if (call.url.includes("/repos/me/hello/")) return reply([]);
+    return undefined;
+  };
+
+  it("counts the forks on the Fork button, which forks the repository and opens the fork", async () => {
+    const { fetch, calls } = fakeGithub((call) => forking(call) ?? (call.url.endsWith("/repos/octocat/hello") ? reply({ default_branch: "main", forks_count: 2 }) : undefined));
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
+    expect(JSON.stringify(shown.nodes)).toContain('"label":"Fork 2"');
+    const result = await loadPage(post("https://github.com/octocat/hello", { fork: "fork" }), context(fetch, "tok"));
+    expect(calls.find((call) => call.method === "POST")).toMatchObject({ url: "https://api.github.com/repos/octocat/hello/forks", auth: "Bearer tok" });
+    expect((await page(result)).url).toBe("https://github.com/me/hello/tree/main");
+  });
+
+  it("waits while GitHub copies the files, then opens the fork", async () => {
+    let looks = 0;
+    const { fetch } = fakeGithub((call) => {
+      if (call.url.includes("/repos/me/hello/commits")) return ++looks < 3 ? reply({ message: "Git Repository is empty." }, 409) : reply([]);
+      return forking(call);
+    });
+    const pauses: number[] = [];
+    const fork = await forkRepo(fetch, "tok", "octocat", "hello", { tries: 8, every: 750, pause: async (ms) => { pauses.push(ms); } });
+    expect(fork).toEqual({ owner: "me", name: "hello" });
+    expect([looks, pauses]).toEqual([3, [750, 750]]);
+  });
+
+  it("says why GitHub wouldn't fork", async () => {
+    const { fetch } = fakeGithub((call) => (call.url.endsWith("/forks") ? reply({ message: "Repository is already forked" }, 403) : undefined));
+    expect(await loadPage(post("https://github.com/octocat/hello", { fork: "fork" }), context(fetch, "tok"))).toEqual({ kind: "error", message: "Repository is already forked" });
+  });
+});
+
 describe("GitHub usernames", () => {
-  const profileLink = (login: string, bold = false) =>
-    JSON.stringify(bold ? { kind: "link", text: login, href: `https://github.com/${login}`, bold } : { kind: "link", text: login, href: `https://github.com/${login}` });
+  /** A name in running text: underlined only under the pointer. */
+  const profileLink = (login: string, bold = false) => {
+    const link = { kind: "link", text: login, href: `https://github.com/${login}`, underline: "hover" };
+    return JSON.stringify(bold ? { ...link, bold } : link);
+  };
 
   it("links who made a commit, an issue and a comment to their profiles", async () => {
     const { fetch } = fakeGithub((call) => {
@@ -280,7 +320,7 @@ describe("GitHub repositories", () => {
 describe("GitHub stars", () => {
   const starForm = (nodes: readonly LayoutNode[]) => forms(nodes).find((form) => form.controls.some((control) => control.kind === "submit" && /^Star/.test(control.label)));
 
-  it("puts a Star button by the repository's name that stars it, signed in", async () => {
+  it("puts Fork and Star buttons by the repository's name, one form whose pressed button says which; Star stars it, signed in", async () => {
     const { fetch, calls } = fakeGithub();
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
     expect(starForm(shown.nodes)).toEqual({
@@ -289,8 +329,8 @@ describe("GitHub stars", () => {
       align: "right",
       radius: 3,
       controls: [
-        { kind: "hidden", name: "star", value: "star" },
-        { kind: "submit", name: "", value: "", label: "Star 0", icon: "safari/github-star" },
+        { kind: "submit", name: "fork", value: "fork", label: "Fork 0", icon: "safari/github-fork", tooltip: "Fork octocat/hello" },
+        { kind: "submit", name: "star", value: "star", label: "Star 0", icon: "safari/github-star" },
       ],
     });
     const result = await loadPage(post("https://github.com/octocat/hello", { star: "star" }), context(fetch, "tok"));
@@ -305,20 +345,23 @@ describe("GitHub stars", () => {
   it("fills the star once starred, and says what pressing it does", async () => {
     const { fetch, calls } = fakeGithub((call) => (call.url.endsWith("/user/starred/octocat/hello") && call.method === "GET" ? reply(null, 204) : undefined));
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
-    expect(starForm(shown.nodes)?.controls).toEqual([
-      { kind: "hidden", name: "star", value: "unstar" },
-      { kind: "submit", name: "", value: "", label: "Starred 0", icon: "safari/github-starred", tooltip: "Unstar octocat/hello" },
-    ]);
+    expect(starForm(shown.nodes)?.controls.at(-1)).toEqual(
+      { kind: "submit", name: "star", value: "unstar", label: "Starred 0", icon: "safari/github-starred", tooltip: "Unstar octocat/hello" },
+    );
     await loadPage(post("https://github.com/octocat/hello", { star: "unstar" }), context(fetch, "tok"));
     expect(calls.find((call) => call.method === "DELETE")).toMatchObject({ url: "https://api.github.com/user/starred/octocat/hello" });
   });
 
-  it("signs in from the Star button when signed out, and comes back to the repository", async () => {
+  it("signs in from the Fork and Star buttons when signed out, and comes back to the repository", async () => {
     const { fetch } = fakeGithub();
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")));
     expect(starForm(shown.nodes)).toMatchObject({
       action: "https://github.com/login",
-      controls: [{ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/tree/main" }, { label: "Star 0", icon: "safari/github-star" }],
+      controls: [
+        { kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/tree/main" },
+        { label: "Fork 0", icon: "safari/github-fork" },
+        { label: "Star 0", icon: "safari/github-star" },
+      ],
     });
   });
 });

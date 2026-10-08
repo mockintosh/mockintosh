@@ -9,6 +9,7 @@ import {
   getViewer,
   type Viewer,
   setStarred,
+  forkRepo,
   listViewerRepos,
   loadPage,
   type ApiLocation,
@@ -24,7 +25,7 @@ import {
   type RepoInfo,
 } from "./api";
 import { commitSubject, formatAge, formatBytes, formatCount } from "./format";
-import { GITHUB_MARK, GITHUB_SEARCH, GITHUB_STAR, GITHUB_STARRED } from "./icons";
+import { GITHUB_FORK, GITHUB_MARK, GITHUB_SEARCH, GITHUB_STAR, GITHUB_STARRED } from "./icons";
 import { formatGithubLocation, parseGithubLocation, type GithubLocation, type ProfileTab } from "./location";
 
 /**
@@ -56,8 +57,8 @@ export const githubSite: SiteAdapter = {
       return loadLocation(await post(posted, fields, context), context, {});
     } catch (error) {
       if (!(error instanceof GithubError)) throw error;
-      // A star has no form to come back to: say why GitHub refused it.
-      if (posted.kind === "star") throw new PageError(error.message);
+      // A star or a fork has no form to come back to: say why GitHub refused it.
+      if (posted.kind === "star" || posted.kind === "fork") throw new PageError(error.message);
       // Back to the form, with what was written and why GitHub refused it.
       return loadLocation(posted.form, context, { draft: fields, error: error.message });
     }
@@ -276,6 +277,7 @@ function accountMenu(account: Viewer, here: string): LayoutNode {
 /** Where a form posts, and the page that shows the form again if GitHub refuses it. */
 type Posted =
   | { kind: "star"; owner: string; repo: string; starred: boolean; form: ApiLocation }
+  | { kind: "fork"; owner: string; repo: string; form: ApiLocation }
   | { kind: "issue"; owner: string; repo: string; form: ApiLocation }
   | { kind: "issueComment"; owner: string; repo: string; number: number; form: ApiLocation }
   | { kind: "discussion"; owner: string; repo: string; form: ApiLocation }
@@ -289,6 +291,8 @@ function postedLocation(location: GithubLocation, fields: Record<string, string>
   if (location.kind === "tree" && (fields.star === "star" || fields.star === "unstar")) {
     return { kind: "star", owner, repo, starred: fields.star === "star", form: { kind: "tree", owner, repo, ref: "", path: "" } };
   }
+  // The Fork button too.
+  if (location.kind === "tree" && fields.fork === "fork") return { kind: "fork", owner, repo, form: { kind: "tree", owner, repo, ref: "", path: "" } };
   if (location.kind === "issues") return { kind: "issue", owner, repo, form: { kind: "newIssue", owner, repo } };
   if (location.kind === "issue" || location.kind === "pull") return { kind: "issueComment", owner, repo, number: location.number, form: location };
   if (location.kind === "discussions") {
@@ -307,6 +311,10 @@ async function post(posted: Posted, fields: Record<string, string>, context: Sit
   if (posted.kind === "star") {
     await setStarred(fetch, token, owner, repo, posted.starred);
     return posted.form;
+  }
+  if (posted.kind === "fork") {
+    const fork = await forkRepo(fetch, token, owner, repo);
+    return { kind: "tree", owner: fork.owner, repo: fork.name, ref: "", path: "" };
   }
   const title = (fields.title ?? "").trim();
   const body = fields.body ?? "";
@@ -374,10 +382,15 @@ function facts(...items: Array<InlineSegment | InlineSegment[] | string | false 
   return paragraph(...segments);
 }
 
-/** A GitHub user's login, linked to their profile; `bold` where github.com sets it bold. */
-function person(login: string, bold = false): InlineSegment {
+/**
+ * A GitHub user's login, linked to their profile: underlined only under the
+ * pointer, as a name in running text, unless `underlined`; `bold` where
+ * github.com sets it bold.
+ */
+function person(login: string, bold = false, underlined = false): InlineSegment {
   const href = githubUrl({ kind: "profile", login, tab: "overview" });
-  return bold ? { kind: "link", text: login, href, bold } : { kind: "link", text: login, href };
+  const link: InlineSegment = underlined ? { kind: "link", text: login, href } : { kind: "link", text: login, href, underline: "hover" };
+  return bold ? { ...link, bold } : link;
 }
 
 const HR: LayoutNode = { type: "hr" };
@@ -500,8 +513,8 @@ function signInFirstPage(location: GithubLocation, why: string): DocumentPage {
   };
 }
 
-/** A form that is only a button, posting to `location`; `icon` names a sprite before the label. */
-function buttonForm(location: Extract<GithubLocation, { kind: "login" | "logout" }>, label: string, icon?: string): LayoutNode {
+/** A form that is only a button, posting to `location`. */
+function buttonForm(location: Extract<GithubLocation, { kind: "login" | "logout" }>, label: string): LayoutNode {
   return {
     type: "form",
     form: {
@@ -510,7 +523,7 @@ function buttonForm(location: Extract<GithubLocation, { kind: "login" | "logout"
       align: "right",
       controls: [
         { kind: "hidden", name: "return_to", value: location.returnTo },
-        { kind: "submit", name: "", value: "", label, icon },
+        { kind: "submit", name: "", value: "", label },
       ],
     },
   };
@@ -648,7 +661,7 @@ function profileSidebar(page: Extract<GithubPage, { view: "profile" }>): LayoutN
 function profileMain(page: Extract<GithubPage, { view: "profile" }>, now: number, forms: PageForms): LayoutNode[] {
   const login = page.profile.login;
   if (page.tab === "people") {
-    const people = page.people.map((login) => [paragraph(person(login))]);
+    const people = page.people.map((login) => [paragraph(person(login, false, true))]);
     return [heading(2, "People"), list(people, "No public members.", false)];
   }
   if (page.tab === "overview") return overviewMain(page, now, forms);
@@ -874,17 +887,35 @@ function repoNav(repo: RepoInfo, view: RepoPage["view"], ref: string): LayoutNod
   return tabs(sections);
 }
 
-/** Room for the Star button at the right of a repository's title: a star and "Starred 1.2k". */
-const STAR_WIDTH = 115;
+/** Room for the Fork and Star buttons at the right of a repository's title: "Fork 1.2k" and "Starred 1.2k". */
+const REPO_BUTTONS_WIDTH = 210;
 
 /**
- * GitHub's Star button and the count beside it: an outline star to star
- * with, a filled one once starred. Signed in, it stars or unstars
- * (`starred` says which it is now); signed out, it signs in and comes back.
+ * GitHub's Fork and Star buttons, each with its count, side by side as one
+ * form: the pressed button's name says which. Signed in, Fork forks the
+ * repository and opens the fork, and Star stars or unstars it (`starred` says
+ * which it is now: an outline star to star with, a filled one once starred).
+ * Signed out (`starred` null), both sign in and come back.
  */
-function starButton(repo: RepoInfo, starred: boolean | null, here: GithubLocation): LayoutNode {
-  const count = formatCount(repo.stars);
-  if (starred === null) return buttonForm({ kind: "login", returnTo: githubUrl(here) }, `Star ${count}`, GITHUB_STAR);
+function repoButtons(repo: RepoInfo, starred: boolean | null, here: GithubLocation): LayoutNode {
+  const forks = `Fork ${formatCount(repo.forks)}`;
+  const stars = formatCount(repo.stars);
+  const name = `${repo.owner}/${repo.name}`;
+  if (starred === null) {
+    return {
+      type: "form",
+      form: {
+        action: "https://github.com/login",
+        method: "post",
+        align: "right",
+        controls: [
+          { kind: "hidden", name: "return_to", value: githubUrl(here) },
+          { kind: "submit", name: "", value: "", label: forks, icon: GITHUB_FORK },
+          { kind: "submit", name: "", value: "", label: `Star ${stars}`, icon: GITHUB_STAR },
+        ],
+      },
+    };
+  }
   return {
     type: "form",
     form: {
@@ -892,10 +923,10 @@ function starButton(repo: RepoInfo, starred: boolean | null, here: GithubLocatio
       method: "post",
       align: "right",
       controls: [
-        { kind: "hidden", name: "star", value: starred ? "unstar" : "star" },
+        { kind: "submit", name: "fork", value: "fork", label: forks, icon: GITHUB_FORK, tooltip: `Fork ${name}` },
         starred
-          ? { kind: "submit", name: "", value: "", label: `Starred ${count}`, icon: GITHUB_STARRED, tooltip: `Unstar ${repo.owner}/${repo.name}` }
-          : { kind: "submit", name: "", value: "", label: `Star ${count}`, icon: GITHUB_STAR },
+          ? { kind: "submit", name: "star", value: "unstar", label: `Starred ${stars}`, icon: GITHUB_STARRED, tooltip: `Unstar ${name}` }
+          : { kind: "submit", name: "star", value: "star", label: `Star ${stars}`, icon: GITHUB_STAR },
       ],
     },
   };
@@ -965,7 +996,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
       main.push(card([bold("README")], resolveRelative(parseMarkdown(page.readme), repo, page.ref, page.path)));
     }
     if (page.path) return { title: page.path, body: main };
-    // The repository's front page: its name and Star button, then the files beside About.
+    // The repository's front page: its name and its Fork and Star buttons, then the files beside About.
     return {
       title: "",
       body: [
@@ -974,7 +1005,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
           gap: 8,
           minWidth: 0,
           center: true,
-          columns: [{ nodes: [heading(1, repo.name)] }, { width: STAR_WIDTH, nodes: [starButton(repo, page.starred, location)] }],
+          columns: [{ nodes: [heading(1, repo.name)] }, { width: REPO_BUTTONS_WIDTH, nodes: [repoButtons(repo, page.starred, location)] }],
         },
         { type: "columns", gap: 16, minWidth: CODE_COLUMNS, columns: [{ nodes: main }, { width: ABOUT_WIDTH, nodes: aboutNodes(repo) }] },
       ],

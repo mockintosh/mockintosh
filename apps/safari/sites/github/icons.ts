@@ -77,4 +77,28 @@ const search: Sprite = fromGrid(11, 10, [
   ".........##",
 ]);
 
-export const githubSprites: Record<string, Sprite> = { [GITHUB_MARK]: githubMark, [GITHUB_STAR]: star, [GITHUB_STARRED]: starred, [GITHUB_SEARCH]: search };
+/** The sprite name of the Fork button's icon. */
+export const GITHUB_FORK = "safari/github-fork";
+
+/** Octicons' `repo-forked`, cut down to the stars' size: two rings branching from a stem into a third. */
+const fork: Sprite = fromGrid(10, 11, [
+  ".##....##.",
+  "#..#..#..#",
+  "#..#..#..#",
+  ".##....##.",
+  "..#....#..",
+  "...#..#...",
+  "....##....",
+  "....##....",
+  "...#..#...",
+  "...#..#...",
+  "....##....",
+]);
+
+export const githubSprites: Record<string, Sprite> = {
+  [GITHUB_MARK]: githubMark,
+  [GITHUB_STAR]: star,
+  [GITHUB_STARRED]: starred,
+  [GITHUB_SEARCH]: search,
+  [GITHUB_FORK]: fork,
+};

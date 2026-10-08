@@ -741,6 +741,33 @@ export async function setStarred(fetch: FetchFunction, token: string, owner: str
   throw new GithubError(detail || `GitHub wouldn't ${starred ? "star" : "unstar"} the repository (${response.status}).`, response.status);
 }
 
+/**
+ * Forks a repository into the signed-in account; resolves with where the
+ * fork is (an existing fork, if there already was one). GitHub copies the
+ * files after it answers, so this waits, a few seconds at most, until the
+ * fork has a commit to show.
+ */
+export async function forkRepo(fetch: FetchFunction, token: string, owner: string, repo: string, wait = FORK_WAIT): Promise<{ owner: string; name: string }> {
+  const fork = asRecord(await gh(fetch, token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/forks`, {}));
+  const where = { owner: stringField(asRecord(fork.owner), "login"), name: stringField(fork, "name") };
+  if (!where.owner || !where.name) throw new GithubError("GitHub didn't say where the fork is.", 502);
+  for (let tries = 0; tries < wait.tries; tries++) {
+    const response = await fetch(`${API}/repos/${encodeURIComponent(where.owner)}/${encodeURIComponent(where.name)}/commits?per_page=1`, { headers: restHeaders(token), cache: "no-cache" });
+    if (response.ok) break;
+    await wait.pause(wait.every);
+  }
+  return where;
+}
+
+/** How long `forkRepo` waits for a new fork's files: up to `tries` looks, `every` ms apart. */
+interface ForkWait {
+  tries: number;
+  every: number;
+  pause: (ms: number) => Promise<void>;
+}
+
+const FORK_WAIT: ForkWait = { tries: 8, every: 750, pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) };
+
 /** A REST call: GET, or POST with `json`. */
 async function gh(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<unknown> {
   const headers = restHeaders(token);
