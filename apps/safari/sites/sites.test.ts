@@ -32,6 +32,7 @@ function links(nodes: readonly LayoutNode[]): string[] {
       return node.segments.flatMap((segment) => (segment.kind === "link" ? [segment.href] : []));
     }
     if (node.type === "box") return links(node.nodes);
+    if (node.type === "columns") return node.columns.flatMap((column) => links(column.nodes));
     return [];
   });
 }
@@ -54,10 +55,9 @@ describe("GitHub pages", () => {
       0,
     );
     expect(page.url).toBe("https://github.com/octocat/Hello-World/tree/main");
+    // The tabs go in the header, with "owner / repo" beside the mark.
+    expect(links(page.nav ? [page.nav] : [])).toContain("https://github.com/octocat/Hello-World/issues");
     expect(links(page.nodes)).toEqual(expect.arrayContaining([
-      "https://github.com/octocat/Hello-World",
-      "https://github.com/octocat",
-      "https://github.com/octocat/Hello-World/issues",
       "https://github.com/octocat/Hello-World/tree/main/src",
       "https://github.com/octocat/Hello-World/blob/main/README.md",
       "https://github.com/octocat/Hello-World/blob/main/docs/guide.md",

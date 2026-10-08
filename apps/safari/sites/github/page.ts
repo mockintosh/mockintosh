@@ -140,19 +140,39 @@ function viewerOf(context: SiteContext): Promise<string> {
   return viewer;
 }
 
-/** Header columns: GitHub's mark, and the account corner, signed in (the login, right-aligned) and out (the Sign In button). */
+/** Header columns: GitHub's mark, the search field, and the account corner, signed in (the login, right-aligned) and out (the Sign In button). */
 const MARK_SIZE = 16;
+const SEARCH_WIDTH = 110;
 const ACCOUNT_WIDTH = 90;
 const SIGN_IN_WIDTH = 48;
 
+/** A page as these builders make it: its tabs (`nav`) go in the header, under the search and account, as on github.com. */
+type GithubDocument = DocumentPage & { nav?: LayoutNode };
+
+/** Where the page is, beside the mark: "owner / repo" in a repository, the login on a profile. */
+function crumbs(url: string): LayoutNode[] {
+  const location = parseGithubLocation(url);
+  if (!location) return [];
+  if ("owner" in location) {
+    return [paragraph(
+      link(location.owner, { kind: "profile", login: location.owner, tab: "overview" }),
+      text(" / "),
+      link(location.repo, { kind: "tree", owner: location.owner, repo: location.repo, ref: "", path: "" }),
+    )];
+  }
+  if (location.kind === "profile") return [paragraph(link(location.login, { ...location, tab: "overview" }))];
+  return [];
+}
+
 /**
  * The band across the top of every GitHub page, as on github.com: the home
- * link, "Search or jump to…", and the account in the corner. `viewer` is
- * the signed-in login (empty when GitHub won't say whose the token is), or
- * null when signed out. The sign-in page leaves the corner empty: it is the
- * account page.
+ * link and where the page is, "Search or jump to…" and the account in the
+ * corner, then the page's tabs, ruled off from the page. `viewer` is the
+ * signed-in login (empty when GitHub won't say whose the token is), or
+ * null when signed out. The sign-in page leaves the corner empty: it is
+ * the account page.
  */
-function withHeader(page: DocumentPage, viewer: string | null, account = true): DocumentPage {
+function withHeader(page: GithubDocument, viewer: string | null, account = true): DocumentPage {
   const corner: LayoutNode[] = !account
     ? []
     : viewer === null
@@ -170,11 +190,13 @@ function withHeader(page: DocumentPage, viewer: string | null, account = true): 
     center: true,
     columns: [
       { width: MARK_SIZE, nodes: [mark] },
-      { nodes: [search] },
+      { nodes: crumbs(page.url) },
+      { width: SEARCH_WIDTH, nodes: [search] },
       { width: account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
     ],
   };
-  return { ...page, nodes: [header, { type: "hr" }, HEADER_SPACE, ...spaceSections(page.nodes)] };
+  const { nav, ...document } = page;
+  return { ...document, nodes: [header, ...(nav ? [nav] : []), HR, HEADER_SPACE, ...spaceSections(page.nodes)] };
 }
 
 /** Room under the header's rule, on every page. */
@@ -454,7 +476,7 @@ function commentForm(location: GithubLocation, forms: PageForms): LayoutNode {
   };
 }
 
-export function githubPage(page: GithubPage, now: number, forms: PageForms = { signedIn: false }): DocumentPage {
+export function githubPage(page: GithubPage, now: number, forms: PageForms = { signedIn: false }): GithubDocument {
   if (page.view === "search") {
     const location: GithubLocation = { kind: "search", query: page.query };
     const results = page.total === 1 ? "1 repository result" : `${formatCount(page.total)} repository results`;
@@ -703,7 +725,7 @@ function tabs(items: readonly { label: string; location: GithubLocation; current
 }
 
 /** A profile as github.com lays it out: its tabs across the top, then the person beside what they've made. */
-function profilePage(page: Extract<GithubPage, { view: "profile" }>, now: number, forms: PageForms): DocumentPage {
+function profilePage(page: Extract<GithubPage, { view: "profile" }>, now: number, forms: PageForms): GithubDocument {
   const profile = page.profile;
   const location: GithubLocation = { kind: "profile", login: profile.login, tab: page.tab };
   const tab = (label: string, name: ProfileTab) => ({
@@ -712,11 +734,10 @@ function profilePage(page: Extract<GithubPage, { view: "profile" }>, now: number
     current: page.tab === name,
   });
   const repositories = `Repositories ${formatCount(profile.publicRepos)}`;
+  const nav = tabs(profile.kind === "Organization"
+    ? [tab("Overview", "overview"), tab(repositories, "repos"), tab("People", "people")]
+    : [tab("Overview", "overview"), tab(repositories, "repos"), tab("Stars", "stars")]);
   const nodes: LayoutNode[] = [
-    tabs(profile.kind === "Organization"
-      ? [tab("Overview", "overview"), tab(repositories, "repos"), tab("People", "people")]
-      : [tab("Overview", "overview"), tab(repositories, "repos"), tab("Stars", "stars")]),
-    HR,
     {
       type: "columns",
       gap: 16,
@@ -724,7 +745,7 @@ function profilePage(page: Extract<GithubPage, { view: "profile" }>, now: number
       columns: [{ width: SIDEBAR, nodes: profileSidebar(page) }, { nodes: profileMain(page, now, forms) }],
     },
   ];
-  return { kind: "document", url: githubUrl(location), title: profile.login, nodes };
+  return { kind: "document", url: githubUrl(location), title: profile.login, nodes, nav };
 }
 
 /** Avatar size asked of GitHub, in pixels; Safari dithers what comes back. */
@@ -763,28 +784,8 @@ function sectionOf(view: RepoPage["view"]): RepoSection {
   return "code";
 }
 
-/**
- * "owner / repo", a line of facts, and the tabs. The About panel
- * (description, website, topics) shows on the Code tab's front page only,
- * as on github.com.
- */
-function repoHeader(repo: RepoInfo, view: RepoPage["view"], ref: string, about: boolean): LayoutNode[] {
-  const root: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
-  const nodes: LayoutNode[] = [
-    heading(1, `${repo.owner} / ${repo.name}`, githubUrl(root)),
-    facts(
-      repo.visibility,
-      link(repo.owner, { kind: "profile", login: repo.owner, tab: "overview" }),
-      `${formatCount(repo.stars)} stars`,
-      `${formatCount(repo.forks)} forks`,
-    ),
-  ];
-  if (about) {
-    if (repo.description) nodes.push(paragraph(text(repo.description)));
-    if (repo.homepage) nodes.push(paragraph({ kind: "link", text: repo.homepage, href: repo.homepage }));
-    const topics = [repo.language, repo.license, ...repo.topics].filter(Boolean);
-    if (topics.length > 0) nodes.push(facts(...topics));
-  }
+/** A repository's tabs: Code, Issues, Pull requests, and Discussions where it has them. */
+function repoNav(repo: RepoInfo, view: RepoPage["view"], ref: string): LayoutNode {
   const section = sectionOf(view);
   const sections = [
     { label: "Code", location: { kind: "tree", owner: repo.owner, repo: repo.name, ref, path: "" } as GithubLocation, current: section === "code" },
@@ -794,7 +795,27 @@ function repoHeader(repo: RepoInfo, view: RepoPage["view"], ref: string, about: 
   if (repo.hasDiscussions || section === "discussions") {
     sections.push({ label: "Discussions", location: { kind: "discussions", owner: repo.owner, repo: repo.name }, current: section === "discussions" });
   }
-  nodes.push(tabs(sections), HR);
+  return tabs(sections);
+}
+
+/** Width of the Code page's About column. */
+const ABOUT_WIDTH = 120;
+/** Narrower than this, About goes under the files. */
+const CODE_COLUMNS = ABOUT_WIDTH + 16 + 240;
+
+/** The Code page's About column, as on github.com: what it is, its site, its tags, and its counts. */
+function aboutNodes(repo: RepoInfo): LayoutNode[] {
+  const nodes: LayoutNode[] = [heading(3, "About")];
+  if (repo.description) nodes.push(paragraph(text(repo.description)));
+  if (repo.homepage) nodes.push(paragraph({ kind: "link", text: repo.homepage.replace(/^https?:\/\//, ""), href: repo.homepage }));
+  const tags = [repo.language, repo.license, ...repo.topics].filter(Boolean);
+  if (tags.length > 0) nodes.push(facts(...tags));
+  nodes.push(
+    paragraph(text(`${repo.visibility} repository`)),
+    paragraph(bold(formatCount(repo.stars)), text(repo.stars === 1 ? " star" : " stars")),
+    paragraph(bold(formatCount(repo.watchers)), text(" watching")),
+    paragraph(bold(formatCount(repo.forks)), text(repo.forks === 1 ? " fork" : " forks")),
+  );
   return nodes;
 }
 
@@ -811,14 +832,13 @@ function pathBar(repo: RepoInfo, ref: string, path: string): LayoutNode {
   return paragraph(...segments);
 }
 
-function repoPage(page: RepoPage, now: number, forms: PageForms): DocumentPage {
+function repoPage(page: RepoPage, now: number, forms: PageForms): GithubDocument {
   const repo = page.repo;
   const ref = page.view === "tree" || page.view === "blob" ? page.ref : repo.defaultBranch;
-  const nodes = repoHeader(repo, page.view, ref, page.view === "tree" && page.path === "");
   const location = repoLocation(page);
   const name = `${repo.owner}/${repo.name}`;
   const { title, body } = repoBody(page, location, now, forms);
-  return { kind: "document", url: githubUrl(location), title: title ? `${title} • ${name}` : name, nodes: [...nodes, ...body] };
+  return { kind: "document", url: githubUrl(location), title: title ? `${title} • ${name}` : name, nodes: body, nav: repoNav(repo, page.view, ref) };
 }
 
 /** What a repository page shows under its header, and its window title before the repository's name. */
@@ -837,11 +857,19 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
     const box: LayoutNode = commit && files.type === "box"
       ? { ...files, nodes: [facts(bold(commit.author), commitSubject(commit.message), commit.sha, formatAge(commit.date, now)), HR, ...files.nodes] }
       : files;
-    const body: LayoutNode[] = [pathBar(repo, page.ref, page.path), box];
+    const main: LayoutNode[] = [pathBar(repo, page.ref, page.path), box];
     if (page.readme) {
-      body.push(card([bold("README")], resolveRelative(parseMarkdown(page.readme), repo, page.ref, page.path)));
+      main.push(card([bold("README")], resolveRelative(parseMarkdown(page.readme), repo, page.ref, page.path)));
     }
-    return { title: page.path, body };
+    if (page.path) return { title: page.path, body: main };
+    // The repository's front page: its name, then the files beside About.
+    return {
+      title: "",
+      body: [
+        heading(1, repo.name),
+        { type: "columns", gap: 16, minWidth: CODE_COLUMNS, columns: [{ nodes: main }, { width: ABOUT_WIDTH, nodes: aboutNodes(repo) }] },
+      ],
+    };
   }
   if (page.view === "blob") {
     const file = page.file;

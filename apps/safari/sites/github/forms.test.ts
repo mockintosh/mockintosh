@@ -143,6 +143,31 @@ describe("GitHub pages", () => {
   });
 });
 
+describe("GitHub repositories", () => {
+  it("heads a repository with where it is, then its tabs over a rule, and puts About beside the files", async () => {
+    const { fetch } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")));
+    const [header, nav, rule] = shown.nodes;
+    if (header?.type !== "columns") throw new Error("no header");
+    expect(header.columns[1]!.nodes).toEqual([
+      {
+        type: "paragraph",
+        align: "left",
+        segments: [
+          { kind: "link", text: "octocat", href: "https://github.com/octocat" },
+          { kind: "text", text: " / " },
+          { kind: "link", text: "hello", href: "https://github.com/octocat/hello" },
+        ],
+      },
+    ]);
+    expect(nav).toMatchObject({ type: "paragraph", segments: expect.arrayContaining([{ kind: "bold", text: "Code" }]) });
+    expect(rule).toEqual({ type: "hr" });
+    const columns = shown.nodes.find((node) => node.type === "columns" && node !== header);
+    if (columns?.type !== "columns") throw new Error("no columns");
+    expect(columns.columns[1]!.nodes[0]).toMatchObject({ type: "heading", text: "About" });
+  });
+});
+
 describe("GitHub profiles", () => {
   it("shows the Overview signed in: pinned repositories, the contribution graph and this month's activity", async () => {
     const { fetch } = fakeGithub();
@@ -267,13 +292,13 @@ describe("GitHub forms", () => {
     const { fetch, calls } = fakeGithub();
     const signedOut = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/5"), context(fetch, "")));
     const header = signedOut.nodes[0];
-    expect(header.type === "columns" && header.columns[2].nodes).toEqual([
+    expect(header.type === "columns" && header.columns[3].nodes).toEqual([
       expect.objectContaining({ form: expect.objectContaining({ controls: expect.arrayContaining([{ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/issues/5" }]) }) }),
     ]);
 
     const signedIn = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/5"), context(fetch, "header-token")));
     await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "header-token"));
-    const corner = signedIn.nodes[0].type === "columns" ? signedIn.nodes[0].columns[2].nodes[0] : null;
+    const corner = signedIn.nodes[0].type === "columns" ? signedIn.nodes[0].columns[3].nodes[0] : null;
     expect(corner).toMatchObject({
       type: "menu",
       label: "octocat",
