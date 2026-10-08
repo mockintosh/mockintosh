@@ -183,4 +183,4 @@ export function html(strings: TemplateStringsArray, ...values: Array<string | nu
   return strings.reduce((out, s, i) => out + s + (i < values.length ? escapeHtml(String(values[i])) : ""), "");
 }
 
-export const EXPIRED_PAGE = html`<p>This code has expired. Show a new one on your Macintosh and scan again.</p>`;
+export const EXPIRED_PAGE = html`<p>This code has expired. Show a new one on your Mockintosh and scan again.</p>`;
