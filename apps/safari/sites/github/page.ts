@@ -195,8 +195,8 @@ function withHeader(page: GithubDocument, viewer: string | null, account = true)
       { width: account && viewer === null ? SIGN_IN_WIDTH : ACCOUNT_WIDTH, nodes: corner },
     ],
   };
-  const { nav, ...document } = page;
-  return { ...document, nodes: [header, ...(nav ? [nav] : []), HR, HEADER_SPACE, ...spaceSections(page.nodes)] };
+  const { nav, ...rest } = page;
+  return { ...rest, nodes: [header, ...(nav ? [nav] : []), HR, HEADER_SPACE, ...spaceSections(page.nodes)] };
 }
 
 /** Room under the header's rule, on every page. */
