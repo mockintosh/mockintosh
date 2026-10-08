@@ -1,4 +1,4 @@
-import { formatUrl, parseMarkdown, parseUrl, queryParams, type BitmapTip, type FormControl, type InlineSegment, type LayoutNode, type WebUrl } from "@mockintosh/sdk";
+import { formatUrl, parseMarkdown, parseUrl, queryParams, type BitmapTip, type FormControl, type MenuEntry, type InlineSegment, type LayoutNode, type WebUrl } from "@mockintosh/sdk";
 import { PageError, type DocumentPage, type SiteContext, type SiteAdapter } from "../../page";
 import {
   GithubError,
@@ -157,7 +157,7 @@ function withHeader(page: DocumentPage, viewer: string | null, account = true): 
     ? []
     : viewer === null
       ? [buttonForm({ kind: "login", returnTo: page.url }, "Sign In")]
-      : [{ type: "paragraph", align: "right", segments: [link(viewer || "Account", { kind: "login", returnTo: page.url })] }];
+      : [accountMenu(viewer, page.url)];
   const search: LayoutNode = {
     type: "form",
     form: { action: "https://github.com/search", method: "get", controls: [{ kind: "text", name: "q", value: "", placeholder: "Search or jump to…" }] },
@@ -175,6 +175,24 @@ function withHeader(page: DocumentPage, viewer: string | null, account = true): 
     ],
   };
   return { ...page, nodes: [header, { type: "hr" }, ...page.nodes] };
+}
+
+/**
+ * The signed-in corner, as github.com's avatar menu: their profile,
+ * repositories and stars, and Sign out, which comes back to `here`.
+ * `viewer` is empty when GitHub wouldn't say whose the token is.
+ */
+function accountMenu(viewer: string, here: string): LayoutNode {
+  const signOut = buttonForm({ kind: "logout", returnTo: here }, "Sign out");
+  const items: MenuEntry[] = viewer
+    ? [
+      { label: "Your profile", href: githubUrl({ kind: "profile", login: viewer, tab: "overview" }) },
+      { label: "Your repositories", href: githubUrl({ kind: "profile", login: viewer, tab: "repos" }) },
+      { label: "Your stars", href: githubUrl({ kind: "profile", login: viewer, tab: "stars" }) },
+    ]
+    : [{ label: "Account", href: githubUrl({ kind: "login", returnTo: here }) }];
+  if (signOut.type === "form") items.push({ label: "Sign out", form: signOut.form });
+  return { type: "menu", label: viewer || "Account", items, align: "right" };
 }
 
 /** Where a form posts, and the page that shows the form again if GitHub refuses it. */

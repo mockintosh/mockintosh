@@ -263,7 +263,7 @@ describe("GitHub forms", () => {
     });
   });
 
-  it("heads every page with the account: a Sign In button, or the login, asked of GitHub once", async () => {
+  it("heads every page with the account: a Sign In button, or a menu under the login, asked of GitHub once", async () => {
     const { fetch, calls } = fakeGithub();
     const signedOut = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/5"), context(fetch, "")));
     const header = signedOut.nodes[0];
@@ -275,9 +275,22 @@ describe("GitHub forms", () => {
     await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "header-token"));
     const corner = signedIn.nodes[0].type === "columns" ? signedIn.nodes[0].columns[2].nodes[0] : null;
     expect(corner).toMatchObject({
-      type: "paragraph",
+      type: "menu",
+      label: "octocat",
       align: "right",
-      segments: [{ kind: "link", text: "octocat", href: "https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Foctocat%2Fhello%2Fissues%2F5" }],
+      items: [
+        { label: "Your profile", href: "https://github.com/octocat" },
+        { label: "Your repositories", href: "https://github.com/octocat?tab=repositories" },
+        { label: "Your stars", href: "https://github.com/octocat?tab=stars" },
+        {
+          label: "Sign out",
+          form: {
+            action: "https://github.com/logout",
+            method: "post",
+            controls: expect.arrayContaining([{ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/issues/5" }]),
+          },
+        },
+      ],
     });
     expect(calls.filter((call) => call.url === "https://api.github.com/user")).toHaveLength(1);
   });

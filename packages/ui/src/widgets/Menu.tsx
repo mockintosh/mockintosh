@@ -1,6 +1,6 @@
 import { For } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Overlay } from "./Overlay";
+import { Overlay, type OverlayAlign } from "./Overlay";
 import { useRadius } from "../theme";
 
 export interface MenuItem {
@@ -17,13 +17,15 @@ export interface MenuProps {
   onDismiss: () => void;
   trigger: JSX.Element;
   items: readonly MenuItem[];
+  /** `end` hangs the menu from the trigger's right edge, for a trigger at the right of a bar. */
+  align?: OverlayAlign;
 }
 
 /** In-window menu. Not the OS menubar. */
 export function Menu(props: MenuProps): JSX.Element {
   const radius = useRadius("md");
   return (
-    <Overlay open={props.open} onDismiss={props.onDismiss} role="menu" trigger={props.trigger}>
+    <Overlay open={props.open} onDismiss={props.onDismiss} role="menu" align={props.align} trigger={props.trigger}>
       <box
         semantic={{ name: props.name ?? "menu", role: "menu" }}
         minWidth={100}

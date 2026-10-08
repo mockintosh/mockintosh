@@ -1,6 +1,6 @@
 import { Errored, For, Loading, Show, createMemo, createSignal, useContext } from "solid-js";
 import type { ImageFrame, JSX, TextRun } from "@mockintosh/ui";
-import { Button, Dithered, TextEditor, TextInput, Tooltip } from "@mockintosh/ui";
+import { Button, Dithered, Menu, TextEditor, TextInput, Tooltip } from "@mockintosh/ui";
 import type { FormControl, InlineSegment, LayoutColumn, LayoutNode, TableRow, WebForm } from "@mockintosh/markdown";
 import { AppServicesContext } from "./index";
 
@@ -109,6 +109,9 @@ function Block(props: BlockProps): JSX.Element {
       </box>
     );
   }
+  if (node.type === "menu") {
+    return <MenuView node={node} view={props.view} />;
+  }
   if (node.type === "scroller") {
     return <ScrollerView node={node} width={props.width} view={props.view} />;
   }
@@ -126,6 +129,36 @@ function Block(props: BlockProps): JSX.Element {
     return <ColumnsView columns={node.columns} gap={node.gap} minWidth={node.minWidth} center={node.center ?? false} width={props.width} view={props.view} />;
   }
   return <box height={6} />;
+}
+
+/** A page's pull-down menu: its label like a link, its items in the UI kit's `Menu`. */
+function MenuView(props: { node: Extract<LayoutNode, { type: "menu" }>; view: DocumentViewProps }): JSX.Element {
+  const node = props.node;
+  const [open, setOpen] = createSignal(false);
+  const choose = (entry: (typeof node.items)[number]) => {
+    if ("href" in entry) props.view.onLink?.(entry.href);
+    else {
+      const fields = entry.form.controls.flatMap((control) => (control.kind === "hidden" ? [{ name: control.name, value: control.value }] : []));
+      props.view.onSubmit?.(entry.form, fields);
+    }
+  };
+  const right = node.align === "right";
+  return (
+    <box flexDirection="row" justifyContent={right ? "flex-end" : node.align === "center" ? "center" : "flex-start"}>
+      <Menu
+        name={node.label}
+        open={open()}
+        onDismiss={() => setOpen(false)}
+        align={right ? "end" : "start"}
+        items={node.items.map((entry) => ({ label: entry.label, onClick: () => choose(entry) }))}
+        trigger={
+          <box cursor="pointer" semantic={{ name: `${node.label} menu`, role: "button" }} onClick={() => setOpen(!open())}>
+            <text font="body" nowrap runs={[{ text: node.label, underline: true }]} />
+          </box>
+        }
+      />
+    </box>
+  );
 }
 
 /** Height of a scroller's bar: a black thumb on a gray track, as thin as it can be and still be dragged. */

@@ -1,6 +1,7 @@
 /**
- * The contribution calendar in a real Safari window: the year is wider
- * than the page, so it opens on the latest weeks and drags sideways.
+ * GitHub in a real Safari window, signed in: the contribution calendar is
+ * wider than the page, so it opens on the latest weeks and scrolls
+ * sideways; the header's account menu signs out.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchResponse } from "@mockintosh/sdk";
@@ -28,7 +29,7 @@ const WEEKS = Array.from({ length: 53 }, (_, index) => ({
   contributionDays: [{ weekday: index % 7, contributionCount: 1, contributionLevel: "FIRST_QUARTILE" }],
 }));
 
-describe("contribution calendar", () => {
+describe("GitHub in a Safari window", () => {
   let platform: HeadlessPlatform;
   let os: BootedOS;
 
@@ -148,5 +149,29 @@ describe("contribution calendar", () => {
     // At the window's right edge, the caption moves left to stay inside the window's body, clear of its scroll bar.
     const window = nodes.find((node) => node.role === "window")!;
     expect(tip!.bounds.x + tip!.bounds.width).toBeLessThanOrEqual(window.bounds.x + window.bounds.width - 15);
+  });
+
+  async function inspect(): Promise<InspectionNode[]> {
+    return (await os.kernel.invoke(os.kernel.createSession(), "inspect", {})) as InspectionNode[];
+  }
+
+  async function click(name: string): Promise<void> {
+    const node = (await inspect()).find((candidate) => candidate.name === name);
+    expect(node, name).toBeDefined();
+    const { x, y, width, height } = node!.bounds;
+    platform.click(x + Math.floor(width / 2), y + Math.floor(height / 2));
+    await settle();
+    await settle();
+  }
+
+  it("opens the account menu from the login in the header, and signs out from it", async () => {
+    await click("octocat menu");
+    const items = (await inspect()).filter((node) => node.role === "menuitem").map((node) => node.name);
+    expect(items).toEqual(["octocat:Your profile", "octocat:Your repositories", "octocat:Your stars", "octocat:Sign out"]);
+
+    await click("octocat:Sign out");
+    const after = await inspect();
+    expect(after.some((node) => node.role === "button" && node.text === "Sign In")).toBe(true);
+    expect(after.some((node) => node.name === "octocat menu")).toBe(false);
   });
 });

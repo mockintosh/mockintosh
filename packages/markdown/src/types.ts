@@ -50,6 +50,9 @@ export interface WebForm {
   align?: Align;
 }
 
+/** One item of a page's `menu`: a link to follow, or a form to submit. */
+export type MenuEntry = { label: string; href: string } | { label: string; form: WebForm };
+
 /** A rectangle of a `bitmap`, in its pixels, that names itself when hovered. */
 export interface BitmapTip {
   x: number;
@@ -107,5 +110,7 @@ export type LayoutNode =
    * opens it scrolled all the way right, for the latest end of a timeline.
    */
   | { type: "scroller"; width: number; nodes: LayoutNode[]; start?: "start" | "end" }
+  /** A pull-down menu: `label` drawn like a link opens `items` under it. `align: "right"` puts it, and hangs the menu, at the right. */
+  | { type: "menu"; label: string; items: MenuEntry[]; align: Align }
   | { type: "spacer"; height: number }
   | { type: "br" };
