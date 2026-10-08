@@ -60,6 +60,20 @@ const starred: Sprite = fromGrid(11, 11, [
   ".###...###.",
 ]);
 
+/** The sprite name of the Watch button's eye. */
+export const GITHUB_WATCH = "safari/github-watch";
+
+/** Octicons' `eye`, cut down to the stars' width: an almond outline round a solid pupil. */
+const eye: Sprite = fromGrid(11, 7, [
+  "...#####...",
+  ".##.....##.",
+  "#...###...#",
+  "#..#####..#",
+  "#...###...#",
+  ".##.....##.",
+  "...#####...",
+]);
+
 /** The sprite name of the header search field's magnifying glass. */
 export const GITHUB_SEARCH = "safari/github-search";
 
@@ -101,4 +115,5 @@ export const githubSprites: Record<string, Sprite> = {
   [GITHUB_STARRED]: starred,
   [GITHUB_SEARCH]: search,
   [GITHUB_FORK]: fork,
+  [GITHUB_WATCH]: eye,
 };

@@ -53,6 +53,7 @@ describe("GitHub pages", () => {
         commit: null,
         readme: "See [the guide](docs/guide.md) and ![logo](logo.png).",
         starred: null,
+        watching: null,
       },
       0,
     );

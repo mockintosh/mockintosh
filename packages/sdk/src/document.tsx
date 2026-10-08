@@ -93,7 +93,7 @@ function Block(props: BlockProps): JSX.Element {
     return <FormView form={node.form} width={props.width} onSubmit={props.view.onSubmit} />;
   }
   if (node.type === "hr") {
-    return <box height={1} background={1} />;
+    return node.dotted ? <box height={1} borderColor={1} borderStyle="dotted" /> : <box height={1} background={1} />;
   }
   if (node.type === "image") {
     return <ImageView node={node} width={props.width} view={props.view} />;
