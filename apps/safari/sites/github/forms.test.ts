@@ -477,7 +477,7 @@ describe("GitHub forms", () => {
     const { fetch, calls } = fakeGithub();
     const form = await page(await loadPage(pageRequest("https://github.com/octocat/hello/discussions/new?category=ideas"), context(fetch, "tok")));
     expect(forms(form.nodes)).toContainEqual(expect.objectContaining({ action: "https://github.com/octocat/hello/discussions", method: "post" }));
-    const labels = (nodes: readonly LayoutNode[]) => forms(nodes).flatMap((f) => f.controls.flatMap((c) => ((c.kind === "text" || c.kind === "textarea") && c.label ? [c.label] : [])));
+    const labels = (nodes: readonly LayoutNode[]) => forms(nodes).flatMap((f) => f.controls.flatMap((c) => ((c.kind === "text" || c.kind === "textarea") && c.label ? [c.required ? `${c.label} *` : c.label] : [])));
     expect(labels(form.nodes)).toEqual(["Add a title *", "Add a body"]);
     const issueForm = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues/new"), context(fetch, "tok")));
     expect(labels(issueForm.nodes)).toEqual(["Add a title *", "Add a description"]);

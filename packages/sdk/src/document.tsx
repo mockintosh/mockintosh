@@ -385,11 +385,11 @@ function FormView(props: { form: WebForm; width: number; onSubmit?: (form: WebFo
     const control = (
       <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={width()} radius={form.radius} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />
     );
-    const label = entry.control.kind === "text" || entry.control.kind === "textarea" ? entry.control.label : undefined;
-    // A labelled control has its label over it, in bold.
-    return label ? (
+    const field = entry.control.kind === "text" || entry.control.kind === "textarea" ? entry.control : undefined;
+    // A labelled control has its label over it, in bold, and a plain asterisk when it must be filled in.
+    return field?.label ? (
       <box flexDirection="column" gap={LABEL_GAP}>
-        <text font="body" bold nowrap>{label}</text>
+        <text font="body" nowrap runs={[{ text: field.label, bold: true }, ...(field.required ? [{ text: " *" }] : [])]} />
         {control}
       </box>
     ) : control;
