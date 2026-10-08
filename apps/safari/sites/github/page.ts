@@ -1098,7 +1098,6 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
       body.push(paragraph(text("Sign in to open an issue.")), signInForm(location, "Sign In"));
     } else {
       body.push(
-        paragraph(text("Add a title, then describe the issue. Markdown works.")),
         ...postForm({ kind: "issues", owner, repo: name }, forms, [
           { kind: "text", name: "title", value: "", placeholder: "Title", label: "Add a title *" },
           { kind: "textarea", name: "body", value: "", rows: 10, markdown: true, label: "Add a description" },
