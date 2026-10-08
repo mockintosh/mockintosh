@@ -5,7 +5,7 @@ import type { ImageFrame } from "@mockintosh/ui";
 import { addressToUrl, formRequest, isSecure, resolveLink, urlToAddress } from "./safari/address";
 import { AddressField, BACK_FORWARD_W, BackForward, HEADER_H, TOOLBAR_BUTTON_W, TOOLBAR_H, TOOLBAR_HEADER_H, TabBar, ToolbarButton, type TabLabel } from "./safari/chrome";
 import { goBack, goForward, replace, visit } from "./safari/history";
-import { backIcon, forwardIcon, plusIcon, shareIcon, windowsIcon } from "./safari/icons";
+import { backIcon, forwardIcon, plusIcon, shareIcon } from "./safari/icons";
 import { PageError, START_URL, pageRequest, type GithubAccount, type PageRequest, type WebPage } from "./safari/page";
 import { BOOKMARKS_KEY, addBookmark, bookmarkTitle, parseBookmarks, removeBookmark, serializeBookmarks, type Bookmark } from "./safari/bookmarks";
 import { faviconCache, type FaviconLoader } from "./safari/favicon";
@@ -22,7 +22,7 @@ const MIN_SIZE = { width: 300, height: 180 };
 const TOOLBAR_PAD = 4;
 const TOOLBAR_GAP = 5;
 /** Everything in the toolbar but the address field, and the field's shadow. */
-const TOOLBAR_FIXED = BACK_FORWARD_W + TOOLBAR_BUTTON_W * 3 + TOOLBAR_GAP * 4 + TOOLBAR_PAD * 2 + 1;
+const TOOLBAR_FIXED = BACK_FORWARD_W + TOOLBAR_BUTTON_W * 2 + TOOLBAR_GAP * 3 + TOOLBAR_PAD * 2 + 1;
 const PAGE_PADDING = 6;
 /** The loading bar eases towards this share of the field: with no length to go by, it never claims to be done… */
 const PROGRESS_CEILING = 0.9;
@@ -565,7 +565,6 @@ function Safari(props: Record<string, unknown>): JSX.Element {
               }
             />
             <ToolbarButton name="safari-new-tab" icon={plusIcon} onClick={newTab} />
-            <ToolbarButton name="safari-new-window" icon={windowsIcon} onClick={newWindow} />
           </box>
           <Show when={manyTabs()}>
             <box height={1} background={1} />

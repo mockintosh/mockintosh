@@ -107,7 +107,7 @@ async function loadBody(location: Exclude<GithubLocation, { kind: "login" | "log
   if (!token && (location.kind === "discussions" || location.kind === "discussion" || location.kind === "newDiscussion")) {
     return signInFirstPage(location, "GitHub shows discussions only to people who are signed in.");
   }
-  // "Search or jump to…": an owner/repo goes straight to the repository.
+  // Search: an owner/repo goes straight to the repository, as github.com's "Search or jump to…".
   const jump = location.kind === "search" ? /^\s*([\w.-]+)\/([\w.-]+)\s*$/.exec(location.query) : null;
   const target: ApiLocation = jump ? { kind: "tree", owner: jump[1], repo: jump[2], ref: "", path: "" } : location;
   try {
@@ -172,7 +172,7 @@ function crumbs(url: string): LayoutNode[] {
 
 /**
  * The band across the top of every GitHub page, as on github.com: the home
- * link and where the page is, "Search or jump to…" and the account in the
+ * link and where the page is, the search field and the account in the
  * corner, then the page's tabs, ruled off from the page. `viewer` is the
  * signed-in account (its login empty when GitHub won't say whose the
  * token is), or null when signed out. The sign-in page leaves the corner
@@ -187,7 +187,7 @@ function withHeader(page: GithubDocument, viewer: Viewer | null, account = true)
   const avatar = corner[0]?.type === "menu" && corner[0].image !== undefined;
   const search: LayoutNode = {
     type: "form",
-    form: { action: "https://github.com/search", method: "get", controls: [{ kind: "text", name: "q", value: "", placeholder: "Search or jump to…", icon: GITHUB_SEARCH }] },
+    form: { action: "https://github.com/search", method: "get", controls: [{ kind: "text", name: "q", value: "", placeholder: "Search…", icon: GITHUB_SEARCH }] },
   };
   const mark: LayoutNode = { type: "image", src: GITHUB_MARK, alt: "GitHub", align: "left", width: MARK_SIZE, height: MARK_SIZE, href: githubUrl({ kind: "home" }) };
   const header: LayoutNode = {

@@ -127,7 +127,7 @@ function texts(nodes: readonly LayoutNode[]): string {
 }
 
 describe("GitHub pages", () => {
-  it("jumps from Search or jump to… straight to an owner/repo", async () => {
+  it("jumps from Search… straight to an owner/repo", async () => {
     const { fetch } = fakeGithub();
     const shown = await page(await loadPage(pageRequest("https://github.com/search?q=octocat%2Fhello"), context(fetch, "")));
     expect(shown.url).toBe("https://github.com/octocat/hello/tree/main");
