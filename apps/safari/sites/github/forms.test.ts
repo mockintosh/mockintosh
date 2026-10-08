@@ -144,6 +144,9 @@ describe("GitHub pages", () => {
     const home = await page(await loadPage(pageRequest("https://github.com/"), context(fetch, "home-token")));
     expect(texts(home.nodes)).toContain("Top repositories");
     expect(texts(home.nodes)).toContain("octocat / hello");
+    // The header says where this is: GitHub itself.
+    const [header] = home.nodes;
+    expect(header?.type === "columns" && header.columns[1]!.nodes[0]).toMatchObject({ segments: [{ kind: "link", text: "GitHub", href: "https://github.com/", bold: true }] });
   });
 });
 

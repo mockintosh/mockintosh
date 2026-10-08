@@ -165,6 +165,7 @@ function crumbs(url: string): LayoutNode[] {
     )];
   }
   if (location.kind === "profile") return [paragraph(crumb(location.login, { ...location, tab: "overview" }, true))];
+  if (location.kind === "home") return [paragraph(crumb("GitHub", location, true))];
   return [];
 }
 
