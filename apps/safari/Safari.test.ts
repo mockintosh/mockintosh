@@ -37,6 +37,8 @@ describe("Safari", () => {
   let platform: HeadlessPlatform;
   let os: BootedOS;
   let hangFetch = false;
+  /** What the host clipboard holds. */
+  let copied = "";
   let finishHang: ((value: FetchResponse) => void) | undefined;
 
   beforeEach(async () => {
@@ -44,6 +46,8 @@ describe("Safari", () => {
     hangFetch = false;
     finishHang = undefined;
     platform = createHeadlessPlatform({ width: 640, height: 480 });
+    copied = "";
+    platform.clipboard = { readText: async () => copied, writeText: async (text) => { copied = text; } };
     platform.fetch = async (url) => {
       if (hangFetch) return new Promise<FetchResponse>((resolve) => { finishHang = resolve; });
       if (!String(url).startsWith("https://hn.algolia.com/")) throw new Error("no network in this test");
@@ -152,6 +156,28 @@ describe("Safari", () => {
     // The front page's address is /news, so this is a second Hacker News bookmark.
     expect(await node("safari-favorite-Orange site")).toBeDefined();
     expect(await node("safari-favorite-Hacker News")).toBeDefined();
+  });
+
+  it("copies the page's address, or bookmarks it, from the Share button's menu", async () => {
+    const dialog = vi.spyOn(os.services, "showDialog").mockResolvedValueOnce("Orange site");
+    // On the start page there is nothing to share.
+    await click("safari-share");
+    expect((await nodes()).filter((n) => n.role === "menuitem")).toEqual([]);
+
+    await openBookmark("Hacker News");
+    await click("safari-share");
+    const items = (await nodes()).filter((n) => n.role === "menuitem");
+    // One menu, under the button: the header's toolbar is built once.
+    expect(items.map((item) => [item.name, item.enabled])).toEqual([["safari-share-menu:Copy URL", true], ["safari-share-menu:Add to Bookmarks…", true]]);
+    await click("safari-share-menu:Copy URL");
+    expect(copied).toMatch(/^https:\/\/news\.ycombinator\.com\//);
+    expect((await nodes()).some((n) => n.role === "menuitem")).toBe(false);
+
+    await click("safari-share");
+    await click("safari-share-menu:Add to Bookmarks…");
+    expect(dialog.mock.calls[0]![0].inputDefault).toBe("Hacker News");
+    await reopen();
+    expect(await node("safari-favorite-Orange site")).toBeDefined();
   });
 
   it("adds a favorite from the start page's Add tile", async () => {

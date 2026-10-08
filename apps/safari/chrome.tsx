@@ -24,6 +24,8 @@ interface FaceProps {
   icon: Sprite;
   onClick: () => void;
   disabled?: boolean;
+  /** Drawn pressed, as while its menu is open. */
+  active?: boolean;
   width: number;
   height: number;
 }
@@ -32,16 +34,17 @@ interface FaceProps {
 function IconFace(props: FaceProps): JSX.Element {
   const press = createPress(props);
   const icon = () => (props.disabled ? dimmed(props.icon) : props.icon);
+  const dark = () => press.pressed() || !!props.active;
   return (
     <box
       {...press.rootProps()}
       width={props.width}
       height={props.height}
-      background={press.pressed() ? 1 : 0}
+      background={dark() ? 1 : 0}
       justifyContent="center"
       alignItems="center"
     >
-      <image src={icon()} width={props.icon.width} height={props.icon.height} mode={press.pressed() ? "inverted" : "normal"} />
+      <image src={icon()} width={props.icon.width} height={props.icon.height} mode={dark() ? "inverted" : "normal"} />
     </box>
   );
 }
@@ -51,6 +54,8 @@ export interface ToolbarButtonProps {
   icon: Sprite;
   onClick: () => void;
   disabled?: boolean;
+  /** Drawn pressed, as while its menu is open. */
+  active?: boolean;
 }
 
 /** A framed toolbar button with a drop shadow. */

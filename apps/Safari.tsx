@@ -1,5 +1,5 @@
 import { Show, WindowHeader, createEffect, createMemo, createSignal, onCleanup } from "@mockintosh/sdk";
-import { useUIServices, type JSX } from "@mockintosh/ui";
+import { Menu, useUIServices, type JSX } from "@mockintosh/ui";
 import { DocumentView, useApp, defineApp, type AppWindow, type FormField, type MenubarItemDef, type WebForm } from "@mockintosh/sdk";
 import type { ImageFrame } from "@mockintosh/ui";
 import { addressToUrl, formRequest, isSecure, resolveLink, urlToAddress } from "./safari/address";
@@ -395,6 +395,8 @@ function Safari(props: Record<string, unknown>): JSX.Element {
     app.openWindow({ title: "Safari", size: WINDOW_SIZE, minSize: MIN_SIZE, scrollable: true, resizable: true });
   }
 
+  /** Whether the Share button's menu is open. */
+  const [sharing, setSharing] = createSignal(false);
   const pageUrl = () => front().history.current.url;
   const canCopyLink = () => clipboard !== undefined && pageUrl() !== START_URL;
   function copyLink(): void {
@@ -549,7 +551,19 @@ function Safari(props: Record<string, unknown>): JSX.Element {
               width={Math.max(60, barWidth() - TOOLBAR_FIXED)}
               progress={progress()}
             />
-            <ToolbarButton name="safari-copy-link" icon={shareIcon} disabled={!canCopyLink()} onClick={copyLink} />
+            <Menu
+              name="safari-share-menu"
+              open={sharing()}
+              onDismiss={() => setSharing(false)}
+              align="end"
+              items={[
+                { label: "Copy URL", disabled: !canCopyLink(), onClick: copyLink },
+                { label: "Add to Bookmarks…", disabled: !bookmarkablePage(), onClick: addBookmarkForPage },
+              ]}
+              trigger={
+                <ToolbarButton name="safari-share" icon={shareIcon} disabled={!canCopyLink() && !bookmarkablePage()} active={sharing()} onClick={() => setSharing(!sharing())} />
+              }
+            />
             <ToolbarButton name="safari-new-tab" icon={plusIcon} onClick={newTab} />
             <ToolbarButton name="safari-new-window" icon={windowsIcon} onClick={newWindow} />
           </box>
