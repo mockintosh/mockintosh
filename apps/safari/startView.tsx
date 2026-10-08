@@ -1,4 +1,4 @@
-import { For, Show, createSignal, useApp } from "@mockintosh/sdk";
+import { For, Show, createEffect, createSignal, onCleanup, useApp, type AppScheduler } from "@mockintosh/sdk";
 import { createPress, type CanvasNode, type JSX } from "@mockintosh/ui";
 import { moveBookmark, type Bookmark } from "./bookmarks";
 import { faviconUrl, type FaviconLoader } from "./favicon";
@@ -18,6 +18,10 @@ const MAX_COLUMNS = 6;
 const BADGE_LEFT = (TILE_W - FRAME) / 2 - 6;
 const BADGE_TOP = -6;
 const ADD_ICON = scaled(plusIcon, 2);
+/** How long a tile takes to glide to a new place. */
+const GLIDE_MS = 140;
+/** A tile's height before it's measured: the frame, the gap, two lines of name. */
+const TILE_H = FRAME + 4 + 24;
 
 export interface StartViewProps {
   /** `null` until they are read from the preferences file. */
@@ -108,9 +112,9 @@ function TileLabel(props: { text: string; pressed: boolean }): JSX.Element {
   );
 }
 
-/** A favorite being dragged to a new place, while editing. */
+/** A favorite being dragged to a new place, while editing: where in it it was grabbed, then the pointer on the screen. */
 interface TileDrag {
-  onStart(bookmark: Bookmark): void;
+  onStart(bookmark: Bookmark, grabX: number, grabY: number, x: number, y: number): void;
   onMove(bookmark: Bookmark, x: number, y: number): void;
   onEnd(bookmark: Bookmark): void;
 }
@@ -122,7 +126,6 @@ function FavoriteTile(props: {
   dragged: boolean;
   icons?: FaviconLoader;
   drag: TileDrag;
-  node(node: CanvasNode): void;
   onOpen(url: string): void;
   onDelete(bookmark: Bookmark): void;
 }): JSX.Element {
@@ -138,15 +141,14 @@ function FavoriteTile(props: {
   return (
     <box
       {...press.rootProps()}
-      ref={(node: CanvasNode) => props.node(node)}
       semantic={{ name: `safari-favorite-${props.bookmark.title}`, role: "link" }}
       cursor={props.editing ? undefined : "pointer"}
       width={TILE_W}
       flexDirection="column"
       alignItems="center"
       gap={4}
-      onDragStart={() => {
-        if (props.editing) props.drag.onStart(props.bookmark);
+      onDragStart={(lx: number, ly: number, x: number, y: number) => {
+        if (props.editing) props.drag.onStart(props.bookmark, lx, ly, x, y);
       }}
       onDrag={(_lx: number, _ly: number, x: number, y: number) => {
         if (props.editing) props.drag.onMove(props.bookmark, x, y);
@@ -194,52 +196,60 @@ function AddTile(props: { onAdd(): void }): JSX.Element {
 }
 
 /**
+ * A place that eases to `target` whenever it moves, as a tile glides to a
+ * new slot; while `follow` holds, it keeps to the target at once (a tile
+ * under the pointer).
+ */
+function createGlide(target: () => { x: number; y: number }, follow: () => boolean, scheduler: AppScheduler): () => { x: number; y: number } {
+  let now = target();
+  const [at, setAt] = createSignal(now);
+  const place = (next: { x: number; y: number }) => {
+    now = next;
+    setAt(next);
+  };
+  let cancel: (() => void) | null = null;
+  createEffect(
+    () => ({ to: target(), jump: follow() }),
+    ({ to, jump }) => {
+      cancel?.();
+      cancel = null;
+      if (jump) return place(to);
+      const from = now;
+      if (from.x === to.x && from.y === to.y) return;
+      const start = scheduler.now();
+      const step = () => {
+        const t = Math.min(1, (scheduler.now() - start) / GLIDE_MS);
+        const eased = 1 - (1 - t) ** 3;
+        place({ x: Math.round(from.x + (to.x - from.x) * eased), y: Math.round(from.y + (to.y - from.y) * eased) });
+        cancel = t < 1 ? scheduler.requestFrame(step) : null;
+      };
+      cancel = scheduler.requestFrame(step);
+    },
+  );
+  onCleanup(() => cancel?.());
+  return at;
+}
+
+/**
  * The start page as Safari draws it: "Favorites" over a grid of the
  * bookmarks, each the site's own icon in one bit inside a rounded square.
  * Edit puts a delete badge on each and an Add tile at the end, and lets a
- * favorite be dragged to a new place: the others make room as it goes, and
- * the order is kept when it's let go.
+ * favorite be dragged to a new place: it follows the pointer, the others
+ * glide aside to leave a gap where it would land, and the order is kept
+ * when it's let go, the tile gliding into its place.
  */
 export function StartView(props: StartViewProps): JSX.Element {
+  const app = useApp();
   const columns = () => favoritesColumns(props.width);
   // One tile per bookmark for as long as it lives, so editing doesn't redraw every icon.
   const tileOf = new WeakMap<Bookmark, Tile>();
-  const nodeOf = new Map<Bookmark, CanvasNode>();
-  /** The favorite being dragged, and where it would go. */
-  const [dragging, setDragging] = createSignal<{ bookmark: Bookmark; to: number } | null>(null);
+  /** The favorite being dragged: where it would go, and the tile's top-left under the pointer. */
+  const [dragging, setDragging] = createSignal<{ bookmark: Bookmark; to: number; x: number; y: number; grabX: number; grabY: number } | null>(null);
   /** The favorites in the order shown: while dragging, with the dragged one where it would go. */
   const ordered = (): readonly Bookmark[] => {
     const bookmarks = props.bookmarks ?? [];
     const drag = dragging();
     return drag ? moveBookmark(bookmarks, drag.bookmark, drag.to) : bookmarks;
-  };
-  const drag: TileDrag = {
-    onStart(bookmark) {
-      const at = (props.bookmarks ?? []).indexOf(bookmark);
-      if (at >= 0) setDragging({ bookmark, to: at });
-    },
-    onMove(bookmark, x, y) {
-      // The place is the tile nearest the pointer, as laid out now.
-      let best = -1;
-      let bestDistance = Infinity;
-      ordered().forEach((shown, index) => {
-        const node = nodeOf.get(shown);
-        if (!node) return;
-        const cx = node.layout.x + node.layout.width / 2;
-        const cy = node.layout.y + FRAME / 2;
-        const distance = (x - cx) ** 2 + (y - cy) ** 2;
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          best = index;
-        }
-      });
-      if (best >= 0 && best !== dragging()?.to) setDragging({ bookmark, to: best });
-    },
-    onEnd(bookmark) {
-      const drag = dragging();
-      setDragging(null);
-      if (drag && drag.bookmark === bookmark && (props.bookmarks ?? []).indexOf(bookmark) !== drag.to) props.onMove?.(bookmark, drag.to);
-    },
   };
   const tiles = (): Tile[] => {
     const bookmarks = ordered();
@@ -251,10 +261,53 @@ export function StartView(props: StartViewProps): JSX.Element {
     if (props.bookmarks && (props.editing || bookmarks.length === 0)) out.push(ADD_TILE);
     return out;
   };
-  const rows = () => Array.from({ length: Math.ceil(tiles().length / columns()) }, (_, row) => row);
-  const rowTiles = (row: number) => tiles().slice(row * columns(), (row + 1) * columns());
+
+  // Every tile has a slot on an even grid: a row as tall as the tallest tile.
+  const [tallest, setTallest] = createSignal(TILE_H);
+  const pitchX = TILE_W + TILE_GAP;
+  const pitchY = () => tallest() + ROW_GAP;
+  const slot = (index: number) => ({ x: (index % columns()) * pitchX, y: Math.floor(index / columns()) * pitchY() });
+  const rowCount = () => Math.max(1, Math.ceil(tiles().length / columns()));
   const gridWidth = () => columns() * TILE_W + (columns() - 1) * TILE_GAP;
   const canEdit = () => (props.bookmarks?.length ?? 0) > 0 || props.editing;
+
+  let grid: CanvasNode | undefined;
+  /** A point on the screen in the grid's own pixels. */
+  const local = (x: number, y: number) => ({ x: x - (grid?.layout.x ?? 0), y: y - (grid?.layout.y ?? 0) });
+  const drag: TileDrag = {
+    onStart(bookmark, grabX, grabY, x, y) {
+      const at = (props.bookmarks ?? []).indexOf(bookmark);
+      if (at < 0) return;
+      const point = local(x, y);
+      setDragging({ bookmark, to: at, x: point.x - grabX, y: point.y - grabY, grabX, grabY });
+    },
+    onMove(bookmark, x, y) {
+      const drag = dragging();
+      if (!drag || drag.bookmark !== bookmark) return;
+      const point = local(x, y);
+      const left = point.x - drag.grabX;
+      const top = point.y - drag.grabY;
+      // It would land in the slot nearest where it is now.
+      const count = (props.bookmarks ?? []).length;
+      const column = Math.max(0, Math.min(columns() - 1, Math.round(left / pitchX)));
+      const row = Math.max(0, Math.round(top / pitchY()));
+      setDragging({ ...drag, x: left, y: top, to: Math.max(0, Math.min(count - 1, row * columns() + column)) });
+    },
+    onEnd(bookmark) {
+      const drag = dragging();
+      // The new order first, so the tiles never see the old one again; then the tile glides into its slot.
+      if (drag && drag.bookmark === bookmark && (props.bookmarks ?? []).indexOf(bookmark) !== drag.to) props.onMove?.(bookmark, drag.to);
+      setDragging(null);
+    },
+  };
+
+  /** The tiles to draw, the dragged one last so it passes over the rest. */
+  const drawn = () => {
+    const all = tiles();
+    const held = dragging()?.bookmark;
+    return held ? [...all.filter((tile) => tile.kind !== "bookmark" || tile.bookmark !== held), ...all.filter((tile) => tile.kind === "bookmark" && tile.bookmark === held)] : all;
+  };
+
   return (
     <box width="100%" alignItems="center" paddingTop={12} paddingBottom={12}>
       <box width={gridWidth()} flexDirection="column" gap={ROW_GAP}>
@@ -269,30 +322,48 @@ export function StartView(props: StartViewProps): JSX.Element {
             />
           </Show>
         </box>
-        <For each={rows()}>
-          {(row) => (
-            <box flexDirection="row" gap={TILE_GAP} alignItems="flex-start">
-              <For each={rowTiles(row)}>
-                {(tile) =>
-                  tile.kind === "add" ? (
+        <box
+          ref={(node: CanvasNode) => {
+            grid = node;
+          }}
+          width={gridWidth()}
+          height={rowCount() * pitchY() - ROW_GAP}
+        >
+          <For each={drawn()}>
+            {(tile) => {
+              const held = () => tile.kind === "bookmark" && dragging()?.bookmark === tile.bookmark;
+              const target = () => {
+                const drag = dragging();
+                return drag && held() ? { x: drag.x, y: drag.y } : slot(tiles().indexOf(tile));
+              };
+              const at = createGlide(target, held, app.scheduler);
+              return (
+                <box
+                  position="absolute"
+                  left={at().x}
+                  top={at().y}
+                  onLayout={({ height }) => {
+                    if (height > tallest()) setTallest(height);
+                  }}
+                >
+                  {tile.kind === "add" ? (
                     <AddTile onAdd={props.onAdd} />
                   ) : (
                     <FavoriteTile
                       bookmark={tile.bookmark}
                       editing={props.editing}
-                      dragged={dragging()?.bookmark === tile.bookmark}
+                      dragged={held()}
                       drag={drag}
-                      node={(node) => nodeOf.set(tile.bookmark, node)}
                       icons={props.icons}
                       onOpen={props.onOpen}
                       onDelete={props.onDelete}
                     />
-                  )
-                }
-              </For>
-            </box>
-          )}
-        </For>
+                  )}
+                </box>
+              );
+            }}
+          </For>
+        </box>
       </box>
     </box>
   );

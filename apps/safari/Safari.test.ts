@@ -182,6 +182,31 @@ describe("Safari", () => {
     expect(await favoriteOrder()).toEqual(after);
   });
 
+  it("moves a dragged favorite with the pointer, and the others aside to make room", async () => {
+    await click("safari-favorites-edit");
+    const [docs, news, wiki] = [(await node("safari-favorite-Mockintosh Docs"))!.bounds, (await node("safari-favorite-Hacker News"))!.bounds, (await node("safari-favorite-Wikipedia"))!.bounds];
+    const grab = { x: wiki.x + 10, y: wiki.y + 20 };
+    platform.pointer({ type: "down", x: grab.x, y: grab.y });
+    // Halfway to Mockintosh Docs: the tile is where the pointer took it, not in a slot.
+    const half = { x: grab.x + Math.round((docs.x - wiki.x) / 2), y: grab.y + 7 };
+    for (let step = 1; step <= 4; step++) {
+      platform.pointer({ type: "move", x: grab.x + ((half.x - grab.x) * step) / 4, y: grab.y + ((half.y - grab.y) * step) / 4 });
+      await settle();
+    }
+    let held = (await node("safari-favorite-Wikipedia"))!.bounds;
+    expect([held.x - wiki.x, held.y - wiki.y]).toEqual([half.x - grab.x, half.y - grab.y]);
+    // Over Mockintosh Docs: it would land first, so Docs glides over to the next slot, and Hacker News on to Wikipedia's.
+    platform.pointer({ type: "move", x: docs.x + 10, y: docs.y + 20 });
+    for (let i = 0; i < 4; i++) await settle();
+    expect((await node("safari-favorite-Mockintosh Docs"))!.bounds.x).toBe(news.x);
+    expect((await node("safari-favorite-Hacker News"))!.bounds.x).toBe(wiki.x);
+    // Let go: it glides into the first slot.
+    platform.pointer({ type: "up", x: docs.x + 10, y: docs.y + 20 });
+    for (let i = 0; i < 4; i++) await settle();
+    held = (await node("safari-favorite-Wikipedia"))!.bounds;
+    expect([held.x, held.y]).toEqual([docs.x, docs.y]);
+  });
+
   it("bookmarks the page in front under the name given", async () => {
     const dialog = vi.spyOn(os.services, "showDialog").mockResolvedValueOnce("Orange site");
     await openBookmark("Hacker News");
