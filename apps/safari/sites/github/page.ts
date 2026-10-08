@@ -9,6 +9,7 @@ import {
   getViewer,
   type Viewer,
   setStarred,
+  setWatching,
   forkRepo,
   listViewerRepos,
   loadPage,
@@ -25,7 +26,7 @@ import {
   type RepoInfo,
 } from "./api";
 import { commitSubject, formatAge, formatBytes, formatCount } from "./format";
-import { GITHUB_FORK, GITHUB_MARK, GITHUB_SEARCH, GITHUB_STAR, GITHUB_STARRED } from "./icons";
+import { GITHUB_FORK, GITHUB_MARK, GITHUB_SEARCH, GITHUB_STAR, GITHUB_STARRED, GITHUB_WATCH } from "./icons";
 import { formatGithubLocation, parseGithubLocation, type GithubLocation, type ProfileTab } from "./location";
 
 /**
@@ -57,8 +58,8 @@ export const githubSite: SiteAdapter = {
       return loadLocation(await post(posted, fields, context), context, {});
     } catch (error) {
       if (!(error instanceof GithubError)) throw error;
-      // A star has no form to come back to: say why GitHub refused it.
-      if (posted.kind === "star") throw new PageError(error.message);
+      // A star or a watch has no form to come back to: say why GitHub refused it.
+      if (posted.kind === "star" || posted.kind === "watch") throw new PageError(error.message);
       // Back to the form, with what was written and why GitHub refused it.
       return loadLocation(posted.form, context, { draft: fields, error: error.message });
     }
@@ -279,6 +280,7 @@ function accountMenu(account: Viewer, here: string): LayoutNode {
 
 /** Where a form posts, and the page that shows the form again if GitHub refuses it. */
 type Posted =
+  | { kind: "watch"; owner: string; repo: string; watching: boolean; form: ApiLocation }
   | { kind: "star"; owner: string; repo: string; starred: boolean; form: ApiLocation }
   /** The Fork button: on to "Create a new fork", where the fork is named. */
   | { kind: "openFork"; owner: string; repo: string; form: ApiLocation }
@@ -292,7 +294,10 @@ type Posted =
 function postedLocation(location: GithubLocation, fields: Record<string, string>): Posted | null {
   if (!("owner" in location)) return null;
   const { owner, repo } = location;
-  // The Star button posts to the repository's front page, saying which way.
+  // The Watch and Star buttons post to the repository's front page, saying which way.
+  if (location.kind === "tree" && (fields.watch === "watch" || fields.watch === "unwatch")) {
+    return { kind: "watch", owner, repo, watching: fields.watch === "watch", form: { kind: "tree", owner, repo, ref: "", path: "" } };
+  }
   if (location.kind === "tree" && (fields.star === "star" || fields.star === "unstar")) {
     return { kind: "star", owner, repo, starred: fields.star === "star", form: { kind: "tree", owner, repo, ref: "", path: "" } };
   }
@@ -314,6 +319,10 @@ async function post(posted: Posted, fields: Record<string, string>, context: Sit
   const token = context.settings.githubToken;
   if (!token) throw new GithubError("Sign in to GitHub first.", 401);
   const { owner, repo } = posted;
+  if (posted.kind === "watch") {
+    await setWatching(fetch, token, owner, repo, posted.watching);
+    return posted.form;
+  }
   if (posted.kind === "star") {
     await setStarred(fetch, token, owner, repo, posted.starred);
     return posted.form;
@@ -892,17 +901,19 @@ function repoNav(repo: RepoInfo, view: RepoPage["view"], ref: string): LayoutNod
   return tabs(sections);
 }
 
-/** Room for the Fork and Star buttons at the right of a repository's title: "Fork 1.2k" and "Starred 1.2k". */
-const REPO_BUTTONS_WIDTH = 210;
+/** Room for the Watch, Fork and Star buttons at the right of a repository's title: "Unwatch 1.2k", "Fork 1.2k" and "Starred 1.2k". */
+const REPO_BUTTONS_WIDTH = 310;
 
 /**
- * GitHub's Fork and Star buttons, each with its count, side by side as one
- * form: the pressed button's name says which. Signed in, Fork forks the
- * repository and opens the fork, and Star stars or unstars it (`starred` says
- * which it is now: an outline star to star with, a filled one once starred).
- * Signed out (`starred` null), both sign in and come back.
+ * GitHub's Watch, Fork and Star buttons, each with its count, side by side as
+ * one form: the pressed button's name says which. Signed in, Watch watches or
+ * unwatches the repository (`watching` says which it is now), Fork forks it
+ * and opens the fork, and Star stars or unstars it (`starred` says which: an
+ * outline star to star with, a filled one once starred). Signed out
+ * (`starred` null), all three sign in and come back.
  */
-function repoButtons(repo: RepoInfo, starred: boolean | null, here: GithubLocation): LayoutNode {
+function repoButtons(repo: RepoInfo, starred: boolean | null, watching: boolean | null, here: GithubLocation): LayoutNode {
+  const watchers = formatCount(repo.watchers);
   const forks = `Fork ${formatCount(repo.forks)}`;
   const stars = formatCount(repo.stars);
   const name = `${repo.owner}/${repo.name}`;
@@ -915,6 +926,7 @@ function repoButtons(repo: RepoInfo, starred: boolean | null, here: GithubLocati
         align: "right",
         controls: [
           { kind: "hidden", name: "return_to", value: githubUrl(here) },
+          { kind: "submit", name: "", value: "", label: `Watch ${watchers}`, icon: GITHUB_WATCH },
           { kind: "submit", name: "", value: "", label: forks, icon: GITHUB_FORK },
           { kind: "submit", name: "", value: "", label: `Star ${stars}`, icon: GITHUB_STAR },
         ],
@@ -928,6 +940,9 @@ function repoButtons(repo: RepoInfo, starred: boolean | null, here: GithubLocati
       method: "post",
       align: "right",
       controls: [
+        watching
+          ? { kind: "submit", name: "watch", value: "unwatch", label: `Unwatch ${watchers}`, icon: GITHUB_WATCH, tooltip: `Unwatch ${name}` }
+          : { kind: "submit", name: "watch", value: "watch", label: `Watch ${watchers}`, icon: GITHUB_WATCH, tooltip: `Watch ${name}` },
         { kind: "submit", name: "fork", value: "fork", label: forks, icon: GITHUB_FORK, tooltip: `Fork ${name}` },
         starred
           ? { kind: "submit", name: "star", value: "unstar", label: `Starred ${stars}`, icon: GITHUB_STARRED, tooltip: `Unstar ${name}` }
@@ -1037,7 +1052,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
           gap: 8,
           minWidth: 0,
           center: true,
-          columns: [{ nodes: [heading(1, repo.name)] }, { width: REPO_BUTTONS_WIDTH, nodes: [repoButtons(repo, page.starred, location)] }],
+          columns: [{ nodes: [heading(1, repo.name)] }, { width: REPO_BUTTONS_WIDTH, nodes: [repoButtons(repo, page.starred, page.watching, location)] }],
         },
         RULE_GAP,
         { type: "hr", dotted: true },

@@ -53,6 +53,7 @@ function fakeGithub(overrides: (call: Call) => FetchResponse | undefined = () =>
     if (path.startsWith("/repos/octocat/hello/issues/5/comments")) return reply(call.method === "POST" ? {} : [], call.method === "POST" ? 201 : 200);
     if (path === "/user") return reply({ login: "octocat" });
     if (path === "/user/starred/octocat/hello") return reply(null, call.method === "GET" ? 404 : 204);
+    if (path === "/repos/octocat/hello/subscription") return reply(call.method === "PUT" ? { subscribed: true, ignored: false } : null, call.method === "GET" ? 404 : call.method === "PUT" ? 200 : 204);
     if (path === "/users/octocat") return reply({ login: "octocat", name: "The Octocat", type: "User", public_repos: 2 });
     if (path.startsWith("/users/octocat/orgs")) return reply([]);
     if (path.startsWith("/users/octocat/repos")) {
@@ -357,7 +358,7 @@ describe("GitHub repositories", () => {
 describe("GitHub stars", () => {
   const starForm = (nodes: readonly LayoutNode[]) => forms(nodes).find((form) => form.controls.some((control) => control.kind === "submit" && /^Star/.test(control.label)));
 
-  it("puts Fork and Star buttons by the repository's name, one form whose pressed button says which; Star stars it, signed in", async () => {
+  it("puts Watch, Fork and Star buttons by the repository's name, one form whose pressed button says which; Star stars it, signed in", async () => {
     const { fetch, calls } = fakeGithub();
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
     expect(starForm(shown.nodes)).toEqual({
@@ -366,6 +367,7 @@ describe("GitHub stars", () => {
       align: "right",
       radius: 3,
       controls: [
+        { kind: "submit", name: "watch", value: "watch", label: "Watch 0", icon: "safari/github-watch", tooltip: "Watch octocat/hello" },
         { kind: "submit", name: "fork", value: "fork", label: "Fork 0", icon: "safari/github-fork", tooltip: "Fork octocat/hello" },
         { kind: "submit", name: "star", value: "star", label: "Star 0", icon: "safari/github-star" },
       ],
@@ -389,13 +391,37 @@ describe("GitHub stars", () => {
     expect(calls.find((call) => call.method === "DELETE")).toMatchObject({ url: "https://api.github.com/user/starred/octocat/hello" });
   });
 
-  it("signs in from the Fork and Star buttons when signed out, and comes back to the repository", async () => {
+  it("watches the repository from Watch, and says Unwatch once watching", async () => {
+    const { fetch, calls } = fakeGithub();
+    await loadPage(post("https://github.com/octocat/hello", { watch: "watch" }), context(fetch, "tok"));
+    expect(calls.find((call) => call.method === "PUT")).toMatchObject({
+      url: "https://api.github.com/repos/octocat/hello/subscription",
+      auth: "Bearer tok",
+      body: { subscribed: true },
+    });
+    const watching = fakeGithub((call) => (call.url.endsWith("/repos/octocat/hello/subscription") && call.method === "GET" ? reply({ subscribed: true, ignored: false }) : undefined));
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(watching.fetch, "tok")));
+    expect(starForm(shown.nodes)?.controls[0]).toEqual(
+      { kind: "submit", name: "watch", value: "unwatch", label: "Unwatch 0", icon: "safari/github-watch", tooltip: "Unwatch octocat/hello" },
+    );
+    await loadPage(post("https://github.com/octocat/hello", { watch: "unwatch" }), context(watching.fetch, "tok"));
+    expect(watching.calls.find((call) => call.method === "DELETE")).toMatchObject({ url: "https://api.github.com/repos/octocat/hello/subscription" });
+  });
+
+  it("doesn't count ignoring a repository as watching it", async () => {
+    const { fetch } = fakeGithub((call) => (call.url.endsWith("/subscription") && call.method === "GET" ? reply({ subscribed: false, ignored: true }) : undefined));
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
+    expect(starForm(shown.nodes)?.controls[0]).toMatchObject({ value: "watch", label: "Watch 0" });
+  });
+
+  it("signs in from the Watch, Fork and Star buttons when signed out, and comes back to the repository", async () => {
     const { fetch } = fakeGithub();
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")));
     expect(starForm(shown.nodes)).toMatchObject({
       action: "https://github.com/login",
       controls: [
         { kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/tree/main" },
+        { label: "Watch 0", icon: "safari/github-watch" },
         { label: "Fork 0", icon: "safari/github-fork" },
         { label: "Star 0", icon: "safari/github-star" },
       ],

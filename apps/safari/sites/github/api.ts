@@ -151,8 +151,11 @@ export type GithubPage =
   | { view: "search"; query: string; total: number; repos: ProfileRepo[] }
   /** `extras` is null when signed out, or when GitHub wouldn't give them. */
   | { view: "profile"; profile: ProfileInfo; tab: ProfileTab; repos: ProfileRepo[]; orgs: string[]; people: string[]; extras: ProfileExtras | null }
-  /** `starred` is whether the signed-in user has starred the repository; null when signed out, or below its front page. */
-  | { view: "tree"; repo: RepoInfo; ref: string; path: string; entries: DirEntry[]; commit: CommitInfo | null; readme: string | null; starred: boolean | null }
+  /**
+   * `starred` and `watching` are whether the signed-in user has starred and is
+   * watching the repository; null when signed out, or below its front page.
+   */
+  | { view: "tree"; repo: RepoInfo; ref: string; path: string; entries: DirEntry[]; commit: CommitInfo | null; readme: string | null; starred: boolean | null; watching: boolean | null }
   | { view: "blob"; repo: RepoInfo; ref: string; file: FileBody }
   | { view: "issues"; repo: RepoInfo; state: "open" | "closed"; counts: StateCounts; issues: IssueInfo[] }
   | { view: "issue"; repo: RepoInfo; issue: IssueInfo; comments: CommentInfo[] }
@@ -391,10 +394,12 @@ async function listLogins(fetch: FetchFunction, token: string, path: string): Pr
 
 async function loadTree(fetch: FetchFunction, token: string, repo: RepoInfo, ref: string, path: string): Promise<GithubPage> {
   const branch = ref || repo.defaultBranch;
-  const [entries, commit, starred] = await Promise.all([
+  const front = Boolean(token) && path === "";
+  const [entries, commit, starred, watching] = await Promise.all([
     getDirectory(fetch, token, repo, branch, path),
     getLatestCommit(fetch, token, repo, branch, path),
-    token && path === "" ? isStarred(fetch, token, repo.owner, repo.name).catch(() => null) : Promise.resolve(null),
+    front ? isStarred(fetch, token, repo.owner, repo.name).catch(() => null) : Promise.resolve(null),
+    front ? isWatching(fetch, token, repo.owner, repo.name).catch(() => null) : Promise.resolve(null),
   ]);
   const readmeEntry = entries.find((entry) => entry.type === "file" && /^readme(\.|$)/i.test(entry.name));
   const readme = path === ""
@@ -402,7 +407,7 @@ async function loadTree(fetch: FetchFunction, token: string, repo: RepoInfo, ref
     : readmeEntry
       ? await getFileText(fetch, token, repo, branch, readmeEntry.path)
       : null;
-  return { view: "tree", repo, ref: branch, path, entries: sortEntries(entries), commit, readme, starred };
+  return { view: "tree", repo, ref: branch, path, entries: sortEntries(entries), commit, readme, starred, watching };
 }
 
 async function loadBlob(fetch: FetchFunction, token: string, repo: RepoInfo, ref: string, path: string): Promise<GithubPage> {
@@ -741,6 +746,34 @@ export async function setStarred(fetch: FetchFunction, token: string, owner: str
   if (response.ok) return;
   const detail = await errorMessage(response);
   throw new GithubError(detail || `GitHub wouldn't ${starred ? "star" : "unstar"} the repository (${response.status}).`, response.status);
+}
+
+function subscriptionPath(owner: string, repo: string): string {
+  return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/subscription`;
+}
+
+/**
+ * Is the signed-in user watching the repository? GitHub answers 404 when
+ * there's no subscription, and an ignoring one isn't watching either.
+ */
+async function isWatching(fetch: FetchFunction, token: string, owner: string, repo: string): Promise<boolean> {
+  try {
+    const record = asRecord(await gh(fetch, token, subscriptionPath(owner, repo)));
+    return record.subscribed === true && record.ignored !== true;
+  } catch (error) {
+    if (error instanceof GithubError && error.status === 404) return false;
+    throw error;
+  }
+}
+
+/** Watches the repository for the signed-in user, or stops watching it. */
+export async function setWatching(fetch: FetchFunction, token: string, owner: string, repo: string, watching: boolean): Promise<void> {
+  const response = await fetch(`${API}${subscriptionPath(owner, repo)}`, watching
+    ? { method: "PUT", headers: { ...restHeaders(token), "Content-Type": "application/json" }, body: JSON.stringify({ subscribed: true }) }
+    : { method: "DELETE", headers: restHeaders(token) });
+  if (response.ok) return;
+  const detail = await errorMessage(response);
+  throw new GithubError(detail || `GitHub wouldn't ${watching ? "watch" : "unwatch"} the repository (${response.status}).`, response.status);
 }
 
 /**
