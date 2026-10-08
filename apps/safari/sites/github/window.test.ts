@@ -2,7 +2,7 @@
  * GitHub in a real Safari window, signed in: the contribution calendar is
  * wider than the page, so it opens on the latest weeks and scrolls
  * sideways; the header's account menu signs out; a starred repository's
- * Star button says it unstars; the current tab's line sits on the rule.
+ * Star button says it unstars; the current tab's line, and a hovered one's, sits on the rule.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchResponse } from "@mockintosh/sdk";
@@ -219,5 +219,14 @@ describe("GitHub in a Safari window", () => {
     const [overview, repositories] = tabs;
     expect(foot(overview!)).toEqual(["1".repeat(overview!.bounds.width), "1".repeat(overview!.bounds.width)]);
     expect(foot(repositories!)).toEqual(["0".repeat(repositories!.bounds.width), "1".repeat(repositories!.bounds.width)]);
+
+    // Hovering another tab draws its line too, until the pointer leaves.
+    platform.pointer({ type: "move", x: repositories!.bounds.x + 1, y: repositories!.bounds.y + 1 });
+    await settle();
+    // The pointer is drawn over the tab's left end: look past it.
+    const clear = 20;
+    expect(foot(repositories!).map((row) => row.slice(clear))).toEqual(["1", "1"].map((ink) => ink.repeat(repositories!.bounds.width - clear)));
+    await parkPointer();
+    expect(foot(repositories!)[0]).toBe("0".repeat(repositories!.bounds.width));
   });
 });

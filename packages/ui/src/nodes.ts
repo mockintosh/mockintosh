@@ -491,7 +491,8 @@ export interface TextRun {
   text: string;
   bold?: boolean;
   italic?: boolean;
-  underline?: boolean;
+  /** `"hover"` underlines a clickable run only while the pointer is over it. */
+  underline?: boolean | "hover";
   onClick?: () => void;
 }
 

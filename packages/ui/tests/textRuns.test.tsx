@@ -116,6 +116,25 @@ describe("<text runs>", () => {
     expect(clicks).toEqual(["docs"]);
     dispose();
   });
+
+  it("underlines a hover-underlined link only while the pointer is over it", () => {
+    const screen = newBitMap(W, H);
+    const ui = createUI({ screen });
+    const runs: TextRun[] = [{ text: "see " }, { text: "docs", underline: "hover", onClick: () => {} }];
+    const dispose = ui.render(() => <box width={W}><text runs={runs} /></box>);
+    ui.frame();
+    const away = pixelsFromBitMap(screen);
+    const linkX = measureText("see ") + 2;
+    ui.dispatchPointer("mousemove", linkX, 4);
+    ui.frame();
+    const over = pixelsFromBitMap(screen);
+    expect(over).toEqual(paint(() => <box width={W}><text runs={[{ text: "see " }, { text: "docs", underline: true }]} /></box>));
+    ui.dispatchPointer("mousemove", 2, 4);
+    ui.frame();
+    expect(pixelsFromBitMap(screen)).toEqual(away);
+    expect(away).toEqual(paint(() => <box width={W}><text runs={[{ text: "see " }, { text: "docs" }]} /></box>));
+    dispose();
+  });
 });
 
 describe("wrapped runs beside a marker", () => {

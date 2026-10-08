@@ -159,9 +159,9 @@ describe("GitHub repositories", () => {
         type: "paragraph",
         align: "left",
         segments: [
-          { kind: "link", text: "octocat", href: "https://github.com/octocat" },
+          { kind: "link", text: "octocat", href: "https://github.com/octocat", underline: "hover" },
           { kind: "text", text: " / " },
-          { kind: "link", text: "hello", href: "https://github.com/octocat/hello", bold: true },
+          { kind: "link", text: "hello", href: "https://github.com/octocat/hello", bold: true, underline: "hover" },
         ],
       },
     ]);
@@ -237,7 +237,7 @@ describe("GitHub profiles", () => {
     const all = texts(shown.nodes);
     const [header] = shown.nodes;
     // The header names whose profile this is, in bold.
-    expect(header?.type === "columns" && header.columns[1]!.nodes[0]).toMatchObject({ segments: [{ kind: "link", text: "octocat", bold: true }] });
+    expect(header?.type === "columns" && header.columns[1]!.nodes[0]).toMatchObject({ segments: [{ kind: "link", text: "octocat", bold: true, underline: "hover" }] });
     for (const expected of ["Overview", "Repositories 2", "Stars", "Pinned", "Shipping", "699 contributions in the last year", "Contribution activity", "Created 39 commits in 1 repository"]) {
       expect(all).toContain(expected);
     }

@@ -45,7 +45,7 @@ export function runStyle(base: FontStyle, run: TextRun): FontStyle {
     ...base,
     bold: Boolean(base.bold || run.bold),
     italic: Boolean(base.italic || run.italic),
-    underline: Boolean(base.underline || run.underline),
+    underline: Boolean(base.underline || run.underline === true),
   };
 }
 

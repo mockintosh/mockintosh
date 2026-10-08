@@ -159,12 +159,12 @@ function crumbs(url: string): LayoutNode[] {
   // The repository, or the person or organization, is bold; the owner before a repository isn't.
   if ("owner" in location) {
     return [paragraph(
-      link(location.owner, { kind: "profile", login: location.owner, tab: "overview" }),
+      crumb(location.owner, { kind: "profile", login: location.owner, tab: "overview" }, false),
       text(" / "),
-      link(location.repo, { kind: "tree", owner: location.owner, repo: location.repo, ref: "", path: "" }, true),
+      crumb(location.repo, { kind: "tree", owner: location.owner, repo: location.repo, ref: "", path: "" }, true),
     )];
   }
-  if (location.kind === "profile") return [paragraph(link(location.login, { ...location, tab: "overview" }, true))];
+  if (location.kind === "profile") return [paragraph(crumb(location.login, { ...location, tab: "overview" }, true))];
   return [];
 }
 
@@ -323,8 +323,13 @@ function italic(value: string): InlineSegment {
   return { kind: "italic", text: value };
 }
 
-function link(value: string, location: GithubLocation, bold = false): InlineSegment {
-  return bold ? { kind: "link", text: value, href: githubUrl(location), bold } : { kind: "link", text: value, href: githubUrl(location) };
+function link(value: string, location: GithubLocation): InlineSegment {
+  return { kind: "link", text: value, href: githubUrl(location) };
+}
+
+/** A link in the header: underlined only under the pointer, and `bold` for the page's own name. */
+function crumb(value: string, location: GithubLocation, bold: boolean): InlineSegment {
+  return bold ? { kind: "link", text: value, href: githubUrl(location), bold, underline: "hover" } : { kind: "link", text: value, href: githubUrl(location), underline: "hover" };
 }
 
 function paragraph(...segments: InlineSegment[]): LayoutNode {

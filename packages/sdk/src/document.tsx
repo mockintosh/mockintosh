@@ -37,7 +37,8 @@ function inlineRuns(segments: readonly InlineSegment[], onLink: ((href: string) 
     if (segment.kind === "italic") return { text: segment.text, italic: true };
     if (segment.kind === "link") {
       const href = segment.href;
-      const run: TextRun = segment.bold ? { text: segment.text, underline: true, bold: true } : { text: segment.text, underline: true };
+      const underline = segment.underline ?? true;
+      const run: TextRun = segment.bold ? { text: segment.text, underline, bold: true } : { text: segment.text, underline };
       return onLink ? { ...run, onClick: () => onLink(href) } : run;
     }
     return { text: segment.text };
@@ -139,24 +140,29 @@ const TAB_GAP = 16;
 /** Between a tab's label and the line under the current one. */
 const TAB_UNDER = 3;
 
-/** Page tabs over a rule; the current tab's line sits on the rule, so it reads as a 2px border under it. */
+/** Page tabs over a rule; the current tab's line, and a hovered one's, sits on the rule, so it reads as a 2px border under it. */
 function TabsView(props: { node: Extract<LayoutNode, { type: "tabs" }>; view: DocumentViewProps }): JSX.Element {
   return (
     <box flexDirection="column">
       <box flexDirection="row" gap={TAB_GAP}>
         <For each={props.node.items}>
-          {(tab) => (
-            <box
-              flexDirection="column"
-              cursor={tab.current ? undefined : "pointer"}
-              semantic={{ name: tab.label, role: "tab", value: tab.current ? "current" : undefined }}
-              onClick={tab.current ? undefined : () => props.view.onLink?.(tab.href)}
-            >
-              <text font="body" bold={tab.current} nowrap>{tab.label}</text>
-              <box height={TAB_UNDER} />
-              <box height={1} background={tab.current ? 1 : 0} />
-            </box>
-          )}
+          {(tab) => {
+            const [hovered, setHovered] = createSignal(false);
+            return (
+              <box
+                flexDirection="column"
+                cursor={tab.current ? undefined : "pointer"}
+                semantic={{ name: tab.label, role: "tab", value: tab.current ? "current" : undefined }}
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
+                onClick={tab.current ? undefined : () => props.view.onLink?.(tab.href)}
+              >
+                <text font="body" bold={tab.current} nowrap>{tab.label}</text>
+                <box height={TAB_UNDER} />
+                <box height={1} background={tab.current || hovered() ? 1 : 0} />
+              </box>
+            );
+          }}
         </For>
       </box>
       <box height={1} background={1} />

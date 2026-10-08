@@ -33,14 +33,24 @@ function nodeBlock(node: CanvasNode, runs: readonly TextRun[]): { block: RunBloc
   return { block, innerW, padL, padT };
 }
 
-function clickableRunAt(node: CanvasNode, lx: number, ly: number): TextRun | undefined {
+/** The index of the clickable run under a point, or -1. */
+function clickableRunAt(node: CanvasNode, lx: number, ly: number): number {
   const runs = nodeRuns(node);
-  if (!runs) return undefined;
+  if (!runs) return -1;
   const { block, innerW, padL, padT } = nodeBlock(node, runs);
   const align = (node.props["align"] as TextAlign | undefined) ?? "left";
   const index = runAtPoint(block, lx - padL, ly - padT, align, innerW);
-  const run = index >= 0 ? runs[index] : undefined;
-  return run?.onClick ? run : undefined;
+  return index >= 0 && runs[index]?.onClick ? index : -1;
+}
+
+/** The clickable run the pointer is over, or -1; a run with `underline: "hover"` is underlined while it is. */
+export function hoveredRun(node: CanvasNode): number {
+  return (node.props["hoveredRun"] as number | undefined) ?? -1;
+}
+
+function hover(node: CanvasNode, index: number): void {
+  if (hoveredRun(node) !== index) setNodeProperty(node, "hoveredRun", index);
+  setNodeProperty(node, "cursor", index >= 0 ? "pointer" : undefined);
 }
 
 const installed = new WeakSet<CanvasNode>();
@@ -50,16 +60,15 @@ export function applyRuns(node: CanvasNode, runs: unknown): void {
   const clickable = Array.isArray(runs) && (runs as readonly TextRun[]).some((run) => run.onClick);
   if (clickable && !installed.has(node)) {
     installed.add(node);
-    setNodeProperty(node, "onClick", (lx: number, ly: number) => clickableRunAt(node, lx, ly)?.onClick?.());
-    setNodeProperty(node, "onMouseMove", (lx: number, ly: number) => {
-      setNodeProperty(node, "cursor", clickableRunAt(node, lx, ly) ? "pointer" : undefined);
-    });
-    setNodeProperty(node, "onMouseLeave", () => setNodeProperty(node, "cursor", undefined));
+    setNodeProperty(node, "onClick", (lx: number, ly: number) => nodeRuns(node)?.[clickableRunAt(node, lx, ly)]?.onClick?.());
+    setNodeProperty(node, "onMouseMove", (lx: number, ly: number) => hover(node, clickableRunAt(node, lx, ly)));
+    setNodeProperty(node, "onMouseLeave", () => hover(node, -1));
   } else if (!clickable && installed.has(node)) {
     installed.delete(node);
     setNodeProperty(node, "onClick", undefined);
     setNodeProperty(node, "onMouseMove", undefined);
     setNodeProperty(node, "onMouseLeave", undefined);
     setNodeProperty(node, "cursor", undefined);
+    setNodeProperty(node, "hoveredRun", undefined);
   }
 }
