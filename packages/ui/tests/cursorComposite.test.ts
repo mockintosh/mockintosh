@@ -70,6 +70,29 @@ describe("moveSoftwareCursor", () => {
   });
 });
 
+describe("inverting cursors", () => {
+  it("shows the I-beam white over black and black over white", () => {
+    const face = MAC_CURSOR_FACES.iBeam;
+    const cursor = cursorFromFace(face);
+    // A pixel on the I-beam's stem, relative to the hot spot.
+    const stem = { h: 7 - face.hotSpot.h, v: 6 - face.hotSpot.v };
+
+    const white = newBitMap(32, 32);
+    const onWhite = newBitMap(32, 32);
+    moveSoftwareCursor(white, onWhite, null, cursor, 16, 16);
+    expect(getBit(onWhite, 16 + stem.h, 16 + stem.v)).toBe(1);
+
+    const black = newBitMap(32, 32);
+    black.baseAddr.fill(0xff);
+    const onBlack = newBitMap(32, 32);
+    copyBitMapBytes(black, onBlack);
+    moveSoftwareCursor(black, onBlack, null, cursor, 16, 16);
+    expect(getBit(onBlack, 16 + stem.h, 16 + stem.v)).toBe(0);
+    // Off the shape, the screen is untouched.
+    expect(getBit(onBlack, 16 + stem.h - 3, 16 + stem.v)).toBe(1);
+  });
+});
+
 describe("cursorFromFaceCached", () => {
   it("reuses the packed Cursor for a face", () => {
     const face = MAC_CURSOR_FACES.iBeam;
