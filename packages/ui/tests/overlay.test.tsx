@@ -14,6 +14,15 @@ const OPTIONS = [
   { value: "b", label: "Pear" },
 ] as const;
 
+/** Frames until `onLayout` measurements (delivered in microtasks) have been laid out. */
+async function settle(ui: ReturnType<typeof createUI>): Promise<void> {
+  for (let i = 0; i < 4; i++) {
+    ui.frame();
+    await Promise.resolve();
+  }
+  ui.frame();
+}
+
 function click(ui: ReturnType<typeof createUI>, name: string): void {
   const node = ui.inspect().find((n) => n.name === name)!;
   ui.dispatchPointer("mousedown", node.bounds.x + 4, node.bounds.y + 4);
@@ -101,7 +110,7 @@ describe("Tooltip", () => {
 });
 
 describe("Tooltip in a scrolled pane", () => {
-  it("hangs the caption over the trigger where it is drawn, not where it would be unscrolled", () => {
+  it("hangs the caption over the trigger where it is drawn, not where it would be unscrolled", async () => {
     const ui = createUI({ screen: newBitMap(240, 80) });
     ui.render(() => (
       <box padding={20}>
@@ -120,14 +129,16 @@ describe("Tooltip in a scrolled pane", () => {
     // 20 padding + 60 in, less 40 scrolled: drawn at x 40.
     expect(day.bounds.x).toBe(40);
     ui.dispatchPointer("mousemove", day.bounds.x + 2, day.bounds.y + 2);
-    ui.frame();
+    await settle(ui);
     const panel = ui.inspect().find((n) => n.name === "overlay-panel")!;
-    expect(panel.bounds.x).toBe(40);
+    // Centred on the day where it is drawn, its bottom 1px above it.
+    expect(Math.abs(panel.bounds.x + panel.bounds.width / 2 - (day.bounds.x + 4))).toBeLessThanOrEqual(1);
+    expect(panel.bounds.y + panel.bounds.height).toBe(day.bounds.y - 1);
   });
 });
 
 describe("Tooltip at the edge", () => {
-  it("moves left to stay on screen when its trigger is near the right edge", () => {
+  it("moves left to stay on screen when its trigger is near the right edge", async () => {
     const ui = createUI({ screen: newBitMap(120, 60) });
     ui.render(() => (
       <box width={120} height={60} flexDirection="row" justifyContent="flex-end" paddingTop={30}>
@@ -139,9 +150,9 @@ describe("Tooltip at the edge", () => {
     ui.frame();
     const day = ui.inspect().find((n) => n.name === "day")!;
     ui.dispatchPointer("mousemove", day.bounds.x + 2, day.bounds.y + 2);
-    ui.frame();
-    ui.frame();
+    await settle(ui);
     const panel = ui.inspect().find((n) => n.name === "overlay-panel")!;
+    expect(panel.bounds.width).toBeGreaterThan(60);
     expect(panel.bounds.x + panel.bounds.width).toBeLessThanOrEqual(120);
     expect(panel.bounds.x).toBeGreaterThanOrEqual(0);
   });

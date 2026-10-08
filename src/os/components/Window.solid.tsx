@@ -509,6 +509,7 @@ export function Window(props: WindowProps): JSX.Element {
           width={contentW()}
           height={props.win.height}
           overflow="scroll"
+          overlayBounds
           scrollOffset={Math.min(props.win.scrollY, maxScrollY())}
           scrollOffsetX={scrollX()}
           onScroll={(dy) => {

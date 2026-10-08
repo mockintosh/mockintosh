@@ -598,7 +598,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
                 <WindowSlotsContext value={w.slots}>
                   <box width={pictureWidth(w)} height={pictureHeight(w)} flexDirection="column">
                     {w.header().view && <box width={w.bandWidth()} height={w.header().height}>{w.header().view!()}</box>}
-                    <box width={w.width()} height={w.height()} overflow="hidden" position="relative">
+                    <box width={w.width()} height={w.height()} overflow="hidden" position="relative" overlayBounds>
                       {/* A scrollable window's document, moved to what the OS has scrolled to. */}
                       <box
                         position="absolute"

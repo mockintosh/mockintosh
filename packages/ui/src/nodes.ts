@@ -359,6 +359,12 @@ export interface BoxProps extends LayoutStyle, EventHandlers, SemanticProps {
   /** Presses in this subtree leave keyboard focus where it is (a menu bar). */
   keepsFocus?: boolean;
   /**
+   * Overlays opened from inside this box (a tooltip, a menu) stay within
+   * its left and right edges: a window's body, whose edge the screen
+   * doesn't show past.
+   */
+  overlayBounds?: boolean;
+  /**
    * Vertical scroll offset in pixels (requires overflow="scroll"). Together
    * with `onScroll` the owner drives the offset: the wheel and touch pans
    * only call `onScroll` and never move the pane themselves.
