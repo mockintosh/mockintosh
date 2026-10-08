@@ -120,7 +120,7 @@ function Block(props: BlockProps): JSX.Element {
   }
   if (node.type === "box") {
     return (
-      <box borderColor={1} padding={CARD_INSET - 1} flexDirection="column" gap={BLOCK_GAP}>
+      <box borderColor={1} borderRadius={node.radius} padding={CARD_INSET - 1} flexDirection="column" gap={BLOCK_GAP}>
         <Blocks nodes={node.nodes} width={props.width - CARD_INSET * 2} view={props.view} />
       </box>
     );

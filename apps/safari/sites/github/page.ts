@@ -282,18 +282,21 @@ function facts(...items: Array<InlineSegment | string | false | undefined>): Lay
 
 const HR: LayoutNode = { type: "hr" };
 
+/** Corner radius of every card on these pages: slightly rounded, as github.com's boxes are. */
+const CARD_RADIUS = 3;
+
 /**
  * A bordered list, as github.com draws issues, files and results: one row
  * per entry, ruled between unless the rows are single lines.
  */
 function list(rows: readonly LayoutNode[][], empty: string, ruled = true): LayoutNode {
-  if (rows.length === 0) return { type: "box", nodes: [paragraph(text(empty))] };
-  return { type: "box", nodes: rows.flatMap((row, index) => (index > 0 && ruled ? [HR, ...row] : row)) };
+  if (rows.length === 0) return { type: "box", radius: CARD_RADIUS, nodes: [paragraph(text(empty))] };
+  return { type: "box", radius: CARD_RADIUS, nodes: rows.flatMap((row, index) => (index > 0 && ruled ? [HR, ...row] : row)) };
 }
 
 /** A bordered card with a header line, as github.com draws each comment. */
 function card(header: InlineSegment[], body: readonly LayoutNode[]): LayoutNode {
-  return { type: "box", nodes: [paragraph(...header), HR, ...body] };
+  return { type: "box", radius: CARD_RADIUS, nodes: [paragraph(...header), HR, ...body] };
 }
 
 /** A heading on the left and a button on the right, as above github.com's lists. */
@@ -410,10 +413,11 @@ function postForm(location: GithubLocation, forms: PageForms, controls: FormCont
 /** The box at the foot of a conversation: write a comment, or sign in to. */
 function commentForm(location: GithubLocation, forms: PageForms): LayoutNode {
   if (!forms.signedIn) {
-    return { type: "box", nodes: [paragraph(text("Sign in to join this conversation on GitHub.")), signInForm(location, "Sign In")] };
+    return { type: "box", radius: CARD_RADIUS, nodes: [paragraph(text("Sign in to join this conversation on GitHub.")), signInForm(location, "Sign In")] };
   }
   return {
     type: "box",
+    radius: CARD_RADIUS,
     nodes: [
       paragraph(bold("Add a comment")),
       ...postForm(location, forms, [
@@ -465,6 +469,7 @@ function repoCard(repo: ProfileRepo, owner: string): LayoutNode {
   const name = repo.owner.toLowerCase() === owner.toLowerCase() ? repo.name : `${repo.owner}/${repo.name}`;
   return {
     type: "box",
+    radius: CARD_RADIUS,
     nodes: [
       paragraph({ kind: "link", text: name, href: githubUrl(location) }, text(repo.fork ? "  Fork" : "  Public")),
       ...(repo.description ? [paragraph(text(repo.description))] : []),
@@ -630,7 +635,7 @@ export function contributionCalendar(total: number, weeks: readonly CalendarWeek
   const width = weeks.length * WEEK - DAY_GAP;
   return [
     heading(2, `${plural(total, "contribution", "contributions")} in the last year`),
-    { type: "box", nodes: [{ type: "scroller", width, start: "end", nodes: [monthRow(weeks), graph] }] },
+    { type: "box", radius: CARD_RADIUS, nodes: [{ type: "scroller", width, start: "end", nodes: [monthRow(weeks), graph] }] },
   ];
 }
 
@@ -818,7 +823,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
     if (file.text !== null) {
       const dir = file.path.split("/").slice(0, -1).join("/");
       body.push(/\.(md|markdown)$/i.test(file.name)
-        ? { type: "box", nodes: resolveRelative(parseMarkdown(file.text), repo, page.ref, dir) }
+        ? { type: "box", radius: CARD_RADIUS, nodes: resolveRelative(parseMarkdown(file.text), repo, page.ref, dir) }
         : { type: "code", text: file.text });
     }
     return { title: file.name, body };

@@ -96,8 +96,8 @@ export type LayoutNode =
    * toolbar; they otherwise hang from the top.
    */
   | { type: "columns"; columns: LayoutColumn[]; gap: number; minWidth: number; center?: boolean }
-  /** A bordered card around its nodes. */
-  | { type: "box"; nodes: LayoutNode[] }
+  /** A bordered card around its nodes, its corners rounded by `radius` pixels. */
+  | { type: "box"; nodes: LayoutNode[]; radius?: number }
   /**
    * 1-bit pixels a page makes itself, drawn at their own size and cut off
    * where the page is narrower: `data` is row by row, 1 for ink, 0 for paper.
