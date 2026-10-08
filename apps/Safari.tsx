@@ -228,6 +228,15 @@ function Safari(props: Record<string, unknown>): JSX.Element {
     return page && page.tabId === next.tabId && page.request === next.request ? page : undefined;
   };
   const loading = () => ready() === undefined;
+  /**
+   * What the page area shows: the page wanted, or while it loads, the tab's
+   * previous page, as a browser keeps it until the next one is ready, so a
+   * site's header stays put. A tab with nothing shown yet says Loading….
+   */
+  const displayed = () => {
+    const page = shown();
+    return ready() ?? (page && page.tabId === wanted().tabId ? page : undefined);
+  };
 
   const scrolledTo = new WeakMap<PageRequest, number>();
   const landed = new WeakSet<PageResult>();
@@ -509,11 +518,17 @@ function Safari(props: Record<string, unknown>): JSX.Element {
         </box>
       </WindowHeader>
       <Show
-        when={ready()}
+        when={displayed()}
         fallback={<box width={win.width()} height={win.height()} padding={PAGE_PADDING} onLayout={reportHeight}>{message("Loading…")}</box>}
       >
         {(page) => (
-          <SafariView shown={page} loadImage={loadImage} favorites={favorites} go={go} setTabs={setTabs} win={win} scrolledTo={scrolledTo} landed={landed} />
+          <box position="relative">
+            <SafariView shown={page} loadImage={loadImage} favorites={favorites} go={go} setTabs={setTabs} win={win} scrolledTo={scrolledTo} landed={landed} />
+            {/* The watch over the previous page while the next loads. It has no handlers, so clicks still reach the page. */}
+            <Show when={loading()}>
+              <box semantic={{ name: "safari-loading", role: "presentation" }} position="absolute" left={0} top={0} width="100%" height="100%" cursor="watch" />
+            </Show>
+          </box>
         )}
       </Show>
     </>

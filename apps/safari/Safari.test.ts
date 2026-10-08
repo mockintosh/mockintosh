@@ -217,6 +217,26 @@ describe("Safari", () => {
     expect(inRepo.some((n) => n.text.includes("Loading…"))).toBe(true);
   });
 
+  it("keeps the page on screen, under the watch, while the next one loads", async () => {
+    await click("safari-favorite-Hacker News");
+    expect(await texts()).toContain("30.");
+
+    hangFetch = true;
+    await os.kernel.invoke(session(), "menu", { menu: "View", item: "Reload" });
+    await settle();
+    // Still the stories, with the watch over them: no Loading… in between.
+    expect(await texts()).toContain("30.");
+    expect((await texts()).some((text) => text.includes("Loading…"))).toBe(false);
+    expect(await node("safari-loading")).toBeDefined();
+
+    finishHang?.(reply({ hits: STORIES.slice(0, 3) }));
+    hangFetch = false;
+    await settle();
+    expect(await texts()).not.toContain("30.");
+    expect(await texts()).toContain("3.");
+    expect(await node("safari-loading")).toBeUndefined();
+  });
+
   it("shows mockintosh.com as the micro desktop picture", async () => {
     const modifiers = { shift: false, ctrl: false, alt: false, meta: false };
     await click("safari-address");
