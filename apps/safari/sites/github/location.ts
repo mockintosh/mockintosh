@@ -10,10 +10,11 @@ export type GithubLocation =
   | { kind: "profile"; login: string; tab: ProfileTab }
   | { kind: "tree"; owner: string; repo: string; ref: string; path: string }
   | { kind: "blob"; owner: string; repo: string; ref: string; path: string }
-  | { kind: "issues"; owner: string; repo: string }
+  /** `state: "closed"` lists the closed ones; omitted, the open ones. */
+  | { kind: "issues"; owner: string; repo: string; state?: "closed" }
   | { kind: "issue"; owner: string; repo: string; number: number }
   | { kind: "newIssue"; owner: string; repo: string }
-  | { kind: "pulls"; owner: string; repo: string }
+  | { kind: "pulls"; owner: string; repo: string; state?: "closed" }
   | { kind: "pull"; owner: string; repo: string; number: number }
   | { kind: "discussions"; owner: string; repo: string }
   | { kind: "discussion"; owner: string; repo: string; number: number }
@@ -59,7 +60,7 @@ export function parseGithubLocation(raw: string): GithubLocation | null {
 
   const [head, second, ...tail] = rest;
   if (head === "issues") {
-    if (rest.length === 1) return { kind: "issues", owner, repo };
+    if (rest.length === 1) return closedList({ kind: "issues", owner, repo }, query);
     if (second === "new") return tail.length > 0 ? null : { kind: "newIssue", owner, repo };
     const number = issueNumber(second);
     return number === null || tail.length > 0 ? null : { kind: "issue", owner, repo, number };
@@ -70,7 +71,7 @@ export function parseGithubLocation(raw: string): GithubLocation | null {
     const number = issueNumber(second);
     return number === null || tail.length > 0 ? null : { kind: "discussion", owner, repo, number };
   }
-  if (head === "pulls") return rest.length === 1 ? { kind: "pulls", owner, repo } : null;
+  if (head === "pulls") return rest.length === 1 ? closedList({ kind: "pulls", owner, repo }, query) : null;
   if (head === "pull") {
     const number = issueNumber(second);
     return number === null ? null : { kind: "pull", owner, repo, number };
@@ -97,7 +98,8 @@ export function formatGithubLocation(location: GithubLocation): string {
     return `${root}?tab=${location.tab === "repos" ? "repositories" : location.tab}`;
   }
   const root = `github.com/${location.owner}/${location.repo}`;
-  if (location.kind === "issues") return `${root}/issues`;
+  // github.com's own filter for the closed ones: `is:issue is:closed`.
+  if (location.kind === "issues") return location.state === "closed" ? `${root}/issues?q=is%3Aissue+is%3Aclosed` : `${root}/issues`;
   if (location.kind === "issue") return `${root}/issues/${location.number}`;
   if (location.kind === "newIssue") return `${root}/issues/new`;
   if (location.kind === "discussions") return `${root}/discussions`;
@@ -105,13 +107,20 @@ export function formatGithubLocation(location: GithubLocation): string {
   if (location.kind === "newDiscussion") {
     return location.category ? `${root}/discussions/new?category=${encodeURIComponent(location.category)}` : `${root}/discussions/new`;
   }
-  if (location.kind === "pulls") return `${root}/pulls`;
+  if (location.kind === "pulls") return location.state === "closed" ? `${root}/pulls?q=is%3Apr+is%3Aclosed` : `${root}/pulls`;
   if (location.kind === "pull") return `${root}/pull/${location.number}`;
   if (!location.ref && !location.path) return root;
   const ref = encodeSegment(location.ref || "HEAD");
   const path = location.path.split("/").filter(Boolean).map(encodeSegment).join("/");
   const suffix = path ? `${ref}/${path}` : ref;
   return `${root}/${location.kind}/${suffix}`;
+}
+
+/** A list of issues or pull requests, closed when its query asks for them: `?q=… is:closed` (or `state:closed`), or `?state=closed`. */
+function closedList<T extends { kind: "issues" | "pulls" }>(list: T, query: string): T {
+  const filter = queryParam(query, "q") ?? "";
+  const closed = queryParam(query, "state") === "closed" || /(?:^|\s)(?:is|state):closed(?:\s|$)/.test(filter);
+  return closed ? { ...list, state: "closed" } : list;
 }
 
 /** Only addresses on github.com come back from signing in. */

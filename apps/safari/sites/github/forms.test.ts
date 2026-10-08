@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchFunction, FetchRequest, FetchResponse, LayoutNode, WebForm } from "@mockintosh/sdk";
 import { pageRequest, type DocumentPage, type GithubAccount, type SiteContext } from "../../page";
 import { loadPage } from "../../router";
@@ -152,6 +152,59 @@ describe("GitHub pages", () => {
     // The header says where this is: GitHub itself.
     const [header] = home.nodes;
     expect(header?.type === "columns" && header.columns[1]!.nodes[0]).toMatchObject({ segments: [{ kind: "link", text: "GitHub", href: "https://github.com/", bold: true }] });
+  });
+});
+
+describe("GitHub issue and pull request lists", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date("2026-10-08T12:00:00Z"), toFake: ["Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** GitHub's search, counting: 12 open and 34 closed of each. */
+  const counted = (call: Call) => {
+    if (!call.url.startsWith("https://api.github.com/search/issues")) return undefined;
+    return reply({ total_count: decodeURIComponent(call.url).includes("is:open") ? 12 : 34, items: [] });
+  };
+
+  it("switches between open and closed issues, with their counts", async () => {
+    const { fetch, calls } = fakeGithub((call) => counted(call) ?? (call.url.includes("/issues?state=")
+      ? reply([{ ...ISSUE, number: 3, title: "Old bug", state: "closed", closed_at: "2026-10-05T12:00:00Z" }])
+      : undefined));
+    const open = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues"), context(fetch, "")));
+    expect(JSON.stringify(open.nodes)).toContain(JSON.stringify({
+      type: "tabs",
+      items: [
+        { label: "12 Open", href: "https://github.com/octocat/hello/issues", current: true },
+        { label: "34 Closed", href: "https://github.com/octocat/hello/issues?q=is%3Aissue+is%3Aclosed", current: false },
+      ],
+    }));
+    expect(calls.some((call) => call.url.endsWith("/issues?state=open&per_page=30"))).toBe(true);
+
+    const closed = await page(await loadPage(pageRequest("https://github.com/octocat/hello/issues?q=is%3Aissue+is%3Aclosed"), context(fetch, "")));
+    expect(calls.some((call) => call.url.endsWith("/issues?state=closed&per_page=30"))).toBe(true);
+    expect(texts(closed.nodes)).toContain("Old bug");
+    expect(texts(closed.nodes)).toContain("#3 by octocat was closed 3d ago  •  0 comments");
+  });
+
+  it("says a closed pull request was merged, and lists without counts when search won't give them", async () => {
+    const { fetch } = fakeGithub((call) => {
+      if (call.url.startsWith("https://api.github.com/search/issues")) return reply({ message: "rate limited" }, 403);
+      if (call.url.includes("/pulls?state=closed")) return reply([{ ...ISSUE, number: 9, title: "Land it", state: "closed", merged_at: "2026-10-07T12:00:00Z", closed_at: "2026-10-07T12:00:00Z" }]);
+      return undefined;
+    });
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello/pulls?q=is%3Apr+is%3Aclosed"), context(fetch, "")));
+    const all = texts(shown.nodes);
+    expect(all).toContain("Open\nClosed");
+    expect(all).toContain("#9 by octocat was merged 1d ago  •  0 comments");
+  });
+
+  it("says when there are none in a state", async () => {
+    const { fetch } = fakeGithub((call) => counted(call) ?? (call.url.includes("/pulls?state=") ? reply([]) : undefined));
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello/pulls?state=closed"), context(fetch, "")));
+    expect(texts(shown.nodes)).toContain("There aren't any closed pull requests.");
   });
 });
 

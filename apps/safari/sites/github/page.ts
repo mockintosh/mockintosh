@@ -16,6 +16,7 @@ import {
   type DiscussionInfo,
   type GithubPage,
   type IssueInfo,
+  type StateCounts,
   type CalendarWeek,
   type ProfileExtras,
   type ProfileRepo,
@@ -383,6 +384,26 @@ const CARD_RADIUS = 3;
 function list(rows: readonly LayoutNode[][], empty: string, ruled = true): LayoutNode {
   if (rows.length === 0) return { type: "box", radius: CARD_RADIUS, nodes: [paragraph(text(empty))] };
   return { type: "box", radius: CARD_RADIUS, nodes: rows.flatMap((row, index) => (index > 0 && ruled ? [HR, ...row] : row)) };
+}
+
+/**
+ * The Open / Closed switch over a list of issues or pull requests, as
+ * github.com's: each with its count, drawn as tabs, the one shown current.
+ */
+function stateSwitch(kind: "issues" | "pulls", owner: string, repo: string, state: "open" | "closed", counts: StateCounts): LayoutNode {
+  const choice = (which: "open" | "closed") => {
+    const count = counts[which];
+    const name = which === "open" ? "Open" : "Closed";
+    const location: GithubLocation = which === "closed" ? { kind, owner, repo, state: "closed" } : { kind, owner, repo };
+    return { label: count === null ? name : `${count.toLocaleString("en-US")} ${name}`, location, current: which === state };
+  };
+  return tabs([choice("open"), choice("closed")]);
+}
+
+/** A list whose card starts with the Open / Closed switch, whose rule rules it off from the rows. */
+function stateList(header: LayoutNode, rows: readonly LayoutNode[][], empty: string): LayoutNode {
+  const body = rows.length === 0 ? [paragraph(text(empty))] : rows.flatMap((row, index) => (index > 0 ? [HR, ...row] : row));
+  return { type: "box", radius: CARD_RADIUS, nodes: [header, ...body] };
 }
 
 /** A bordered card with a header line, as github.com draws each comment. */
@@ -812,8 +833,8 @@ function repoLocation(page: RepoPage): GithubLocation {
   const { owner, name } = page.repo;
   if (page.view === "tree") return { kind: "tree", owner, repo: name, ref: page.ref, path: page.path };
   if (page.view === "blob") return { kind: "blob", owner, repo: name, ref: page.ref, path: page.file.path };
-  if (page.view === "issues") return { kind: "issues", owner, repo: name };
-  if (page.view === "pulls") return { kind: "pulls", owner, repo: name };
+  if (page.view === "issues") return page.state === "closed" ? { kind: "issues", owner, repo: name, state: "closed" } : { kind: "issues", owner, repo: name };
+  if (page.view === "pulls") return page.state === "closed" ? { kind: "pulls", owner, repo: name, state: "closed" } : { kind: "pulls", owner, repo: name };
   if (page.view === "issue") return { kind: "issue", owner, repo: name, number: page.issue.number };
   if (page.view === "pull") return { kind: "pull", owner, repo: name, number: page.pull.number };
   if (page.view === "newIssue") return { kind: "newIssue", owner, repo: name };
@@ -967,15 +988,20 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
   if (page.view === "issues" || page.view === "pulls") {
     const pulls = page.view === "pulls";
     const items = pulls ? page.pulls : page.issues;
+    const closed = page.state === "closed";
     const rows = items.map((item): LayoutNode[] => {
       const target: GithubLocation = pulls ? { kind: "pull", owner, repo: name, number: item.number } : { kind: "issue", owner, repo: name, number: item.number };
-      return [heading(3, item.title, githubUrl(target)), facts(`#${item.number} opened ${formatAge(item.createdAt, now)} by ${item.user}`, commentCount(item.comments))];
+      const when = closed
+        ? `#${item.number} by ${item.user} was ${item.state === "merged" ? "merged" : "closed"} ${formatAge(item.closedAt || item.createdAt, now)}`
+        : `#${item.number} opened ${formatAge(item.createdAt, now)} by ${item.user}`;
+      return [heading(3, item.title, githubUrl(target)), facts(when, commentCount(item.comments))];
     });
+    const noun = pulls ? "pull requests" : "issues";
     return {
       title: pulls ? "Pull requests" : "Issues",
       body: [
-        toolbar(pulls ? "Open pull requests" : "Open issues", pulls ? null : linkButton("New issue", { kind: "newIssue", owner, repo: name })),
-        list(rows, pulls ? "There aren't any open pull requests." : "There aren't any open issues."),
+        toolbar(pulls ? "Pull requests" : "Issues", pulls ? null : linkButton("New issue", { kind: "newIssue", owner, repo: name })),
+        stateList(stateSwitch(page.view, owner, name, page.state, page.counts), rows, `There aren't any ${page.state} ${noun}.`),
       ],
     };
   }

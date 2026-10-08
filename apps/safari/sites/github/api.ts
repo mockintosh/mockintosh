@@ -46,6 +46,14 @@ export interface IssueInfo {
   state: string;
   body: string;
   createdAt: string;
+  /** When it was closed, or merged; empty while open. */
+  closedAt: string;
+}
+
+/** How many open and closed issues, or pull requests, a repository has; null where GitHub wouldn't say. */
+export interface StateCounts {
+  open: number | null;
+  closed: number | null;
 }
 
 export interface CommentInfo {
@@ -143,9 +151,9 @@ export type GithubPage =
   /** `starred` is whether the signed-in user has starred the repository; null when signed out, or below its front page. */
   | { view: "tree"; repo: RepoInfo; ref: string; path: string; entries: DirEntry[]; commit: CommitInfo | null; readme: string | null; starred: boolean | null }
   | { view: "blob"; repo: RepoInfo; ref: string; file: FileBody }
-  | { view: "issues"; repo: RepoInfo; issues: IssueInfo[] }
+  | { view: "issues"; repo: RepoInfo; state: "open" | "closed"; counts: StateCounts; issues: IssueInfo[] }
   | { view: "issue"; repo: RepoInfo; issue: IssueInfo; comments: CommentInfo[] }
-  | { view: "pulls"; repo: RepoInfo; pulls: IssueInfo[] }
+  | { view: "pulls"; repo: RepoInfo; state: "open" | "closed"; counts: StateCounts; pulls: IssueInfo[] }
   | { view: "pull"; repo: RepoInfo; pull: IssueInfo; comments: CommentInfo[] }
   | { view: "newIssue"; repo: RepoInfo }
   | { view: "discussions"; repo: RepoInfo; discussions: DiscussionInfo[] }
@@ -171,12 +179,14 @@ export async function loadPage(fetch: FetchFunction, token: string, location: Ap
   if (location.kind === "tree") return loadTree(fetch, token, repo, location.ref, location.path);
   if (location.kind === "blob") return loadBlob(fetch, token, repo, location.ref, location.path);
   if (location.kind === "issues") {
-    const issues = await listIssues(fetch, token, repo, "issue");
-    return { view: "issues", repo, issues };
+    const state = location.state ?? "open";
+    const [issues, counts] = await Promise.all([listIssues(fetch, token, repo, "issue", state), stateCounts(fetch, token, repo, "issue")]);
+    return { view: "issues", repo, state, counts, issues };
   }
   if (location.kind === "pulls") {
-    const pulls = await listIssues(fetch, token, repo, "pull");
-    return { view: "pulls", repo, pulls };
+    const state = location.state ?? "open";
+    const [pulls, counts] = await Promise.all([listIssues(fetch, token, repo, "pull", state), stateCounts(fetch, token, repo, "pr")]);
+    return { view: "pulls", repo, state, counts, pulls };
   }
   if (location.kind === "newIssue") return { view: "newIssue", repo };
   if (location.kind === "discussions") return { view: "discussions", repo, discussions: await listDiscussions(fetch, token, repo) };
@@ -456,16 +466,30 @@ async function getLatestCommit(fetch: FetchFunction, token: string, repo: RepoIn
   return commitInfo(asRecord(data[0]));
 }
 
-async function listIssues(fetch: FetchFunction, token: string, repo: RepoInfo, kind: "issue" | "pull"): Promise<IssueInfo[]> {
+async function listIssues(fetch: FetchFunction, token: string, repo: RepoInfo, kind: "issue" | "pull", state: "open" | "closed"): Promise<IssueInfo[]> {
   const path = kind === "pull"
-    ? `${repoPath(repo)}/pulls?state=open&per_page=30`
-    : `${repoPath(repo)}/issues?state=open&per_page=30`;
+    ? `${repoPath(repo)}/pulls?state=${state}&per_page=30`
+    : `${repoPath(repo)}/issues?state=${state}&per_page=30`;
   const data = await gh(fetch, token, path);
   if (!Array.isArray(data)) return [];
   return data
     .map((item) => asRecord(item))
     .filter((item) => kind === "pull" || item.pull_request === undefined)
     .map(issueInfo);
+}
+
+/** The Open and Closed counts over a list, from GitHub's search; a count it won't give (rate limited, offline) is null. */
+async function stateCounts(fetch: FetchFunction, token: string, repo: RepoInfo, kind: "issue" | "pr"): Promise<StateCounts> {
+  const count = async (state: "open" | "closed"): Promise<number | null> => {
+    const query = encodeURIComponent(`repo:${repo.owner}/${repo.name} is:${kind} is:${state}`);
+    try {
+      return numberField(asRecord(await gh(fetch, token, `/search/issues?q=${query}&per_page=1`)), "total_count");
+    } catch {
+      return null;
+    }
+  };
+  const [open, closed] = await Promise.all([count("open"), count("closed")]);
+  return { open, closed };
 }
 
 async function getIssue(fetch: FetchFunction, token: string, repo: RepoInfo, number: number): Promise<IssueInfo> {
@@ -619,6 +643,7 @@ function discussionInfo(record: Record<string, unknown>): DiscussionInfo {
     title: stringField(record, "title"),
     comments: numberField(asRecord(record.comments), "totalCount"),
     state: "open",
+    closedAt: "",
     category: stringField(asRecord(record.category), "name"),
     answered: typeof record.answerChosenAt === "string",
   };
@@ -668,6 +693,7 @@ function issueInfo(record: Record<string, unknown>): IssueInfo {
     state: merged ? "merged" : stringField(record, "state") || "open",
     body: stringField(record, "body"),
     createdAt: stringField(record, "created_at"),
+    closedAt: stringField(record, "merged_at") || stringField(asRecord(record.pull_request), "merged_at") || stringField(record, "closed_at"),
   };
 }
 

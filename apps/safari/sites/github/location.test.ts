@@ -12,11 +12,20 @@ describe("parseGithubLocation", () => {
       ["github.com/login", { kind: "login", returnTo: "" }],
       ["github.com/login?return_to=https%3A%2F%2Fgithub.com%2Focto%2Frepo%2Fissues%2F1", { kind: "login", returnTo: "https://github.com/octo/repo/issues/1" }],
       ["github.com/logout", { kind: "logout", returnTo: "" }],
+      ["github.com/octocat/Hello-World/issues?q=is%3Aissue+is%3Aclosed", { kind: "issues", owner: "octocat", repo: "Hello-World", state: "closed" }],
+      ["github.com/octocat/Hello-World/pulls?q=is%3Apr+is%3Aclosed", { kind: "pulls", owner: "octocat", repo: "Hello-World", state: "closed" }],
     ] as const;
     for (const [address, location] of cases) {
       expect(parseGithubLocation(address)).toEqual(location);
       expect(formatGithubLocation(location)).toBe(address);
     }
+  });
+
+  it("reads closed lists however github.com writes them", () => {
+    const closed = { kind: "issues", owner: "octocat", repo: "Hello-World", state: "closed" };
+    expect(parseGithubLocation("github.com/octocat/Hello-World/issues?state=closed")).toEqual(closed);
+    expect(parseGithubLocation("github.com/octocat/Hello-World/issues?q=is%3Aissue%20state%3Aclosed")).toEqual(closed);
+    expect(parseGithubLocation("github.com/octocat/Hello-World/issues?q=is%3Aissue+is%3Aopen")).toEqual({ kind: "issues", owner: "octocat", repo: "Hello-World" });
   });
 
   it("comes back from signing in only to github.com", () => {
