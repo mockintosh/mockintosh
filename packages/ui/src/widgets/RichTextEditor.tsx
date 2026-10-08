@@ -3,7 +3,6 @@ import type { JSX } from "@mockintosh/ui";
 import { createPress } from "../primitives/press";
 import { fromGrid, type Sprite } from "../sprite";
 import { applyMarkdownEdit, type MarkdownEdit } from "./markdownEdits";
-import { Tabs } from "./Tabs";
 import { TextEditor, type TextEditorController } from "./TextEditor";
 import { Tooltip } from "./Tooltip";
 
@@ -25,20 +24,41 @@ export interface RichTextEditorProps {
 
 const grid = (rows: string[]): Sprite => fromGrid(rows[0]!.length, rows.length, rows);
 
-/** The toolbar, as github.com's comment box has it: each button's edit, name and icon. */
-const TOOLS: ReadonlyArray<{ edit: MarkdownEdit; label: string; icon: Sprite }> = [
-  { edit: "heading", label: "Heading", icon: grid(["#.....#", "#.....#", "#.....#", "#######", "#.....#", "#.....#", "#.....#"]) },
-  { edit: "bold", label: "Bold", icon: grid(["#####..", "##..##.", "##..##.", "#####..", "##..##.", "##..##.", "#####.."]) },
-  { edit: "italic", label: "Italic", icon: grid(["...####", "....#..", "...#...", "...#...", "..#....", ".#.....", "####..."]) },
-  { edit: "code", label: "Code", icon: grid(["..#...#..", ".#.....#.", "#.......#", ".#.....#.", "..#...#.."]) },
-  { edit: "link", label: "Link", icon: grid([".###...###.", "#...#.#...#", "#..#####..#", "#...#.#...#", ".###...###."]) },
-  { edit: "quote", label: "Quote", icon: grid(["##..##.", "##..##.", ".#...#.", "#...#.."]) },
-  { edit: "bullets", label: "Bulleted list", icon: grid(["##.######", ".........", "##.######", ".........", "##.######"]) },
-  { edit: "numbers", label: "Numbered list", icon: grid([".#..#####", "##.......", ".#..#####", ".#.......", "###.#####"]) },
+const ICONS: Record<MarkdownEdit, Sprite> = {
+  heading: grid(["#.....#", "#.....#", "#.....#", "#######", "#.....#", "#.....#", "#.....#"]),
+  bold: grid(["#####..", "##..##.", "##..##.", "#####..", "##..##.", "##..##.", "#####.."]),
+  italic: grid(["...####", "....#..", "...#...", "...#...", "..#....", ".#.....", "####..."]),
+  quote: grid(["##..##.", "##..##.", ".#...#.", "#...#.."]),
+  code: grid(["..#...#..", ".#.....#.", "#.......#", ".#.....#.", "..#...#.."]),
+  link: grid([".###...###.", "#...#.#...#", "#..#####..#", "#...#.#...#", ".###...###."]),
+  bullets: grid(["##.######", ".........", "##.######", ".........", "##.######"]),
+  numbers: grid([".#..#####", "##.......", ".#..#####", ".#.......", "###.#####"]),
+};
+
+const LABELS: Record<MarkdownEdit, string> = {
+  heading: "Heading",
+  bold: "Bold",
+  italic: "Italic",
+  quote: "Quote",
+  code: "Code",
+  link: "Link",
+  bullets: "Bulleted list",
+  numbers: "Numbered list",
+};
+
+/** The toolbar in github.com's order and groups: text, then lists, a rule between. */
+const GROUPS: readonly (readonly MarkdownEdit[])[] = [
+  ["heading", "bold", "italic", "quote", "code", "link"],
+  ["bullets", "numbers"],
 ];
 
 const TOOL_W = 17;
 const TOOL_H = 15;
+/** Height of the strip the tabs and toolbar sit in. */
+const HEADER_H = 21;
+/** Between the outer box and the text box (or the preview). */
+const PAD = 6;
+const TAB_PAD_X = 10;
 
 /**
  * A toolbar button: its icon, black while pressed, and its name over it when
@@ -57,9 +77,46 @@ function Tool(props: { name: string; label: string; icon: Sprite; onClick: () =>
 }
 
 /**
- * A box to write Markdown in, as github.com's comment box: a toolbar that
- * marks the selection up (headings, bold, italic, code, links, quotes and
- * lists), and Write and Preview tabs, Preview showing it formatted.
+ * One of the Write / Preview tabs, as github.com draws them: the current one
+ * open into the box below it (no rule under it, a line at each side that
+ * isn't the box's own edge), the other plain on the strip.
+ */
+function EditorTab(props: { name: string; label: string; current: boolean; first: boolean; onSelect: () => void }): JSX.Element {
+  return (
+    <box
+      semantic={{ name: props.name, role: "tab", value: String(props.current) }}
+      height={HEADER_H}
+      paddingLeft={TAB_PAD_X}
+      paddingRight={TAB_PAD_X}
+      flexDirection="row"
+      alignItems="center"
+      background={0}
+      position="relative"
+      cursor={props.current ? "default" : "pointer"}
+      onClick={() => {
+        if (!props.current) props.onSelect();
+      }}
+    >
+      <text font="body" nowrap>{props.label}</text>
+      <Show when={props.current}>
+        <Show when={!props.first}>
+          <box position="absolute" left={0} top={0} width={1} height={HEADER_H} background={1} />
+        </Show>
+        <box position="absolute" right={0} top={0} width={1} height={HEADER_H} background={1} />
+      </Show>
+      <Show when={!props.current}>
+        <box position="absolute" left={0} bottom={0} width="100%" height={1} background={1} />
+      </Show>
+    </box>
+  );
+}
+
+/**
+ * A box to write Markdown in, as github.com's comment box: Write and Preview
+ * tabs and a toolbar across the top of a rounded box, the current tab open
+ * into it; under Write a text box whose toolbar marks the selection up
+ * (headings, bold, italic, quotes, code, links and lists), under Preview the
+ * text formatted.
  */
 export function RichTextEditor(props: RichTextEditorProps): JSX.Element {
   const [tab, setTab] = createSignal<"write" | "preview">("write");
@@ -70,54 +127,64 @@ export function RichTextEditor(props: RichTextEditorProps): JSX.Element {
     editor.edit(next.value, next.start, next.end);
   };
   const name = (part: string) => (props.name ? `${props.name}:${part}` : part);
+  /** Inside the outer border and its padding. */
+  const innerWidth = () => props.width - 2 - PAD * 2;
+  const tabs = () => (props.preview ? (["write", "preview"] as const) : (["write"] as const));
   return (
-    <box flexDirection="column" width={props.width} gap={4}>
-      <box position="relative" width={props.width}>
-        <Tabs
-          name={name("tabs")}
-          untabbable
-          value={tab()}
-          onChange={(value) => setTab(value === "preview" ? "preview" : "write")}
-          items={props.preview ? [{ value: "write", label: "Write" }, { value: "preview", label: "Preview" }] : [{ value: "write", label: "Write" }]}
-        />
-        <Show when={tab() === "write"}>
-          <box position="absolute" right={0} top={1} flexDirection="row" gap={1}>
-            <For each={TOOLS}>{(tool) => <Tool name={name(tool.edit)} label={tool.label} icon={tool.icon} onClick={() => apply(tool.edit)} />}</For>
-          </box>
+    <box width={props.width} borderWidth={1} borderColor={1} borderRadius={props.borderRadius} flexDirection="column" overflow="hidden">
+      <box flexDirection="row" height={HEADER_H} alignItems="flex-end">
+        <For each={tabs()}>
+          {(value, index) => (
+            <EditorTab
+              name={name(`tabs:${value}`)}
+              label={value === "write" ? "Write" : "Preview"}
+              current={tab() === value}
+              first={index() === 0}
+              onSelect={() => setTab(value)}
+            />
+          )}
+        </For>
+        {/* The strip's rule runs on past the tabs, under the toolbar. */}
+        <box flexGrow={1} height={HEADER_H} flexDirection="row" alignItems="center" justifyContent="flex-end" paddingRight={4} position="relative">
+          <Show when={tab() === "write"}>
+            <For each={GROUPS}>
+              {(group, index) => (
+                <>
+                  <Show when={index() > 0}>
+                    <box width={1} height={TOOL_H - 4} marginLeft={3} marginRight={3} background={1} />
+                  </Show>
+                  <For each={group}>{(edit) => <Tool name={name(edit)} label={LABELS[edit]} icon={ICONS[edit]} onClick={() => apply(edit)} />}</For>
+                </>
+              )}
+            </For>
+          </Show>
+          <box position="absolute" left={0} bottom={0} width="100%" height={1} background={1} />
+        </box>
+      </box>
+      <box padding={PAD}>
+        <Show
+          when={tab() === "preview" && props.preview}
+          fallback={
+            <TextEditor
+              name={props.name}
+              value={props.value}
+              onChange={props.onChange}
+              width={innerWidth()}
+              height={props.height}
+              borderRadius={props.borderRadius}
+              controller={(controller) => {
+                editor = controller;
+              }}
+            />
+          }
+        >
+          {(preview) => (
+            <box semantic={{ name: name("preview"), role: "document" }} width={innerWidth()} height={props.height} overflow="scroll" flexDirection="column">
+              {props.value.trim() ? preview()(props.value, innerWidth()) : <text font="body" wrap>Nothing to preview.</text>}
+            </box>
+          )}
         </Show>
       </box>
-      <Show
-        when={tab() === "preview" && props.preview}
-        fallback={
-          <TextEditor
-            name={props.name}
-            value={props.value}
-            onChange={props.onChange}
-            width={props.width}
-            height={props.height}
-            borderRadius={props.borderRadius}
-            controller={(controller) => {
-              editor = controller;
-            }}
-          />
-        }
-      >
-        {(preview) => (
-          <box
-            semantic={{ name: name("preview"), role: "document" }}
-            width={props.width}
-            height={props.height}
-            borderWidth={1}
-            borderColor={1}
-            borderRadius={props.borderRadius}
-            padding={5}
-            overflow="scroll"
-            flexDirection="column"
-          >
-            {props.value.trim() ? preview()(props.value, props.width - 12) : <text font="body" wrap>Nothing to preview.</text>}
-          </box>
-        )}
-      </Show>
     </box>
   );
 }
