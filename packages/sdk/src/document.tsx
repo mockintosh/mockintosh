@@ -377,7 +377,7 @@ function FormView(props: { form: WebForm; width: number; onSubmit?: (form: WebFo
   const firstButton = form.controls.findIndex((control) => control.kind === "submit");
   const shown = form.controls.map((control, index) => ({ control, index })).filter((entry) => entry.control.kind !== "hidden");
   const view = (entry: { control: FormControl; index: number }, width: () => number) => (
-    <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={width()} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />
+    <FormControlView entry={entry} values={values} setValues={setValues} inputWidth={width()} radius={form.radius} submit={() => submit(firstButton >= 0 ? firstButton : null)} press={submit} />
   );
   // With several lines to write, fields stack at the page's width and the buttons sit under them.
   if (form.controls.some((control) => control.kind === "textarea")) {
@@ -403,6 +403,7 @@ function FormControlView(props: {
   values: () => Record<number, string>;
   setValues: (update: (prev: Record<number, string>) => Record<number, string>) => void;
   inputWidth: number;
+  radius: number | undefined;
   submit: () => void;
   press: (index: number) => void;
 }): JSX.Element {
@@ -412,6 +413,7 @@ function FormControlView(props: {
     return (
       <TextInput
         icon={icon}
+        borderRadius={props.radius}
         value={props.values()[index] ?? ""}
         placeholder={control.placeholder}
         width={props.inputWidth}
@@ -427,6 +429,7 @@ function FormControlView(props: {
         value={props.values()[index] ?? ""}
         width={props.inputWidth}
         height={control.rows * TEXTAREA_LINE + 8}
+        borderRadius={props.radius}
         onChange={(value) => props.setValues((prev) => ({ ...prev, [index]: value }))}
       />
     );
@@ -434,7 +437,7 @@ function FormControlView(props: {
   if (control.kind === "submit") {
     const app = useContext(AppServicesContext);
     const icon = control.icon ? app?.getSprite(control.icon) : undefined;
-    const button = <Button label={control.label} icon={icon} onClick={() => props.press(index)} />;
+    const button = <Button label={control.label} icon={icon} borderRadius={props.radius} onClick={() => props.press(index)} />;
     return control.tooltip ? <Tooltip label={control.tooltip}>{button}</Tooltip> : button;
   }
   return <box />;

@@ -203,6 +203,7 @@ describe("GitHub stars", () => {
       action: "https://github.com/octocat/hello",
       method: "post",
       align: "right",
+      radius: 3,
       controls: [
         { kind: "hidden", name: "star", value: "star" },
         { kind: "submit", name: "", value: "", label: "Star 0", icon: "safari/github-star" },
@@ -304,6 +305,7 @@ describe("GitHub forms", () => {
       action: "https://github.com/login",
       method: "post",
       align: "left",
+      radius: 3,
       controls: [
         { kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello/issues/5" },
         { kind: "submit", name: "", value: "", label: "Sign In" },
@@ -354,6 +356,7 @@ describe("GitHub forms", () => {
       action: "https://github.com/login",
       method: "post",
       align: "right",
+      radius: 3,
       controls: [
         { kind: "hidden", name: "return_to", value: "https://github.com/" },
         { kind: "submit", name: "", value: "", label: "Sign In" },

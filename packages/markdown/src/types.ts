@@ -54,6 +54,8 @@ export interface WebForm {
   controls: FormControl[];
   /** Where a one-line form's controls sit across the page. Omitted is the left. */
   align?: Align;
+  /** Corner radius of the form's fields and buttons; the theme's when omitted. */
+  radius?: number;
 }
 
 /** One item of a page's `menu`: a link to follow, or a form to submit. */

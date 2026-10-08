@@ -205,7 +205,17 @@ function withHeader(page: GithubDocument, viewer: Viewer | null, account = true)
   const { nav, ...rest } = page;
   // Tabs draw their own rule, under the current tab's line.
   const top = nav ? [header, TABS_SPACE, nav] : [header, HR];
-  return { ...rest, nodes: [...top, HEADER_SPACE, ...spaceSections(page.nodes)] };
+  return { ...rest, nodes: roundControls([...top, HEADER_SPACE, ...spaceSections(page.nodes)]) };
+}
+
+/** Every form on the page, through its columns, cards and scrollers, its fields and buttons as round as GitHub's cards. */
+function roundControls(nodes: readonly LayoutNode[]): LayoutNode[] {
+  return nodes.map((node): LayoutNode => {
+    if (node.type === "form") return { ...node, form: { ...node.form, radius: CARD_RADIUS } };
+    if (node.type === "columns") return { ...node, columns: node.columns.map((column) => ({ ...column, nodes: roundControls(column.nodes) })) };
+    if (node.type === "box" || node.type === "scroller") return { ...node, nodes: roundControls(node.nodes) };
+    return node;
+  });
 }
 
 /** 4px more between the header and the tabs: an empty spacer adds one more of the page's 4px gaps. */

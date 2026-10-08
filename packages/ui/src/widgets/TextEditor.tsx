@@ -10,6 +10,8 @@ import {createTextClicks, paragraphRangeAt, type TextClickSelection} from "../te
 export interface TextEditorProps {
   name?: string; value: string; onChange(value: string): void;
   width: number; height: number; disabled?: boolean; line?: number;
+  /** Corner radius of the border; the theme's when omitted. */
+  borderRadius?: number;
 }
 /** Multiline text editing in the canvas renderer. The document owner controls
  * saving/revisions; this widget owns only selection, caret, and viewport. */
@@ -110,7 +112,7 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
     if (sel) { focus.focus(node); select(sel); }
   }
   return <box ref={n => node = n} semantic={{name: props.name, role: "textbox", value: props.value, enabled: !props.disabled}}
-    width={props.width} height={props.height} borderWidth={1} borderColor={1} borderRadius={radius()} background={0} overflow="hidden" tabIndex={0}
+    width={props.width} height={props.height} borderWidth={1} borderColor={1} borderRadius={props.borderRadius ?? radius()} background={0} overflow="hidden" tabIndex={0}
     cursor={props.disabled ? "default" : "text"}
     onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
     onMouseDown={(x, y) => pointer(x, y)} onDrag={(x, y) => select(clicks.drag(valueNow(), pointAt(x, y)))} onDoubleClick={doubleClick}

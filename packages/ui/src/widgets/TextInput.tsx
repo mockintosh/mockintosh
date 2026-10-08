@@ -31,6 +31,8 @@ export interface TextInputProps {
   padding?: number;
   /** Omit the field border (e.g. inline rename over a label). */
   borderless?: boolean;
+  /** Corner radius of the border; the theme's when omitted. */
+  borderRadius?: number;
   /** Drawn inset at the field's left, before the text, as a search field's magnifying glass. */
   icon?: Sprite;
   /**
@@ -442,7 +444,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
       borderColor={bordered() ? 1 : undefined}
       borderStyle={bordered() ? "solid" : undefined}
       borderWidth={bordered() ? 1 : 0}
-      borderRadius={bordered() ? radius() : undefined}
+      borderRadius={bordered() ? props.borderRadius ?? radius() : undefined}
       paddingTop={padY()}
       paddingBottom={padY()}
       paddingLeft={padLeft()}
