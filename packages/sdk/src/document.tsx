@@ -37,9 +37,8 @@ function inlineRuns(segments: readonly InlineSegment[], onLink: ((href: string) 
     if (segment.kind === "italic") return { text: segment.text, italic: true };
     if (segment.kind === "link") {
       const href = segment.href;
-      return onLink
-        ? { text: segment.text, underline: true, onClick: () => onLink(href) }
-        : { text: segment.text, underline: true };
+      const run: TextRun = segment.bold ? { text: segment.text, underline: true, bold: true } : { text: segment.text, underline: true };
+      return onLink ? { ...run, onClick: () => onLink(href) } : run;
     }
     return { text: segment.text };
   });

@@ -15,7 +15,8 @@ export type InlineSegment =
   | { kind: "bold"; text: string }
   | { kind: "italic"; text: string }
   | { kind: "code"; text: string }
-  | { kind: "link"; text: string; href: string };
+  /** `bold` sets a link in bold, as a page's own name in a site's header. */
+  | { kind: "link"; text: string; href: string; bold?: boolean };
 
 // A link hit-rect produced during a render pass.
 export interface LinkRect {
