@@ -204,6 +204,14 @@ function measureNode(
       // re-derive height (the row width stays definite).
       const dir = s.flexDirection ?? "column";
       if (dir === "row" && relativeChildren.length > 0) {
+        // An auto-width row derives its children's natural widths side by
+        // side, which can be wider than its container offers. It is no
+        // wider than that (shrink-to-fit, as CSS sizes it), so its shrinking
+        // children wrap here, where their height still counts, and not in
+        // the position pass after the rows below have been placed.
+        if (explicitW === undefined && node.layout.width > availableWidth) {
+          node.layout.width = clamp(availableWidth, s);
+        }
         const innerW = Math.max(0, node.layout.width - inset.left - inset.right);
         const shares = flexMainSizes(relativeChildren, innerW, true, s.gap ?? 0);
         let remasured = false;
