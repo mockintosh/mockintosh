@@ -28,7 +28,7 @@ const ICON_APPSTORE_32X32 = defineSprite(
 const ICON_APPSTORE_SMR_32X32 = defineSprite(
   32,
   32,
-  "AKqqqqqqqgAKqqqqqqqqoCqqqqqqqqqoKqqqqqqqqqiqqqqWlqqqqqqqqlaVqqqqqqqqlWaqqqqqqqqVZqqqqqqqqqWaqqqqqqqqpZqqqqqqqqqmWqqqqqqqqpZmqqqqqqqqmaaqqqqqqqpZpaqqqqqqqmaZqqqqqqqpZplqqqqqqqmapmqqqqqqpZqmWqqqqqVVVWmVWqqqmZmZqZZmqqqlVVVaZpqqqqqqqqplqqqqqmaqqpmqqqqpZqqqmWqqqqlaqqqlaqqqqlqqqqWqqqqqqqqqqqqqqqqqqqqqqqoqqqqqqqqqqCqqqqqqqqqoCqqqqqqqqqAAqqqqqqqqAA=="
+  "ACqqqqqqqAAClVVVVVVWgAlmpqampqlgJqpqqqpqapgmpqqWlqqmmJpqqlaVqqpmpqqqlWaqpqqqaqqVZqqqaqaqqqWaqqqmqqqqpZqqqqqqqqqmWqqqqqqqqpZmqqqqmqqqmaaqqpqqqqpZpaqqqqqqqmaZqqqqqqqpZplqqqqaqqmapmqqmqqqpZqmWqqqqqVVVWmVWqqqmZmZqZZmqqqlVVVaZpqqqqqqqqplqqqqqmaqqpmqqqqpZqqqmWqqqqlaqqqlaqqqqlqqqqWqqqqqqqqqqqqqKqqqqqqqqqgqqqqqqqqqqAqqqqqqqqqgAqqqqqqqqoAAKqqqqqqoAA=="
 );
 const ICON_APPSTORE2 = defineSprite(
   32,
@@ -291,7 +291,7 @@ const ICON_MACFLIM_16X16 = fromGrid(16, 16, [
   "....########....",
   "......####......",
 ]);
-/** Black rounded square with a lit top edge and a white lens ring with a highlight. */
+/** Black rounded square with a lit top edge and a white lens ring with one glint. */
 const ICON_PHOTOBOOTH_SMR_32_16X16 = fromGrid(16, 16, [
   "..############..",
   ".##oooooooooo##.",
@@ -300,9 +300,9 @@ const ICON_PHOTOBOOTH_SMR_32_16X16 = fromGrid(16, 16, [
   "####ooo##ooo####",
   "###oo######oo###",
   "###o##oo####o###",
-  "###o#oo###o#o###",
-  "###o#o####o#o###",
-  "###o#####o##o###",
+  "###o##oo####o###",
+  "###o########o###",
+  "###o########o###",
   "###oo######oo###",
   "####ooo##ooo####",
   "######oooo######",

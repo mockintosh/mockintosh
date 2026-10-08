@@ -28,6 +28,7 @@ import { sprites as tp7Sprites } from "@/apps/tp7/icons";
 import { sprites as pchkraftSprites } from "@/apps/pchkraft/icons";
 import { sprites as visualizerSprites } from "@/apps/visualizer/icons";
 import { sprites as earthSprites } from "@/apps/earth/icons";
+import { sprites as chatgippitySprites } from "@/apps/chatgippity/icons";
 import { sprites as foundrySprites } from "@/apps/foundry/icons";
 
 const declared = declarations as Record<string, AppDeclaration>;
@@ -65,7 +66,8 @@ registerBundledApp({
   declaration: declared["chatgippity"],
   title: "ChatGippity",
   description: "A chat window onto a language model that can use this Macintosh.",
-  icon: "icon/computer",
+  icon: "chatgippity/icon",
+  sprites: chatgippitySprites,
   requires: ["network"],
   permissions: ["kernel:*"],
   load: () => import("@/apps/ChatGippity"),

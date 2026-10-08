@@ -895,7 +895,7 @@
    "terminal/icon": {
     "width": 32,
     "height": 32,
-    "data": "AKqqqqqqqgAKqqqqqqqqoCqqqqqqqqqoKqqqqqqqqqiqqqqqqqqqqqqqqqqqqqqqqqWqqqqqqqqqqWqqqqqqqqqqWqqqqqqqqqqWqqqqqqqqqlqqqqqqqqqpalVWqqqqqqWqVVaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqoqqqqqqqqqqCqqqqqqqqqoCqqqqqqqqqAAqqqqqqqqAA=="
+    "data": "ACqqqqqqqAACqqqqqqqqgAqlVVVVVVqgKlqqqqqqpagpqqqqqqqqaKmqqqqqqqpqpqWqqqqqqpqmqWqqqqqqmqaqWqqqqqqapqqWqqqqqpqmqlqqqqqqmqapalVWqqqapqWqVVaqqpqmqqqqqqqqmqaqqqqqqqqapqqqqqqqqpqmqqqqqqqqmqaqqqqqqqqapqqqqqqqqpqmqqqqqqqqmqaqqqqqqqqapqqqqqqqqpqmqqqqqqqqmqaqqqqqqqqapqqqqqqqqpqmqqqqqqqqmqmqqqqqqqpqKaqqqqqqqmgqWqqqqqqlqAqlVVVVVVqgAqqqqqqqqoAAKqqqqqqoAA=="
    },
    "terminal/icon-16x16": {
     "width": 16,
@@ -928,18 +928,30 @@
  "chatgippity": {
   "id": "chatgippity",
   "title": "ChatGippity",
-  "icon": "icon/computer",
+  "icon": "chatgippity/icon",
   "defaultSize": {
    "width": 360,
    "height": 260
   },
-  "smallIcon": "icon/computer-16x16",
+  "smallIcon": "chatgippity/icon-16x16",
   "requires": [
    "network"
   ],
   "permissions": [
    "kernel:*"
-  ]
+  ],
+  "sprites": {
+   "chatgippity/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "ACqqqqqqqAACqqqqqqqqgAqqqqqqqqqgKqqqqqqqaqgqqqqqqqpqqKqqqqqqqmqqqqqqqqqpWqqqqqqqqlVVaqqqqqqqqVqqqqqqqqqqaqqqqqqWqqpqqqqqqpaqqmqqqqqqVaqqqqqqqqpVqqqqqqqqqVVqqqqqqqqlVVqqqqqqqlVVVaqqqqqlVVVVWqqqqqVVVVVaqqqqqlVVVaqqqqqqpVVaqqqqqqqpVWqqqqqqqqpVqqqqqqqqqlWqqqqqqqqqlqqqqqqqqqqWqqqqqqqqqqqqqqqqKqqqqqqqqqgqqqqqqqqqqAqqqqqqqqqgAqqqqqqqqoAAKqqqqqqoAA=="
+   },
+   "chatgippity/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "CqqqoCqqqqiqqqpqqqqpWqqqqmqqqqqqqqaqqqqmqqqqlaqqqVVaqqqVqqqqpqqqqqaqqqqqqqoqqqqoCqqqoA=="
+   }
+  }
  },
  "fx": {
   "id": "fx",

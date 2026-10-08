@@ -2,6 +2,7 @@ import { For, createSignal, createMemo, createEffect, onCleanup } from "solid-js
 import type { JSX } from "@mockintosh/ui";
 import { Button, TextInput } from "@mockintosh/ui";
 import { useApp, defineApp } from "@mockintosh/sdk";
+import { sprites } from "./chatgippity/icons";
 import { allAgentTools, runAgent } from "@mockintosh/agent";
 import type { ChatMessage, CompleteResult, OpenAITool } from "@mockintosh/sdk";
 
@@ -191,8 +192,9 @@ export default defineApp({
   id: "chatgippity",
   requires: ["network"],
   title: "ChatGippity",
-  icon: "icon/computer",
-  smallIcon: "icon/computer-16x16",
+  icon: "chatgippity/icon",
+  smallIcon: "chatgippity/icon-16x16",
+  sprites,
   defaultSize: { width: 360, height: 260 },
   permissions: ["kernel:*"],
   Component: ChatGippity,
