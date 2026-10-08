@@ -3,7 +3,8 @@
  * wider than the page, so it opens on the latest weeks and scrolls
  * sideways; the header's account menu signs out; a starred repository's
  * Star button says it unstars; the current tab's line, and a hovered one's, sits on the rule;
- * the account menu opens from a ringed avatar.
+ * the account menu opens from a ringed avatar; Tab goes from a new issue's
+ * title to its description.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchResponse } from "@mockintosh/sdk";
@@ -241,5 +242,28 @@ describe("GitHub in a Safari window", () => {
     // The ring's top and bottom, and its sides, solid black around the dithered picture.
     expect([rows[0], rows[15]]).toEqual(["0000011111100000", "0000011111100000"]);
     for (const row of rows.slice(5, 11)) expect([row[0], row[15]]).toEqual(["1", "1"]);
+  });
+
+  it("tabs from a new issue's title to its description", async () => {
+    os.services.openApp("safari", { url: "https://github.com/octocat/hello/issues/new" });
+    await settle();
+    const fields = () => inspect().then((all) => all.filter((n) => n.role === "textbox"));
+    const description = (await fields()).find((n) => n.name === "body");
+    expect(description, "the description").toBeDefined();
+    // The title is the field just above the description.
+    const title = (await fields()).filter((n) => n.bounds.y < description!.bounds.y).sort((a, b) => b.bounds.y - a.bounds.y)[0]!;
+    platform.click(title.bounds.x + 10, title.bounds.y + 5);
+    await settle();
+    const type = (key: string, modifiers = {}) => {
+      platform.key({ type: "down", key, modifiers });
+      platform.key({ type: "up", key, modifiers });
+    };
+    type("A");
+    type("Tab");
+    type("B");
+    await settle();
+    const after = await fields();
+    expect(after.find((n) => n.name === "body")?.value).toBe("B");
+    expect(after.find((n) => n.bounds.x === title.bounds.x && n.bounds.y === title.bounds.y)?.value).toBe("A");
   });
 });

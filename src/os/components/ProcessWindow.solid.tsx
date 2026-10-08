@@ -118,6 +118,8 @@ export function ProcessWindow(props: { process: AppProcess; windowKey: string; s
       tabIndex={0}
       autoFocus={options.body}
       rawKeys={rawKeys()}
+      // Tab moves focus among the app's own controls, in the worker.
+      tabKeys
       semantic={options.body ? { name: "app-process", role: "canvas" } : undefined}
       onPaint={(surface) => {
         const start = app.scheduler.now();

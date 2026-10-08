@@ -159,6 +159,12 @@ export interface FocusEventHandlers {
    * ordinary key rather than Paste. For terminals and editors.
    */
   rawKeys?: boolean;
+  /**
+   * The focused node takes Tab and Shift-Tab as keys, as `rawKeys` does, but
+   * no other: for a view of another UI (a worker app's picture) whose own
+   * focus they move. ⌃Tab still moves focus here.
+   */
+  tabKeys?: boolean;
 }
 
 export type EventHandlers = MouseEventHandlers & KeyboardEventHandlers & FocusEventHandlers;
@@ -699,7 +705,7 @@ export const EVENT_PROP_NAMES = new Set<string>([
   "onMouseMove", "onMouseEnter", "onMouseLeave", "onDragStart", "onDrag", "onDragEnd",
   "onScroll", "onScrollX",
   "onKeyDown", "onKeyUp", "onKeyPress", "onPaste",
-  "onFocus", "onBlur", "tabIndex", "autoFocus", "rawKeys", "cursor",
+  "onFocus", "onBlur", "tabIndex", "autoFocus", "rawKeys", "tabKeys", "cursor",
 ]);
 
 export function setNodeProperty(node: CanvasNode, name: string, value: unknown): void {

@@ -128,6 +128,31 @@ describe("FocusManager — Tab navigation", () => {
   });
 });
 
+describe("FocusManager — a node that takes Tab", () => {
+  it("gets Tab and Shift-Tab as keys, as a worker app's picture does to move its own focus; ⌃Tab still moves focus", () => {
+    const root = createNode("_root");
+    const picture = makeFocusableNode(0);
+    const other = makeFocusableNode(0);
+    const keys = vi.fn();
+    picture._eventHandlers.tabKeys = true;
+    picture._eventHandlers.onKeyDown = keys;
+    root.children = [picture, other];
+    picture.parent = root;
+    other.parent = root;
+
+    const mgr = createFocusManager(root);
+    mgr.focus(picture);
+    mgr.dispatchKeyboard("keydown", "Tab", MOD);
+    mgr.dispatchKeyboard("keydown", "Tab", { ...MOD, shift: true });
+    expect(mgr.focused).toBe(picture);
+    expect(keys.mock.calls.map(([key, mods]) => [key, mods.shift])).toEqual([["Tab", false], ["Tab", true]]);
+
+    mgr.dispatchKeyboard("keydown", "Tab", { ...MOD, ctrl: true });
+    expect(mgr.focused).toBe(other);
+    expect(mgr.takesRawKeys()).toBe(false);
+  });
+});
+
 describe("FocusManager — keyboard dispatch", () => {
   it("routes keydown to focused element", () => {
     const root = createNode("_root");
