@@ -101,6 +101,8 @@ export type LayoutNode =
       height?: number;
       /** CSS-style corner radius the picture is clipped to (half its size for a circle). */
       borderRadius?: number;
+      /** A 1px black border around the picture, inside its size, following `borderRadius`. */
+      border?: boolean;
     }
   /**
    * Columns side by side, stacked instead when the page is narrower than
@@ -124,10 +126,10 @@ export type LayoutNode =
   | { type: "scroller"; width: number; nodes: LayoutNode[]; start?: "start" | "end" }
   /**
    * A pull-down menu: `label` drawn like a link opens `items` under it, or
-   * `image` (a picture's `src`, drawn round at `size`) in the label's place.
+   * `image` (a picture's `src`, drawn round at `size`, ringed with `border`) in the label's place.
    * `align: "right"` puts it, and hangs the menu, at the right.
    */
-  | { type: "menu"; label: string; items: MenuEntry[]; align: Align; image?: { src: string; size: number } }
+  | { type: "menu"; label: string; items: MenuEntry[]; align: Align; image?: { src: string; size: number; border?: boolean } }
   /**
    * A site's page tabs over a rule across the page, as github.com's: the
    * current tab bold with a line under it on the rule, the others plain links.

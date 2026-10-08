@@ -237,7 +237,7 @@ function spaceSections(nodes: readonly LayoutNode[]): LayoutNode[] {
   });
 }
 
-/** The signed-in account's avatar in the header, round, opening its menu. */
+/** The signed-in account's avatar in the header, round in a 1px ring, opening its menu. */
 const HEADER_AVATAR = 16;
 
 /**
@@ -259,7 +259,7 @@ function accountMenu(account: Viewer, here: string): LayoutNode {
   if (signOut.type === "form") items.push({ label: "Sign out", form: signOut.form });
   const avatar = viewer ? avatarSrc(account.avatarUrl, HEADER_AVATAR) : "";
   const menu: LayoutNode = { type: "menu", label: viewer || "Account", items, align: "right" };
-  return avatar ? { ...menu, image: { src: avatar, size: HEADER_AVATAR } } : menu;
+  return avatar ? { ...menu, image: { src: avatar, size: HEADER_AVATAR, border: true } } : menu;
 }
 
 /** Where a form posts, and the page that shows the form again if GitHub refuses it. */

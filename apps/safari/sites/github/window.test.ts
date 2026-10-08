@@ -2,7 +2,8 @@
  * GitHub in a real Safari window, signed in: the contribution calendar is
  * wider than the page, so it opens on the latest weeks and scrolls
  * sideways; the header's account menu signs out; a starred repository's
- * Star button says it unstars; the current tab's line, and a hovered one's, sits on the rule.
+ * Star button says it unstars; the current tab's line, and a hovered one's, sits on the rule;
+ * the account menu opens from a ringed avatar.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FetchResponse } from "@mockintosh/sdk";
@@ -65,9 +66,11 @@ describe("GitHub in a Safari window", () => {
       if (path.endsWith("/users/octocat")) return reply({ login: "octocat", type: "User", public_repos: 0 });
       if (path.endsWith("/repos/octocat/hello")) return reply({ name: "hello", owner: { login: "octocat" }, default_branch: "main", stargazers_count: 7 });
       if (path.endsWith("/user/starred/octocat/hello")) return reply(null, 204);
-      if (path.endsWith("/user")) return reply({ login: "octocat" });
+      if (path.endsWith("/user")) return reply({ login: "octocat", avatar_url: "https://avatars.githubusercontent.com/u/583231?v=4" });
       return reply([]);
     };
+    // Every picture decodes to plain mid-gray, which dithers to a pattern a solid ring stands out from.
+    platform.images = { decode: async () => ({ width: 16, height: 16, rgba: new Uint8ClampedArray(16 * 16 * 4).fill(128) }) };
     // Registered before boot, as bundled apps are, so boot registers its sprites too.
     registerApp(Safari);
     os = await bootOS(platform);
@@ -228,5 +231,15 @@ describe("GitHub in a Safari window", () => {
     expect(foot(repositories!).map((row) => row.slice(clear))).toEqual(["1", "1"].map((ink) => ink.repeat(repositories!.bounds.width - clear)));
     await parkPointer();
     expect(foot(repositories!)[0]).toBe("0".repeat(repositories!.bounds.width));
+  });
+
+  it("rings the avatar the account menu opens from in 1px, round", async () => {
+    const avatar = (await inspect()).find((node) => node.name === "octocat menu");
+    expect(avatar?.bounds).toMatchObject({ width: 16, height: 16 });
+    await parkPointer();
+    const rows = pixels(avatar!.bounds).split("\n");
+    // The ring's top and bottom, and its sides, solid black around the dithered picture.
+    expect([rows[0], rows[15]]).toEqual(["0000011111100000", "0000011111100000"]);
+    for (const row of rows.slice(5, 11)) expect([row[0], row[15]]).toEqual(["1", "1"]);
   });
 });

@@ -400,7 +400,7 @@ describe("GitHub forms", () => {
     if (header?.type !== "columns") throw new Error("no header");
     expect(header.columns[3]).toMatchObject({
       width: 16,
-      nodes: [{ type: "menu", label: "octocat", image: { src: "https://avatars.githubusercontent.com/u/583231?v=4&s=16", size: 16 } }],
+      nodes: [{ type: "menu", label: "octocat", image: { src: "https://avatars.githubusercontent.com/u/583231?v=4&s=16", size: 16, border: true } }],
     });
   });
 });

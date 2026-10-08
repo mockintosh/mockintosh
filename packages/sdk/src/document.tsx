@@ -194,7 +194,7 @@ function MenuView(props: { node: Extract<LayoutNode, { type: "menu" }>; view: Do
             <Show when={node.image} fallback={<text font="body" nowrap runs={[{ text: node.label, underline: true }]} />}>
               {(image) => (
                 <ImageView
-                  node={{ type: "image", src: image().src, alt: node.label, align: "left", width: image().size, height: image().size, borderRadius: image().size / 2 }}
+                  node={{ type: "image", src: image().src, alt: node.label, align: "left", width: image().size, height: image().size, borderRadius: image().size / 2, border: image().border }}
                   width={image().size}
                   view={props.view}
                 />
@@ -478,14 +478,23 @@ function ImageView(props: { node: Extract<LayoutNode, { type: "image" }>; width:
     <Loading fallback={pending()}>
       <Errored fallback={() => alt()}>
         <Show when={size()} fallback={alt()}>
-          {(fit) =>
-            node.borderRadius ? (
-              <box width={fit().width} height={fit().height} borderRadius={node.borderRadius} overflow="hidden">
-                <Dithered src={fit().frame} width={fit().width} height={fit().height} />
+          {(fit) => {
+            const radius = node.borderRadius ?? 0;
+            // A border rings the picture from outside a clip one pixel in, so the picture never paints over it.
+            const inset = node.border ? 1 : 0;
+            const picture = (
+              <box width={fit().width - inset * 2} height={fit().height - inset * 2} borderRadius={Math.max(0, radius - inset)} overflow={radius ? "hidden" : undefined}>
+                <Dithered src={fit().frame} width={fit().width - inset * 2} height={fit().height - inset * 2} />
+              </box>
+            );
+            return node.border ? (
+              <box width={fit().width} height={fit().height} borderWidth={1} borderColor={1} borderRadius={radius}>
+                {picture}
               </box>
             ) : (
-              <Dithered src={fit().frame} width={fit().width} height={fit().height} />
-            )}
+              picture
+            );
+          }}
         </Show>
       </Errored>
     </Loading>,
