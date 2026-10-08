@@ -4,6 +4,7 @@ import {
   parseLinkNext,
   renderContributorsModule,
   resolveRepo,
+  shouldRefresh,
 } from "./build-contributors";
 
 describe("resolveRepo", () => {
@@ -49,5 +50,13 @@ describe("renderContributorsModule", () => {
     expect(source).toContain("export const contributors");
     expect(source).toContain('"gustavlrsn"');
     expect(source).toContain("158");
+  });
+});
+
+describe("shouldRefresh", () => {
+  it("refreshes on Vercel or with --refresh, and leaves the committed file alone otherwise", () => {
+    expect(shouldRefresh({}, [])).toBe(false);
+    expect(shouldRefresh({ VERCEL: "1" }, [])).toBe(true);
+    expect(shouldRefresh({}, ["--refresh"])).toBe(true);
   });
 });
