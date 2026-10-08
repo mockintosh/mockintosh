@@ -563,6 +563,9 @@ function Safari(props: Record<string, unknown>): JSX.Element {
               onClose={closeOneTab}
             />
           </Show>
+          {/* A black line and a white one: with the window's own rule under them, a Finder folder's double rule. */}
+          <box height={1} background={1} />
+          <box height={1} background={0} />
         </box>
       </WindowHeader>
       <Show

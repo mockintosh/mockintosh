@@ -4,10 +4,12 @@ import { closeIcon, dimmed, lockIcon } from "./icons";
 
 export const TOOLBAR_H = 24;
 export const TAB_BAR_H = 17;
-/** Toolbar and the header band's own bottom rule (no tab bar). */
-export const TOOLBAR_HEADER_H = TOOLBAR_H + 1;
-/** Toolbar, rule, tab bar, and the header band's own bottom rule. */
-export const HEADER_H = TOOLBAR_H + 1 + TAB_BAR_H + 1;
+/** The double rule under the header, as a Finder folder's: a black line and a white one over the band's own bottom rule. */
+export const DOUBLE_RULE_H = 2;
+/** Toolbar, the double rule, and the header band's own bottom rule (no tab bar). */
+export const TOOLBAR_HEADER_H = TOOLBAR_H + DOUBLE_RULE_H + 1;
+/** Toolbar, rule, tab bar, the double rule, and the header band's own bottom rule. */
+export const HEADER_H = TOOLBAR_H + 1 + TAB_BAR_H + DOUBLE_RULE_H + 1;
 const FACE_H = 18;
 const TAB_FONT = "body";
 const ARROW_W = 23;
