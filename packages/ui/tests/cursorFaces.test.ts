@@ -3,11 +3,12 @@ import { globals } from "@mockintosh/quickdraw";
 import { cssCursorFromFace, cursorFromFace, faceFromCursor } from "../src/cursorFace";
 import { MAC_CURSOR_FACES, resolveMacCursorFace } from "../src/cursors/mac";
 
+/** Pixels that mark the screen: opaque black, or inverting (data set, mask clear). */
 function inkCount(name: keyof typeof MAC_CURSOR_FACES): number {
   const { sprite } = MAC_CURSOR_FACES[name];
   let n = 0;
   for (let i = 0; i < sprite.data.length; i++) {
-    if ((sprite.mask ? sprite.mask[i] : 1) && sprite.data[i]) n += 1;
+    if (sprite.data[i]) n += 1;
   }
   return n;
 }
@@ -30,6 +31,13 @@ describe("Macintosh cursor faces", () => {
     expect(inkCount("watch")).toBeGreaterThan(10);
     expect(inkCount("pointer")).toBeGreaterThan(10);
     expect(inkCount("grab")).toBeGreaterThan(10);
+  });
+
+  it("draws the I-beam and cross as inverting cursors, like the System's", () => {
+    for (const name of ["iBeam", "cross"] as const) {
+      expect(maskCount(name)).toBe(0);
+      expect(inkCount(name)).toBeGreaterThan(10);
+    }
   });
 
   it("round-trips the ROM arrow through faceFromCursor", () => {

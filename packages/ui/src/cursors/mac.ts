@@ -3,8 +3,9 @@
  *
  * Arrow is QuickDraw's ROM cursor. Watch and plus are System 7.5.3 `CURS`
  * 4 and 3 from `scripts/extract-system753-resources.py`. iBeam and cross
- * dumped as empty (all-transparent) from that image — reconstructed to the
- * documented hot spots. Pointer is HyperCard's browse finger (`CURS` 128).
+ * dumped as empty from that image: their masks are all clear, so every ink
+ * pixel inverts the screen — white over black text, black over white. They
+ * are reconstructed as inverting faces at the documented hot spots. Pointer is HyperCard's browse finger (`CURS` 128).
  * Grab / fist are the open-hand sprites.
  *
  * The full suitcase (Color Tools, Finder busy-watch frames, …) stays in
@@ -19,9 +20,14 @@ import {
   type CursorFaceTable,
 } from "../cursorFace";
 import type { CursorSpec, NamedCursor } from "../cursor";
-import { defineSprite, fromGrid } from "../sprite";
+import { defineSprite, fromGrid, type Sprite } from "../sprite";
 
-const I_BEAM = fromGrid(16, 16, [
+/** Clear the mask so the ROM's `srcXor` pass inverts every ink pixel. */
+function inverting(sprite: Sprite): Sprite {
+  return { ...sprite, mask: new Uint8Array(sprite.width * sprite.height) };
+}
+
+const I_BEAM = inverting(fromGrid(16, 16, [
   "....##....##....",
   ".....##..##.....",
   "......####......",
@@ -38,9 +44,9 @@ const I_BEAM = fromGrid(16, 16, [
   "....##....##....",
   "................",
   "................",
-]);
+]));
 
-const CROSS = fromGrid(16, 16, [
+const CROSS = inverting(fromGrid(16, 16, [
   ".....#..........",
   ".....#..........",
   ".....#..........",
@@ -57,7 +63,7 @@ const CROSS = fromGrid(16, 16, [
   "................",
   "................",
   "................",
-]);
+]));
 
 const PLUS = defineSprite(
   16,
