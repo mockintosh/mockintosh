@@ -108,6 +108,28 @@ describe("Tooltip", () => {
     expect(ui.inspect().some((n) => n.name === "tooltip")).toBe(false);
   });
 
+  it("leaves its 1px gap above a raised button's face, which draws a pixel above its box", async () => {
+    const screen = newBitMap(200, 80);
+    const ui = createUI({ screen });
+    ui.render(() => (
+      <box padding={40} flexDirection="row">
+        <Tooltip label="Fork it">
+          <Button name="fork" label="Fork" onClick={() => {}} />
+        </Tooltip>
+      </box>
+    ));
+    await settle(ui);
+    const button = ui.inspect().find((n) => n.name === "fork")!;
+    ui.dispatchPointer("mousemove", button.bounds.x + 8, button.bounds.y + 6);
+    await settle(ui);
+    const tip = ui.inspect().find((n) => n.name === "tooltip")!;
+    const row = (y: number) => Array.from({ length: 20 }, (_, i) => (getBit(screen, button.bounds.x + 8 + i, y) ? "#" : ".")).join("");
+    const faceTop = button.bounds.y - 1;
+    expect(row(faceTop)).toBe("#".repeat(20));
+    expect(row(faceTop - 1)).toBe(".".repeat(20));
+    expect(tip.bounds.y + tip.bounds.height).toBe(faceTop - 1);
+  });
+
   it("closes when its trigger moves out from under a still pointer, as a scrolled window's content does", () => {
     const ui = createUI({ screen: newBitMap(240, 120) });
     // The window's scroll, as the OS gives it to a worker app: the content moves, the pointer doesn't.

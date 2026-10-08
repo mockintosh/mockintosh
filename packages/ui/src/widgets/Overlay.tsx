@@ -1,6 +1,6 @@
 import { For, Show, createContext, createEffect, createSignal, onCleanup, onSettled, useContext } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import type { CanvasNode } from "../nodes";
+import { shadowRaise, type CanvasNode } from "../nodes";
 import { getFocusManager } from "../focusContext";
 import { scrollPaintOffset, scrollPaintOffsetX } from "../scroll";
 
@@ -199,6 +199,25 @@ function drawnAt(node: CanvasNode): { x: number; y: number } {
   return { x, y };
 }
 
+/**
+ * How far above its layout box `node` is drawn: a box with a shadow draws
+ * its face a pixel up and left of its box (the shadow fills the box's right
+ * and bottom edges), and so does everything inside it. Only boxes along the
+ * top edge count; one not laid out yet isn't there.
+ */
+function raisedAbove(node: CanvasNode): number {
+  const top = node.layout.y;
+  let most = 0;
+  const visit = (n: CanvasNode, raised: number) => {
+    if (n.layout.y !== top) return;
+    const lift = raised + shadowRaise(n);
+    most = Math.max(most, lift);
+    for (const child of n.children) visit(child, lift);
+  };
+  visit(node, 0);
+  return most;
+}
+
 /** The left and right edges of the nearest `overlayBounds` box around `node`, as drawn. */
 function boundsOf(node: CanvasNode): { left: number; right: number } | undefined {
   for (let n = node.parent; n; n = n.parent) {
@@ -219,7 +238,8 @@ function place(
   if (!node) return { x: 0, y: 0 };
   const at = drawnAt(node);
   const above = side === "top";
-  const y = above ? at.y - offset : at.y + node.layout.height + offset;
+  // Above, the gap is from the top of what's drawn, which a raised (shadowed) button lifts a pixel.
+  const y = above ? at.y - raisedAbove(node) - offset : at.y + node.layout.height + offset;
   const bounds = boundsOf(node);
   if (align === "end") {
     let root: CanvasNode = node;
