@@ -878,12 +878,12 @@
    "terminal/icon": {
     "width": 32,
     "height": 32,
-    "data": "AAAAAAAAAAAAAAAAAAAAAACqqqqqqqgAAlVVVVVVVgAJVVVVVVVVgCVqqqqqqqVgJaqqqqqqqWglqqqqqqqpaCWqqqqqqqloJalqqqqqqWglqlqqqqqpaCWqlqqqqqloJaqlqqqqqWglqqWqqqqpaCWqlqqqqqloJapalVWqqWglqWqVVaqpaCWqqqqqqqloJaqqqqqqqWglqqqqqqqpaCWqqqqqqqloJaqqqqqqqWglqqqqqqqpaCWqqqqqqqloJaqqqqqqqWglaqqqqqqlaAlVVVVVVVWoAlVVVVVVVqAAqqqqqqqqgAAqqqqqqqoAAAAAAAAAAAAAAAAAAAAAAA=="
+    "data": "AKqqqqqqqgAKqqqqqqqqoCqqqqqqqqqoKqqqqqqqqqiqqqqqqqqqqqqqqqqqqqqqqqWqqqqqqqqqqWqqqqqqqqqqWqqqqqqqqqqWqqqqqqqqqlqqqqqqqqqpalVWqqqqqqWqVVaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqoqqqqqqqqqqCqqqqqqqqqoCqqqqqqqqqAAqqqqqqqqAA=="
    },
    "terminal/icon-16x16": {
     "width": 16,
     "height": 16,
-    "data": "AAAAACqqqqCVVVVYmqqqmpqqqpqaaqqampqqmpqmqpqamqqammlWmpqqqpqaqqqamqqqmpVVVVoqqqqqCqqqqA=="
+    "data": "CqqqoCqqqqiqqqqqqaqqqqpqqqqqmqqqqmqqqqmpWqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqoqqqqoCqqqoA=="
    }
   }
  },
