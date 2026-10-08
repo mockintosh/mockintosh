@@ -258,7 +258,7 @@ export default defineApp({
 - `agentRuntime` — language-model agents with your app's tools, when this Macintosh can run them (see [Agents](#agents))
 - `scheduler` — `requestFrame` / `now` (no `requestAnimationFrame` / `performance`)
 - `capabilities` — the set of things this Macintosh can do (see [Capabilities](#capabilities))
-- `env.origin` / `env.config` — host origin and configuration (`SPOTIFY_CLIENT_ID`, …)
+- `env.origin` / `env.config` — host origin and configuration
 - `crypto.randomBytes` / `crypto.sha256`
 - `browser` — `openExternal`, `authorize`, `loadScript`, when this Macintosh runs in a browser
 - `signIn` — sign in to an OAuth provider from the user's phone (see [Signing in](#signing-in))

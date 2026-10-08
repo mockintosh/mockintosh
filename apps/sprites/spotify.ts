@@ -79,7 +79,7 @@ const SPRITE_PAUSE = fromGrid(16, 16, [
   "................",
 ]);
 
-const SPRITE_PREV = fromGrid(12, 12, [
+const SPRITE_NEXT = fromGrid(12, 12, [
   "............",
   ".#....#.....",
   ".##...##....",
@@ -94,7 +94,7 @@ const SPRITE_PREV = fromGrid(12, 12, [
   "............",
 ]);
 
-const SPRITE_NEXT = fromGrid(12, 12, [
+const SPRITE_PREV = fromGrid(12, 12, [
   "............",
   ".....#....#.",
   "....##...##.",
