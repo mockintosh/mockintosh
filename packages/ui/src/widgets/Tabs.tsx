@@ -12,6 +12,8 @@ export interface TabsProps {
   value: string;
   onChange: (value: string) => void;
   items: readonly TabItem[];
+  /** Leave the tabs out of Tab's order, as a tool strip beside a text box does. */
+  untabbable?: boolean;
   children?: JSX.Element;
 }
 
@@ -46,7 +48,7 @@ export function Tabs(props: TabsProps): JSX.Element {
                 background={active() ? 1 : 0}
                 borderColor={1}
                 borderWidth={1}
-                tabIndex={item.disabled ? undefined : 0}
+                tabIndex={item.disabled || props.untabbable ? undefined : 0}
                 cursor={item.disabled ? "default" : "pointer"}
                 onClick={select}
                 onKeyDown={(key: string) => {

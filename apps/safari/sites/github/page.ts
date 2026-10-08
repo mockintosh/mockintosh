@@ -1101,7 +1101,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
         paragraph(text("Add a title, then describe the issue. Markdown works.")),
         ...postForm({ kind: "issues", owner, repo: name }, forms, [
           { kind: "text", name: "title", value: "", placeholder: "Title" },
-          { kind: "textarea", name: "body", value: "", rows: 10 },
+          { kind: "textarea", name: "body", value: "", rows: 10, markdown: true },
           { kind: "submit", name: "", value: "", label: "Create" },
         ]),
       );
@@ -1184,7 +1184,7 @@ function newDiscussionNodes(page: Extract<GithubPage, { view: "newDiscussion" }>
     ...postForm({ kind: "discussions", owner: repo.owner, repo: repo.name }, forms, [
       { kind: "hidden", name: "category", value: category.slug },
       { kind: "text", name: "title", value: "", placeholder: "Title" },
-      { kind: "textarea", name: "body", value: "", rows: 10 },
+      { kind: "textarea", name: "body", value: "", rows: 10, markdown: true },
       { kind: "submit", name: "", value: "", label: "Start discussion" },
     ]),
   ];

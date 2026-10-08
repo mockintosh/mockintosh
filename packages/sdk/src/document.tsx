@@ -1,6 +1,7 @@
 import { Errored, For, Loading, Show, createMemo, createSignal, useContext } from "solid-js";
 import type { ImageFrame, JSX, TextRun } from "@mockintosh/ui";
-import { Button, Dithered, Menu, TextEditor, TextInput, Tooltip } from "@mockintosh/ui";
+import { Button, Dithered, Menu, RichTextEditor, TextEditor, TextInput, Tooltip } from "@mockintosh/ui";
+import { parseMarkdown } from "@mockintosh/markdown";
 import type { FormControl, InlineSegment, LayoutColumn, LayoutNode, TableRow, WebForm } from "@mockintosh/markdown";
 import { AppServicesContext } from "./index";
 
@@ -419,6 +420,19 @@ function FormControlView(props: {
         width={props.inputWidth}
         onChange={(value) => props.setValues((prev) => ({ ...prev, [index]: value }))}
         onSubmit={() => props.submit()}
+      />
+    );
+  }
+  if (control.kind === "textarea" && control.markdown) {
+    return (
+      <RichTextEditor
+        name={control.name || undefined}
+        value={props.values()[index] ?? ""}
+        width={props.inputWidth}
+        height={control.rows * TEXTAREA_LINE + 8}
+        borderRadius={props.radius}
+        onChange={(value) => props.setValues((prev) => ({ ...prev, [index]: value }))}
+        preview={(value) => <DocumentView nodes={parseMarkdown(value)} />}
       />
     );
   }

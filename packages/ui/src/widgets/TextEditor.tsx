@@ -12,6 +12,16 @@ export interface TextEditorProps {
   width: number; height: number; disabled?: boolean; line?: number;
   /** Corner radius of the border; the theme's when omitted. */
   borderRadius?: number;
+  /** Hands over a way to read and change the selection, for a toolbar that edits around it. */
+  controller?: (controller: TextEditorController) => void;
+}
+
+/** What a toolbar can do with a TextEditor. */
+export interface TextEditorController {
+  /** The selection, `start` to `end` (equal for a caret). */
+  selection(): { start: number; end: number };
+  /** Replaces the text with `value`, selects `start` to `end`, and takes focus back. */
+  edit(value: string, start: number, end: number): void;
 }
 /** Multiline text editing in the canvas renderer. The document owner controls
  * saving/revisions; this widget owns only selection, caret, and viewport. */
@@ -67,6 +77,18 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
     props.onChange(next);
     move(lo + text.length);
   }
+  props.controller?.({
+    selection: () => ({ start: range().lo, end: range().hi }),
+    edit(value, start, end) {
+      if (props.disabled) return;
+      draft = value;
+      props.onChange(value);
+      anchorAt = start;
+      setAnchor(start);
+      move(end, true);
+      focus.focus(node);
+    },
+  });
   function key(key: string, mods: Modifiers) {
     if (props.disabled) return;
     const command = mods.meta || mods.ctrl, {lo, hi} = range(), at = location(caretAt);
