@@ -31,6 +31,10 @@ const TEXTAREA_LINE = 14;
 /** Border plus padding on each side of a `box` card. */
 const CARD_INSET = 7;
 const BLOCK_GAP = 4;
+/** In a form of stacked fields: from a label to its field, between fields (and on to the buttons), and over a labelled form's first. */
+const LABEL_GAP = 4;
+const FIELD_GAP = 12;
+const FORM_TOP = 8;
 
 function inlineRuns(segments: readonly InlineSegment[], onLink: ((href: string) => void) | undefined): TextRun[] {
   return segments.map((segment) => {
@@ -384,7 +388,7 @@ function FormView(props: { form: WebForm; width: number; onSubmit?: (form: WebFo
     const label = entry.control.kind === "text" || entry.control.kind === "textarea" ? entry.control.label : undefined;
     // A labelled control has its label over it, in bold.
     return label ? (
-      <box flexDirection="column" gap={3}>
+      <box flexDirection="column" gap={LABEL_GAP}>
         <text font="body" bold nowrap>{label}</text>
         {control}
       </box>
@@ -393,7 +397,7 @@ function FormView(props: { form: WebForm; width: number; onSubmit?: (form: WebFo
   // With several lines to write, fields stack at the page's width and the buttons sit under them.
   if (form.controls.some((control) => control.kind === "textarea")) {
     return (
-      <box flexDirection="column" gap={4}>
+      <box flexDirection="column" gap={FIELD_GAP} paddingTop={form.controls.some((control) => "label" in control && control.kind !== "submit" && control.label) ? FORM_TOP : 0}>
         <For each={shown.filter((entry) => entry.control.kind !== "submit")}>{(entry) => view(entry, () => props.width)}</For>
         <box flexDirection="row" gap={4} justifyContent="flex-end">
           <For each={shown.filter((entry) => entry.control.kind === "submit")}>{(entry) => view(entry, () => props.width)}</For>
