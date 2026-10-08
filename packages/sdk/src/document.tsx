@@ -161,8 +161,8 @@ function MenuView(props: { node: Extract<LayoutNode, { type: "menu" }>; view: Do
   );
 }
 
-/** Height of a scroller's bar: a black thumb on the windows' own scroll-track gray, as thin as it can be and still be dragged. */
-const SCROLLER_BAR = 6;
+/** Height of a scroller's bar: a black thumb on the windows' own scroll-track gray, thin enough to stay out of the way. */
+const SCROLLER_BAR = 4;
 /** The bar's thumb is never narrower than this. */
 const SCROLLER_THUMB = 16;
 
