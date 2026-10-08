@@ -49,10 +49,6 @@ export function favoritesColumns(width: number): number {
   return Math.max(1, Math.min(MAX_COLUMNS, Math.floor((width + TILE_GAP) / (TILE_W + TILE_GAP))));
 }
 
-function inverted(bits: Uint8Array): Uint8Array {
-  return bits.map((bit) => 1 - bit);
-}
-
 /** A rounded square around a tile's picture. */
 function TileFrame(props: { pressed: boolean; children: JSX.Element }): JSX.Element {
   // The frame goes on top: a white icon would paint over the corners' arcs.
@@ -74,7 +70,7 @@ function TileFrame(props: { pressed: boolean; children: JSX.Element }): JSX.Elem
 }
 
 /** The site's picture; its letter while there is none. */
-function SiteIcon(props: { bookmark: Bookmark; icons?: FaviconLoader; pressed: boolean }): JSX.Element {
+function SiteIcon(props: { bookmark: Bookmark; icons?: FaviconLoader }): JSX.Element {
   const app = useApp();
   const icon = props.bookmark.icon;
   const sprite = icon ? app.getSprite(icon) : undefined;
@@ -84,25 +80,25 @@ function SiteIcon(props: { bookmark: Bookmark; icons?: FaviconLoader; pressed: b
   if (src && props.icons && known === undefined) void props.icons.load(src).then((loaded) => setBits(loaded));
 
   const letter = () => (
-    <text font="newYork" size={24} nowrap color={props.pressed ? 0 : 1}>{props.bookmark.title.slice(0, 1).toUpperCase()}</text>
+    <text font="newYork" size={24} nowrap>{props.bookmark.title.slice(0, 1).toUpperCase()}</text>
   );
   return (
-    <TileFrame pressed={props.pressed}>
+    <TileFrame pressed={false}>
       <Show
         when={sprite}
         fallback={
           <Show when={bits()} fallback={letter()}>
-            {(pixels) => <bitmap pixels={props.pressed ? inverted(pixels()) : pixels()} width={FAVICON_SIZE} height={FAVICON_SIZE} />}
+            {(pixels) => <bitmap pixels={pixels()} width={FAVICON_SIZE} height={FAVICON_SIZE} />}
           </Show>
         }
       >
-        {(art) => <image src={art()} width={art().width} height={art().height} mode={props.pressed ? "inverted" : "normal"} />}
+        {(art) => <image src={art()} width={art().width} height={art().height} />}
       </Show>
     </TileFrame>
   );
 }
 
-function TileLabel(props: { text: string; pressed: boolean }): JSX.Element {
+function TileLabel(props: { text: string; pressed?: boolean }): JSX.Element {
   return (
     <box alignSelf="stretch" alignItems="center">
       <text font="body" wrap align="center" color={props.pressed ? 0 : 1} background={props.pressed ? 1 : 0}>
@@ -122,8 +118,6 @@ interface TileDrag {
 function FavoriteTile(props: {
   bookmark: Bookmark;
   editing: boolean;
-  /** Being dragged: drawn black, as a pressed tile. */
-  dragged: boolean;
   icons?: FaviconLoader;
   drag: TileDrag;
   onOpen(url: string): void;
@@ -136,7 +130,6 @@ function FavoriteTile(props: {
     },
     onClick: () => props.onOpen(props.bookmark.url),
   });
-  const dark = () => press.pressed() || props.dragged;
   // While editing, a tile drags to a new place; the grid works out where.
   return (
     <box
@@ -157,8 +150,8 @@ function FavoriteTile(props: {
         if (props.editing) props.drag.onEnd(props.bookmark);
       }}
     >
-      <SiteIcon bookmark={props.bookmark} icons={props.icons} pressed={dark()} />
-      <TileLabel text={props.bookmark.title} pressed={dark()} />
+      <SiteIcon bookmark={props.bookmark} icons={props.icons} />
+      <TileLabel text={props.bookmark.title} />
       <Show when={props.editing}>
         <box
           semantic={{ name: `safari-favorite-delete-${props.bookmark.title}`, role: "button" }}
@@ -352,7 +345,6 @@ export function StartView(props: StartViewProps): JSX.Element {
                     <FavoriteTile
                       bookmark={tile.bookmark}
                       editing={props.editing}
-                      dragged={held()}
                       drag={drag}
                       icons={props.icons}
                       onOpen={props.onOpen}
