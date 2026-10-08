@@ -516,12 +516,22 @@ export function githubPage(page: GithubPage, now: number, forms: PageForms = { s
 }
 
 /** Repositories by full name, as search results and the dashboard list them. */
+/**
+ * A repository's name as a link, its owner first unless `separator` is
+ * null: the name bold, the owner not, as github.com sets them.
+ */
+function repoName(owner: string, name: string, separator: string | null): InlineSegment[] {
+  const href = githubUrl({ kind: "tree", owner, repo: name, ref: "", path: "" });
+  const bold: InlineSegment = { kind: "link", text: name, href, bold: true };
+  return separator === null ? [bold] : [{ kind: "link", text: `${owner}${separator}`, href }, bold];
+}
+
 function repoList(repos: readonly ProfileRepo[], empty: string): LayoutNode {
   return list(
     repos.map((repo): LayoutNode[] => {
       const location: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
       return [
-        heading(3, `${repo.owner} / ${repo.name}`, githubUrl(location)),
+        paragraph(...repoName(repo.owner, repo.name, " / ")),
         ...(repo.description ? [paragraph(text(repo.description))] : []),
         facts(repo.fork && "Fork", repo.language, plural(repo.stars, "star", "stars")),
       ];
@@ -537,13 +547,12 @@ const TWO_COLUMNS = SIDEBAR + 16 + 220;
 
 /** A repository as a card: name, description, and language / stars / forks. */
 function repoCard(repo: ProfileRepo, owner: string): LayoutNode {
-  const location: GithubLocation = { kind: "tree", owner: repo.owner, repo: repo.name, ref: "", path: "" };
-  const name = repo.owner.toLowerCase() === owner.toLowerCase() ? repo.name : `${repo.owner}/${repo.name}`;
+  const own = repo.owner.toLowerCase() === owner.toLowerCase();
   return {
     type: "box",
     radius: CARD_RADIUS,
     nodes: [
-      paragraph({ kind: "link", text: name, href: githubUrl(location) }, text(repo.fork ? "  Fork" : "  Public")),
+      paragraph(...repoName(repo.owner, repo.name, own ? null : "/"), text(repo.fork ? "  Fork" : "  Public")),
       ...(repo.description ? [paragraph(text(repo.description))] : []),
       facts(repo.language, plural(repo.stars, "star", "stars"), repo.forks > 0 && plural(repo.forks, "fork", "forks")),
     ],
