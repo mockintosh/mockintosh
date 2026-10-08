@@ -418,7 +418,8 @@ async function getDiscussion(
     repository(owner: $owner, name: $name) {
       discussion(number: $number) {
         id ${DISCUSSION_FIELDS}
-        comments(first: 30) {
+        # Renamed: DISCUSSION_FIELDS already asks for comments' count, and GraphQL won't take one field with two sets of arguments.
+        thread: comments(first: 30) {
           nodes {
             body createdAt isAnswer author { login }
             replies(first: 10) { nodes { body createdAt author { login } } }
@@ -429,7 +430,7 @@ async function getDiscussion(
   }`, { owner: repo.owner, name: repo.name, number });
   const record = asRecord(asRecord(asRecord(data).repository).discussion);
   if (!record.id) throw new GithubError("Not found on GitHub.", 404);
-  const nodes = asRecord(record.comments).nodes;
+  const nodes = asRecord(record.thread).nodes;
   const comments = Array.isArray(nodes)
     ? nodes.map((node) => {
       const comment = asRecord(node);

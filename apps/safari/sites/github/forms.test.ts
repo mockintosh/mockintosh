@@ -25,7 +25,8 @@ const ISSUE = { number: 5, title: "It broke", user: { login: "octocat" }, commen
 const DISCUSSION = {
   id: "D_1", number: 9, title: "Ideas", body: "Let's talk", createdAt: "2026-10-01T00:00:00Z", author: { login: "octocat" },
   category: { name: "Ideas" }, answerChosenAt: null,
-  comments: { totalCount: 1, nodes: [{ body: "Yes", createdAt: "2026-10-02T00:00:00Z", isAnswer: false, author: { login: "hubot" }, replies: { nodes: [{ body: "Agreed", createdAt: "2026-10-03T00:00:00Z", author: { login: "monalisa" } }] } }] },
+  comments: { totalCount: 1 },
+  thread: { nodes: [{ body: "Yes", createdAt: "2026-10-02T00:00:00Z", isAnswer: false, author: { login: "hubot" }, replies: { nodes: [{ body: "Agreed", createdAt: "2026-10-03T00:00:00Z", author: { login: "monalisa" } }] } }] },
 };
 const CATEGORIES = { repository: { id: "R_1", discussionCategories: { nodes: [{ id: "C_1", slug: "ideas", name: "Ideas", description: "Share ideas" }] } } };
 
