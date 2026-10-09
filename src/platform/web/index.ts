@@ -211,6 +211,9 @@ function createDOMInput(
     canvas.focus({ preventScroll: true });
     emitPointer({ type: "down", ...toScreen(e), button: button(e), modifiers: modifiers(e) });
   });
+  // The screen's own contextual menus answer the right button and ⌃-click;
+  // the browser's must not open over them.
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   canvas.addEventListener("mouseup", (e) => {
     emitPointer({ type: "up", ...toScreen(e), button: button(e), modifiers: modifiers(e) });
   });
