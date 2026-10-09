@@ -8,6 +8,16 @@ export class GithubError extends Error {
   }
 }
 
+/** What a 404 says when GitHub gives no more reason than that. */
+export const NOT_FOUND = "Not found on GitHub.";
+
+/** GitHub has answered all the requests it will this hour, for this address signed out or this account signed in; it answers again from `resetsAt` (ms), when it says. */
+export class RateLimitError extends GithubError {
+  constructor(readonly resetsAt: number | null) {
+    super("GitHub has answered all the requests it will for now. Try again later.", 403);
+  }
+}
+
 export interface RepoInfo {
   owner: string;
   name: string;
@@ -585,7 +595,7 @@ async function getDiscussion(
     }
   }`, { owner: repo.owner, name: repo.name, number });
   const record = asRecord(asRecord(asRecord(data).repository).discussion);
-  if (!record.id) throw new GithubError("Not found on GitHub.", 404);
+  if (!record.id) throw new GithubError(NOT_FOUND, 404);
   const nodes = asRecord(record.thread).nodes;
   const comments = Array.isArray(nodes)
     ? nodes.map((node) => {
@@ -810,11 +820,14 @@ async function gh(fetch: FetchFunction, token: string, path: string, json?: unkn
   // GitHub lets browsers keep its answers for a minute: ask it whether they're current, so a star, an issue or a
   // comment just made shows at once. An unchanged answer costs a 304, which doesn't count against the rate limit.
   const response = await fetch(`${API}${path}`, json === undefined ? { headers, cache: "no-cache" } : { method: "POST", headers, body: JSON.stringify(json) });
-  if (response.status === 404) throw new GithubError("Not found on GitHub.", 404);
+  if (response.status === 404) throw new GithubError(NOT_FOUND, 404);
   if (!response.ok) {
     const detail = await errorMessage(response);
+    if ((response.status === 403 || response.status === 429) && (response.headers.get("x-ratelimit-remaining") === "0" || /rate limit/i.test(detail))) {
+      throw new RateLimitError(resetTime(response));
+    }
     if (response.status === 401 || response.status === 403) {
-      throw new GithubError(detail || "GitHub refused the request. A token raises the rate limit.", response.status);
+      throw new GithubError(detail || "GitHub refused the request.", response.status);
     }
     throw new GithubError(detail || `GitHub returned ${response.status}.`, response.status);
   }
@@ -827,10 +840,19 @@ async function graphql(fetch: FetchFunction, token: string, query: string, varia
   const data = asRecord(await gh(fetch, token, "/graphql", { query, variables }));
   const errors = Array.isArray(data.errors) ? data.errors.map((error) => stringField(asRecord(error), "message")).filter(Boolean) : [];
   if (errors.length > 0) {
+    if (Array.isArray(data.errors) && data.errors.some((error) => asRecord(error).type === "RATE_LIMITED")) throw new RateLimitError(null);
     const missing = Array.isArray(data.errors) && data.errors.some((error) => asRecord(error).type === "NOT_FOUND");
-    throw new GithubError(missing ? "Not found on GitHub." : errors.join(" "), missing ? 404 : 422);
+    throw new GithubError(missing ? NOT_FOUND : errors.join(" "), missing ? 404 : 422);
   }
   return data.data;
+}
+
+/** When GitHub answers again: its reset time, or a wait it asks for; null when it doesn't say. */
+function resetTime(response: { headers: { get(name: string): string | null } }): number | null {
+  const reset = Number(response.headers.get("x-ratelimit-reset"));
+  if (reset > 0) return reset * 1000;
+  const wait = Number(response.headers.get("retry-after"));
+  return wait > 0 ? Date.now() + wait * 1000 : null;
 }
 
 async function errorMessage(response: { json(): Promise<unknown> }): Promise<string> {
