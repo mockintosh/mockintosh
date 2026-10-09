@@ -60,7 +60,48 @@ const ICON_APPLE_MUSIC_16: Sprite = fromGrid(16, 16, [
   "................",
 ]);
 
+/** The now-playing bar's toggles, drawn at the height of a button label. */
+const SHUFFLE = fromGrid(13, 9, [
+  "..........##.",
+  "###.....#####",
+  "...#...#..##.",
+  "....#.#......",
+  ".....#.......",
+  "....#.#......",
+  "...#...#..##.",
+  "###.....#####",
+  "..........##.",
+]);
+
+const REPEAT = fromGrid(13, 9, [
+  ".........##..",
+  "..##########.",
+  ".#.......##..",
+  ".#.........#.",
+  ".#.........#.",
+  ".#.........#.",
+  "..##.......#.",
+  ".##########..",
+  "..##.........",
+]);
+
+/** Repeat with a 1 in the loop: the same song again. */
+const REPEAT_ONE = fromGrid(13, 9, [
+  ".........##..",
+  "..##########.",
+  ".#.......##..",
+  ".#....##...#.",
+  ".#.....#...#.",
+  ".#.....#...#.",
+  "..##...#...#.",
+  ".##########..",
+  "..##.........",
+]);
+
 export const sprites: Record<string, Sprite> = {
+  "applemusic/shuffle": SHUFFLE,
+  "applemusic/repeat": REPEAT,
+  "applemusic/repeat-one": REPEAT_ONE,
   "applemusic/icon": ICON_APPLE_MUSIC,
   "applemusic/icon-16x16": ICON_APPLE_MUSIC_16,
 };

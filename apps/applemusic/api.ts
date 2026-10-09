@@ -67,6 +67,15 @@ export interface MusicKitInstance {
   readonly nowPlayingItem: MusicKitMediaItem | undefined;
   musicUserToken?: string;
   volume: number;
+  /** Seconds into the current item. */
+  readonly currentPlaybackTime: number;
+  /** Length of the current item in seconds; 0 until it has loaded. */
+  readonly currentPlaybackDuration: number;
+  seekToTime(seconds: number): Promise<void>;
+  /** 0 off, 1 songs. */
+  shuffleMode: number;
+  /** 0 none, 1 the current item, 2 the whole queue. */
+  repeatMode: number;
   setQueue(options: Record<string, unknown>): Promise<unknown>;
   play(): Promise<void>;
   pause(): void;
@@ -356,6 +365,21 @@ export async function ditherArtwork(url: string, size: number, session: AppleMus
   } catch {
     return null;
   }
+}
+
+/** Repeat as the bar cycles it, like Apple Music: off → all → one → off. */
+export type RepeatMode = "none" | "one" | "all";
+
+export function repeatModeOf(music: MusicKitInstance): RepeatMode {
+  return music.repeatMode === 1 ? "one" : music.repeatMode === 2 ? "all" : "none";
+}
+
+export function setRepeatMode(music: MusicKitInstance, mode: RepeatMode): void {
+  music.repeatMode = mode === "one" ? 1 : mode === "all" ? 2 : 0;
+}
+
+export function nextRepeatMode(mode: RepeatMode): RepeatMode {
+  return mode === "none" ? "all" : mode === "all" ? "one" : "none";
 }
 
 export function formatDuration(ms: number): string {

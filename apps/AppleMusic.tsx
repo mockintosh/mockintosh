@@ -1,12 +1,13 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Button, Spinner } from "@mockintosh/ui";
+import { Button } from "@mockintosh/ui";
 import { useApp, defineApp } from "@mockintosh/sdk";
 import {
   type AppleMusicSession,
   type Collection,
   type MusicKitInstance,
   type NowPlaying,
+  type RepeatMode,
   type Track,
   collectionAsNowPlaying,
   configureMusicKit,
@@ -19,13 +20,17 @@ import {
   fetchSongs,
   fetchTracks,
   isStoredUserToken,
+  nextRepeatMode,
   nowPlaying,
   playCollection,
   playTracks,
+  repeatModeOf,
+  setRepeatMode,
   signIn,
   trackAsNowPlaying,
 } from "./applemusic/api";
-import { Artwork, createArtworkLoader } from "./applemusic/Artwork";
+import { createArtworkLoader } from "./applemusic/Artwork";
+import { NOW_PLAYING_H, NowPlayingBar } from "./applemusic/NowPlayingBar";
 import {
   ArtistList,
   CollectionGrid,
@@ -35,7 +40,6 @@ import {
   Sidebar,
   Title,
   TrackList,
-  fit,
   useLoaded,
   type Route,
 } from "./applemusic/views";
@@ -45,10 +49,12 @@ import { sprites } from "./applemusic/icons";
 const TOKEN_KEY = "user-token.json";
 
 const PAD = 6;
-const FOOTER_H = 32;
-const FOOTER_ART = 24;
-/** The footer's buttons and volume, right of the track. */
-const CONTROLS_W = 170;
+/** MusicKit events that move the position slider, and that change shuffle or repeat. */
+const TIME_EVENTS = ["playbackTimeDidChange", "playbackDurationDidChange", "nowPlayingItemDidChange"];
+const MODE_EVENTS = ["shuffleModeDidChange", "repeatModeDidChange"];
+
+/** How long the position slider waits for the drag to rest before seeking. */
+const SEEK_DELAY_MS = 150;
 
 function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
@@ -67,6 +73,12 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   const shown = () => pending() ?? current();
   const [playing, setPlaying] = createSignal(false);
   const [volume, setVolume] = createSignal(50);
+  const [time, setTime] = createSignal(0);
+  const [duration, setDuration] = createSignal(0);
+  /** Where the position slider is being dragged to; MusicKit's time is ignored until the seek lands. */
+  const [scrubTo, setScrubTo] = createSignal<number | null>(null);
+  const [shuffle, setShuffle] = createSignal(false);
+  const [repeat, setRepeat] = createSignal<RepeatMode>("none");
   const [error, setError] = createSignal("");
   const [signingIn, setSigningIn] = createSignal(false);
 
@@ -171,6 +183,16 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     setPlaying(isPlaying);
     if (isPlaying) setPending(null);
   };
+  const onTime = () => {
+    if (!music) return;
+    setTime(music.currentPlaybackTime || 0);
+    setDuration(music.currentPlaybackDuration || 0);
+  };
+  const onModes = () => {
+    if (!music) return;
+    setShuffle(music.shuffleMode === 1);
+    setRepeat(repeatModeOf(music));
+  };
   const onPlaybackError = () => {
     setPending(null);
     setError("Apple Music couldn't play that.");
@@ -187,8 +209,12 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
           music.addEventListener("nowPlayingItemDidChange", showNowPlaying);
           music.addEventListener("playbackStateDidChange", onPlaybackState);
           music.addEventListener("mediaPlaybackError", onPlaybackError);
+          for (const name of TIME_EVENTS) music.addEventListener(name, onTime);
+          for (const name of MODE_EVENTS) music.addEventListener(name, onModes);
           showNowPlaying();
           onPlaybackState();
+          onTime();
+          onModes();
         } catch (e) {
           setError(e instanceof Error ? e.message : "MusicKit failed");
         }
@@ -201,6 +227,9 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     music.removeEventListener("nowPlayingItemDidChange", showNowPlaying);
     music.removeEventListener("playbackStateDidChange", onPlaybackState);
     music.removeEventListener("mediaPlaybackError", onPlaybackError);
+    for (const name of TIME_EVENTS) music.removeEventListener(name, onTime);
+    for (const name of MODE_EVENTS) music.removeEventListener(name, onModes);
+    clearTimeout(seekTimer);
     music.pause();
   });
 
@@ -239,10 +268,33 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     );
   }
 
-  function changeVolume(delta: number): void {
-    const next = Math.max(0, Math.min(100, volume() + delta));
+  function changeVolume(next: number): void {
     setVolume(next);
     if (music) music.volume = next / 100;
+  }
+
+  // The slider reports every pixel of a drag; seek once it comes to rest.
+  let seekTimer: ReturnType<typeof setTimeout> | undefined;
+  function seek(seconds: number): void {
+    setScrubTo(seconds);
+    clearTimeout(seekTimer);
+    seekTimer = setTimeout(() => {
+      withMusic((m) => m.seekToTime(seconds).finally(() => setScrubTo(null)));
+    }, SEEK_DELAY_MS);
+  }
+
+  function toggleShuffle(): void {
+    withMusic((m) => {
+      m.shuffleMode = m.shuffleMode === 1 ? 0 : 1;
+      onModes();
+    });
+  }
+
+  function cycleRepeat(): void {
+    withMusic((m) => {
+      setRepeatMode(m, nextRepeatMode(repeatModeOf(m)));
+      onModes();
+    });
   }
 
   /** A sidebar choice starts a fresh trail; opening something from a page adds to it. */
@@ -395,7 +447,11 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
 
   const logo = app.getSprite("applemusic/icon");
 
-  const nowPlayingW = () => win.width() - FOOTER_ART - CONTROLS_W - 24;
+  const icons = {
+    shuffle: app.getSprite("applemusic/shuffle"),
+    repeat: app.getSprite("applemusic/repeat"),
+    repeatOne: app.getSprite("applemusic/repeat-one"),
+  };
 
   return (
     <>
@@ -439,47 +495,36 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
             marginLeft={SIDEBAR_W}
             width={win.width() - SIDEBAR_W}
             padding={PAD}
-            paddingBottom={FOOTER_H + PAD}
+            paddingBottom={NOW_PLAYING_H + PAD}
             flexDirection="column"
             semantic={{ name: "music-content" }}
           >
             {/* One element per route, so each page mounts fresh. */}
             <For each={[route()]}>{(r) => <Page route={r} />}</For>
           </box>
-          <Sidebar top={win.scrollY()} height={win.height() - FOOTER_H} route={route()} playlists={playlists() ?? []} onSelect={select} />
-          <box
-            position="absolute"
-            left={0}
-            top={win.scrollY() + win.height() - FOOTER_H}
+          <Sidebar top={win.scrollY()} height={win.height() - NOW_PLAYING_H} route={route()} playlists={playlists() ?? []} onSelect={select} />
+          <NowPlayingBar
+            top={win.scrollY() + win.height() - NOW_PLAYING_H}
             width={win.width()}
-            height={FOOTER_H}
-            flexDirection="column"
-            background={0}
-            semantic={{ name: "music-now-playing" }}
-          >
-            <box width={win.width()} height={1} background={1} />
-            <box flexGrow={1} flexDirection="row" alignItems="center" gap={6} paddingLeft={4} paddingRight={4}>
-              <Artwork loader={artwork} url={shown()?.artworkUrl ?? null} size={FOOTER_ART} />
-              <box flexGrow={1} flexDirection="column">
-                <text font="body" bold nowrap>{fit(error() || shown()?.title || "Not Playing", nowPlayingW(), "body", true)}</text>
-                <Show
-                  when={pending() && !error()}
-                  fallback={<text font="body" nowrap>{fit(error() ? "" : current()?.artist ?? "", nowPlayingW())}</text>}
-                >
-                  <box flexDirection="row" alignItems="center" gap={4}>
-                    <Spinner name="music-loading" />
-                    <text font="body" nowrap>Loading…</text>
-                  </box>
-                </Show>
-              </box>
-              <Button label="<<" onClick={() => withMusic((m) => m.skipToPreviousItem())} />
-              <Button label={playing() ? "||" : ">"} onClick={() => withMusic((m) => (playing() ? m.pause() : m.play()))} />
-              <Button label=">>" onClick={() => withMusic((m) => m.skipToNextItem())} />
-              <Button label="-" onClick={() => changeVolume(-10)} />
-              <text font="body" nowrap>{String(volume())}</text>
-              <Button label="+" onClick={() => changeVolume(10)} />
-            </box>
-          </box>
+            loader={artwork}
+            shown={shown()}
+            loading={!!pending()}
+            error={error()}
+            playing={playing()}
+            time={scrubTo() ?? time()}
+            duration={duration()}
+            shuffle={shuffle()}
+            repeat={repeat()}
+            volume={volume()}
+            icons={icons}
+            onPrevious={() => withMusic((m) => m.skipToPreviousItem())}
+            onPlayPause={() => withMusic((m) => (playing() ? m.pause() : m.play()))}
+            onNext={() => withMusic((m) => m.skipToNextItem())}
+            onSeek={seek}
+            onShuffle={toggleShuffle}
+            onRepeat={cycleRepeat}
+            onVolume={changeVolume}
+          />
         </box>
       </Show>
     </>
