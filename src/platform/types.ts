@@ -20,6 +20,7 @@ import type {
   AppCrypto,
   AudioService,
   BrowserService,
+  MusicKitService,
   CameraService,
   GpuService,
   Capability,
@@ -196,6 +197,8 @@ export interface Platform {
   fonts?: FontRasterService;
   crypto: AppCrypto;
   browser?: BrowserService;
+  /** Apple Music playback: MusicKit loaded and held in the page (`AppContext.musicKit`). */
+  musicKit?: MusicKitService;
   /** Phone sign-in for apps (`useApp().signIn`). Absent when no relay server is reachable. */
   signInRelay?: SignInRelay;
   /**
