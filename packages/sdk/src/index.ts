@@ -674,8 +674,9 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
   /** An application (the default) or a menubar app; see `AppKind`. */
   kind?: AppKind;
   /**
-   * A menubar app's icon in the menubar: a sprite at most 16×16 (`smallIcon`
-   * when omitted). Ignored for applications.
+   * A menubar app's icon in the menubar, in the same 16×16 slot the
+   * application menu draws the front app's `smallIcon` in. `smallIcon` when
+   * omitted; anything not 16×16 is reduced to it. Ignored for applications.
    */
   menubarIcon?: string;
   /**

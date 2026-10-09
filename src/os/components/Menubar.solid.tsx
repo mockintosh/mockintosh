@@ -60,7 +60,6 @@ const SHADOW_INSET  = 3;        // the 1px shadow starts this far along from the
 const SMALL_ICON    = 16;       // ics# — what the application menu shows
 const SWITCHER_W    = 34;       // the application menu's title: icon plus its margins
 const SWITCHER_GAP  = 6;        // between the application menu's title and the screen's right edge
-const EXTRA_W       = 26;       // a menubar app's icon plus its margins, right to left from the application menu
 
 interface MenubarProps {
   height: number;
@@ -167,8 +166,8 @@ export function Menubar(props: MenubarProps): JSX.Element {
         return {
           id: app.id,
           title: app.title,
-          icon: sprite && (sprite.width <= SMALL_ICON && sprite.height <= SMALL_ICON ? sprite : smallIcon(sprite)),
-          left: switcherX() - (index + 1) * EXTRA_W,
+          icon: sprite && (sprite.width === SMALL_ICON && sprite.height === SMALL_ICON ? sprite : smallIcon(sprite)),
+          left: switcherX() - (index + 1) * SWITCHER_W,
         };
       });
   });
@@ -331,59 +330,27 @@ export function Menubar(props: MenubarProps): JSX.Element {
       {/* Menubar apps — each one's icon, lit while it has a window open. */}
       <For each={extras()}>
         {(extra) => (
-          <box
-            position="absolute"
+          <IconTitle
             left={extra.left}
-            top={TITLE_TOP}
-            width={EXTRA_W}
-            height={TITLE_H}
-            justifyContent="center"
-            alignItems="center"
-            background={extraOpen(extra.id) ? 1 : undefined}
+            icon={extra.icon}
+            lit={extraOpen(extra.id)}
             semantic={{ name: extra.title, role: "button" }}
             onMouseDown={() => {
               closeMenu();
               os.toggleMenubarApp(extra.id);
             }}
-          >
-            <Show when={extra.icon}>
-              {(icon) => (
-                <image
-                  width={icon().width}
-                  height={icon().height}
-                  src={spriteSrc(icon())}
-                  mode={extraOpen(extra.id) ? "inverted" : "normal"}
-                />
-              )}
-            </Show>
-          </box>
+          />
         )}
       </For>
 
       {/* Application menu — the front app's 16×16 icon, at the right end. */}
-      <box
-        position="absolute"
+      <IconTitle
         left={switcherX()}
-        top={TITLE_TOP}
-        width={SWITCHER_W}
-        height={TITLE_H}
-        justifyContent="center"
-        alignItems="center"
-        background={openIdx() === APP_MENU ? 1 : undefined}
+        icon={activeIcon()}
+        lit={openIdx() === APP_MENU}
         semantic={{ name: "Application", role: "menu" }}
         {...titleHandlers(APP_MENU)}
-      >
-        <Show when={activeIcon()}>
-          {(icon) => (
-            <image
-              width={SMALL_ICON}
-              height={SMALL_ICON}
-              src={spriteSrc(icon())}
-              mode={openIdx() === APP_MENU ? "inverted" : "normal"}
-            />
-          )}
-        </Show>
-      </box>
+      />
 
       <Show when={openIdx() === APP_MENU}>
         <AppMenuDropdown
@@ -720,6 +687,45 @@ function SubmenuArrow(props: { left: number; ink: 0 | 1 }): JSX.Element {
         />
       )}
     </For>
+  );
+}
+
+/**
+ * A menubar title that is an icon rather than a word: the application menu,
+ * and each menubar app beside it. One slot for both, so they line up: the
+ * title's full height, `SWITCHER_W` wide, a 16×16 icon centred in it, and the
+ * whole title inverted while it is lit.
+ */
+function IconTitle(props: {
+  left: number;
+  icon: Sprite | undefined;
+  lit: boolean;
+  semantic: { name: string; role: "menu" | "button" };
+  onMouseDown?: () => void;
+  onMouseEnter?: () => void;
+  onMouseUp?: () => void;
+}): JSX.Element {
+  return (
+    <box
+      position="absolute"
+      left={props.left}
+      top={TITLE_TOP}
+      width={SWITCHER_W}
+      height={TITLE_H}
+      justifyContent="center"
+      alignItems="center"
+      background={props.lit ? 1 : undefined}
+      semantic={props.semantic}
+      onMouseDown={props.onMouseDown}
+      onMouseEnter={props.onMouseEnter}
+      onMouseUp={props.onMouseUp}
+    >
+      <Show when={props.icon}>
+        {(icon) => (
+          <image width={SMALL_ICON} height={SMALL_ICON} src={spriteSrc(icon())} mode={props.lit ? "inverted" : "normal"} />
+        )}
+      </Show>
+    </box>
   );
 }
 

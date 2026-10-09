@@ -686,7 +686,7 @@ export default defineApp({
 
 ### Menubar apps
 
-An app declared `kind: "menubar"` lives in the menubar instead of the application menu, like a macOS menu bar extra (Spotlight is one). The OS draws its `menubarIcon` (a sprite up to 16×16; `smallIcon` when omitted) at the right end of the menubar, beside the application menu. A click on the icon opens the app — `onOpen`, or the main window — and a click while any of its windows is open closes them. `hotkey` does the same from anywhere: `hotkey: " "` is ⌘Space (⌃Space too, since a Mac host keeps ⌘Space for itself).
+An app declared `kind: "menubar"` lives in the menubar instead of the application menu, like a macOS menu bar extra (Spotlight is one). The OS draws its `menubarIcon` (16×16; `smallIcon` when omitted) at the right end of the menubar, in a slot like the application menu's beside it. A click on the icon opens the app — `onOpen`, or the main window — and a click while any of its windows is open closes them. `hotkey` does the same from anywhere: `hotkey: " "` is ⌘Space (⌃Space too, since a Mac host keeps ⌘Space for itself).
 
 Its windows take the keyboard but not the menubar: the menus of the app you were in stay up, ⌘ keys go to your window instead of to those menus, and closing the window gives the keyboard back to the window it came up over. A menubar app is never listed in the application menu. Open a `panel` and close it when the user is done, or when `window.isActive()` goes false, so a click elsewhere puts it away:
 
@@ -697,7 +697,6 @@ export default defineApp({
   kind: "menubar",
   icon: "clock/icon",
   smallIcon: "clock/icon-16x16",
-  menubarIcon: "clock/menubar",
   hotkey: "k",
   defaultSize: { width: 160, height: 60 },
   windowKind: "panel",

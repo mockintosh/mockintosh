@@ -149,7 +149,7 @@ Menus are owned by apps, not windows. `SolidApp.menus` (or `setAppMenus(appId, �
 
 ### Menubar apps
 
-An app declared `kind: "menubar"` (Spotlight) has no menus and is never in the application menu. The menubar draws its `menubarIcon` left of the application menu; a click on it, or its `hotkey` with ⌘/⌃ from anywhere (`onKey` in `boot.ts`), calls `toggleMenubarApp`: close the app's windows if it has any, else `openApp`. Its windows are marked `accessory` (`openWindow` in `boot.ts`) and remember the key window they came up over (`openedOver`): `menubarWindow()` follows that back, so the menubar keeps the app you were in, `runMenuShortcut` leaves ⌘ keys to the panel, and closing it gives the keyboard back. Spotlight is a shell app (it reads the app registry, the App Store listings and the whole disk); it opens the App Store on an app's page through `src/os/appStoreLink.ts`.
+An app declared `kind: "menubar"` (Spotlight) has no menus and is never in the application menu. The menubar draws its `menubarIcon` left of the application menu, in the same 16×16 slot (`IconTitle` in `Menubar.solid.tsx`); a click on it, or its `hotkey` with ⌘/⌃ from anywhere (`onKey` in `boot.ts`), calls `toggleMenubarApp`: close the app's windows if it has any, else `openApp`. Its windows are marked `accessory` (`openWindow` in `boot.ts`) and remember the key window they came up over (`openedOver`): `menubarWindow()` follows that back, so the menubar keeps the app you were in, `runMenuShortcut` leaves ⌘ keys to the panel, and closing it gives the keyboard back. Spotlight is a shell app (it reads the app registry, the App Store listings and the whole disk); it opens the App Store on an app's page through `src/os/appStoreLink.ts`.
 
 ### Third-party apps (SDK v3)
 

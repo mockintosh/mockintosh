@@ -402,7 +402,7 @@ function SpotlightPanel(): JSX.Element {
     else win.close();
   }
 
-  const glyph = sprites["spotlight/menubar"];
+  const glyph = sprites["spotlight/search-field"];
 
   return (
     <box width={PANEL_W} height={win.height()} flexDirection="column" background={0}>
@@ -546,7 +546,6 @@ export default defineApp({
   kind: "menubar",
   icon: "spotlight/icon",
   smallIcon: "spotlight/icon-16x16",
-  menubarIcon: "spotlight/menubar",
   hotkey: " ",
   runtime: "main",
   sprites,
