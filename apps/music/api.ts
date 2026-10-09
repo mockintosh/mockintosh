@@ -1,13 +1,20 @@
-import { coverFrame, toBits, type BrowserService, type FetchFunction, type ImageService } from "@mockintosh/sdk";
+import {
+  coverFrame,
+  toBits,
+  type FetchFunction,
+  type ImageService,
+  type MusicKitItem,
+  type MusicKitRepeatMode,
+  type MusicKitService,
+} from "@mockintosh/sdk";
 
 /**
- * Apple Music, through MusicKit on the Web for playback and the Apple Music
- * API for the library. Two tokens: the developer token, signed by this
- * deployment (`api/apple-music/token.ts`), and the user's Music User Token,
- * from signing in (`api/apple-music/sign-in.ts`).
+ * Apple Music: the OS's MusicKit (`useApp().musicKit`) for playback and
+ * signing in, and the Apple Music API for the library. Two tokens: the
+ * developer token, signed by this deployment (`api/apple-music/token.ts`),
+ * and the user's Music User Token, from signing in.
  */
 
-const MUSICKIT_URL = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
 const API_BASE = "https://api.music.apple.com";
 
 export interface AppleMusicSession {
@@ -60,51 +67,6 @@ export interface NowPlaying {
   artworkUrl: string | null;
 }
 
-/** The slice of a MusicKit instance the app uses. */
-export interface MusicKitInstance {
-  readonly isAuthorized: boolean;
-  readonly isPlaying: boolean;
-  readonly nowPlayingItem: MusicKitMediaItem | undefined;
-  musicUserToken?: string;
-  volume: number;
-  /** Seconds into the current item. */
-  readonly currentPlaybackTime: number;
-  /** Length of the current item in seconds; 0 until it has loaded. */
-  readonly currentPlaybackDuration: number;
-  seekToTime(seconds: number): Promise<void>;
-  /** 0 off, 1 songs. */
-  shuffleMode: number;
-  /** 0 none, 1 the current item, 2 the whole queue. */
-  repeatMode: number;
-  setQueue(options: Record<string, unknown>): Promise<unknown>;
-  play(): Promise<void>;
-  pause(): void;
-  skipToNextItem(): Promise<void>;
-  skipToPreviousItem(): Promise<void>;
-  unauthorize(): Promise<void>;
-  addEventListener(name: string, listener: () => void): void;
-  removeEventListener(name: string, listener: () => void): void;
-}
-
-interface MusicKitMediaItem {
-  id?: string;
-  title?: string;
-  artistName?: string;
-  albumName?: string;
-  attributes?: {
-    name?: string;
-    artistName?: string;
-    albumName?: string;
-    artwork?: { url?: string };
-    playParams?: { id?: string; catalogId?: string };
-  };
-}
-
-interface MusicKitGlobal {
-  configure(options: { developerToken: string; app: { name: string; build: string } }): Promise<MusicKitInstance> | MusicKitInstance;
-  getInstance(): MusicKitInstance;
-}
-
 /** A resource as the Apple Music API returns it. */
 interface Resource {
   id: string;
@@ -140,38 +102,6 @@ export async function fetchDeveloperToken(session: AppleMusicSession): Promise<s
   const data = (await resp.json().catch(() => ({}))) as { developerToken?: string; error?: string };
   if (!data.developerToken) throw new Error(data.error ?? `Apple Music token unavailable (${resp.status})`);
   return data.developerToken;
-}
-
-/**
- * Sign in through the deployment's sign-in popup. Resolves with the Music
- * User Token, or rejects when the user closes it or Apple refuses.
- */
-export async function signIn(session: AppleMusicSession, browser: BrowserService): Promise<string> {
-  const params = await browser.authorize(`${session.origin}/api/apple-music/sign-in`);
-  if (!params.code) throw new Error("Apple Music did not send a token");
-  return params.code;
-}
-
-/**
- * Configure MusicKit for playback. It finds the user token the sign-in popup
- * left in this origin's storage; where it doesn't, it is handed ours.
- */
-export async function configureMusicKit(session: AppleMusicSession, browser: BrowserService): Promise<MusicKitInstance> {
-  if (!session.developerToken) throw new Error("No developer token");
-  const MusicKit = (await browser.loadScript(MUSICKIT_URL, "MusicKit")) as MusicKitGlobal | undefined;
-  if (!MusicKit) throw new Error("MusicKit failed to load");
-  const music = (await MusicKit.configure({
-    developerToken: session.developerToken,
-    app: { name: "Mockintosh", build: "1.0" },
-  })) ?? MusicKit.getInstance();
-  if (!music.isAuthorized && session.musicUserToken) {
-    try {
-      music.musicUserToken = session.musicUserToken;
-    } catch {
-      // Read-only in this MusicKit; playback will report it.
-    }
-  }
-  return music;
 }
 
 /**
@@ -506,32 +436,24 @@ export async function fetchTracks(collection: Collection, session: AppleMusicSes
 }
 
 /** Play a whole collection, from track `startWith`. */
-export async function playCollection(music: MusicKitInstance, collection: Collection, startWith = 0): Promise<void> {
-  await music.setQueue({ [collection.kind]: collection.id, startWith, startPlaying: true });
+export async function playCollection(musicKit: MusicKitService, collection: Collection, startWith = 0): Promise<void> {
+  await musicKit.setQueue({ [collection.kind]: collection.id, startWith, startPlaying: true });
 }
 
 /** Play a list of songs, from `startWith`. */
-export async function playTracks(music: MusicKitInstance, tracks: Track[], startWith = 0): Promise<void> {
-  await music.setQueue({ songs: tracks.map((t) => t.id), startWith, startPlaying: true });
+export async function playTracks(musicKit: MusicKitService, tracks: Track[], startWith = 0): Promise<void> {
+  await musicKit.setQueue({ songs: tracks.map((t) => t.id), startWith, startPlaying: true });
 }
 
-/** A MusicKit media item as the app shows it, whichever shape MusicKit gives it. */
-function mediaItemAsNowPlaying(item: MusicKitMediaItem): NowPlaying {
-  const a = item.attributes ?? {};
-  const ids = [item.id, a.playParams?.id, a.playParams?.catalogId].filter((id): id is string => !!id);
+/** What MusicKit is playing, as the app shows it: names cleaned for the 1-bit fonts. */
+export function itemAsNowPlaying(item: MusicKitItem): NowPlaying {
   return {
-    ids,
-    title: plainText(item.title ?? a.name),
-    artist: plainText(item.artistName ?? a.artistName),
-    album: plainText(item.albumName ?? a.albumName),
-    artworkUrl: a.artwork?.url ?? null,
+    ids: item.ids,
+    title: plainText(item.title),
+    artist: plainText(item.artistName),
+    album: plainText(item.albumName),
+    artworkUrl: item.artworkUrl,
   };
-}
-
-/** What's playing, read from MusicKit's media item. */
-export function nowPlaying(music: MusicKitInstance): NowPlaying | null {
-  const item = music.nowPlayingItem;
-  return item ? mediaItemAsNowPlaying(item) : null;
 }
 
 /** What the now-playing bar shows for `track` while MusicKit is still fetching it. */
@@ -578,16 +500,13 @@ export async function ditherArtwork(url: string, size: number, session: AppleMus
 /** Repeat as the bar cycles it, like Apple Music: off → all → one → off. */
 export type RepeatMode = "none" | "one" | "all";
 
-export function repeatModeOf(music: MusicKitInstance): RepeatMode {
-  return music.repeatMode === 1 ? "one" : music.repeatMode === 2 ? "all" : "none";
+export function repeatModeOf(mode: MusicKitRepeatMode): RepeatMode {
+  return mode === 1 ? "one" : mode === 2 ? "all" : "none";
 }
 
-export function setRepeatMode(music: MusicKitInstance, mode: RepeatMode): void {
-  music.repeatMode = mode === "one" ? 1 : mode === "all" ? 2 : 0;
-}
-
-export function nextRepeatMode(mode: RepeatMode): RepeatMode {
-  return mode === "none" ? "all" : mode === "all" ? "one" : "none";
+/** The MusicKit mode after `mode`, as the button cycles it. */
+export function nextRepeatMode(mode: RepeatMode): MusicKitRepeatMode {
+  return mode === "none" ? 2 : mode === "all" ? 1 : 0;
 }
 
 export function formatDuration(ms: number): string {

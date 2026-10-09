@@ -9,6 +9,10 @@ import { createEffect, createRoot, untrack } from "solid-js";
 import type { BitMap } from "@mockintosh/quickdraw";
 import { fontRegistrations, onFontRegistration, type CursorSpec, type UIClipboard, type UIImageService } from "@mockintosh/ui";
 import type {
+  MusicKitQueueOptions,
+  MusicKitRepeatMode,
+  MusicKitService,
+  MusicKitShuffleMode,
   AppContext,
   AppServices,
   AudioPortOptions,
@@ -157,6 +161,8 @@ export class AppProcess {
   /** Live video and camera sources the app opened, and those it wants a picture of. */
   private readonly media = new Map<number, VideoSource | CameraSource>();
   private readonly mediaWanted = new Set<number>();
+  /** Stops the MusicKit pushes, once the app has asked for them. */
+  private stopMusicKit: (() => void) | null = null;
   private disposeRoot: () => void = () => {};
   private releaseLaunch: (() => void) | null;
   private latencyTimer: ReturnType<typeof setInterval> | null = null;
@@ -192,6 +198,7 @@ export class AppProcess {
         audio: typeof this.context.audio?.openPort === "function",
         download: this.context.download !== undefined,
         signIn: this.context.signIn && { redirectUri: this.context.signIn.redirectUri },
+        musicKit: this.context.musicKit?.state,
         video: typeof this.context.video?.excerpt === "function",
         videoPlayback: this.context.video !== undefined,
         camera: this.context.camera !== undefined,
@@ -292,6 +299,8 @@ export class AppProcess {
     this.microphones.clear();
     for (const monitor of this.monitors.values()) monitor.close();
     this.monitors.clear();
+    this.stopMusicKit?.();
+    this.stopMusicKit = null;
     this.releaseLaunch?.();
     this.releaseLaunch = null;
     for (const release of this.keepAlives.values()) release();
@@ -491,6 +500,8 @@ export class AppProcess {
       case "signIn":
         if (!ctx.signIn) throw new Error("This Macintosh can't sign in from a phone");
         return ctx.signIn.authorize(args[0] as string);
+      case "musicKit":
+        return this.musicKitCall(name, args);
       case "os":
         if (name === "showDialog") return ctx.os.showDialog(args[0] as never);
         if (name === "openApp") return ctx.os.openApp(args[0] as string, args[1] as Record<string, unknown>);
@@ -546,6 +557,50 @@ export class AppProcess {
     const frame = source.frame();
     const first = frame && { width: frame.width, height: frame.height, rgba: frame.rgba.slice() };
     return new Transfer({ id, width: source.width, height: source.height, duration, first }, first ? [first.rgba.buffer] : []);
+  }
+
+  /** Apple Music: MusicKit stays here in the page; the app drives it by name and is sent each new state. */
+  private musicKitCall(name: string, args: unknown[]): unknown {
+    const musicKit = this.context.musicKit;
+    if (!musicKit) throw new Error("This Macintosh can't play Apple Music");
+    switch (name) {
+      case "listen":
+        if (!this.stopMusicKit) {
+          // The state is plain data: it crosses to the worker as it is.
+          const offChange = musicKit.onChange((state) => this.send({ t: "musicKit", state }));
+          const offError = musicKit.onError((message) => this.send({ t: "musicKitError", message }));
+          this.stopMusicKit = () => {
+            offChange();
+            offError();
+          };
+        }
+        return undefined;
+      case "configure":
+        return musicKit.configure(args[0] as Parameters<MusicKitService["configure"]>[0]);
+      case "authorize":
+        return musicKit.authorize();
+      case "unauthorize":
+        return musicKit.unauthorize();
+      case "setQueue":
+        return musicKit.setQueue(args[0] as MusicKitQueueOptions);
+      case "play":
+        return musicKit.play();
+      case "pause":
+        return musicKit.pause();
+      case "skipToNextItem":
+        return musicKit.skipToNextItem();
+      case "skipToPreviousItem":
+        return musicKit.skipToPreviousItem();
+      case "seekToTime":
+        return musicKit.seekToTime(args[0] as number);
+      case "setVolume":
+        return musicKit.setVolume(args[0] as number);
+      case "setShuffleMode":
+        return musicKit.setShuffleMode(args[0] as MusicKitShuffleMode);
+      case "setRepeatMode":
+        return musicKit.setRepeatMode(args[0] as MusicKitRepeatMode);
+    }
+    throw new Error(`Unknown call musicKit.${name}`);
   }
 
   private mediaCall(name: string, args: unknown[]): unknown {

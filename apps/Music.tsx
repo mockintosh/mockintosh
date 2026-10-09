@@ -1,16 +1,14 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { Button, TextInput } from "@mockintosh/ui";
-import { useApp, defineApp } from "@mockintosh/sdk";
+import { useApp, defineApp, type MusicKitService, type MusicKitState } from "@mockintosh/sdk";
 import {
   type AppleMusicSession,
   type Collection,
-  type MusicKitInstance,
   type NowPlaying,
   type RepeatMode,
   type Track,
   collectionAsNowPlaying,
-  configureMusicKit,
   fetchAlbums,
   fetchArtistAlbums,
   fetchArtists,
@@ -26,13 +24,11 @@ import {
   fetchTracks,
   isStoredUserToken,
   nextRepeatMode,
-  nowPlaying,
+  itemAsNowPlaying,
   playCollection,
   playTracks,
   repeatModeOf,
   searchCatalog,
-  setRepeatMode,
-  signIn,
   trackAsNowPlaying,
 } from "./music/api";
 import { createArtworkLoader } from "./music/Artwork";
@@ -57,10 +53,6 @@ import { sprites } from "./music/icons";
 const TOKEN_KEY = "user-token.json";
 
 const PAD = 6;
-/** MusicKit events that move the position slider, and that change shuffle or repeat. */
-const TIME_EVENTS = ["playbackTimeDidChange", "playbackDurationDidChange", "nowPlayingItemDidChange"];
-const MODE_EVENTS = ["shuffleModeDidChange", "repeatModeDidChange"];
-
 /** How long a play or pause click may show before MusicKit confirms it; then the button shows MusicKit's state. */
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -74,7 +66,7 @@ function Music(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
   const win = app.window;
   const { storage } = app;
-  const browser = app.browser!; // present: the app requires "browser"
+  const musicKit = app.musicKit!; // present: the app requires "music-kit"
   const [userToken, setUserToken] = createSignal<string | null>(null, { ownedWrite: true });
   const [ready, setReady] = createSignal(false);
   const [configError, setConfigError] = createSignal("");
@@ -119,7 +111,8 @@ function Music(_props: Record<string, unknown>): JSX.Element {
   /** Whether a saved sign-in has been looked for: MusicKit waits, so it starts signed in or not, once. */
   const [tokenChecked, setTokenChecked] = createSignal(false);
 
-  let music: MusicKitInstance | null = null;
+  /** MusicKit has been configured for this sign-in: until then there's nothing to play with. */
+  let connected = false;
 
   const session: AppleMusicSession = {
     fetch: app.fetch!, // present: the app requires "network"
@@ -156,8 +149,7 @@ function Music(_props: Record<string, unknown>): JSX.Element {
   }
 
   async function signOut(message = ""): Promise<void> {
-    music?.pause();
-    await music?.unauthorize().catch(() => undefined);
+    if (connected) await musicKit.unauthorize().catch(() => undefined);
     saveUserToken(null);
     setError(message);
   }
@@ -225,62 +217,49 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     },
   );
 
-  const showNowPlaying = () => setCurrent(music ? nowPlaying(music) : null);
   /**
    * While a new queue is being set, MusicKit's playback states are the old
    * song's winding down (playing, stopped, loading…): they neither confirm
    * the new song nor deny it, so they leave the button and the bar alone.
    */
   let queueing = false;
-  const onPlaybackState = () => {
-    const isPlaying = !!music?.isPlaying;
-    setPlaying(isPlaying);
+  /** Which item `current` shows: MusicKit sends its state on every tick, the item only now and then. */
+  let currentKey = "";
+  function onMusicKit(state: MusicKitState): void {
+    const key = state.item ? `${state.item.id}:${state.item.title}` : "";
+    if (key !== currentKey) {
+      currentKey = key;
+      setCurrent(state.item ? itemAsNowPlaying(state.item) : null);
+    }
+    setTime(state.time);
+    setDuration(state.duration);
+    setShuffle(state.shuffleMode === 1);
+    setRepeat(repeatModeOf(state.repeatMode));
+    setPlaying(state.playing);
     if (queueing) return;
-    if (isPlaying) setPending(null);
-    if (requested() === isPlaying) request(null);
-  };
-  const onTime = () => {
-    if (!music) return;
-    setTime(music.currentPlaybackTime || 0);
-    setDuration(music.currentPlaybackDuration || 0);
-  };
-  const onModes = () => {
-    if (!music) return;
-    setShuffle(music.shuffleMode === 1);
-    setRepeat(repeatModeOf(music));
-  };
-  const onPlaybackError = () => {
+    if (state.playing) setPending(null);
+    if (requested() === state.playing) request(null);
+  }
+  function onPlaybackError(message: string): void {
     setPending(null);
     request(null);
-    setError("Apple Music couldn't play that.");
-  };
-
-  function listen(m: MusicKitInstance, on: boolean): void {
-    const method = on ? "addEventListener" : "removeEventListener";
-    m[method]("nowPlayingItemDidChange", showNowPlaying);
-    m[method]("playbackStateDidChange", onPlaybackState);
-    m[method]("mediaPlaybackError", onPlaybackError);
-    for (const name of TIME_EVENTS) m[method](name, onTime);
-    for (const name of MODE_EVENTS) m[method](name, onModes);
+    setError(message);
   }
+  const stopListening = [musicKit.onChange(onMusicKit), musicKit.onError(onPlaybackError)];
 
   /**
    * (Re)configure MusicKit for the current sign-in. Signed out it plays
-   * previews; signing in configures it again, and it picks up the token the
-   * sign-in page left in this origin's storage.
+   * previews; signing in configures it again, so it picks up the token.
    */
   async function connectMusicKit(): Promise<void> {
     try {
-      const previous = music;
-      if (previous) listen(previous, false);
-      const next = await configureMusicKit(session, browser);
-      music = next;
-      next.volume = volume() / 100;
-      listen(next, true);
-      showNowPlaying();
-      onPlaybackState();
-      onTime();
-      onModes();
+      const state = await musicKit.configure({
+        developerToken: session.developerToken!,
+        musicUserToken: session.musicUserToken,
+      });
+      connected = true;
+      musicKit.setVolume(volume() / 100);
+      onMusicKit(state);
     } catch (e) {
       setError(e instanceof Error ? e.message : "MusicKit failed");
     }
@@ -298,19 +277,18 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     },
   );
 
+  // The OS stops the music when this launch ends; the app only lets go of it.
   onCleanup(() => {
-    if (!music) return;
-    listen(music, false);
+    for (const stop of stopListening) stop();
     clearTimeout(seekTimer);
     clearTimeout(requestTimer);
-    music.pause();
   });
 
   async function startSignIn(): Promise<void> {
     setError("");
     setSigningIn(true);
     try {
-      saveUserToken(await signIn(session, browser));
+      saveUserToken(await musicKit.authorize());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
@@ -319,21 +297,21 @@ function Music(_props: Record<string, unknown>): JSX.Element {
   }
 
   /** Run a MusicKit call, showing what went wrong instead of failing silently. */
-  function withMusic(action: (m: MusicKitInstance) => Promise<unknown> | void): void {
-    if (!music) {
+  function withMusic(action: (m: MusicKitService) => Promise<unknown> | void): void {
+    if (!connected) {
       setError("MusicKit isn't ready yet.");
       return;
     }
     setError("");
-    void Promise.resolve(action(music)).catch((e: unknown) => {
+    void Promise.resolve(action(musicKit)).catch((e: unknown) => {
       request(null);
       setError(e instanceof Error ? e.message : "Couldn't play that");
     });
   }
 
   /** Start `play`, showing `what` in the bar until the music actually starts. */
-  function startPlaying(what: NowPlaying, play: (m: MusicKitInstance) => Promise<unknown>): void {
-    if (music) {
+  function startPlaying(what: NowPlaying, play: (m: MusicKitService) => Promise<unknown>): void {
+    if (connected) {
       setPending(what);
       request(true);
     }
@@ -347,14 +325,14 @@ function Music(_props: Record<string, unknown>): JSX.Element {
         .finally(() => {
           queueing = false;
           // The queue is set: from here MusicKit's state is the new song's.
-          onPlaybackState();
+          onMusicKit(m.state);
         });
     });
   }
 
   function changeVolume(next: number): void {
     setVolume(next);
-    if (music) music.volume = next / 100;
+    if (connected) musicKit.setVolume(next / 100);
   }
 
   // The slider reports every pixel of a drag; seek once it comes to rest.
@@ -368,17 +346,11 @@ function Music(_props: Record<string, unknown>): JSX.Element {
   }
 
   function toggleShuffle(): void {
-    withMusic((m) => {
-      m.shuffleMode = m.shuffleMode === 1 ? 0 : 1;
-      onModes();
-    });
+    withMusic((m) => m.setShuffleMode(shuffle() ? 0 : 1));
   }
 
   function cycleRepeat(): void {
-    withMusic((m) => {
-      setRepeatMode(m, nextRepeatMode(repeatModeOf(m)));
-      onModes();
-    });
+    withMusic((m) => m.setRepeatMode(nextRepeatMode(repeat())));
   }
 
   function openNowPlaying(): void {
@@ -758,7 +730,7 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     onPrevious: () => withMusic((m) => m.skipToPreviousItem()),
     onPlayPause: () => {
       const next = !shownPlaying();
-      if (music) request(next);
+      if (connected) request(next);
       withMusic((m) => (next ? m.play() : m.pause()));
     },
     onNext: () => withMusic((m) => m.skipToNextItem()),
@@ -842,8 +814,8 @@ function Music(_props: Record<string, unknown>): JSX.Element {
 
 export default defineApp({
   id: "music",
-  // MusicKit plays in the page, as a live object a process can't hold.
-  requires: ["network", "browser"],
+  // MusicKit plays in the page; the OS holds it (`music-kit`), so the app can run in a process.
+  requires: ["network", "music-kit"],
   title: "Music",
   icon: "music/icon",
   smallIcon: "music/icon-16x16",

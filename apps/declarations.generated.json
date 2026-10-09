@@ -489,7 +489,7 @@
   "smallIcon": "music/icon-16x16",
   "requires": [
    "network",
-   "browser"
+   "music-kit"
   ],
   "scrollable": true,
   "resizable": true,

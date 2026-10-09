@@ -16,6 +16,7 @@ import type {
   MicrophonePortOptions,
   MicrophoneService,
   SignInService,
+  MusicKitService,
   WindowSpec,
 } from "@mockintosh/sdk";
 import { listFontFamilies, onFontsChanged, registerFont } from "@mockintosh/ui";
@@ -178,6 +179,55 @@ function instanceAgentRuntime(os: OSServices, runtime: AgentRuntime, instanceId?
   };
 }
 
+/**
+ * Apple Music as one launch sees it: its listeners are removed, and the
+ * music it started stops, when the launch ends. MusicKit is one per page, so
+ * the player itself is shared.
+ */
+function instanceMusicKit(os: OSServices, musicKit: MusicKitService, instanceId?: string): MusicKitService {
+  if (!instanceId || !os.instances) return musicKit;
+  const removers = new Set<() => void>();
+  let played = false;
+  os.instances.own(instanceId, () => {
+    for (const remove of removers) remove();
+    removers.clear();
+    if (played) void musicKit.pause().catch(() => undefined);
+  });
+  function listen<L>(add: (listener: L) => () => void, listener: L): () => void {
+    const remove = add(listener);
+    removers.add(remove);
+    return () => {
+      remove();
+      removers.delete(remove);
+    };
+  }
+  return {
+    get state() {
+      return musicKit.state;
+    },
+    onChange: (listener) => listen((l) => musicKit.onChange(l), listener),
+    onError: (listener) => listen((l) => musicKit.onError(l), listener),
+    configure: (options) => musicKit.configure(options),
+    authorize: () => musicKit.authorize(),
+    unauthorize: () => musicKit.unauthorize(),
+    setQueue(options) {
+      played = true;
+      return musicKit.setQueue(options);
+    },
+    play() {
+      played = true;
+      return musicKit.play();
+    },
+    pause: () => musicKit.pause(),
+    skipToNextItem: () => musicKit.skipToNextItem(),
+    skipToPreviousItem: () => musicKit.skipToPreviousItem(),
+    seekToTime: (seconds) => musicKit.seekToTime(seconds),
+    setVolume: (volume) => musicKit.setVolume(volume),
+    setShuffleMode: (mode) => musicKit.setShuffleMode(mode),
+    setRepeatMode: (mode) => musicKit.setRepeatMode(mode),
+  };
+}
+
 /** Sign-in as one app sees it: limited to its declared hosts, its sheet closing when the launch ends. */
 function appSignIn(os: OSServices, signIn: SystemSignIn, appId: string, instanceId?: string): SignInService {
   const app = getApp(appId);
@@ -218,6 +268,7 @@ export function createAppContext(
     env: { origin: os.env.origin, config: os.env.config ?? {} },
     crypto: os.crypto,
     browser: os.browser,
+    musicKit: os.musicKit && instanceMusicKit(os, os.musicKit, options.instanceId),
     signIn: os.signIn && appSignIn(os, os.signIn, appId, options.instanceId),
     capabilities: os.capabilities,
     fetch: os.fetch,

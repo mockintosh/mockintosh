@@ -90,7 +90,7 @@ registerBundledApp({
   description: "Plays your Apple Music library.",
   icon: "music/icon",
   sprites: musicSprites,
-  requires: ["network", "browser"],
+  requires: ["network", "music-kit"],
   load: () => import("@/apps/Music"),
 });
 
