@@ -31,6 +31,7 @@ import { tuckMenubar } from "./menubarReveal";
 import { disposeAllWindowContent, disposeWindowContent } from "./windowContent";
 import { windowDefinition, type OSWindowKind } from "./windowKinds";
 import type { MenubarDefinition, MenubarItemDef } from "@mockintosh/sdk";
+import { warnMenubarProblems } from "./shortcuts";
 
 export type { OSWindowKind } from "./windowKinds";
 
@@ -179,6 +180,7 @@ function appMenus(): Record<string, MenubarDefinition[]> {
 }
 
 export function setAppMenus(appId: string, menus: MenubarDefinition[]): void {
+  warnMenubarProblems(appId, menus);
   appMenus();
   runHostWrite(() => {
     _setAppMenusRaw!((s) => {
@@ -435,6 +437,7 @@ export function bringToFront(id: string): void {
 export function updateOSWindow(id: string, updates: Partial<OSWindow>): void {
   _setWindowStore((s) => {
     const win = s.list.find((w) => w.id === id);
+    if (win && updates.menus) warnMenubarProblems(win.appId, updates.menus);
     if (win) Object.assign(win, updates);
   });
 }

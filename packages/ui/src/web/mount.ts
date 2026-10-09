@@ -8,6 +8,8 @@ import { resolveMacCursorFace } from "../cursors/mac";
 import type { UIScheduler, UIServices } from "../services";
 import { createDoubleClickTracker } from "../pointer";
 import { createUI, type UIInstance } from "../ui";
+import { isEditingChord } from "../textEditing";
+import { macKey } from "../modifiers";
 import type { UITheme } from "../theme";
 import { CanvasPresenter } from "./CanvasPresenter";
 import { createWebImageService } from "./decode";
@@ -337,27 +339,25 @@ export function mountCanvasUI(options: CanvasUIOptions): CanvasUIHost {
       e.preventDefault();
     }
   };
+  /** The event's key and modifiers in the Macintosh's terms (`macKey`). */
+  const keyOf = (e: KeyboardEvent) =>
+    macKey(e.key, { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey }, ui!.focusedTakesRawKeys());
   const onKeyDown = (e: KeyboardEvent) => {
-    const mods = {
-      shift: e.shiftKey,
-      ctrl: e.ctrlKey,
-      alt: e.altKey,
-      meta: e.metaKey,
-    };
-    for (const type of hostKeyStrokes(e.key, mods)) {
-      ui!.dispatchKeyboard(type, e.key, mods);
+    const { key, modifiers: mods } = keyOf(e);
+    const focused = ui!.focusManager.focused !== null;
+    for (const type of hostKeyStrokes(key, mods)) {
+      ui!.dispatchKeyboard(type, key, mods);
     }
-    if (e.key === "Tab" || e.key === "Backspace" || e.key === " " || (e.key.length === 1 && !mods.ctrl && !mods.meta)) {
+    if (key === "Tab" || key === "Backspace" || key === " " || (key.length === 1 && !mods.ctrl && !mods.meta)) {
       e.preventDefault();
     }
+    // A focused editor's ⌘A, ⌘Z, ⌘← are its own, not the page's (⌘← is Back);
+    // a terminal's ⌃ keys are its own.
+    if (focused && (mods.ctrl || (mods.meta && isEditingChord(key)))) e.preventDefault();
   };
   const onKeyUp = (e: KeyboardEvent) => {
-    ui!.dispatchKeyboard("keyup", e.key, {
-      shift: e.shiftKey,
-      ctrl: e.ctrlKey,
-      alt: e.altKey,
-      meta: e.metaKey,
-    });
+    const { key, modifiers } = keyOf(e);
+    ui!.dispatchKeyboard("keyup", key, modifiers);
   };
 
   canvas.addEventListener("pointerdown", onPointerDown);
