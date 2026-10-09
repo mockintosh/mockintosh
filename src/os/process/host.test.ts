@@ -81,6 +81,7 @@ function fakeMusicKit() {
     setQueue: vi.fn(async () => {}),
     setVolume: vi.fn(),
     openSignUp: vi.fn(async () => {}),
+    openInAppleMusic: vi.fn(async () => {}),
   } as unknown as MusicKitService;
   return {
     musicKit,
@@ -163,8 +164,10 @@ describe("AppProcess", () => {
     receive({ t: "call", id: 11, method: "musicKit.setQueue", args: [{ playlist: "pl.1", startPlaying: true }] });
     receive({ t: "call", id: 0, method: "musicKit.setVolume", args: [0.4] });
     receive({ t: "call", id: 12, method: "musicKit.openSignUp", args: [] });
+    receive({ t: "call", id: 13, method: "musicKit.openInAppleMusic", args: ["https://music.apple.com/se/playlist/pl.1"] });
     await settle();
     expect(musicKit.openSignUp).toHaveBeenCalledTimes(1);
+    expect(musicKit.openInAppleMusic).toHaveBeenCalledWith("https://music.apple.com/se/playlist/pl.1");
     expect(musicKit.setQueue).toHaveBeenCalledWith({ playlist: "pl.1", startPlaying: true });
     expect(musicKit.setVolume).toHaveBeenCalledWith(0.4);
     expect(posted.map((p) => p.message)).toContainEqual({ t: "reply", id: 11, ok: true, value: undefined });

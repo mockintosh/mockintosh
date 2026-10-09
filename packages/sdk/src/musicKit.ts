@@ -37,6 +37,12 @@ export interface MusicKitService {
    * for someone who isn't a member. Call it from a click: it opens a tab.
    */
   openSignUp(): Promise<void>;
+  /**
+   * Open a page on Apple Music (a `music.apple.com` link, such as the Apple
+   * Music API's `url` attributes) in a new tab. Rejects any other link. Call
+   * it from a click: it opens a tab.
+   */
+  openInAppleMusic(url: string): Promise<void>;
   /** MusicKit's `setQueue`: `{ album | playlist | station | song: id }` or `{ songs: ids }`, with `startWith` and `startPlaying`. */
   setQueue(options: MusicKitQueueOptions): Promise<void>;
   play(): Promise<void>;
@@ -100,6 +106,8 @@ export interface MusicKitItem {
   albumName: string;
   /** Apple's artwork URL template, with `{w}` and `{h}`. */
   artworkUrl: string | null;
+  /** Its page on Apple Music (`music.apple.com`), for a catalog song. */
+  url: string | null;
 }
 
 /** A player with nothing configured: what `state` is until `configure` resolves. */

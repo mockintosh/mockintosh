@@ -64,8 +64,11 @@ export function NowPlayingScreen(props: NowPlayingScreenProps): JSX.Element {
       background={0}
       semantic={{ name: "music-now-playing-screen" }}
     >
-      <box alignSelf="flex-start">
+      <box flexDirection="row" justifyContent="space-between">
         <Button label="Close" onClick={props.onClose} />
+        <Show when={props.player.onOpenInAppleMusic}>
+          {(open) => <Button name="music-open-in-apple-music" label="Open in Apple Music" onClick={open()} />}
+        </Show>
       </box>
       <Show
         when={sideBySide()}

@@ -40,6 +40,8 @@ export interface Collection {
   /** The artist, or the playlist's curator. */
   subtitle: string;
   artwork: string | null;
+  /** Its page on Apple Music; the library's own albums and playlists have none. */
+  url: string | null;
 }
 
 export interface Track {
@@ -51,6 +53,8 @@ export interface Track {
   album: string;
   durationMs: number;
   artwork: string | null;
+  /** Its page on Apple Music, for a catalog song. */
+  url: string | null;
 }
 
 export interface Artist {
@@ -65,6 +69,8 @@ export interface NowPlaying {
   artist: string;
   album: string;
   artworkUrl: string | null;
+  /** Its page on Apple Music, when it has one. */
+  url: string | null;
 }
 
 /** A resource as the Apple Music API returns it. */
@@ -78,6 +84,8 @@ interface Resource {
     curatorName?: string;
     durationInMillis?: number;
     artwork?: { url?: string };
+    /** Its page on Apple Music (catalog resources only). */
+    url?: string;
     playParams?: { id?: string; catalogId?: string };
     /** A recommendation's heading, the line under it, and what kind of shelf it is. */
     title?: { stringForDisplay?: string };
@@ -185,6 +193,7 @@ function toCollection(r: Resource): Collection | null {
     name: plainText(a.name) || "Untitled",
     subtitle: plainText(a.artistName ?? a.curatorName),
     artwork: a.artwork?.url ?? null,
+    url: a.url ?? null,
   };
 }
 
@@ -199,6 +208,7 @@ function toTrack(r: Resource): Track | null {
     album: plainText(a.albumName),
     durationMs: a.durationInMillis ?? 0,
     artwork: a.artwork?.url ?? null,
+    url: a.url ?? null,
   };
 }
 
@@ -453,6 +463,7 @@ export function itemAsNowPlaying(item: MusicKitItem): NowPlaying {
     artist: plainText(item.artistName),
     album: plainText(item.albumName),
     artworkUrl: item.artworkUrl,
+    url: item.url,
   };
 }
 
@@ -464,12 +475,13 @@ export function trackAsNowPlaying(track: Track): NowPlaying {
     artist: track.artist,
     album: track.album,
     artworkUrl: track.artwork,
+    url: track.url,
   };
 }
 
 /** The same for a whole album or playlist: its name, until its first track starts. */
 export function collectionAsNowPlaying(collection: Collection): NowPlaying {
-  return { ids: [], title: collection.name, artist: collection.subtitle, album: "", artworkUrl: collection.artwork };
+  return { ids: [], title: collection.name, artist: collection.subtitle, album: "", artworkUrl: collection.artwork, url: collection.url };
 }
 
 export function isPlaying(track: Track, current: NowPlaying | null): boolean {

@@ -375,6 +375,8 @@ The provider must support the **authorization code flow with PKCE**. The relay o
    // <Button label="Try Apple Music" onClick={() => void musicKit!.openSignUp()} />
    ```
 
+5. Link what you show to Apple Music: Apple asks apps that play previews to link each one to its music. The Apple Music API gives catalog items a `url`, and `state.item.url` is the playing song's; `openInAppleMusic(url)` opens it in a new tab (and only `music.apple.com` links).
+
 The music stops when your app quits. `apps/Music.tsx` is a complete example.
 
 ## Sound

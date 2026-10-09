@@ -61,4 +61,14 @@ describe("createWebMusicKit", () => {
     await musicKit.openSignUp();
     expect(browser.openExternal).toHaveBeenLastCalledWith("https://finance-app.itunes.apple.com/deeplink?p=subscribe");
   });
+
+  it("opens pages on Apple Music, and no other links", async () => {
+    const { musicKit, browser } = setup();
+    await musicKit.openInAppleMusic("https://music.apple.com/se/album/1440833098");
+    expect(browser.openExternal).toHaveBeenCalledWith("https://music.apple.com/se/album/1440833098");
+    await expect(musicKit.openInAppleMusic("https://example.com/music.apple.com")).rejects.toThrow("That isn't an Apple Music link");
+    await expect(musicKit.openInAppleMusic("http://music.apple.com/se/album/1")).rejects.toThrow("That isn't an Apple Music link");
+    await expect(musicKit.openInAppleMusic("javascript:alert(1)")).rejects.toThrow("That isn't an Apple Music link");
+    expect(browser.openExternal).toHaveBeenCalledTimes(1);
+  });
 });

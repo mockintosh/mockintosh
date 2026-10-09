@@ -13,6 +13,9 @@ const MUSICKIT_URL = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
 /** Apple Music's own page, for signing up before MusicKit has loaded. */
 const APPLE_MUSIC_URL = "https://www.apple.com/apple-music/";
 
+/** Where `openInAppleMusic` may go. */
+const APPLE_MUSIC_HOST = "music.apple.com";
+
 /** MusicKit's error reasons for an account that can't play full songs. */
 const MEMBERSHIP_REASONS = new Set(["SUBSCRIPTION_ERROR", "STREAM_UPSELL"]);
 const MEMBERSHIP_REQUIRED = "Apple Music membership required";
@@ -63,6 +66,7 @@ interface MediaItem {
     artistName?: string;
     albumName?: string;
     artwork?: { url?: string };
+    url?: string;
     playParams?: { id?: string; catalogId?: string };
   };
 }
@@ -83,6 +87,7 @@ function itemOf(item: MediaItem | undefined): MusicKitItem | null {
     artistName: item.artistName ?? a.artistName ?? "",
     albumName: item.albumName ?? a.albumName ?? "",
     artworkUrl: a.artwork?.url ?? null,
+    url: a.url ?? null,
   };
 }
 
@@ -200,6 +205,16 @@ export function createWebMusicKit(browser: BrowserService, origin: string): Musi
       changed();
     },
     openSignUp: () => browser.openExternal(music?.subscribeURL || APPLE_MUSIC_URL),
+    async openInAppleMusic(url) {
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        throw new Error("That isn't an Apple Music link");
+      }
+      if (parsed.protocol !== "https:" || parsed.hostname !== APPLE_MUSIC_HOST) throw new Error("That isn't an Apple Music link");
+      await browser.openExternal(parsed.href);
+    },
     async setQueue(options) {
       await playing(player().setQueue({ ...options }));
     },

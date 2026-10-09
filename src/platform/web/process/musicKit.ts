@@ -53,6 +53,7 @@ export function createWorkerMusicKit(call: Call, notify: (method: string, ...arg
     authorize: () => call("musicKit.authorize", []) as Promise<string>,
     unauthorize: () => call("musicKit.unauthorize", []) as Promise<void>,
     openSignUp: () => call("musicKit.openSignUp", []) as Promise<void>,
+    openInAppleMusic: (url) => call("musicKit.openInAppleMusic", [url]) as Promise<void>,
     setQueue: (options) => call("musicKit.setQueue", [options]) as Promise<void>,
     play: () => call("musicKit.play", []) as Promise<void>,
     pause: () => call("musicKit.pause", []) as Promise<void>,

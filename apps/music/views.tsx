@@ -344,6 +344,8 @@ export function CollectionHeader(props: {
   width: number;
   loader: ArtworkLoader;
   onPlay: () => void;
+  /** Its page on Apple Music, when it has one. */
+  onOpenInAppleMusic?: () => void;
 }): JSX.Element {
   const textW = () => props.width - HEADER_ART - 8;
   return (
@@ -355,8 +357,11 @@ export function CollectionHeader(props: {
         <text font="body" nowrap>
           {props.trackCount === undefined ? "" : `${props.trackCount} ${props.trackCount === 1 ? "song" : "songs"}`}
         </text>
-        <box paddingTop={2}>
+        <box paddingTop={2} flexDirection="row" gap={6}>
           <Button label="Play" disabled={!props.trackCount} onClick={props.onPlay} />
+          <Show when={props.onOpenInAppleMusic}>
+            {(open) => <Button name="music-open-in-apple-music" label="Open in Apple Music" onClick={open()} />}
+          </Show>
         </box>
       </box>
     </box>

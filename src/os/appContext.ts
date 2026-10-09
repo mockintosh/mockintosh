@@ -211,6 +211,7 @@ function instanceMusicKit(os: OSServices, musicKit: MusicKitService, instanceId?
     authorize: () => musicKit.authorize(),
     unauthorize: () => musicKit.unauthorize(),
     openSignUp: () => musicKit.openSignUp(),
+    openInAppleMusic: (url) => musicKit.openInAppleMusic(url),
     setQueue(options) {
       played = true;
       return musicKit.setQueue(options);

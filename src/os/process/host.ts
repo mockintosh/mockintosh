@@ -583,6 +583,8 @@ export class AppProcess {
         return musicKit.unauthorize();
       case "openSignUp":
         return musicKit.openSignUp();
+      case "openInAppleMusic":
+        return musicKit.openInAppleMusic(String(args[0]));
       case "setQueue":
         return musicKit.setQueue(args[0] as MusicKitQueueOptions);
       case "play":

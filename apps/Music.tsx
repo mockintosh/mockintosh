@@ -305,6 +305,11 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     musicKit.openSignUp().catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't open Apple Music"));
   }
 
+  /** The page for what's shown on Apple Music, in a new tab: previews link to the music they're from. */
+  function openInAppleMusic(url: string): void {
+    musicKit.openInAppleMusic(url).catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't open Apple Music"));
+  }
+
   /** Run a MusicKit call, showing what went wrong instead of failing silently. */
   function withMusic(action: (m: MusicKitService) => Promise<unknown> | void): void {
     if (!connected) {
@@ -480,6 +485,7 @@ function Music(_props: Record<string, unknown>): JSX.Element {
           width={contentW()}
           loader={artwork}
           onPlay={() => startPlaying(collectionAsNowPlaying(props.collection), (m) => playCollection(m, props.collection))}
+          onOpenInAppleMusic={props.collection.url ? () => openInAppleMusic(props.collection.url!) : undefined}
         />
         <Show when={tracks()} fallback={<Loading />}>
           {(list) => (
@@ -738,6 +744,10 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     },
     get onSignUp() {
       return offerSignUp() ? openSignUp : undefined;
+    },
+    get onOpenInAppleMusic() {
+      const url = shown()?.url;
+      return url ? () => openInAppleMusic(url) : undefined;
     },
     onPrevious: () => withMusic((m) => m.skipToPreviousItem()),
     onPlayPause: () => {

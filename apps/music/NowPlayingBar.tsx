@@ -42,6 +42,8 @@ export interface Player {
   onShuffle: () => void;
   onRepeat: () => void;
   onVolume: (volume: number) => void;
+  /** Set when what's showing has a page on Apple Music. */
+  onOpenInAppleMusic?: () => void;
   /** Set when the account has no Apple Music membership: the transport makes way for signing up. */
   onSignUp?: () => void;
 }
