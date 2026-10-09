@@ -14,6 +14,7 @@ import {
   fetchAlbums,
   fetchArtistAlbums,
   fetchArtists,
+  fetchCharts,
   fetchDeveloperToken,
   fetchPlaylists,
   fetchRecentlyAdded,
@@ -37,6 +38,7 @@ import {
   CollectionHeader,
   Loading,
   SIDEBAR_W,
+  SectionTitle,
   Sidebar,
   Title,
   TrackList,
@@ -64,7 +66,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   const [userToken, setUserToken] = createSignal<string | null>(null, { ownedWrite: true });
   const [ready, setReady] = createSignal(false);
   const [configError, setConfigError] = createSignal("");
-  const [route, setRoute] = createSignal<Route>({ view: "recent" });
+  const [route, setRoute] = createSignal<Route>({ view: "browse" });
   /** Pages behind the current one, for Back: artist → album, say. */
   const [history, setHistory] = createSignal<Route[]>([]);
   const [current, setCurrent] = createSignal<NowPlaying | null>(null);
@@ -81,6 +83,8 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   const [repeat, setRepeat] = createSignal<RepeatMode>("none");
   const [error, setError] = createSignal("");
   const [signingIn, setSigningIn] = createSignal(false);
+  /** Whether a saved sign-in has been looked for: MusicKit waits, so it starts signed in or not, once. */
+  const [tokenChecked, setTokenChecked] = createSignal(false);
 
   let music: MusicKitInstance | null = null;
 
@@ -120,22 +124,30 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     music?.pause();
     await music?.unauthorize().catch(() => undefined);
     saveUserToken(null);
-    setCurrent(null);
-    setRoute({ view: "recent" });
-    setHistory([]);
     setError(message);
   }
 
-  createEffect(() => !!userToken(), (signedIn) => {
+  createEffect(() => [!!userToken(), signingIn()] as const, ([signedIn, busy]) => {
     app.setMenus([
       {
         label: "File",
         items: [
-          { label: "Sign Out", disabled: !signedIn, onClick: () => void signOut() },
+          signedIn
+            ? { label: "Sign Out", onClick: () => void signOut() }
+            : { label: "Sign In…", disabled: busy, onClick: () => void startSignIn() },
           { label: "Quit", shortcut: "Q", onClick: () => app.quit() },
         ],
       },
     ]);
+  });
+
+  // Signing in opens the library; signing out goes back to the catalog,
+  // since the library's pages can't load without the account.
+  let wasSignedIn = false;
+  createEffect(() => !!userToken(), (signedIn) => {
+    if (signedIn === wasSignedIn) return;
+    wasSignedIn = signedIn;
+    select(signedIn ? { view: "recent" } : { view: "browse" });
   });
 
   // The developer token first: without one there is nothing to sign in to.
@@ -168,6 +180,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
         session.musicUserToken = token;
         setUserToken(token);
       }
+      setTokenChecked(true);
     },
   );
   createEffect(
@@ -198,37 +211,52 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     setError("Apple Music couldn't play that.");
   };
 
+  function listen(m: MusicKitInstance, on: boolean): void {
+    const method = on ? "addEventListener" : "removeEventListener";
+    m[method]("nowPlayingItemDidChange", showNowPlaying);
+    m[method]("playbackStateDidChange", onPlaybackState);
+    m[method]("mediaPlaybackError", onPlaybackError);
+    for (const name of TIME_EVENTS) m[method](name, onTime);
+    for (const name of MODE_EVENTS) m[method](name, onModes);
+  }
+
+  /**
+   * (Re)configure MusicKit for the current sign-in. Signed out it plays
+   * previews; signing in configures it again, and it picks up the token the
+   * sign-in page left in this origin's storage.
+   */
+  async function connectMusicKit(): Promise<void> {
+    try {
+      const previous = music;
+      if (previous) listen(previous, false);
+      const next = await configureMusicKit(session, browser);
+      music = next;
+      next.volume = volume() / 100;
+      listen(next, true);
+      showNowPlaying();
+      onPlaybackState();
+      onTime();
+      onModes();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "MusicKit failed");
+    }
+  }
+
+  let connectedAs: string | null | undefined;
   createEffect(
-    () => [ready(), userToken()] as const,
-    ([isReady, token]) => {
-      if (!isReady || !token || music) return;
-      void (async () => {
-        try {
-          music = await configureMusicKit(session, browser);
-          music.volume = volume() / 100;
-          music.addEventListener("nowPlayingItemDidChange", showNowPlaying);
-          music.addEventListener("playbackStateDidChange", onPlaybackState);
-          music.addEventListener("mediaPlaybackError", onPlaybackError);
-          for (const name of TIME_EVENTS) music.addEventListener(name, onTime);
-          for (const name of MODE_EVENTS) music.addEventListener(name, onModes);
-          showNowPlaying();
-          onPlaybackState();
-          onTime();
-          onModes();
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "MusicKit failed");
-        }
-      })();
+    () => [ready(), tokenChecked(), userToken()] as const,
+    ([isReady, checked, token]) => {
+      if (!isReady || !checked || connectedAs === token) return;
+      const signingOut = connectedAs !== undefined && token === null;
+      connectedAs = token;
+      // Signing out already told MusicKit (unauthorize); it carries on with previews.
+      if (!signingOut) void connectMusicKit();
     },
   );
 
   onCleanup(() => {
     if (!music) return;
-    music.removeEventListener("nowPlayingItemDidChange", showNowPlaying);
-    music.removeEventListener("playbackStateDidChange", onPlaybackState);
-    music.removeEventListener("mediaPlaybackError", onPlaybackError);
-    for (const name of TIME_EVENTS) music.removeEventListener(name, onTime);
-    for (const name of MODE_EVENTS) music.removeEventListener(name, onModes);
+    listen(music, false);
     clearTimeout(seekTimer);
     music.pause();
   });
@@ -427,9 +455,39 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     );
   }
 
+  /** Apple's charts: what there is to play signed out, and a way into the catalog signed in. */
+  function BrowsePage(): JSX.Element {
+    const charts = useLoaded(() => "charts", (key) => cached(key, () => fetchCharts(session)));
+    return (
+      <>
+        <Title width={contentW()}>Browse</Title>
+        <Show when={charts()} fallback={<Loading />}>
+          {(c) => (
+            <>
+              <SectionTitle>Top Playlists</SectionTitle>
+              <CollectionGrid items={c().playlists} width={contentW()} maxRows={2} loader={artwork} onOpen={openCollection} />
+              <SectionTitle>Top Albums</SectionTitle>
+              <CollectionGrid items={c().albums} width={contentW()} maxRows={2} loader={artwork} onOpen={openCollection} />
+              <SectionTitle>Top Songs</SectionTitle>
+              <TrackList
+                tracks={c().songs}
+                width={contentW()}
+                showAlbum
+                current={shown()}
+                onPlay={(i) => startPlaying(trackAsNowPlaying(c().songs[i]!), (m) => playTracks(m, c().songs, i))}
+              />
+            </>
+          )}
+        </Show>
+      </>
+    );
+  }
+
   function Page(props: { route: Route }): JSX.Element {
     const r = props.route;
     switch (r.view) {
+      case "browse":
+        return <BrowsePage />;
       case "recent":
         return <GridPage title="Recently Added" cacheKey="recent" load={() => fetchRecentlyAdded(session)} />;
       case "albums":
@@ -445,8 +503,6 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     }
   }
 
-  const logo = app.getSprite("applemusic/icon");
-
   const icons = {
     shuffle: app.getSprite("applemusic/shuffle"),
     repeat: app.getSprite("applemusic/repeat"),
@@ -461,24 +517,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
           <text font="body">{configError()}</text>
         </box>
       </Show>
-      <Show when={ready() && !userToken()}>
-        <box width={win.width()} height={win.height()} background={1} flexDirection="column" alignItems="center" justifyContent="center" gap={8} padding={8}>
-          {logo && (
-            <image
-              width={logo.width}
-              height={logo.height}
-              src={{ width: logo.width, height: logo.height, data: logo.data, mask: logo.mask }}
-              mode="inverted"
-            />
-          )}
-          <text font="body" color={0}>Sign in to play your Apple Music library.</text>
-          <Button label="Sign In…" disabled={signingIn()} onClick={() => void startSignIn()} />
-          <Show when={error()}>
-            <text font="body" color={0}>{error()}</text>
-          </Show>
-        </box>
-      </Show>
-      <Show when={ready() && userToken()}>
+      <Show when={ready()}>
         {/*
           The page scrolls with the window's own scroll bar, which runs the
           window's full height. The sidebar and the now-playing bar are drawn
@@ -502,7 +541,16 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
             {/* One element per route, so each page mounts fresh. */}
             <For each={[route()]}>{(r) => <Page route={r} />}</For>
           </box>
-          <Sidebar top={win.scrollY()} height={win.height() - NOW_PLAYING_H} route={route()} playlists={playlists() ?? []} onSelect={select} />
+          <Sidebar
+            top={win.scrollY()}
+            height={win.height() - NOW_PLAYING_H}
+            route={history()[0] ?? route()}
+            signedIn={!!userToken()}
+            signingIn={signingIn()}
+            playlists={playlists() ?? []}
+            onSelect={select}
+            onSignIn={() => void startSignIn()}
+          />
           <NowPlayingBar
             top={win.scrollY() + win.height() - NOW_PLAYING_H}
             width={win.width()}

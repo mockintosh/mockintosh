@@ -169,16 +169,19 @@ export async function configureMusicKit(session: AppleMusicSession, browser: Bro
   return music;
 }
 
+/**
+ * GET from the Apple Music API. The user's own data (`/v1/me/…`) needs their
+ * token; the catalog needs only the developer token, so it works signed out.
+ */
 async function apiGet(path: string, session: AppleMusicSession): Promise<Page | null> {
+  const personal = path.startsWith("/v1/me/");
   // Throw rather than answer empty: an empty answer would be cached as the library.
-  if (!session.developerToken || !session.musicUserToken) throw new Error("Not signed in to Apple Music yet");
-  const resp = await session.fetch(`${API_BASE}${path}`, {
-    headers: {
-      Authorization: `Bearer ${session.developerToken}`,
-      "Music-User-Token": session.musicUserToken,
-    },
-  });
-  if (resp.status === 401 || resp.status === 403) {
+  if (!session.developerToken) throw new Error("Apple Music isn't ready yet");
+  if (personal && !session.musicUserToken) throw new Error("Not signed in to Apple Music");
+  const headers: Record<string, string> = { Authorization: `Bearer ${session.developerToken}` };
+  if (session.musicUserToken) headers["Music-User-Token"] = session.musicUserToken;
+  const resp = await session.fetch(`${API_BASE}${path}`, { headers });
+  if (personal && (resp.status === 401 || resp.status === 403)) {
     session.onSignedOut();
     return null;
   }
@@ -278,16 +281,61 @@ export function fetchArtistAlbums(artistId: string, session: AppleMusicSession):
   return fetchAll(`/v1/me/library/artists/${encodeURIComponent(artistId)}/albums?limit=100`, session, toCollection);
 }
 
-const storefronts = new WeakMap<AppleMusicSession, Promise<string>>();
+const FALLBACK_STOREFRONT = "us";
 
-/** The user's country catalog (`se`, `us`, …), which catalog requests are made against. */
+/** The country in the browser's locale (`sv-SE` → `se`): the best guess at a signed-out listener's store. */
+function localeStorefront(): string {
+  const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+  return /-([A-Z]{2})\b/.exec(locale)?.[1]?.toLowerCase() ?? FALLBACK_STOREFRONT;
+}
+
+const storefronts = new WeakMap<AppleMusicSession, { token: string | null; pending: Promise<string> }>();
+
+/**
+ * The country catalog (`se`, `us`, …) catalog requests are made against:
+ * the account's when signed in, the locale's guess when not.
+ */
 function storefront(session: AppleMusicSession): Promise<string> {
-  let pending = storefronts.get(session);
-  if (!pending) {
-    pending = apiGet("/v1/me/storefront", session).then((page) => page?.data?.[0]?.id ?? "us");
-    storefronts.set(session, pending);
-  }
+  const known = storefronts.get(session);
+  if (known && known.token === session.musicUserToken) return known.pending;
+  const pending = session.musicUserToken
+    ? apiGet("/v1/me/storefront", session).then((page) => page?.data?.[0]?.id ?? localeStorefront())
+    : Promise.resolve(localeStorefront());
+  storefronts.set(session, { token: session.musicUserToken, pending });
   return pending;
+}
+
+/** Apple's charts for the listener's country: what preview mode browses. */
+export interface Charts {
+  playlists: Collection[];
+  albums: Collection[];
+  songs: Track[];
+}
+
+interface ChartsResponse {
+  results?: { [type: string]: Array<{ data?: Resource[] }> | undefined };
+}
+
+export async function fetchCharts(session: AppleMusicSession): Promise<Charts> {
+  async function chartsFor(sf: string): Promise<Charts | null> {
+    if (!session.developerToken) throw new Error("Apple Music isn't ready yet");
+    const resp = await session.fetch(`${API_BASE}/v1/catalog/${sf}/charts?types=playlists,albums,songs&limit=24`, {
+      headers: { Authorization: `Bearer ${session.developerToken}` },
+    });
+    if (!resp.ok) return null;
+    const body = (await resp.json()) as ChartsResponse;
+    const chart = (type: string) => body.results?.[type]?.[0]?.data ?? [];
+    return {
+      playlists: chart("playlists").map(toCollection).filter((c): c is Collection => !!c),
+      albums: chart("albums").map(toCollection).filter((c): c is Collection => !!c),
+      songs: chart("songs").map(toTrack).filter((t): t is Track => !!t),
+    };
+  }
+  const sf = await storefront(session);
+  // A locale's country may have no Apple Music store; fall back to the US one.
+  const charts = (await chartsFor(sf)) ?? (sf === FALLBACK_STOREFRONT ? null : await chartsFor(FALLBACK_STOREFRONT));
+  if (!charts) throw new Error("Apple Music's charts didn't load");
+  return charts;
 }
 
 /** Library ids start `l.` (albums), `p.` (playlists) or `i.` (songs); anything else is in the catalog. */

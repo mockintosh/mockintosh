@@ -6,6 +6,7 @@ import { formatDuration, isPlaying, type Artist, type Collection, type NowPlayin
 
 /** What the content pane shows. */
 export type Route =
+  | { view: "browse" }
   | { view: "recent" }
   | { view: "artists" }
   | { view: "albums" }
@@ -57,6 +58,8 @@ export function useLoaded<T>(key: () => string, fetch: (key: string) => Promise<
 
 // --- Sidebar ---------------------------------------------------------------
 
+const CATALOG: Array<{ label: string; route: Route }> = [{ label: "Browse", route: { view: "browse" } }];
+
 const LIBRARY: Array<{ label: string; route: Route }> = [
   { label: "Recently Added", route: { view: "recent" } },
   { label: "Artists", route: { view: "artists" } },
@@ -89,9 +92,14 @@ function SidebarHeading(props: { children: string }): JSX.Element {
 export function Sidebar(props: {
   top: number;
   height: number;
+  /** The section to highlight: where the current page's Back trail starts. */
   route: Route;
+  /** Signed out, the sidebar offers the catalog and a way to sign in instead of a library. */
+  signedIn: boolean;
+  signingIn: boolean;
   playlists: Collection[];
   onSelect: (route: Route) => void;
+  onSignIn: () => void;
 }): JSX.Element {
   const isSelected = (route: Route) => {
     const current = props.route;
@@ -110,17 +118,32 @@ export function Sidebar(props: {
       semantic={{ name: "music-sidebar" }}
     >
       <box width={SIDEBAR_W - 1} height={props.height} flexDirection="column" overflow="scroll">
-        <SidebarHeading>Library</SidebarHeading>
-        <For each={LIBRARY}>
+        <SidebarHeading>Apple Music</SidebarHeading>
+        <For each={CATALOG}>
           {(item) => <SidebarRow label={item.label} selected={isSelected(item.route)} onClick={() => props.onSelect(item.route)} />}
         </For>
-        <SidebarHeading>Playlists</SidebarHeading>
-        <For each={props.playlists}>
-          {(playlist) => {
-            const route: Route = { view: "collection", collection: playlist };
-            return <SidebarRow label={playlist.name} selected={isSelected(route)} onClick={() => props.onSelect(route)} />;
-          }}
-        </For>
+        <Show
+          when={props.signedIn}
+          fallback={
+            <box flexDirection="column" gap={4} paddingLeft={PAD} paddingRight={PAD} paddingTop={10} semantic={{ name: "music-preview-note" }}>
+              <text font="body" wrap>Playing 30-second previews.</text>
+              <text font="body" wrap>Sign in to play whole songs and your library.</text>
+              <Button label="Sign In…" disabled={props.signingIn} onClick={props.onSignIn} />
+            </box>
+          }
+        >
+          <SidebarHeading>Library</SidebarHeading>
+          <For each={LIBRARY}>
+            {(item) => <SidebarRow label={item.label} selected={isSelected(item.route)} onClick={() => props.onSelect(item.route)} />}
+          </For>
+          <SidebarHeading>Playlists</SidebarHeading>
+          <For each={props.playlists}>
+            {(playlist) => {
+              const route: Route = { view: "collection", collection: playlist };
+              return <SidebarRow label={playlist.name} selected={isSelected(route)} onClick={() => props.onSelect(route)} />;
+            }}
+          </For>
+        </Show>
       </box>
       <box width={1} height={props.height} background={1} />
     </box>
@@ -133,6 +156,15 @@ export function Loading(): JSX.Element {
   return (
     <box padding={PAD}>
       <text font="body">Loading…</text>
+    </box>
+  );
+}
+
+/** A heading within a page, over a shelf of tiles or a list. */
+export function SectionTitle(props: { children: string }): JSX.Element {
+  return (
+    <box paddingTop={6} paddingBottom={4}>
+      <text font="body" bold nowrap>{props.children}</text>
     </box>
   );
 }
@@ -150,6 +182,8 @@ export function Title(props: { children: string; width: number; onBack?: () => v
 export function CollectionGrid(props: {
   items: Collection[];
   width: number;
+  /** Show only this many rows: a shelf rather than the whole list. */
+  maxRows?: number;
   loader: ArtworkLoader;
   onOpen: (collection: Collection) => void;
 }): JSX.Element {
@@ -165,7 +199,7 @@ export function CollectionGrid(props: {
     const n = columns();
     const out: Collection[][] = [];
     for (let i = 0; i < props.items.length; i += n) out.push(props.items.slice(i, i + n));
-    return out;
+    return props.maxRows ? out.slice(0, props.maxRows) : out;
   });
   return (
     <box flexDirection="column" gap={TILE_GAP}>
