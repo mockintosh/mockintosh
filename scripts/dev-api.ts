@@ -79,6 +79,8 @@ const { default: oauthPollHandler } = await import("../api/oauth/poll.js");
 const { default: browseHandler } = await import("../api/browse.js");
 const { default: webImageHandler } = await import("../api/web-image.js");
 const { default: githubTokenHandler } = await import("../api/github/token.js");
+const { default: appleMusicTokenHandler } = await import("../api/apple-music/token.js");
+const { default: appleMusicSignInHandler } = await import("../api/apple-music/sign-in.js");
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/chat": chatHandler,
@@ -90,6 +92,8 @@ const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/browse": browseHandler,
   "/api/web-image": webImageHandler,
   "/api/github/token": githubTokenHandler,
+  "/api/apple-music/token": appleMusicTokenHandler,
+  "/api/apple-music/sign-in": appleMusicSignInHandler,
 };
 
 const server = createServer(async (req, res) => {

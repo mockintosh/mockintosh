@@ -271,6 +271,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     fontFolder,
     crypto: platform.crypto,
     browser: platform.browser,
+    musicKit: platform.musicKit,
     signIn: platform.signInRelay && systemSignIn(platform.signInRelay),
     installer,
     openApp(appId, props = {}, fromRect?) {

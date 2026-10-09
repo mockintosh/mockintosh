@@ -31,6 +31,7 @@ export const SDK_CLEAN = [
   "Terminal.tsx",
   "Assistant.tsx",
   "SpotifyPlayer.tsx",
+  "Music.tsx",
 ] as const;
 
 /** App entry files that are OS shell and are not expected to be SDK-clean. */
@@ -65,6 +66,7 @@ export const BUNDLED_APPS = [
   "VideoPlayer.tsx",
   "PhotoBooth.tsx",
   "SpotifyPlayer.tsx",
+  "Music.tsx",
   "SourceEditor.tsx",
   "Terminal.tsx",
   "Assistant.tsx",
@@ -84,6 +86,7 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "Maps.tsx": ["maps"],
   "Foundry.tsx": ["foundry"],
   "SpotifyPlayer.tsx": ["spotify", "sprites"],
+  "Music.tsx": ["music"],
   "Finder.solid.tsx": ["finder"],
   "PhotoBooth.tsx": ["photobooth"],
   "Dither.tsx": ["photobooth", "dither"],
@@ -124,6 +127,7 @@ export const APP_TITLES: Record<BundledAppEntry, string> = {
   "VideoPlayer.tsx": "Video Player",
   "PhotoBooth.tsx": "Photo Booth",
   "SpotifyPlayer.tsx": "Spotify",
+  "Music.tsx": "Music",
   "SourceEditor.tsx": "Source Editor",
   "Terminal.tsx": "Terminal",
   "Assistant.tsx": "Assistant",

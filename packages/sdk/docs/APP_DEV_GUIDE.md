@@ -41,6 +41,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Terminal | `Terminal.tsx` | SDK-clean |
 | Assistant | `Assistant.tsx` | SDK-clean |
 | Spotify | `SpotifyPlayer.tsx` | SDK-clean |
+| Music | `Music.tsx` | SDK-clean |
 | Finder | `Finder.solid.tsx` | Shell |
 | App Store | `AppStore.tsx` | Shell |
 | Icon Gallery | `IconGallery.tsx` | Shell |
@@ -283,6 +284,7 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `microphone` | `useApp().microphone` is available (see [Sound input](#sound-input)) |
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
 | `sign-in`   | `useApp().signIn` is available (see [Signing in](#signing-in))        |
+| `music-kit` | `useApp().musicKit` is available (see [Apple Music](#apple-music))    |
 | `gpu`       | `useApp().gpu` is available: WGSL pixel programs rendered to an `ImageFrame`, and a rasterizer for meshes kept on the GPU, drawn by a WGSL corner program with a depth test (see `GpuService`) |
 | `agent-runtime` | `useApp().agentRuntime` is available (see [Agents](#agents))      |
 
@@ -341,6 +343,42 @@ The provider must support the **authorization code flow with PKCE**. The relay o
    ```
 
 `authorize` resolves `null` when the user cancels, closes the sheet, or declines on the phone. It rejects when the provider reports another error or the host is not declared. `apps/spotify/api.ts` (`signInWithPhone`) is a complete example.
+
+## Apple Music
+
+`useApp().musicKit` plays Apple Music through MusicKit on the Web (capability `music-kit`). MusicKit is a live object in the page and plays DRM-protected audio through the page's media element, so the OS holds it and your app drives it, the same on the OS's thread or in a process. It's one player per page: every app that uses it drives the same music.
+
+1. Have your server sign a developer token from a MusicKit key (this deployment's is `/api/apple-music/token`) and configure with it. Signed out, MusicKit plays 30-second previews:
+
+   ```tsx
+   const { musicKit } = useApp();
+   const state = await musicKit!.configure({ developerToken });
+   ```
+
+2. Sign in for whole songs and the user's library. `authorize` puts up this deployment's sign-in window and resolves with the Music User Token, for your app to keep and to send to the Apple Music API as `Music-User-Token`. Configure again afterwards, so MusicKit picks it up:
+
+   ```tsx
+   const musicUserToken = await musicKit!.authorize();
+   await musicKit!.configure({ developerToken, musicUserToken });
+   ```
+
+3. Queue and play, and follow the player's state, which is plain data (`playing`, `item`, `time`, `duration`, `shuffleMode`, `repeatMode`, …):
+
+   ```tsx
+   musicKit!.onChange((state) => setTitle(state.item?.title ?? "Not Playing"));
+   await musicKit!.setQueue({ playlist: "pl.f4d106fed2bd41149aaacabb233eb5eb", startPlaying: true });
+   ```
+
+4. Offer a membership to someone who signs in without one. A play their account can't make reaches `onError` with `membershipRequired`; `openSignUp`, called from a click, opens Apple Music's sign-up page with Apple's current trial:
+
+   ```tsx
+   musicKit!.onError((error) => setOfferTrial(error.membershipRequired));
+   // <Button label="Try Apple Music" onClick={() => void musicKit!.openSignUp()} />
+   ```
+
+5. Link what you show to Apple Music: Apple asks apps that play previews to link each one to its music. The Apple Music API gives catalog items a `url`, and `state.item.url` is the playing song's; `openInAppleMusic(url)` opens it in a new tab (and only `music.apple.com` links).
+
+The music stops when your app quits. `apps/Music.tsx` is a complete example.
 
 ## Sound
 

@@ -72,6 +72,8 @@ export interface OSServices {
   fontFolder?: import("./fontFolder").FontFolder;
   crypto: AppCrypto;
   browser?: BrowserService;
+  /** Apple Music playback (`useApp().musicKit`), when the platform holds MusicKit. */
+  musicKit?: import("@mockintosh/sdk").MusicKitService;
   /** Phone sign-in (`useApp().signIn`), when the platform has a relay. */
   signIn?: import("./signIn").SystemSignIn;
   /** Installs App Store apps. Remote bundles also need `Platform.loadModule`. */

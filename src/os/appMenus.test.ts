@@ -4,6 +4,7 @@
  * or host keeps for itself unless it means what that key means there.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MUSIC_KIT_IDLE } from "@mockintosh/sdk";
 import { APP_MODULES } from "@/src/appModules";
 import { bootOS, type BootedOS } from "./boot";
 import { registerApp } from "./apps";
@@ -12,8 +13,12 @@ import { menubarProblems } from "./shortcuts";
 import { createHeadlessPlatform } from "../platform/headless";
 import type { Platform } from "../platform/types";
 
-/** A service that takes every call and never answers: enough to open an app that needs one. */
-const inert = <T>(): T => new Proxy({}, { get: () => () => new Promise(() => {}) }) as T;
+/**
+ * A service that takes every call and never answers: enough to open an app
+ * that needs one. `members` are real, for what an app reads or keeps.
+ */
+const inert = <T>(members: Record<string, unknown> = {}): T =>
+  new Proxy(members, { get: (target, key) => (key in target ? target[key as string] : () => new Promise(() => {})) }) as T;
 
 describe("bundled apps' menu shortcuts", () => {
   let os: BootedOS | undefined;
@@ -41,6 +46,7 @@ describe("bundled apps' menu shortcuts", () => {
       const services: Partial<Platform> = {
         fetch: () => new Promise<Response>(() => {}),
         images: inert(), video: inert(), camera: inert(), browser: inert(), signInRelay: inert(),
+        musicKit: inert({ state: MUSIC_KIT_IDLE, onChange: () => () => {}, onError: () => () => {} }),
       };
       Object.assign(platform, services);
       os = await bootOS(platform);

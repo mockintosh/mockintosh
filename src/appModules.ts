@@ -22,6 +22,7 @@ export const APP_MODULES: Readonly<Record<string, AppModuleLoader>> = {
   dither: () => import("@/apps/Dither"),
   trace: () => import("@/apps/Trace"),
   spotify: () => import("@/apps/SpotifyPlayer"),
+  music: () => import("@/apps/Music"),
   macpaint: () => import("@/apps/MacPaint"),
   canvas: () => import("@/apps/Canvas"),
   surface: () => import("@/apps/Surface"),
