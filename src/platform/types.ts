@@ -67,6 +67,11 @@ export interface PlatformKeyEvent {
   type: "down" | "up";
   /** Key value as in `KeyboardEvent.key` ("a", "Enter", "ArrowLeft", …). */
   key: string;
+  /**
+   * Where the key is, as `KeyboardEvent.code` ("KeyS", "Digit5"), for when a
+   * modifier changed what it typed (⌥S types ß on a Mac). Absent = unknown.
+   */
+  code?: string;
   modifiers: Modifiers;
 }
 
@@ -89,7 +94,11 @@ export type Unsubscribe = () => void;
 
 export interface PlatformInput {
   onPointer(handler: (event: PlatformPointerEvent) => void): Unsubscribe;
-  onKey(handler: (event: PlatformKeyEvent) => void): Unsubscribe;
+  /**
+   * The handler returns `true` when the Macintosh used the key, so a host that
+   * has keys of its own (a browser's ⌘S, ⌘R) leaves that one alone.
+   */
+  onKey(handler: (event: PlatformKeyEvent) => boolean | void): Unsubscribe;
   /** Host files dropped onto the screen. Absent on hosts with no such notion. */
   onDrop?(handler: (event: PlatformDropEvent) => void): Unsubscribe;
 }
