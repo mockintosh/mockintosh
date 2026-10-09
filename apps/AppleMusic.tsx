@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Button } from "@mockintosh/ui";
+import { Button, TextInput } from "@mockintosh/ui";
 import { useApp, defineApp } from "@mockintosh/sdk";
 import {
   type AppleMusicSession,
@@ -15,6 +15,8 @@ import {
   fetchArtistAlbums,
   fetchArtists,
   fetchCharts,
+  fetchGenreStations,
+  fetchRadio,
   fetchDeveloperToken,
   fetchPlaylists,
   fetchRecentlyPlayed,
@@ -28,6 +30,7 @@ import {
   playCollection,
   playTracks,
   repeatModeOf,
+  searchCatalog,
   setRepeatMode,
   signIn,
   trackAsNowPlaying,
@@ -35,7 +38,7 @@ import {
 import { createArtworkLoader } from "./applemusic/Artwork";
 import { NOW_PLAYING_H, NowPlayingBar } from "./applemusic/NowPlayingBar";
 import {
-  ArtistList,
+  NameList,
   CollectionGrid,
   CollectionHeader,
   Loading,
@@ -56,6 +59,9 @@ const PAD = 6;
 /** MusicKit events that move the position slider, and that change shuffle or repeat. */
 const TIME_EVENTS = ["playbackTimeDidChange", "playbackDurationDidChange", "nowPlayingItemDidChange"];
 const MODE_EVENTS = ["shuffleModeDidChange", "repeatModeDidChange"];
+
+/** How long typing pauses before the search runs. */
+const SEARCH_DELAY_MS = 350;
 
 /** How long the position slider waits for the drag to rest before seeking. */
 const SEEK_DELAY_MS = 150;
@@ -84,6 +90,9 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   const [shuffle, setShuffle] = createSignal(false);
   const [repeat, setRepeat] = createSignal<RepeatMode>("none");
   const [error, setError] = createSignal("");
+  /** What's in the search field, and the term last searched for: kept while you look at the results' pages. */
+  const [query, setQuery] = createSignal("");
+  const [searchTerm, setSearchTerm] = createSignal("");
   const [signingIn, setSigningIn] = createSignal(false);
   /** Whether a saved sign-in has been looked for: MusicKit waits, so it starts signed in or not, once. */
   const [tokenChecked, setTokenChecked] = createSignal(false);
@@ -458,7 +467,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
       <>
         <Title width={contentW()}>Artists</Title>
         <Show when={artists()} fallback={<Loading />}>
-          {(list) => <ArtistList artists={list()} width={contentW()} onOpen={(artist) => open({ view: "artist", artist })} />}
+          {(list) => <NameList items={list()} width={contentW()} onOpen={(artist) => open({ view: "artist", artist })} />}
         </Show>
       </>
     );
@@ -492,6 +501,110 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     );
   }
 
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  function typeQuery(value: string): void {
+    setQuery(value);
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => setSearchTerm(value.trim()), SEARCH_DELAY_MS);
+  }
+  function submitQuery(value: string): void {
+    clearTimeout(searchTimer);
+    setSearchTerm(value.trim());
+  }
+
+  function SearchPage(): JSX.Element {
+    const signedIn = () => !!userToken();
+    const results = useLoaded(
+      () => `search:${signedIn() ? "full" : "preview"}:${searchTerm()}`,
+      (key) => {
+        const term = searchTerm();
+        return term ? cached(key, () => searchCatalog(term, signedIn(), session)) : Promise.resolve(null);
+      },
+    );
+    const empty = () => {
+      const r = results();
+      return !!r && !r.songs.length && !r.artists.length && !r.albums.length && !r.playlists.length && !r.stations.length;
+    };
+    return (
+      <>
+        <Title width={contentW()}>Search</Title>
+        <TextInput
+          name="music-search"
+          value={query()}
+          onChange={typeQuery}
+          onSubmit={submitQuery}
+          placeholder="Artists, songs, albums…"
+          icon={searchIcon}
+          width={contentW()}
+          autoFocus
+        />
+        <Show when={searchTerm()} fallback={<box paddingTop={8}><text font="body">Search Apple Music's catalog.</text></box>}>
+          <Show when={results()} fallback={<Loading />}>
+            {(r) => (
+              <>
+                <Show when={empty()}>
+                  <box paddingTop={8}><text font="body">{`Nothing found for "${searchTerm()}".`}</text></box>
+                </Show>
+                <Show when={r().songs.length}>
+                  <SectionTitle>Songs</SectionTitle>
+                  <TrackList
+                    tracks={r().songs}
+                    width={contentW()}
+                    showAlbum
+                    current={shown()}
+                    onPlay={(i) => startPlaying(trackAsNowPlaying(r().songs[i]!), (m) => playTracks(m, r().songs, i))}
+                  />
+                </Show>
+                <Show when={r().artists.length}>
+                  <SectionTitle>Artists</SectionTitle>
+                  <NameList items={r().artists} width={contentW()} onOpen={(artist) => open({ view: "artist", artist })} />
+                </Show>
+                <Show when={r().albums.length}>
+                  <SectionTitle>Albums</SectionTitle>
+                  <CollectionGrid items={r().albums} width={contentW()} maxRows={2} loader={artwork} onOpen={openCollection} />
+                </Show>
+                <Show when={r().playlists.length}>
+                  <SectionTitle>Playlists</SectionTitle>
+                  <CollectionGrid items={r().playlists} width={contentW()} maxRows={2} loader={artwork} onOpen={openCollection} />
+                </Show>
+                <Show when={r().stations.length}>
+                  <SectionTitle>Stations</SectionTitle>
+                  <CollectionGrid items={r().stations} width={contentW()} maxRows={1} loader={artwork} onOpen={openCollection} />
+                </Show>
+              </>
+            )}
+          </Show>
+        </Show>
+      </>
+    );
+  }
+
+  /** Stations: yours, Apple's live radio, and the genres' (signed in; they don't play as previews). */
+  function RadioPage(): JSX.Element {
+    const radio = useLoaded(() => "radio", (key) => cached(key, () => fetchRadio(session)));
+    return (
+      <>
+        <Title width={contentW()}>Radio</Title>
+        <Show when={radio()} fallback={<Loading />}>
+          {(r) => (
+            <>
+              <Show when={r().personal.length}>
+                <SectionTitle>Your Station</SectionTitle>
+                <CollectionGrid items={r().personal} width={contentW()} maxRows={1} loader={artwork} onOpen={openCollection} />
+              </Show>
+              <SectionTitle>Live Radio</SectionTitle>
+              <CollectionGrid items={r().live} width={contentW()} loader={artwork} onOpen={openCollection} />
+              <Show when={r().genres.length}>
+                <SectionTitle>Stations by Genre</SectionTitle>
+                <NameList items={r().genres} width={contentW()} onOpen={(genre) => open({ view: "genre", genre })} />
+              </Show>
+            </>
+          )}
+        </Show>
+      </>
+    );
+  }
+
   /** Signed in: what you played lately, then Apple's recommendations, a shelf each. */
   function HomePage(): JSX.Element {
     const recent = useLoaded(() => "recently-played", (key) => cached(key, () => fetchRecentlyPlayed(session)));
@@ -517,6 +630,9 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
             </Show>
           )}
         </Show>
+        <Show when={recent()?.length === 0 && shelves()?.length === 0}>
+          <text font="body">Play something, and it will show up here.</text>
+        </Show>
         <For each={freshShelves()}>
           {(shelf) => (
             <>
@@ -534,6 +650,12 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     switch (r.view) {
       case "home":
         return <HomePage />;
+      case "search":
+        return <SearchPage />;
+      case "radio":
+        return <RadioPage />;
+      case "genre":
+        return <GridPage title={r.genre.name} cacheKey={`genre:${r.genre.id}`} load={() => fetchGenreStations(r.genre, session)} />;
       case "browse":
         return <BrowsePage />;
       case "recent":
@@ -551,6 +673,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     }
   }
 
+  const searchIcon = app.getSprite("applemusic/search");
   const icons = {
     shuffle: app.getSprite("applemusic/shuffle"),
     repeat: app.getSprite("applemusic/repeat"),

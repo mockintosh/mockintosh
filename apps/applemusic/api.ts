@@ -328,8 +328,78 @@ export function fetchSongs(session: AppleMusicSession, next?: string): Promise<P
   return fetchPage(next ?? "/v1/me/library/songs?limit=100", session, toTrack);
 }
 
-export function fetchArtistAlbums(artistId: string, session: AppleMusicSession): Promise<Collection[]> {
-  return fetchAll(`/v1/me/library/artists/${encodeURIComponent(artistId)}/albums?limit=100`, session, toCollection);
+/** An artist's albums: those in the library for a library artist (`r.…`), the catalog's for one found by search. */
+export async function fetchArtistAlbums(artistId: string, session: AppleMusicSession): Promise<Collection[]> {
+  const id = encodeURIComponent(artistId);
+  const path = isLibraryId(artistId)
+    ? `/v1/me/library/artists/${id}/albums?limit=100`
+    : `/v1/catalog/${await storefront(session)}/artists/${id}/albums?limit=100`;
+  return fetchAll(path, session, toCollection);
+}
+
+export interface SearchResults {
+  songs: Track[];
+  artists: Artist[];
+  albums: Collection[];
+  playlists: Collection[];
+  stations: Collection[];
+}
+
+interface SearchResponse {
+  results?: { [type: string]: { data?: Resource[] } | undefined };
+}
+
+/**
+ * Search the catalog. Stations only when signed in: MusicKit can't play
+ * them as previews.
+ */
+export async function searchCatalog(term: string, withStations: boolean, session: AppleMusicSession): Promise<SearchResults> {
+  const types = withStations ? "songs,artists,albums,playlists,stations" : "songs,artists,albums,playlists";
+  const page = (await apiGet(
+    `/v1/catalog/${await storefront(session)}/search?term=${encodeURIComponent(term)}&types=${types}&limit=12`,
+    session,
+  )) as SearchResponse | null;
+  const of = (type: string) => page?.results?.[type]?.data ?? [];
+  return {
+    songs: of("songs").map(toTrack).filter((t): t is Track => !!t),
+    artists: of("artists").map(toArtist).filter((a): a is Artist => !!a),
+    albums: of("albums").map(toCollection).filter((c): c is Collection => !!c),
+    playlists: of("playlists").map(toCollection).filter((c): c is Collection => !!c),
+    stations: of("stations").map(toCollection).filter((c): c is Collection => !!c),
+  };
+}
+
+export interface Genre {
+  id: string;
+  name: string;
+}
+
+export interface Radio {
+  /** The station Apple makes from what you play, when it has one. */
+  personal: Collection[];
+  live: Collection[];
+  genres: Genre[];
+}
+
+/** Radio (signed in: stations don't play as previews). */
+export async function fetchRadio(session: AppleMusicSession): Promise<Radio> {
+  const sf = await storefront(session);
+  const [personal, live, genres] = await Promise.all([
+    apiGet(`/v1/catalog/${sf}/stations?filter[identity]=personal`, session).catch(() => null),
+    apiGet(`/v1/catalog/${sf}/stations?filter[featured]=apple-music-live-radio`, session),
+    fetchAll(`/v1/catalog/${sf}/station-genres?limit=100`, session, (r) => ({ id: r.id, name: plainText(r.attributes?.name) }), 200).catch(
+      () => [] as Genre[],
+    ),
+  ]);
+  return {
+    personal: collections(personal?.data),
+    live: collections(live?.data),
+    genres: genres.filter((g) => g.name).sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+export async function fetchGenreStations(genre: Genre, session: AppleMusicSession): Promise<Collection[]> {
+  return fetchAll(`/v1/catalog/${await storefront(session)}/station-genres/${encodeURIComponent(genre.id)}/stations?limit=50`, session, toCollection, 200);
 }
 
 const FALLBACK_STOREFRONT = "us";
@@ -415,9 +485,9 @@ export async function fetchCharts(session: AppleMusicSession): Promise<Charts> {
   };
 }
 
-/** Library ids start `l.` (albums), `p.` (playlists) or `i.` (songs); anything else is in the catalog. */
+/** Library ids start `l.` (albums), `p.` (playlists), `i.` (songs) or `r.` (artists); anything else is in the catalog. */
 function isLibraryId(id: string): boolean {
-  return /^[lpi]\./.test(id);
+  return /^[lpir]\./.test(id);
 }
 
 export async function fetchTracks(collection: Collection, session: AppleMusicSession): Promise<Track[]> {

@@ -98,7 +98,22 @@ const REPEAT_ONE = fromGrid(13, 9, [
   "..##.........",
 ]);
 
+/** The search field's magnifying glass, as Maps draws it. */
+const SEARCH = fromGrid(11, 10, [
+  "..####.....",
+  ".#....#....",
+  "#......#...",
+  "#......#...",
+  "#......#...",
+  "#......#...",
+  ".#....#....",
+  "..####.##..",
+  "........##.",
+  ".........##",
+]);
+
 export const sprites: Record<string, Sprite> = {
+  "applemusic/search": SEARCH,
   "applemusic/shuffle": SHUFFLE,
   "applemusic/repeat": REPEAT,
   "applemusic/repeat-one": REPEAT_ONE,

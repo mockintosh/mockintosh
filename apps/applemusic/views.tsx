@@ -2,12 +2,15 @@ import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { Button, measureText } from "@mockintosh/ui";
 import { Artwork, type ArtworkLoader } from "./Artwork";
-import { formatDuration, isPlaying, type Artist, type Collection, type NowPlaying, type Track } from "./api";
+import { formatDuration, isPlaying, type Artist, type Collection, type Genre, type NowPlaying, type Track } from "./api";
 
 /** What the content pane shows. */
 export type Route =
+  | { view: "search" }
   | { view: "home" }
   | { view: "browse" }
+  | { view: "radio" }
+  | { view: "genre"; genre: Genre }
   | { view: "recent" }
   | { view: "artists" }
   | { view: "albums" }
@@ -59,7 +62,13 @@ export function useLoaded<T>(key: () => string, fetch: (key: string) => Promise<
 
 // --- Sidebar ---------------------------------------------------------------
 
-const CATALOG: Array<{ label: string; route: Route }> = [{ label: "Browse", route: { view: "browse" } }];
+/** Apple Music's own pages; some need the account (Home is yours, stations don't play as previews). */
+const CATALOG: Array<{ label: string; route: Route; signedIn?: boolean }> = [
+  { label: "Search", route: { view: "search" } },
+  { label: "Home", route: { view: "home" }, signedIn: true },
+  { label: "Browse", route: { view: "browse" } },
+  { label: "Radio", route: { view: "radio" }, signedIn: true },
+];
 
 const LIBRARY: Array<{ label: string; route: Route }> = [
   { label: "Recently Added", route: { view: "recent" } },
@@ -120,10 +129,7 @@ export function Sidebar(props: {
     >
       <box width={SIDEBAR_W - 1} height={props.height} flexDirection="column" overflow="scroll">
         <SidebarHeading>Apple Music</SidebarHeading>
-        <Show when={props.signedIn}>
-          <SidebarRow label="Home" selected={isSelected({ view: "home" })} onClick={() => props.onSelect({ view: "home" })} />
-        </Show>
-        <For each={CATALOG}>
+        <For each={CATALOG.filter((item) => props.signedIn || !item.signedIn)}>
           {(item) => <SidebarRow label={item.label} selected={isSelected(item.route)} onClick={() => props.onSelect(item.route)} />}
         </For>
         <Show
@@ -229,13 +235,14 @@ export function CollectionGrid(props: {
   );
 }
 
-export function ArtistList(props: { artists: Artist[]; width: number; onOpen: (artist: Artist) => void }): JSX.Element {
+/** Artists or genres: a list of names, each opening its page. */
+export function NameList<T extends { id: string; name: string }>(props: { items: T[]; width: number; onOpen: (item: T) => void }): JSX.Element {
   return (
     <box flexDirection="column">
-      <For each={props.artists}>
-        {(artist) => (
-          <box height={ROW_H} flexDirection="row" alignItems="center" onClick={() => props.onOpen(artist)}>
-            <text font="body" nowrap>{fit(artist.name, props.width)}</text>
+      <For each={props.items}>
+        {(item) => (
+          <box height={ROW_H} flexDirection="row" alignItems="center" onClick={() => props.onOpen(item)}>
+            <text font="body" nowrap>{fit(item.name, props.width)}</text>
           </box>
         )}
       </For>
