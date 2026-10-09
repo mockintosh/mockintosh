@@ -579,7 +579,7 @@ function Music(_props: Record<string, unknown>): JSX.Element {
           width={contentW()}
           autoFocus
         />
-        <Show when={searchTerm()} fallback={<box paddingTop={8}><text font="body">Search Apple Music's catalog.</text></box>}>
+        <Show when={searchTerm()} fallback={<box paddingTop={8}><text font="body">Search the Apple Music catalog.</text></box>}>
           <Show when={results()} fallback={<Loading />}>
             {(r) => (
               <>

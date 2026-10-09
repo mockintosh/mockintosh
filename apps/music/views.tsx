@@ -83,6 +83,8 @@ const SIDEBAR_INSET = 4;
 const ROW_RADIUS = 5;
 /** Where a row's text starts, inside its inset: headings line up with it. */
 const SIDEBAR_TEXT_X = SIDEBAR_INSET + PAD;
+/** The signed-out panel's margin: its buttons span the sidebar but for this. */
+const PREVIEW_PAD = 8;
 
 function SidebarRow(props: { label: string; selected: boolean; onClick: () => void }): JSX.Element {
   return (
@@ -105,9 +107,10 @@ function SidebarRow(props: { label: string; selected: boolean; onClick: () => vo
   );
 }
 
-function SidebarHeading(props: { children: string }): JSX.Element {
+/** A section's heading; the first sits 2px higher, on the page title's baseline. */
+function SidebarHeading(props: { children: string; first?: boolean }): JSX.Element {
   return (
-    <box height={ROW_H + 6} flexDirection="row" alignItems="flex-end" paddingLeft={SIDEBAR_TEXT_X} paddingBottom={2}>
+    <box height={ROW_H + (props.first ? 4 : 6)} flexDirection="row" alignItems="flex-end" paddingLeft={SIDEBAR_TEXT_X} paddingBottom={2}>
       <text font="body" bold nowrap>{props.children}</text>
     </box>
   );
@@ -147,34 +150,35 @@ export function Sidebar(props: {
       background={0}
       semantic={{ name: "music-sidebar" }}
     >
-      <box width={SIDEBAR_W - 1} height={props.height} flexDirection="column" overflow="scroll" paddingBottom={SIDEBAR_INSET}>
-        <SidebarHeading>Apple Music</SidebarHeading>
-        <For each={CATALOG.filter((item) => props.signedIn || !item.signedIn)}>
-          {(item) => <SidebarRow label={item.label} selected={isSelected(item.route)} onClick={() => props.onSelect(item.route)} />}
-        </For>
-        <Show
-          when={props.signedIn}
-          fallback={
-            <box flexDirection="column" gap={4} paddingLeft={SIDEBAR_TEXT_X} paddingRight={SIDEBAR_TEXT_X} paddingTop={10} semantic={{ name: "music-preview-note" }}>
-              <text font="body" wrap>Playing 30-second previews.</text>
-              <text font="body" wrap>Sign in to play whole songs and your library.</text>
-              <Button label="Sign In…" disabled={props.signingIn} onClick={props.onSignIn} />
-              <text font="body" wrap>New to Apple Music?</text>
-              <Button name="music-sign-up" label="Try It" onClick={props.onSignUp} />
-            </box>
-          }
-        >
-          <SidebarHeading>Library</SidebarHeading>
-          <For each={LIBRARY}>
+      <box width={SIDEBAR_W - 1} height={props.height} flexDirection="column">
+        <box flexGrow={1} flexShrink={1} minHeight={0} flexDirection="column" overflow="scroll" paddingBottom={SIDEBAR_INSET}>
+          <SidebarHeading first>Apple Music</SidebarHeading>
+          <For each={CATALOG.filter((item) => props.signedIn || !item.signedIn)}>
             {(item) => <SidebarRow label={item.label} selected={isSelected(item.route)} onClick={() => props.onSelect(item.route)} />}
           </For>
-          <SidebarHeading>Playlists</SidebarHeading>
-          <For each={props.playlists}>
-            {(playlist) => {
-              const route: Route = { view: "collection", collection: playlist };
-              return <SidebarRow label={playlist.name} selected={isSelected(route)} onClick={() => props.onSelect(route)} />;
-            }}
-          </For>
+          <Show when={props.signedIn}>
+            <SidebarHeading>Library</SidebarHeading>
+            <For each={LIBRARY}>
+              {(item) => <SidebarRow label={item.label} selected={isSelected(item.route)} onClick={() => props.onSelect(item.route)} />}
+            </For>
+            <SidebarHeading>Playlists</SidebarHeading>
+            <For each={props.playlists}>
+              {(playlist) => {
+                const route: Route = { view: "collection", collection: playlist };
+                return <SidebarRow label={playlist.name} selected={isSelected(route)} onClick={() => props.onSelect(route)} />;
+              }}
+            </For>
+          </Show>
+        </box>
+        {/* Signed out: what's playing and how to get more, set apart at the sidebar's foot. */}
+        <Show when={!props.signedIn}>
+          <box width={SIDEBAR_W - 1} height={1} background={1} />
+          <box flexDirection="column" gap={4} padding={PREVIEW_PAD} semantic={{ name: "music-preview-note" }}>
+            <text font="body" bold nowrap>Previews</text>
+            <text font="body" wrap>Sign in for whole songs and your library.</text>
+            <Button label="Sign In…" alignSelf="stretch" disabled={props.signingIn} onClick={props.onSignIn} />
+            <Button name="music-sign-up" label="Try Apple Music" alignSelf="stretch" onClick={props.onSignUp} />
+          </box>
         </Show>
       </box>
       <box width={1} height={props.height} background={1} />
