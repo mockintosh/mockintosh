@@ -84,6 +84,14 @@ export interface OSWindow {
   onGoAway?: () => void;
   /** Overrides the kind's modality (`windowDefinition(kind).modal`). */
   modal?: boolean;
+  /**
+   * The window belongs to a menubar app (`kind: "menubar"`): it takes the
+   * keyboard, but the menubar and the application menu go on showing the
+   * app behind it.
+   */
+  accessory?: boolean;
+  /** For an `accessory` window: the key window it came up over (null: the Finder desktop), which keeps the menubar and gets the keyboard back. */
+  openedOver?: string | null;
   /** Minimum content width when resizing (default 100). */
   minWidth?: number;
   /** Minimum content height when resizing (default 60). */
@@ -193,23 +201,39 @@ export function getAppMenus(appId: string): MenubarDefinition[] | undefined {
   return appMenus()[appId];
 }
 
+/** Whether `win` can own the menubar: not an alert, and not a menubar app's window. */
+function ownsMenubar(win: OSWindow): boolean {
+  return !isModalWindow(win) && !win.accessory;
+}
+
+function windowById(id: string | null | undefined): OSWindow | undefined {
+  return id ? (windowStore().list as OSWindow[]).find((w) => w.id === id) : undefined;
+}
+
 /**
  * The window that determines the menubar: the active window, unless it is a
  * system-modal alert, in which case the frontmost non-modal window (alerts
- * borrow the menubar of whatever they interrupted). Undefined means the
- * Finder desktop.
+ * borrow the menubar of whatever they interrupted), or a menubar app's
+ * window, which keeps the menubar of the window it came up over. Undefined
+ * means the Finder desktop.
  */
 function menubarWindow(): OSWindow | undefined {
-  const active = getActiveWindow();
+  let active = getActiveWindow();
   // No key window means the Finder desktop is front, even if other apps
   // still have windows open behind it.
+  while (active?.accessory) active = windowById(active.openedOver);
   if (!active) return undefined;
-  if (!isModalWindow(active)) return active;
+  if (ownsMenubar(active)) return active;
   const stack = sortWindowsForPaint(windowStore().list as OSWindow[]);
   for (let i = stack.length - 1; i >= 0; i--) {
-    if (!isModalWindow(stack[i])) return stack[i];
+    if (ownsMenubar(stack[i])) return stack[i];
   }
   return undefined;
+}
+
+/** Whether the key window is a menubar app's: its keys are its own, not the menubar's ⌘ shortcuts. */
+export function isAccessoryKey(): boolean {
+  return getActiveWindow()?.accessory === true;
 }
 
 /** The app whose menus the menubar shows; the Finder when no window is open. */
@@ -264,7 +288,7 @@ function nextVisibleAppId(hidden: readonly string[]): string {
   const stack = sortWindowsForPaint(windowStore().list as OSWindow[]);
   for (let i = stack.length - 1; i >= 0; i--) {
     const win = stack[i];
-    if (!hidden.includes(win.appId) && !isModalWindow(win) && !win.appId.startsWith("__")) return win.appId;
+    if (!hidden.includes(win.appId) && ownsMenubar(win) && !win.appId.startsWith("__")) return win.appId;
   }
   return FINDER_APP_ID;
 }
@@ -313,6 +337,10 @@ export const [getScreenshotMarquee, setScreenshotMarquee] = lazySignal<{
 
 export function openOSWindow(win: OSWindow): void {
   if (windowDefinition(win.kind).coversScreen) tuckMenubar();
+  if (win.accessory) {
+    const over = getActiveWindow();
+    win.openedOver = over?.accessory ? over.openedOver : (over?.id ?? null);
+  }
   const def = windowDefinition(win.kind);
   _setWindowStore((s) => {
     // Remove any duplicate with the same id before adding
@@ -343,6 +371,10 @@ export function closeOSWindow(id: string): void {
   setActiveWindowId((prev) => {
     if (prev !== id) return prev;
     const remaining = windowStore().list.filter((w) => w.id !== id && !isAppHidden(w.appId)) as OSWindow[];
+    // A menubar app's window gives the keyboard back to what it came up over.
+    if (closing?.accessory && (closing.openedOver === null || remaining.some((w) => w.id === closing.openedOver))) {
+      return closing.openedOver ?? null;
+    }
     // The app stays front while it has windows left (a desk, a palette).
     const sameApp = closing ? keyWindowId(remaining, closing.appId) : null;
     return sameApp ?? (remaining.length > 0 ? remaining[remaining.length - 1].id : null);

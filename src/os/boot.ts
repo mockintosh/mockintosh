@@ -49,6 +49,7 @@ import {
   FINDER_APP_ID,
   hideApps as hideAppsInState,
   isAppHidden,
+  isAccessoryKey,
 } from "./state";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
@@ -351,6 +352,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         openWindowCount: getWindows().length,
       });
       win.Component ??= app.Component;
+      if (app.kind === "menubar") win.accessory = true;
       win.instanceId = instanceId ?? instances.create(appId, osServices.projects?.selectedBuild(appId));
       instances.addWindow(win.instanceId, win.id);
       win.openedFromRect = fromRect;
@@ -400,6 +402,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     },
     openFSNode(nodeId, fromRect?) {
       void openFSNodeImpl(nodeId, fromRect);
+    },
+    toggleMenubarApp(appId) {
+      const open = getWindows().filter((w) => w.appId === appId);
+      if (open.length === 0) {
+        osServices.openApp(appId);
+        return;
+      }
+      for (const win of open) osServices.closeWindow(win.id);
     },
     closeWindow(id) {
       const win = getWindows().find((w) => w.id === id);
@@ -806,6 +816,8 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
    * it, `"disabled"` when the key only belongs to a dimmed item, else null.
    */
   function runMenuShortcut(e: PlatformKeyEvent): "ran" | "disabled" | null {
+    // A menubar app's panel is key: the menubar belongs to the app behind it, and the keys to the panel.
+    if (isAccessoryKey()) return null;
     let dimmed = false;
     for (const menu of getMenubarMenus()) {
       for (const item of menuCommands(menu.items)) {
@@ -861,6 +873,16 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       osServices.forceQuit();
       scheduleRepaint();
       return true;
+    }
+    // A menubar app's hotkey works from anywhere (⌘Space: Spotlight; a host's
+    // ⌃Space is ⌘Space here, except in a terminal, whose ⌃ keys are its own).
+    if (command && !mods.alt) {
+      const menubarApp = getAllApps().find((app) => app.kind === "menubar" && app.hotkey?.toLowerCase() === e.key.toLowerCase());
+      if (menubarApp) {
+        osServices.toggleMenubarApp(menubarApp.id);
+        scheduleRepaint();
+        return true;
+      }
     }
     // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
     if (command && e.key.toLowerCase() === "v") {

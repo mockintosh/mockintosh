@@ -147,6 +147,10 @@ Windows belong to apps via `OSWindow.appId`; the **active app** is derived, neve
 
 Menus are owned by apps, not windows. `SolidApp.menus` (or `setAppMenus(appId, …)` for menus that change at runtime) registers an app's menubar; `useWindow().setMenus` sets a *per-window override* for menus that depend on window state (Finder's "Clean Up" is enabled only inside a folder). `getMenubarMenus()` resolves override → app menus → `[]`, so switching windows always shows the right menus with no imperative sync.
 
+### Menubar apps
+
+An app declared `kind: "menubar"` (Spotlight) has no menus and is never in the application menu. The menubar draws its `menubarIcon` left of the application menu, in the same 16×16 slot (`IconTitle` in `Menubar.solid.tsx`); a click on it, or its `hotkey` with ⌘/⌃ from anywhere (`onKey` in `boot.ts`), calls `toggleMenubarApp`: close the app's windows if it has any, else `openApp`. Its windows are marked `accessory` (`openWindow` in `boot.ts`) and remember the key window they came up over (`openedOver`): `menubarWindow()` follows that back, so the menubar keeps the app you were in, `runMenuShortcut` leaves ⌘ keys to the panel, and closing it gives the keyboard back. Spotlight is a shell app (it reads the app registry, the App Store listings and the whole disk); it opens the App Store on an app's page through `src/os/appStoreLink.ts`.
+
 ### Third-party apps (SDK v3)
 
 ```ts
@@ -317,6 +321,7 @@ A window's `kind` selects a **window definition** (`src/os/windowKinds.ts`) — 
 | `"alert"`         | `dBoxProc`        | 1px / 2px white / 2px square frame and shadow; system-modal | 5 front              |
 | `"fullscreen"`    | —                 | none; bounds are the screen, menubar hidden         | 3 above documents            |
 | `"desk"`          | —                 | none; the screen under the menubar, local = global coordinates; a press does not take the key window | behind the app's other windows; hidden when another app is front |
+| `"panel"`         | `plainDBox`       | 1px frame and shadow, not movable; opens in the upper centre | 4 above fullscreen |
 
 `buildAppWindow` clamps size/position to the desktop (gray region minus 3 px). Zoom box toggles `standardBounds` vs `userBounds`. Opening from a Finder icon plays the zoom-rect animation.
 
