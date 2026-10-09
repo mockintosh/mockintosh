@@ -525,12 +525,12 @@
    "music/icon": {
     "width": 32,
     "height": 32,
-    "data": "AAAAAAAAAAAAAACqqgAAAAAAKqqqqAAAAACqqqqqAAAACqqqqqqgAAAqqWqqqqgAAKqmqqqqqgAAqpqqqqqqAAKqaaqqqqqACqmmqqqqqqAKppqqqqqqoAqaapVWqqqgKpqqVVWqqqgqqqlVVWqqqCqqqVVVaqqoKqqpVpVqqqgqqqlWlWqqqCqqqVVVaqqoKqqpVVVqqqgqqqpVVaqmqAqqqpVWqaagCqqqqqqmmqAKqqqqqppqoAKqqqqqaaqAAKqqqqqmqgAAqqqqqpqqAAAqqqqpaqgAAAqqqqqqoAAAAKqqqqoAAAAAKqqqqAAAAAAAqqoAAAAAAAAAAAAAAA=="
+    "data": "AAAAqqoAAAAAACqqqqgAAAACqqqqqoAAAAqqqqqqoAAAKqWqqqqoAACqmqqqqqoAAqpqqqqqqoAKqaWqqqqqoAqmmqqqqqqgKppqqqqqqqgqaaqlWqqqqCppqlVVqqqoqqqpVVVqqqqqqqlVVWqqqqqqpVVVWqqqqqqlVpVaqqqqqqVWlVqqqqqqpVVVWqqqqqqpVVVqqqqqqqlVVWqqqiqqqlVVqmmoKqqqpVqqaagqqqqqqqmmqAqqqqqqppqgCqqqqqpaaqACqqqqqqmqgACqqqqqpqoAACqqqqpaqAAACqqqqqqgAAACqqqqqoAAAAAqqqqoAAAAAACqqgAAAA=="
    },
    "music/icon-16x16": {
     "width": 16,
     "height": 16,
-    "data": "AAAAAACqqgACqqqACpqqoCpqqqgppVqoKpVWqCqWlqgqlpaoKpVWqCqlWmgqqqmoCqqmoAKqqoAAqqoAAAAAAA=="
+    "data": "ACqoAAKqqoAKmqqgKmqqqCmqqqimpVqqqpVWqqqWlqqqlpaqqpVWqqqlWpoqqqpoKqqpqAqqpqACqqqAACqoAA=="
    }
   }
  },
