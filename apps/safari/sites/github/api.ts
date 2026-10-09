@@ -8,6 +8,13 @@ export class GithubError extends Error {
   }
 }
 
+/** The sign-in doesn't let Safari do this: it was made before Safari asked for the permission. Signing in again grants it. */
+export class MissingScopeError extends GithubError {
+  constructor(message: string) {
+    super(message, 403);
+  }
+}
+
 /** What a 404 says when GitHub gives no more reason than that. */
 export const NOT_FOUND = "Not found on GitHub.";
 
@@ -782,6 +789,9 @@ export async function setWatching(fetch: FetchFunction, token: string, owner: st
     ? { method: "PUT", headers: { ...restHeaders(token), "Content-Type": "application/json" }, body: JSON.stringify({ subscribed: true }) }
     : { method: "DELETE", headers: restHeaders(token) });
   if (response.ok) return;
+  // The repository is there (its page had the button), so a 404 is GitHub hiding what the token can't do:
+  // watching needs the notifications scope, which sign-ins from before it was asked for don't have.
+  if (response.status === 404) throw new MissingScopeError(`Safari's sign-in doesn't let it ${watching ? "watch" : "unwatch"} repositories. Sign in again to allow it.`);
   const detail = await errorMessage(response);
   throw new GithubError(detail || `GitHub wouldn't ${watching ? "watch" : "unwatch"} the repository (${response.status}).`, response.status);
 }

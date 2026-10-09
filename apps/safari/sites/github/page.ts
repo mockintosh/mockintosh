@@ -2,6 +2,7 @@ import { formatUrl, parseMarkdown, parseUrl, queryParams, type BitmapTip, type F
 import { PageError, type DocumentPage, type SiteContext, type SiteAdapter } from "../../page";
 import {
   GithubError,
+  MissingScopeError,
   NOT_FOUND,
   RateLimitError,
   addDiscussionComment,
@@ -542,6 +543,7 @@ function signInFirstPage(location: GithubLocation, why: string): DocumentPage {
 function errorPage(location: GithubLocation, error: GithubError, signedIn: boolean, now: number): DocumentPage {
   if (error instanceof RateLimitError) return rateLimitPage(location, signedIn, error.resetsAt, now);
   const page = (title: string, ...nodes: LayoutNode[]): DocumentPage => ({ kind: "document", url: githubUrl(location), title, nodes: [heading(1, title), ...nodes] });
+  if (error instanceof MissingScopeError) return page("Sign in to GitHub", paragraph(text(error.message)), signInForm(location, "Sign In Again"));
   if (error.status === 404) {
     // A file opened as a folder, a category that isn't there: GitHub's own word for it.
     if (error.message !== NOT_FOUND) return page("Not found", paragraph(text(error.message)));

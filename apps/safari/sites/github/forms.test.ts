@@ -408,6 +408,16 @@ describe("GitHub stars", () => {
     expect(watching.calls.find((call) => call.method === "DELETE")).toMatchObject({ url: "https://api.github.com/repos/octocat/hello/subscription" });
   });
 
+  it("asks to sign in again when the sign-in can't watch, as ones from before Safari asked for notifications can't", async () => {
+    const { fetch } = fakeGithub((call) => (call.url.endsWith("/subscription") && call.method === "PUT" ? reply({ message: "Not Found" }, 404) : undefined));
+    const shown = await page(await loadPage(post("https://github.com/octocat/hello", { watch: "watch" }), context(fetch, "tok")));
+    const all = texts(shown.nodes);
+    expect(all).toContain("octocat / hello");
+    expect(all).toContain("Safari's sign-in doesn't let it watch repositories. Sign in again to allow it.");
+    const again = forms(shown.nodes).find((form) => form.controls.some((control) => control.kind === "submit" && control.label === "Sign In Again"));
+    expect(again?.controls).toContainEqual({ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello" });
+  });
+
   it("doesn't count ignoring a repository as watching it", async () => {
     const { fetch } = fakeGithub((call) => (call.url.endsWith("/subscription") && call.method === "GET" ? reply({ subscribed: false, ignored: true }) : undefined));
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
