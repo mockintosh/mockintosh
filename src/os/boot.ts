@@ -49,6 +49,7 @@ import {
   FINDER_APP_ID,
   hideApps as hideAppsInState,
   isAppHidden,
+  isAccessoryKey,
 } from "./state";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
@@ -348,6 +349,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         openWindowCount: getWindows().length,
       });
       win.Component ??= app.Component;
+      if (app.kind === "menubar") win.accessory = true;
       win.instanceId = instanceId ?? instances.create(appId, osServices.projects?.selectedBuild(appId));
       instances.addWindow(win.instanceId, win.id);
       win.openedFromRect = fromRect;
@@ -397,6 +399,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     },
     openFSNode(nodeId, fromRect?) {
       void openFSNodeImpl(nodeId, fromRect);
+    },
+    toggleMenubarApp(appId) {
+      const open = getWindows().filter((w) => w.appId === appId);
+      if (open.length === 0) {
+        osServices.openApp(appId);
+        return;
+      }
+      for (const win of open) osServices.closeWindow(win.id);
     },
     closeWindow(id) {
       const win = getWindows().find((w) => w.id === id);
@@ -800,6 +810,8 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
 
   /** ⌘-shortcut from the current menubar, if any. Returns true when handled. */
   function runMenuShortcut(key: string): boolean {
+    // A menubar app's panel is key: the menubar belongs to the app behind it, and the keys to the panel.
+    if (isAccessoryKey()) return false;
     for (const menu of getMenubarMenus()) {
       for (const item of menuCommands(menu.items)) {
         if (item.type === "radiogroup") continue;
@@ -844,6 +856,16 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       osServices.forceQuit();
       scheduleRepaint();
       return;
+    }
+    // A menubar app's hotkey works from anywhere (⌘Space: Spotlight), except
+    // that ⌃ keys stay a terminal's own.
+    if (command && !mods.alt && !(mods.ctrl && !mods.meta && ui.focusedTakesRawKeys())) {
+      const menubarApp = getAllApps().find((app) => app.kind === "menubar" && app.hotkey?.toLowerCase() === e.key.toLowerCase());
+      if (menubarApp) {
+        osServices.toggleMenubarApp(menubarApp.id);
+        scheduleRepaint();
+        return;
+      }
     }
     // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
     // ⌃V is a key of its own for a terminal ("insert the next character literally").

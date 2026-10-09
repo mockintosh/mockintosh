@@ -38,6 +38,7 @@ export const SHELL_APPS = [
   "Finder.solid.tsx",
   "AppStore.tsx",
   "IconGallery.tsx",
+  "Spotlight.tsx",
 ] as const;
 
 /** Every bundled app entry, including those still being cleaned. */
@@ -70,6 +71,7 @@ export const BUNDLED_APPS = [
   "Finder.solid.tsx",
   "AppStore.tsx",
   "IconGallery.tsx",
+  "Spotlight.tsx",
 ] as const;
 
 export type BundledAppEntry = (typeof BUNDLED_APPS)[number];
@@ -128,6 +130,7 @@ export const APP_TITLES: Record<BundledAppEntry, string> = {
   "Finder.solid.tsx": "Finder",
   "AppStore.tsx": "App Store",
   "IconGallery.tsx": "Icon Gallery",
+  "Spotlight.tsx": "Spotlight",
 };
 
 export function isSdkClean(entry: string): boolean {

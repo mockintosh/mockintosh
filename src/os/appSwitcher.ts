@@ -12,11 +12,11 @@ function isSwitcherApp(appId: string, finderId: string): boolean {
   return appId !== finderId && !appId.startsWith("__");
 }
 
-/** Finder first, then each other app in the order its first window opened. */
-export function runningAppIds(windows: readonly { appId: string }[], finderId: string): string[] {
+/** Finder first, then each other app in the order its first window opened. Menubar apps' windows don't count. */
+export function runningAppIds(windows: readonly { appId: string; accessory?: boolean }[], finderId: string): string[] {
   const ids = [finderId];
   for (const win of windows) {
-    if (!isSwitcherApp(win.appId, finderId) || ids.includes(win.appId)) continue;
+    if (win.accessory || !isSwitcherApp(win.appId, finderId) || ids.includes(win.appId)) continue;
     ids.push(win.appId);
   }
   return ids;

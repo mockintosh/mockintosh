@@ -409,8 +409,25 @@ export interface PrintService {
  *                  does not take the key window, and it is hidden while
  *                  another app is frontmost. MacPaint's gray desk with its
  *                  palettes is one.
+ * - `panel`      — a plain box with a shadow that floats above documents,
+ *                  full-screen windows and palettes, and never drags: what a
+ *                  menubar app (`kind: "menubar"`) opens from its menubar
+ *                  icon. It takes the keyboard but not the menubar.
  */
-export type WindowKind = "document" | "dialog" | "utility" | "plain" | "alert" | "fullscreen" | "desk";
+export type WindowKind = "document" | "dialog" | "utility" | "plain" | "alert" | "fullscreen" | "desk" | "panel";
+
+/**
+ * What sort of app this is. `"application"` (the default) is an app you
+ * switch to: its windows bring its menus into the menubar and it is listed
+ * in the application menu while it runs. `"menubar"` is a menubar app (the
+ * macOS menu bar extra): it has no menus of its own and is never in the
+ * application menu. Instead the OS puts its `menubarIcon` at the right end of
+ * the menubar, beside the application menu. A click on the icon opens the
+ * app (`onOpen`), and a click while any of its windows is open closes them,
+ * as does its `hotkey`. Its windows (usually a `panel`) take the keyboard
+ * while the menubar keeps showing the app you were in.
+ */
+export type AppKind = "application" | "menubar";
 
 /**
  * What an app asks for when it opens a window. Everything is optional: the
@@ -654,6 +671,18 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
    * processes). Declare `"main"` only for something a process can't serve.
    */
   runtime?: "worker" | "main";
+  /** An application (the default) or a menubar app; see `AppKind`. */
+  kind?: AppKind;
+  /**
+   * A menubar app's icon in the menubar: a sprite at most 16×16 (`smallIcon`
+   * when omitted). Ignored for applications.
+   */
+  menubarIcon?: string;
+  /**
+   * A menubar app's ⌘ key: ⌘ (or ⌃) and this key open it from anywhere, and
+   * close it again. `" "` is ⌘Space. Ignored for applications.
+   */
+  hotkey?: string;
   /** Content size of the main window. */
   defaultSize: { width: number; height: number };
   /** Kind of the main window (default `document`). */

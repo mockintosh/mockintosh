@@ -44,6 +44,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Finder | `Finder.solid.tsx` | Shell |
 | App Store | `AppStore.tsx` | Shell |
 | Icon Gallery | `IconGallery.tsx` | Shell |
+| Spotlight | `Spotlight.tsx` | Shell |
 
 ## Quick Start
 
@@ -656,6 +657,7 @@ Like the Macintosh's `NewWindow`, you choose what kind of window you get:
 | `alert`      | `plain` and system-modal: nothing else takes input until it closes         |
 | `fullscreen` | no chrome at all — the whole screen, menubar included (see below)          |
 | `desk`       | your app's own desktop: no chrome, the whole screen below the menubar, always behind your other windows. Content coordinates are screen coordinates. Clicking it does not take the key window; hidden while another app is front. MacPaint's gray desk with its palettes is one. |
+| `panel`      | `plain` with a shadow, above documents, palettes and full-screen pictures, opened in the upper centre of the screen. What a menubar app opens (below). |
 
 ### Deciding what opening does: `onOpen`
 
@@ -681,6 +683,35 @@ export default defineApp({
 `onOpen` receives an `AppContext`: everything `useApp()` has except `window` and `setMenus`, since there is no window yet. It runs outside any component — open windows and dialogs there; keep signals and effects inside components.
 
 `openWindow(spec)` takes a `WindowSpec` whose every field is optional and defaults to your `defineApp`: `kind`, `title`, `size` (content pixels), `position`, `scrollable`, `resizable`, `minSize`, `Component` (a different component for this window — a preferences dialog, a palette) and `props`. `movable: false` pins a window where it opened. `onGoAway` makes the close box ask instead of close — run your Close command and call `window.close()` once the user agrees. `modal: false` keeps an `alert`-framed window from blocking the rest of the screen, for dialogs that decide themselves what clicks elsewhere do. It returns the window id, which `os.closeWindow` accepts. `openWindow()` with no argument is the main window.
+
+### Menubar apps
+
+An app declared `kind: "menubar"` lives in the menubar instead of the application menu, like a macOS menu bar extra (Spotlight is one). The OS draws its `menubarIcon` (a sprite up to 16×16; `smallIcon` when omitted) at the right end of the menubar, beside the application menu. A click on the icon opens the app — `onOpen`, or the main window — and a click while any of its windows is open closes them. `hotkey` does the same from anywhere: `hotkey: " "` is ⌘Space (⌃Space too, since a Mac host keeps ⌘Space for itself).
+
+Its windows take the keyboard but not the menubar: the menus of the app you were in stay up, ⌘ keys go to your window instead of to those menus, and closing the window gives the keyboard back to the window it came up over. A menubar app is never listed in the application menu. Open a `panel` and close it when the user is done, or when `window.isActive()` goes false, so a click elsewhere puts it away:
+
+```tsx
+export default defineApp({
+  id: "clock",
+  title: "Clock",
+  kind: "menubar",
+  icon: "clock/icon",
+  smallIcon: "clock/icon-16x16",
+  menubarIcon: "clock/menubar",
+  hotkey: "k",
+  defaultSize: { width: 160, height: 60 },
+  windowKind: "panel",
+  Component() {
+    const { window: win } = useApp();
+    let shown = false;
+    createEffect(win.isActive, (active) => {
+      if (active) shown = true;
+      else if (shown) win.close();
+    });
+    return <text font="menu">{new Date().toLocaleTimeString()}</text>;
+  },
+});
+```
 
 ### Full screen
 

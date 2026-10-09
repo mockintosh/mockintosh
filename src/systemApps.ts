@@ -5,8 +5,9 @@
  * are registered from their declarations (`apps/declarations.generated.json`),
  * so the page loads an app's code only if it has to run it on the OS's
  * thread; in a process the app loads it there. The Finder registers itself:
- * it is part of the shell and the boot sequence depends on it. App Store and
- * Icon Gallery are shell apps too and are loaded here.
+ * it is part of the shell and the boot sequence depends on it. App Store,
+ * Icon Gallery and Spotlight (a menubar app) are shell apps too and are
+ * loaded here.
  */
 import { registerApp } from "./os/apps";
 import { registerBundledApp } from "./os/bundledApps";
@@ -15,6 +16,7 @@ import { APP_MODULES } from "./appModules";
 import declarations from "@/apps/declarations.generated.json";
 import AppStore from "@/apps/AppStore";
 import IconGallery from "@/apps/IconGallery";
+import Spotlight from "@/apps/Spotlight";
 import { sprites as ditherSprites } from "@/apps/dither/icons";
 import { sprites as traceSprites } from "@/apps/trace/icons";
 import { spotifySprites } from "@/apps/sprites/spotify";
@@ -32,7 +34,7 @@ import { sprites as foundrySprites } from "@/apps/foundry/icons";
 
 const declared = declarations as Record<string, AppDeclaration>;
 
-for (const app of [AppStore, IconGallery]) registerApp(app);
+for (const app of [AppStore, IconGallery, Spotlight]) registerApp(app);
 
 for (const id of ["testing", "file", "preview", "video", "photobooth", "safari", "maps", "showreel", "terminal"]) {
   registerApp(declaredApp(declared[id]!, APP_MODULES[id]!));

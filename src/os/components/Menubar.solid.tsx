@@ -1,8 +1,8 @@
 import { appleMenu, runMenuItem, runRadioItem } from "../kernel/menus";
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { measureText, COMMAND_KEY, CHECK_MARK, smallIcon, type Sprite } from "@mockintosh/ui";
-import { getApp } from "../apps";
+import { getAllApps, getApp, onAppsChanged } from "../apps";
 import { runningAppIds } from "../appSwitcher";
 import { useOS } from "../context";
 import {
@@ -60,6 +60,7 @@ const SHADOW_INSET  = 3;        // the 1px shadow starts this far along from the
 const SMALL_ICON    = 16;       // ics# — what the application menu shows
 const SWITCHER_W    = 34;       // the application menu's title: icon plus its margins
 const SWITCHER_GAP  = 6;        // between the application menu's title and the screen's right edge
+const EXTRA_W       = 26;       // a menubar app's icon plus its margins, right to left from the application menu
 
 interface MenubarProps {
   height: number;
@@ -153,6 +154,25 @@ export function Menubar(props: MenubarProps): JSX.Element {
   );
   const activeIcon = () => running().find((app) => app.id === getActiveAppId())?.icon;
   const switcherX = () => os.resolution.width - SWITCHER_GAP - SWITCHER_W;
+
+  // Menubar apps, in registration order from the application menu leftwards.
+  const [appsVersion, setAppsVersion] = createSignal(0, { ownedWrite: true });
+  onCleanup(onAppsChanged(() => setAppsVersion((v) => v + 1)));
+  const extras = createMemo(() => {
+    appsVersion();
+    return getAllApps()
+      .filter((app) => app.kind === "menubar")
+      .map((app, index) => {
+        const sprite = os.sprites.get(app.menubarIcon ?? app.smallIcon ?? app.icon);
+        return {
+          id: app.id,
+          title: app.title,
+          icon: sprite && (sprite.width <= SMALL_ICON && sprite.height <= SMALL_ICON ? sprite : smallIcon(sprite)),
+          left: switcherX() - (index + 1) * EXTRA_W,
+        };
+      });
+  });
+  const extraOpen = (appId: string) => getWindows().some((w) => w.appId === appId);
 
   const openIdx   = () => getOpenMenuIndex();
   const openMenu  = () => {
@@ -307,6 +327,38 @@ export function Menubar(props: MenubarProps): JSX.Element {
           );
         }}
         </For>
+
+      {/* Menubar apps — each one's icon, lit while it has a window open. */}
+      <For each={extras()}>
+        {(extra) => (
+          <box
+            position="absolute"
+            left={extra.left}
+            top={TITLE_TOP}
+            width={EXTRA_W}
+            height={TITLE_H}
+            justifyContent="center"
+            alignItems="center"
+            background={extraOpen(extra.id) ? 1 : undefined}
+            semantic={{ name: extra.title, role: "button" }}
+            onMouseDown={() => {
+              closeMenu();
+              os.toggleMenubarApp(extra.id);
+            }}
+          >
+            <Show when={extra.icon}>
+              {(icon) => (
+                <image
+                  width={icon().width}
+                  height={icon().height}
+                  src={spriteSrc(icon())}
+                  mode={extraOpen(extra.id) ? "inverted" : "normal"}
+                />
+              )}
+            </Show>
+          </box>
+        )}
+      </For>
 
       {/* Application menu — the front app's 16×16 icon, at the right end. */}
       <box
