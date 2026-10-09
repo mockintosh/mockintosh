@@ -10,6 +10,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
     "dev": "tsx scripts/build-chat-context.ts && vite",
     "dev:ui": "npm run dev --prefix sites/ui",
     "build:ui": "npm run build --prefix sites/ui",

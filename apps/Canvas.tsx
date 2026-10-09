@@ -712,7 +712,7 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
           label: "Edit",
           items: [
             { label: "Undo", shortcut: "Z", disabled: !s.canUndo, onClick: undo },
-            { label: "Redo", disabled: !s.canRedo, onClick: redo },
+            { label: "Redo", shortcut: "⇧Z", disabled: !s.canRedo, onClick: redo },
             { type: "separator" },
             { label: "Duplicate", shortcut: "D", disabled: !s.hasSel, onClick: duplicateSelected },
             { label: "Clear", disabled: !s.hasSel || s.editing, onClick: deleteSelected },

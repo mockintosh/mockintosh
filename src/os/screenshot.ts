@@ -143,7 +143,7 @@ function pointInBounds(event: PlatformPointerEvent, bounds: { width: number; hei
 function cancelsCapture(event: PlatformKeyEvent): boolean {
   if (event.type !== "down") return false;
   if (event.key === "Escape") return true;
-  return (event.modifiers.meta || event.modifiers.ctrl) && event.key === ".";
+  return event.modifiers.meta && event.key === ".";
 }
 
 export function createScreenshots(deps: ScreenshotDeps): Screenshots {

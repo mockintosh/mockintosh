@@ -2,10 +2,11 @@ import { encodeQuery, type AppCrypto, type FetchFunction, type SignInService } f
 
 export const GITHUB_SIGN_IN_HOST = "github.com";
 /**
- * Issues, discussions and comments on public repositories. OAuth apps have
- * nothing narrower: this also lets the token write code there.
+ * Issues, discussions, comments, stars and forks on public repositories
+ * (`public_repo`; OAuth apps have nothing narrower, so this also lets the
+ * token write code there), and watching them (`notifications`).
  */
-export const GITHUB_SCOPE = "public_repo";
+export const GITHUB_SCOPE = "public_repo notifications";
 /** The server's half: the OAuth app's client id, and the code exchange (`api/github/token.ts`). */
 const TOKEN_ENDPOINT = "/api/github/token";
 
