@@ -90,10 +90,10 @@ Proposed remaps (only for non-standard uses of reserved chords):
 |---|---|---|
 | Earth: Home | ⌘H | ⇧⌘H (Finder's "Home") |
 | Earth: The Moon | ⌘M | ⇧⌘M |
-| Showreel: Mute | ⌘M | ⌥⌘M |
+| Showreel: Mute | ⌘M | ⇧⌘M (⌥⌘M is macOS's Minimize All) |
 | Synth: Mutate | ⌘M | ⇧⌘M |
-| Photo Booth: Take Photo | ⌘T | keep (it's Photo Booth's own), add Return/Space in the window |
-| MacPaint: Align Middle | ⌘M | **decision needed**: keep the authentic key and rely on ⌃M, or move it |
+| Photo Booth: Take Photo | ⌘T | keep (it's Photo Booth's own; ⌃T reaches it) |
+| MacPaint: Align Middle | ⌘M | keep (MacPaint 1.0's own; ⌃M reaches it). Revisit if you'd rather move it |
 
 Keys that only have a default action (⌘R, ⌘[, ⌘=, ⌘5…) don't need remapping. Section 1 makes them work as they are.
 
@@ -111,7 +111,12 @@ Keys that only have a default action (⌘R, ⌘[, ⌘=, ⌘5…) don't need rema
    - Matching needs the physical key, so `PlatformKeyEvent` gained an optional `code`. A letter is found by where it is on the keyboard when ⌥ or the layout typed something else (⌥S types ß, and Cyrillic layouts type other letters). A character typed with ⇧, like `?`, matches as itself.
    - The menu font gained ⇧ and ⌥ glyphs, and the shortcut column is measured instead of fixed at 36px. A dimmed item's shortcut is now greyed along with its label.
    - Canvas is the only app with a real Redo, so it alone got ⇧⌘Z.
-4. **Policy table and `validateMenubar`.** Apply the remaps above.
+4. **Policy table and `validateMenubar`.** Apply the remaps above. *Done, with a narrower check than first planned.* `menubarProblems` in `src/os/shortcuts.ts` flags three things:
+   - a shortcut that doesn't parse;
+   - one chord on two items in the same menubar;
+   - a chord the browser or host keeps (⌘Q W N T H M, plus ⇧⌘Q W N T and ⌥⌘H M) used for anything other than its own meaning.
+
+   The standard-letter rule (⌘P only for Print, and so on) was dropped. It mostly flagged harmless authentic keys, such as MacPaint's Style menu and Earth's ⌘P for Play, and those are prevented in the browser now anyway. MacPaint's ⌘M and Photo Booth's ⌘T are listed as authentic exceptions. `setAppMenus` and window menus warn once about each problem. `src/os/appMenus.test.ts` is the audit: it opens the Finder and every bundled app on a headless Mac, giving inert services to the apps that need a camera or the network, and fails on any problem.
 5. **Optional:** Keyboard Lock in full screen, and a Keyboard Shortcuts page (Help menu and `sites/` docs) generated from the menubars and the table.
 
 ## Verification
@@ -121,5 +126,5 @@ Keys that only have a default action (⌘R, ⌘[, ⌘=, ⌘5…) don't need rema
   - The shortcut parser and matcher: exact modifiers, case, ⇧ forms.
   - `onKey`'s handled result for each class: matched, disabled-matched, unmatched, paste, force quit, editing chord with text focus, editing chord with no focus.
   - The web platform listener: dispatch a `KeyboardEvent` with `metaKey` on a stub `window` and assert `defaultPrevented`. Synthetic events don't trigger browser accelerators, so we assert on `defaultPrevented` rather than on browser behavior.
-- **Menu audit test:** boot the OS on the in-memory platform, open each bundled app, and run `validateMenubar` over `getMenubarMenus()`. Menus depend on app state, so a test that changes state as well (Earth's mission mode) needs per-app hooks. Start with the menus each app shows at launch.
+- **Menu audit test** (done, `src/os/appMenus.test.ts`): boot the OS on the in-memory platform, open each bundled app, and run `menubarProblems` over `getMenubarMenus()`. Menus depend on app state, so a test that changes state as well (Earth's mission mode) needs per-app hooks. Start with the menus each app shows at launch.
 - **Manual browser matrix**, run once to confirm the reserved table and again whenever the key layer changes: Chrome, Safari, and Firefox on macOS, and Chrome/Edge on Windows. For each, check ⌘Q, ⌘W, ⌘N, ⌘T, ⌘R, ⌘S, ⌘[, ⌘=, ⌘L, ⌘5, and the ⌃ alias in Finder, Safari, Terminal, and MacPaint. Record the results in this file.

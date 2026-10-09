@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseShortcut, shortcutLabel, shortcutMatches } from "./shortcuts";
+import { menubarProblems, parseShortcut, shortcutLabel, shortcutMatches } from "./shortcuts";
 
 const NONE = { shift: false, ctrl: false, alt: false, meta: true };
 const SHIFT = { ...NONE, shift: true };
@@ -46,5 +46,39 @@ describe("shortcutMatches", () => {
     expect(shortcutMatches("[", "[", "BracketLeft", NONE)).toBe(true);
     expect(shortcutMatches("⌥=", "≠", "Equal", OPTION)).toBe(true);
     expect(shortcutMatches("5", "5", "Digit5", NONE)).toBe(true);
+  });
+});
+
+describe("menubarProblems", () => {
+  const menubar = (...items: { label: string; shortcut: string; disabled?: boolean }[]) => [{ label: "File", items }];
+
+  it("passes standard menus, and Quit, Close and New on the keys the browser keeps", () => {
+    expect(menubarProblems(menubar(
+      { label: "New Window", shortcut: "N" },
+      { label: "Close Window", shortcut: "W" },
+      { label: "Undo", shortcut: "Z" },
+      { label: "Redo", shortcut: "⇧Z" },
+      { label: "Quit", shortcut: "Q" },
+    ))).toEqual([]);
+  });
+
+  it("finds a chord on two items, inside submenus and dimmed items too", () => {
+    expect(menubarProblems([
+      { label: "File", items: [{ label: "Save", shortcut: "S" }] },
+      { label: "Style", items: [{ type: "submenu", label: "Face", items: [{ label: "Shadow", shortcut: "S", disabled: true }] }] },
+    ])).toEqual(["⌘S is both “Save” and “Shadow”"]);
+  });
+
+  it("finds a key the browser or host keeps used for something else, unless the app keeps it from its original", () => {
+    expect(menubarProblems(menubar({ label: "Home", shortcut: "H" }))).toEqual([
+      "⌘H never reaches the page (the browser or the host keeps it), so “Home” can only be reached with ⌃",
+    ]);
+    expect(menubarProblems(menubar({ label: "Minimize All", shortcut: "⌥M" }))).toHaveLength(1);
+    expect(menubarProblems(menubar({ label: "Align Middle", shortcut: "M" }), "macpaint")).toEqual([]);
+    expect(menubarProblems(menubar({ label: "Home", shortcut: "⇧H" }))).toEqual([]);
+  });
+
+  it("finds a shortcut that isn't one key", () => {
+    expect(menubarProblems(menubar({ label: "Save", shortcut: "Ctrl+S" }))).toHaveLength(1);
   });
 });
