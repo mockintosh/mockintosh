@@ -12,6 +12,7 @@
 // Engine
 // -------------------------------------------------------------------------
 export { createUI } from "./ui";
+export { isEditingChord } from "./textEditing";
 export type { UIInstance, UIConfig } from "./ui";
 export { useUIServices } from "./services";
 export type { UIServices, UIClipboard, UIImageService, UIScheduler, ImageDecodeOptions } from "./services";
@@ -152,7 +153,7 @@ export { layoutText, lineLeft, lineTop, caretPoint, indexAtPoint } from "./fonts
 export type { TextBlock, TextLine } from "./fonts/textLayout";
 export { layoutRuns, runAtPoint } from "./fonts/runLayout";
 export type { RunBlock, RunLine, RunFragment, RunFace } from "./fonts/runLayout";
-export { heldModifiers } from "./modifiers";
+export { heldModifiers, macKey } from "./modifiers";
 export { fontFamilyId, fontFamilyName } from "./fonts/strike";
 export { drawPixels } from "./portDraw";
 export { faceMetrics, faceMetricsByName, alignmentHeight, cdefBaseline, middleCellTop } from "./fonts/metrics";

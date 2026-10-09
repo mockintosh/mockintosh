@@ -17,7 +17,7 @@ import { registerFileOperations } from "./kernel/files";
 
 import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd, type Rect } from "@mockintosh/quickdraw";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
-import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
+import { copyBitMapBytes, createDoubleClickTracker, createUI, isEditingChord, macKey, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
 import { FileSystem } from "@mockintosh/fs";
 import type { AppContext } from "@mockintosh/sdk";
 import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEvent } from "../platform/types";
@@ -102,7 +102,8 @@ export interface BootedOS {
   kernel: Kernel;
   input: {
     pointer(event: PlatformPointerEvent): void;
-    key(event: PlatformKeyEvent): void;
+    /** `true` when the Macintosh used the key. */
+    key(event: PlatformKeyEvent): boolean;
     drop(event: PlatformDropEvent): void;
   };
   render(cancellation?: Cancellation): Promise<void>;
@@ -798,19 +799,26 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     }
   }
 
-  /** ⌘-shortcut from the current menubar, if any. Returns true when handled. */
-  function runMenuShortcut(key: string): boolean {
+  /**
+   * ⌘-shortcut from the current menubar: `"ran"` when an enabled item took
+   * it, `"disabled"` when the key only belongs to a dimmed item, else null.
+   */
+  function runMenuShortcut(key: string): "ran" | "disabled" | null {
+    let dimmed = false;
     for (const menu of getMenubarMenus()) {
       for (const item of menuCommands(menu.items)) {
         if (item.type === "radiogroup") continue;
-        if (item.shortcut && item.shortcut.toLowerCase() === key.toLowerCase() && !item.disabled) {
-          if (item.onClick) runMenuItem(item);
-          setOpenMenuIndex(null);
-          return true;
+        if (!item.shortcut || item.shortcut.toLowerCase() !== key.toLowerCase()) continue;
+        if (item.disabled) {
+          dimmed = true;
+          continue;
         }
+        if (item.onClick) runMenuItem(item);
+        setOpenMenuIndex(null);
+        return "ran";
       }
     }
-    return false;
+    return dimmed ? "disabled" : null;
   }
 
   function pasteFromClipboard(): void {
@@ -826,42 +834,54 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       });
   }
 
-  function onKey(e: PlatformKeyEvent): void {
+  /**
+   * Handles a key and says whether the Macintosh used it, so the host can
+   * keep its own action for it (a browser's Save Page on ⌘S, Reload on ⌘R)
+   * only when nothing here did. Keys no menu or editor claims stay the host's.
+   */
+  function onKey(hostEvent: PlatformKeyEvent): boolean {
     if (stopped) throw new ServiceError("disconnect", "Boot has ended");
+    // From here on, meta is the Macintosh's ⌘ and ctrl its ⌃ (a terminal's).
+    const e: PlatformKeyEvent = { ...hostEvent, ...macKey(hostEvent.key, hostEvent.modifiers, ui.focusedTakesRawKeys()) };
     if (screenshotCapture.key(e)) {
       trackCursor();
       scheduleRepaint();
-      return;
+      return true;
     }
     const mods: Modifiers = e.modifiers;
     if (e.type === "up") {
       ui.dispatchKeyboard("keyup", e.key, mods);
-      return;
+      return false;
     }
-    const command = mods.meta || mods.ctrl;
-    // ⌘⌥Esc, as on the Mac; the host keeps that one on a Mac, so ⌃⌥Esc too.
+    const command = mods.meta;
+    // ⌘⌥Esc, as on the Mac (the host keeps that one on a Mac; ⌃⌥Esc is ⌘⌥Esc too).
     if (command && mods.alt && e.key === "Escape") {
       osServices.forceQuit();
       scheduleRepaint();
-      return;
+      return true;
     }
     // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
-    // ⌃V is a key of its own for a terminal ("insert the next character literally").
-    const rawControlKey = mods.ctrl && !mods.meta && ui.focusedTakesRawKeys();
-    if (command && e.key.toLowerCase() === "v" && !rawControlKey) {
-      if (!(mods.meta && runMenuShortcut(e.key))) pasteFromClipboard();
+    if (command && e.key.toLowerCase() === "v") {
+      if (runMenuShortcut(e.key) !== "ran") pasteFromClipboard();
       scheduleRepaint();
-      return;
+      return true;
     }
-    if (mods.meta && e.key.length === 1 && runMenuShortcut(e.key)) {
+    const shortcut = command && e.key.length === 1 ? runMenuShortcut(e.key) : null;
+    if (shortcut === "ran") {
       scheduleRepaint();
-      return;
+      return true;
     }
+    const focused = ui.focusManager.focused !== null;
     ui.dispatchKeyboard("keydown", e.key, mods);
-    if (e.key.length === 1 && !command) {
+    if (e.key.length === 1 && !command && !mods.ctrl) {
       ui.dispatchKeyboard("keypress", e.key, mods);
     }
     scheduleRepaint();
+    // A dimmed item's key is still the Mac's (no Save Page under a dim Save),
+    // though the focused field gets it: Finder dims Select All while renaming.
+    // A terminal takes ⌃R, ⌃W and the rest as its own (only a terminal sees ⌃);
+    // a text field takes ⌘A, ⌘Z and ⌘← (which a browser would read as Back).
+    return shortcut === "disabled" || (focused && (mods.ctrl || (command && isEditingChord(e.key))));
   }
 
   async function onDrop(e: PlatformDropEvent): Promise<void> {
