@@ -17,6 +17,8 @@ import {
   fetchCharts,
   fetchDeveloperToken,
   fetchPlaylists,
+  fetchRecentlyPlayed,
+  fetchRecommendations,
   fetchRecentlyAdded,
   fetchSongs,
   fetchTracks,
@@ -103,9 +105,11 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   function cached<T>(key: string, fetch: () => Promise<T>): Promise<T> {
     let pending = cache.get(key) as Promise<T> | undefined;
     if (!pending) {
+      const owner = cache;
       pending = fetch().catch((e: unknown) => {
-        cache.delete(key);
-        setError(e instanceof Error ? e.message : "Apple Music didn't answer");
+        owner.delete(key);
+        // A request from before a sign-in or sign-out has nothing to report: its page is gone.
+        if (owner === cache) setError(e instanceof Error ? e.message : "Apple Music didn't answer");
         throw e;
       });
       cache.set(key, pending);
@@ -147,7 +151,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   createEffect(() => !!userToken(), (signedIn) => {
     if (signedIn === wasSignedIn) return;
     wasSignedIn = signedIn;
-    select(signedIn ? { view: "recent" } : { view: "browse" });
+    select(signedIn ? { view: "home" } : { view: "browse" });
   });
 
   // The developer token first: without one there is nothing to sign in to.
@@ -353,7 +357,14 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   );
 
   const contentW = () => win.width() - SIDEBAR_W - PAD * 2;
-  const openCollection = (collection: Collection) => open({ view: "collection", collection });
+  /** A tile opens its page; a station has no tracks to list, so it just plays, as in Apple Music. */
+  function openCollection(collection: Collection): void {
+    if (collection.kind === "station") {
+      startPlaying(collectionAsNowPlaying(collection), (m) => playCollection(m, collection));
+      return;
+    }
+    open({ view: "collection", collection });
+  }
 
   function GridPage(props: { title: string; load: () => Promise<Collection[]>; cacheKey: string }): JSX.Element {
     const items = useLoaded(() => props.cacheKey, (key) => cached(key, props.load));
@@ -410,34 +421,32 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     );
   }
 
+  /** An album or playlist. Stations have no page: their tiles just play (see `openCollection`). */
   function CollectionPage(props: { collection: Collection }): JSX.Element {
-    const isStation = props.collection.kind === "station";
     const tracks = useLoaded(
       () => `tracks:${props.collection.id}`,
-      (key) => (isStation ? Promise.resolve([] as Track[]) : cached(key, () => fetchTracks(props.collection, session))),
+      (key) => cached(key, () => fetchTracks(props.collection, session)),
     );
     return (
       <>
         <Show when={onBack()}>{(goBack) => <box paddingBottom={4}><Button label="Back" onClick={goBack()} /></box>}</Show>
         <CollectionHeader
           collection={props.collection}
-          trackCount={isStation ? 1 : tracks()?.length}
+          trackCount={tracks()?.length}
           width={contentW()}
           loader={artwork}
           onPlay={() => startPlaying(collectionAsNowPlaying(props.collection), (m) => playCollection(m, props.collection))}
         />
-        <Show when={!isStation}>
-          <Show when={tracks()} fallback={<Loading />}>
-            {(list) => (
-              <TrackList
-                tracks={list()}
-                width={contentW()}
-                showAlbum={props.collection.kind === "playlist"}
-                current={shown()}
-                onPlay={(i) => startPlaying(trackAsNowPlaying(list()[i]!), (m) => playCollection(m, props.collection, i))}
-              />
-            )}
-          </Show>
+        <Show when={tracks()} fallback={<Loading />}>
+          {(list) => (
+            <TrackList
+              tracks={list()}
+              width={contentW()}
+              showAlbum={props.collection.kind === "playlist"}
+              current={shown()}
+              onPlay={(i) => startPlaying(trackAsNowPlaying(list()[i]!), (m) => playCollection(m, props.collection, i))}
+            />
+          )}
         </Show>
       </>
     );
@@ -483,9 +492,48 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     );
   }
 
+  /** Signed in: what you played lately, then Apple's recommendations, a shelf each. */
+  function HomePage(): JSX.Element {
+    const recent = useLoaded(() => "recently-played", (key) => cached(key, () => fetchRecentlyPlayed(session)));
+    // Recommendations are a nicety: if Apple has none, Home is just what you played.
+    const shelves = useLoaded(
+      () => "recommendations",
+      (key) => cached(key, () => fetchRecommendations(session).catch(() => [])),
+    );
+    // Apple's recommendations include their own recently-played shelf (in the
+    // store's language): hide any shelf that mostly repeats ours.
+    const freshShelves = () => {
+      const played = new Set((recent() ?? []).map((c) => c.id));
+      return (shelves() ?? []).filter((shelf) => shelf.items.filter((c) => played.has(c.id)).length * 2 < shelf.items.length);
+    };
+    return (
+      <>
+        <Title width={contentW()}>Home</Title>
+        <Show when={recent()} fallback={<Loading />}>
+          {(items) => (
+            <Show when={items().length}>
+              <SectionTitle>Recently Played</SectionTitle>
+              <CollectionGrid items={items()} width={contentW()} maxRows={1} loader={artwork} onOpen={openCollection} />
+            </Show>
+          )}
+        </Show>
+        <For each={freshShelves()}>
+          {(shelf) => (
+            <>
+              <SectionTitle>{shelf.title}</SectionTitle>
+              <CollectionGrid items={shelf.items} width={contentW()} maxRows={1} loader={artwork} onOpen={openCollection} />
+            </>
+          )}
+        </For>
+      </>
+    );
+  }
+
   function Page(props: { route: Route }): JSX.Element {
     const r = props.route;
     switch (r.view) {
+      case "home":
+        return <HomePage />;
       case "browse":
         return <BrowsePage />;
       case "recent":

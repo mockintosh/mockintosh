@@ -6,6 +6,7 @@ import { formatDuration, isPlaying, type Artist, type Collection, type NowPlayin
 
 /** What the content pane shows. */
 export type Route =
+  | { view: "home" }
   | { view: "browse" }
   | { view: "recent" }
   | { view: "artists" }
@@ -119,6 +120,9 @@ export function Sidebar(props: {
     >
       <box width={SIDEBAR_W - 1} height={props.height} flexDirection="column" overflow="scroll">
         <SidebarHeading>Apple Music</SidebarHeading>
+        <Show when={props.signedIn}>
+          <SidebarRow label="Home" selected={isSelected({ view: "home" })} onClick={() => props.onSelect({ view: "home" })} />
+        </Show>
         <For each={CATALOG}>
           {(item) => <SidebarRow label={item.label} selected={isSelected(item.route)} onClick={() => props.onSelect(item.route)} />}
         </For>

@@ -117,7 +117,10 @@ interface Resource {
     durationInMillis?: number;
     artwork?: { url?: string };
     playParams?: { id?: string; catalogId?: string };
+    /** A recommendation's heading. */
+    title?: { stringForDisplay?: string };
   };
+  relationships?: { contents?: { data?: Resource[] } };
 }
 
 interface Page {
@@ -174,6 +177,14 @@ export async function configureMusicKit(session: AppleMusicSession, browser: Bro
  * token; the catalog needs only the developer token, so it works signed out.
  */
 async function apiGet(path: string, session: AppleMusicSession): Promise<Page | null> {
+  const { language } = await store(session);
+  // Apple's text (shelf titles, genres) in the app's language; `next` links already carry it.
+  const localized = language && !/[?&]l=/.test(path) ? `${path}${path.includes("?") ? "&" : "?"}l=${language}` : path;
+  return request(localized, session);
+}
+
+/** A GET as it is, without choosing a language: how the store itself is looked up. */
+async function request(path: string, session: AppleMusicSession): Promise<Page | null> {
   const personal = path.startsWith("/v1/me/");
   // Throw rather than answer empty: an empty answer would be cached as the library.
   if (!session.developerToken) throw new Error("Apple Music isn't ready yet");
@@ -217,6 +228,15 @@ async function fetchAll<T>(path: string, session: AppleMusicSession, map: (r: Re
   return all;
 }
 
+/**
+ * Text the 1-bit fonts can draw: emoji (Apple's "New Nordic ❄️") and the
+ * selectors and joiners that build them are dropped, then the spaces they
+ * leave behind.
+ */
+export function plainText(text: string | undefined): string {
+  return (text ?? "").replace(/[\p{Extended_Pictographic}\u{FE0E}\u{FE0F}\u{200D}\u{20E3}]/gu, "").replace(/\s{2,}/g, " ").trim();
+}
+
 function toCollection(r: Resource): Collection | null {
   const a = r.attributes ?? {};
   const kind: CollectionKind | null = r.type.endsWith("albums")
@@ -230,8 +250,8 @@ function toCollection(r: Resource): Collection | null {
   return {
     kind,
     id: r.id,
-    name: a.name ?? "Untitled",
-    subtitle: a.artistName ?? a.curatorName ?? "",
+    name: plainText(a.name) || "Untitled",
+    subtitle: plainText(a.artistName ?? a.curatorName),
     artwork: a.artwork?.url ?? null,
   };
 }
@@ -242,9 +262,9 @@ function toTrack(r: Resource): Track | null {
   return {
     id: r.id,
     catalogId: a.playParams?.catalogId ?? null,
-    name: a.name ?? "Untitled",
-    artist: a.artistName ?? "",
-    album: a.albumName ?? "",
+    name: plainText(a.name) || "Untitled",
+    artist: plainText(a.artistName),
+    album: plainText(a.albumName),
     durationMs: a.durationInMillis ?? 0,
     artwork: a.artwork?.url ?? null,
   };
@@ -256,6 +276,37 @@ function toArtist(r: Resource): Artist | null {
 
 export function fetchPlaylists(session: AppleMusicSession): Promise<Collection[]> {
   return fetchAll("/v1/me/library/playlists?limit=100", session, toCollection, 500);
+}
+
+/** A titled row of albums, playlists and stations on Home. */
+export interface Shelf {
+  title: string;
+  items: Collection[];
+}
+
+/** Shelf contents, leaving out any that arrived as bare references without a name. */
+function collections(resources: Resource[] | undefined): Collection[] {
+  return (resources ?? [])
+    .filter((r) => r.attributes?.name)
+    .map(toCollection)
+    .filter((c): c is Collection => !!c);
+}
+
+/** What the user played lately. Apple pages these 10 at a time. */
+export function fetchRecentlyPlayed(session: AppleMusicSession): Promise<Collection[]> {
+  return fetchAll("/v1/me/recent/played?limit=10", session, toCollection, 30);
+}
+
+/** Apple's personal recommendations: each a titled shelf, its contents nested inside. */
+export async function fetchRecommendations(session: AppleMusicSession): Promise<Shelf[]> {
+  const page = await apiGet("/v1/me/recommendations?limit=10", session);
+  const shelves: Shelf[] = [];
+  for (const recommendation of page?.data ?? []) {
+    const items = collections(recommendation.relationships?.contents?.data);
+    const title = recommendation.attributes?.title?.stringForDisplay;
+    if (title && items.length) shelves.push({ title, items });
+  }
+  return shelves;
 }
 
 /** Recently added albums, playlists and stations. Apple pages these 25 at a time. */
@@ -282,6 +333,8 @@ export function fetchArtistAlbums(artistId: string, session: AppleMusicSession):
 }
 
 const FALLBACK_STOREFRONT = "us";
+/** Mockintosh speaks English; Apple's text should too, where the store offers it. */
+const APP_LANGUAGE = "en";
 
 /** The country in the browser's locale (`sv-SE` → `se`): the best guess at a signed-out listener's store. */
 function localeStorefront(): string {
@@ -289,20 +342,53 @@ function localeStorefront(): string {
   return /-([A-Z]{2})\b/.exec(locale)?.[1]?.toLowerCase() ?? FALLBACK_STOREFRONT;
 }
 
-const storefronts = new WeakMap<AppleMusicSession, { token: string | null; pending: Promise<string> }>();
+/** A country's Apple Music store, and the language to ask it for. */
+interface Store {
+  /** `se`, `us`, …: the catalog requests are made against. */
+  id: string;
+  /** The store's tag for the app's language (`en-GB` in Sweden), or null to take its default. */
+  language: string | null;
+}
 
-/**
- * The country catalog (`se`, `us`, …) catalog requests are made against:
- * the account's when signed in, the locale's guess when not.
- */
-function storefront(session: AppleMusicSession): Promise<string> {
-  const known = storefronts.get(session);
+interface StorefrontResource {
+  id: string;
+  attributes?: { supportedLanguageTags?: string[] };
+}
+
+function toStore(resource: StorefrontResource | undefined): Store | null {
+  if (!resource) return null;
+  const tags = resource.attributes?.supportedLanguageTags ?? [];
+  return { id: resource.id, language: tags.find((tag) => tag.split("-")[0] === APP_LANGUAGE) ?? null };
+}
+
+async function lookUpStore(session: AppleMusicSession): Promise<Store> {
+  if (session.musicUserToken) {
+    const page = await request("/v1/me/storefront", session).catch(() => null);
+    const store = toStore(page?.data?.[0] as StorefrontResource | undefined);
+    if (store) return store;
+  }
+  // Signed out, guess from the locale; that country may have no store, so fall back to the US one.
+  for (const id of [localeStorefront(), FALLBACK_STOREFRONT]) {
+    const page = await request(`/v1/storefronts/${id}`, session).catch(() => null);
+    const store = toStore(page?.data?.[0] as StorefrontResource | undefined);
+    if (store) return store;
+  }
+  return { id: FALLBACK_STOREFRONT, language: null };
+}
+
+const stores = new WeakMap<AppleMusicSession, { token: string | null; pending: Promise<Store> }>();
+
+/** The listener's store: the account's when signed in, the locale's guess when not. Looked up once per sign-in. */
+function store(session: AppleMusicSession): Promise<Store> {
+  const known = stores.get(session);
   if (known && known.token === session.musicUserToken) return known.pending;
-  const pending = session.musicUserToken
-    ? apiGet("/v1/me/storefront", session).then((page) => page?.data?.[0]?.id ?? localeStorefront())
-    : Promise.resolve(localeStorefront());
-  storefronts.set(session, { token: session.musicUserToken, pending });
+  const pending = lookUpStore(session);
+  stores.set(session, { token: session.musicUserToken, pending });
   return pending;
+}
+
+async function storefront(session: AppleMusicSession): Promise<string> {
+  return (await store(session)).id;
 }
 
 /** Apple's charts for the listener's country: what preview mode browses. */
@@ -317,25 +403,16 @@ interface ChartsResponse {
 }
 
 export async function fetchCharts(session: AppleMusicSession): Promise<Charts> {
-  async function chartsFor(sf: string): Promise<Charts | null> {
-    if (!session.developerToken) throw new Error("Apple Music isn't ready yet");
-    const resp = await session.fetch(`${API_BASE}/v1/catalog/${sf}/charts?types=playlists,albums,songs&limit=24`, {
-      headers: { Authorization: `Bearer ${session.developerToken}` },
-    });
-    if (!resp.ok) return null;
-    const body = (await resp.json()) as ChartsResponse;
-    const chart = (type: string) => body.results?.[type]?.[0]?.data ?? [];
-    return {
-      playlists: chart("playlists").map(toCollection).filter((c): c is Collection => !!c),
-      albums: chart("albums").map(toCollection).filter((c): c is Collection => !!c),
-      songs: chart("songs").map(toTrack).filter((t): t is Track => !!t),
-    };
-  }
-  const sf = await storefront(session);
-  // A locale's country may have no Apple Music store; fall back to the US one.
-  const charts = (await chartsFor(sf)) ?? (sf === FALLBACK_STOREFRONT ? null : await chartsFor(FALLBACK_STOREFRONT));
-  if (!charts) throw new Error("Apple Music's charts didn't load");
-  return charts;
+  const page = (await apiGet(`/v1/catalog/${await storefront(session)}/charts?types=playlists,albums,songs&limit=24`, session)) as
+    | ChartsResponse
+    | null;
+  if (!page?.results) throw new Error("Apple Music's charts didn't load");
+  const chart = (type: string) => page.results?.[type]?.[0]?.data ?? [];
+  return {
+    playlists: chart("playlists").map(toCollection).filter((c): c is Collection => !!c),
+    albums: chart("albums").map(toCollection).filter((c): c is Collection => !!c),
+    songs: chart("songs").map(toTrack).filter((t): t is Track => !!t),
+  };
 }
 
 /** Library ids start `l.` (albums), `p.` (playlists) or `i.` (songs); anything else is in the catalog. */
@@ -367,9 +444,9 @@ export function nowPlaying(music: MusicKitInstance): NowPlaying | null {
   const ids = [item.id, a.playParams?.id, a.playParams?.catalogId].filter((id): id is string => !!id);
   return {
     ids,
-    title: item.title ?? a.name ?? "",
-    artist: item.artistName ?? a.artistName ?? "",
-    album: item.albumName ?? a.albumName ?? "",
+    title: plainText(item.title ?? a.name),
+    artist: plainText(item.artistName ?? a.artistName),
+    album: plainText(item.albumName ?? a.albumName),
     artworkUrl: a.artwork?.url ?? null,
   };
 }
