@@ -40,6 +40,7 @@ import { createWebBrowserService } from "./browser";
 import { createWebMusicKit } from "./musicKit";
 import { createWebSignInRelay } from "./signInRelay";
 import { createWebFontRasterService } from "./fontRaster";
+import { leaveOnPurpose } from "./unloadGuard";
 export interface WebPlatformOptions {
   /** Element the screen canvas is appended to. */
   root: HTMLElement;
@@ -49,6 +50,8 @@ export interface WebPlatformOptions {
 
 /** The classic 512×342 screen — what the web build boots with. */
 export const DEFAULT_SCREEN = { width: 512, height: 342 } as const;
+
+export { guardUnload } from "./unloadGuard";
 
 export function createWebPlatform(options: WebPlatformOptions): Platform {
   const { root, width, height } = options;
@@ -134,9 +137,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     storage,
     env: {
       origin: location.origin,
-      config: {
-        SPOTIFY_CLIENT_ID: (import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined) ?? "",
-      },
+      config: {},
     },
     hostCapabilities,
     crypto: createWebCrypto(),
@@ -165,6 +166,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     },
     loadModule: (url) => import(/* @vite-ignore */ url),
     reload() {
+      leaveOnPurpose();
       location.reload();
     },
   };
@@ -175,11 +177,16 @@ function createDOMInput(
   toScreen: (e: Pick<MouseEvent, "clientX" | "clientY">) => { x: number; y: number },
 ): PlatformInput {
   const pointerHandlers = new Set<(e: PlatformPointerEvent) => void>();
-  const keyHandlers = new Set<(e: PlatformKeyEvent) => void>();
+  const keyHandlers = new Set<(e: PlatformKeyEvent) => boolean | void>();
   const dropHandlers = new Set<(e: PlatformDropEvent) => void>();
 
   const emitPointer = (e: PlatformPointerEvent) => pointerHandlers.forEach((h) => h(e));
-  const emitKey = (e: PlatformKeyEvent) => keyHandlers.forEach((h) => h(e));
+  /** `true` when a handler (the OS) used the key. */
+  const emitKey = (e: PlatformKeyEvent) => {
+    let used = false;
+    keyHandlers.forEach((h) => { if (h(e)) used = true; });
+    return used;
+  };
   const emitDrop = (e: PlatformDropEvent) => dropHandlers.forEach((h) => h(e));
   const button = (e: MouseEvent): PointerButton => (e.button === 1 || e.button === 2 ? e.button : 0);
   const modifiers = (e: MouseEvent | KeyboardEvent): Modifiers => ({
@@ -263,13 +270,17 @@ function createDOMInput(
   const keyEvent = (type: "down" | "up", e: KeyboardEvent): PlatformKeyEvent => ({
     type,
     key: e.key,
+    code: e.code,
     modifiers: modifiers(e),
   });
   window.addEventListener("keydown", (e) => {
-    // Tab moves focus inside the Macintosh, not the browser's focus off it,
-    // when the keys are the Macintosh's (not a field of the page around it).
-    if (e.key === "Tab" && (e.target === canvas || e.target === document.body)) e.preventDefault();
-    emitKey(keyEvent("down", e));
+    // The keys are the Macintosh's, not a field of the page around it.
+    const ours = e.target === canvas || e.target === document.body;
+    // Tab moves focus inside the Macintosh, not the browser's focus off it.
+    if (e.key === "Tab" && ours) e.preventDefault();
+    // A key the Macintosh used is not also the browser's: ⌘S saves the
+    // document, not the page; ⌘R records, and doesn't reload the Mac away.
+    if (emitKey(keyEvent("down", e)) && ours) e.preventDefault();
   });
   window.addEventListener("keyup", (e) => emitKey(keyEvent("up", e)));
 

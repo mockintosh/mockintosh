@@ -19,7 +19,7 @@ function reply(body: unknown, status = 200): FetchResponse {
   return {
     ok: true,
     status,
-    headers: { get: () => "application/json" },
+    headers: { get: (name) => (name.toLowerCase() === "content-type" ? "application/json" : null) },
     text: async () => JSON.stringify(body),
     json: async () => body,
     arrayBuffer: async () => new ArrayBuffer(0),

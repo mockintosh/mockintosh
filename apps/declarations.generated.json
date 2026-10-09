@@ -425,8 +425,8 @@
   "title": "Spotify Player",
   "icon": "icon/spotify",
   "defaultSize": {
-   "width": 380,
-   "height": 280
+   "width": 540,
+   "height": 340
   },
   "smallIcon": "icon/spotify-16x16",
   "requires": [
@@ -440,6 +440,10 @@
    ]
   },
   "scrollable": false,
+  "minSize": {
+   "width": 440,
+   "height": 240
+  },
   "sprites": {
    "icon/spotify": {
     "width": 32,
@@ -464,12 +468,12 @@
    "spotify/prev": {
     "width": 12,
     "height": 12,
-    "data": "AAAAIAgAKAoAKgqAKoqgKqqoKqqoKoqgKgqAKAoAIAgAAAAA"
+    "data": "AAAAACAIAKAoAqCoCqKoKqqoKqqoCqKoAqCoAKAoACAIAAAA"
    },
    "spotify/next": {
     "width": 12,
     "height": 12,
-    "data": "AAAAACAIAKAoAqCoCqKoKqqoKqqoCqKoAqCoAKAoACAIAAAA"
+    "data": "AAAAIAgAKAoAKgqAKoqgKqqoKqqoKoqgKgqAKAoAIAgAAAAA"
    },
    "spotify/volume": {
     "width": 12,
