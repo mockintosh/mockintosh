@@ -87,7 +87,7 @@ registerBundledApp({
   id: "music",
   declaration: declared["music"],
   title: "Music",
-  description: "Plays your Apple Music library.",
+  description: "Plays Apple Music: 30-second previews for anyone, and whole songs and your library with an Apple Music membership. Not affiliated with or endorsed by Apple.",
   icon: "music/icon",
   sprites: musicSprites,
   requires: ["network", "music-kit"],

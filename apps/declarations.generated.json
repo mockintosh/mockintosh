@@ -497,6 +497,10 @@
    "width": 380,
    "height": 220
   },
+  "about": {
+   "version": "1.0",
+   "description": "Plays Apple Music: 30-second previews for anyone, and whole songs and your library with a membership. Not affiliated with, sponsored or endorsed by Apple. Apple and Apple Music are trademarks of Apple Inc., registered in the U.S. and other countries."
+  },
   "sprites": {
    "music/search": {
     "width": 11,

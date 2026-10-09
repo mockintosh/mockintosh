@@ -843,6 +843,11 @@ export default defineApp({
   icon: "music/icon",
   smallIcon: "music/icon-16x16",
   sprites,
+  about: {
+    version: "1.0",
+    description:
+      "Plays Apple Music: 30-second previews for anyone, and whole songs and your library with a membership. Not affiliated with, sponsored or endorsed by Apple. Apple and Apple Music are trademarks of Apple Inc., registered in the U.S. and other countries.",
+  },
   defaultSize: { width: 480, height: 300 },
   resizable: true,
   minSize: { width: 380, height: 220 },
