@@ -568,7 +568,7 @@ export class AppProcess {
         if (!this.stopMusicKit) {
           // The state is plain data: it crosses to the worker as it is.
           const offChange = musicKit.onChange((state) => this.send({ t: "musicKit", state }));
-          const offError = musicKit.onError((message) => this.send({ t: "musicKitError", message }));
+          const offError = musicKit.onError((error) => this.send({ t: "musicKitError", error }));
           this.stopMusicKit = () => {
             offChange();
             offError();
@@ -581,6 +581,8 @@ export class AppProcess {
         return musicKit.authorize();
       case "unauthorize":
         return musicKit.unauthorize();
+      case "openSignUp":
+        return musicKit.openSignUp();
       case "setQueue":
         return musicKit.setQueue(args[0] as MusicKitQueueOptions);
       case "play":

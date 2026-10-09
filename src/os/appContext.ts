@@ -210,6 +210,7 @@ function instanceMusicKit(os: OSServices, musicKit: MusicKitService, instanceId?
     configure: (options) => musicKit.configure(options),
     authorize: () => musicKit.authorize(),
     unauthorize: () => musicKit.unauthorize(),
+    openSignUp: () => musicKit.openSignUp(),
     setQueue(options) {
       played = true;
       return musicKit.setQueue(options);

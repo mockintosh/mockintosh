@@ -368,6 +368,13 @@ The provider must support the **authorization code flow with PKCE**. The relay o
    await musicKit!.setQueue({ playlist: "pl.f4d106fed2bd41149aaacabb233eb5eb", startPlaying: true });
    ```
 
+4. Offer a membership to someone who signs in without one. A play their account can't make reaches `onError` with `membershipRequired`; `openSignUp`, called from a click, opens Apple Music's sign-up page with Apple's current trial:
+
+   ```tsx
+   musicKit!.onError((error) => setOfferTrial(error.membershipRequired));
+   // <Button label="Try Apple Music" onClick={() => void musicKit!.openSignUp()} />
+   ```
+
 The music stops when your app quits. `apps/Music.tsx` is a complete example.
 
 ## Sound

@@ -1,7 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { Button, TextInput } from "@mockintosh/ui";
-import { useApp, defineApp, type MusicKitService, type MusicKitState } from "@mockintosh/sdk";
+import { useApp, defineApp, type MusicKitError, type MusicKitService, type MusicKitState } from "@mockintosh/sdk";
 import {
   type AppleMusicSession,
   type Collection,
@@ -104,6 +104,9 @@ function Music(_props: Record<string, unknown>): JSX.Element {
   const [nowPlayingOpen, setNowPlayingOpen] = createSignal(false);
   let pageScrollY = 0;
   const [error, setError] = createSignal("");
+  /** The error that says the account has no Apple Music membership: while it shows, the bar offers to sign up. */
+  const [membershipError, setMembershipError] = createSignal("");
+  const offerSignUp = () => !!error() && error() === membershipError();
   /** What's in the search field, and the term last searched for: kept while you look at the results' pages. */
   const [query, setQuery] = createSignal("");
   const [searchTerm, setSearchTerm] = createSignal("");
@@ -240,9 +243,10 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     if (state.playing) setPending(null);
     if (requested() === state.playing) request(null);
   }
-  function onPlaybackError(message: string): void {
+  function onPlaybackError({ message, membershipRequired }: MusicKitError): void {
     setPending(null);
     request(null);
+    if (membershipRequired) setMembershipError(message);
     setError(message);
   }
   const stopListening = [musicKit.onChange(onMusicKit), musicKit.onError(onPlaybackError)];
@@ -294,6 +298,11 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     } finally {
       setSigningIn(false);
     }
+  }
+
+  /** Apple Music's sign-up page, in a new tab, for someone who isn't a member. */
+  function openSignUp(): void {
+    musicKit.openSignUp().catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't open Apple Music"));
   }
 
   /** Run a MusicKit call, showing what went wrong instead of failing silently. */
@@ -727,6 +736,9 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     get icons() {
       return icons;
     },
+    get onSignUp() {
+      return offerSignUp() ? openSignUp : undefined;
+    },
     onPrevious: () => withMusic((m) => m.skipToPreviousItem()),
     onPlayPause: () => {
       const next = !shownPlaying();
@@ -796,6 +808,7 @@ function Music(_props: Record<string, unknown>): JSX.Element {
             playlists={playlists() ?? []}
             onSelect={select}
             onSignIn={() => void startSignIn()}
+            onSignUp={openSignUp}
           />
           <Show when={barShown()}>
             <NowPlayingBar

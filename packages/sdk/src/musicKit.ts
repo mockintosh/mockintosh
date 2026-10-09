@@ -13,8 +13,11 @@ export interface MusicKitService {
   readonly state: MusicKitState;
   /** Called with the new state whenever it changes: playing, the item, the time, the modes. */
   onChange(listener: (state: MusicKitState) => void): () => void;
-  /** Called when MusicKit can't play what was asked (`mediaPlaybackError`). */
-  onError(listener: (message: string) => void): () => void;
+  /**
+   * Called when MusicKit can't play what was asked: a `mediaPlaybackError`,
+   * or a play that the account isn't allowed (`membershipRequired`).
+   */
+  onError(listener: (error: MusicKitError) => void): () => void;
   /**
    * Load MusicKit and configure it with the app's developer token (a JWT the
    * app's server signs). Signed out it plays 30-second previews. Configure
@@ -29,6 +32,11 @@ export interface MusicKitService {
    */
   authorize(): Promise<string>;
   unauthorize(): Promise<void>;
+  /**
+   * Open Apple Music's sign-up page, with whatever trial Apple is offering,
+   * for someone who isn't a member. Call it from a click: it opens a tab.
+   */
+  openSignUp(): Promise<void>;
   /** MusicKit's `setQueue`: `{ album | playlist | station | song: id }` or `{ songs: ids }`, with `startWith` and `startPlaying`. */
   setQueue(options: MusicKitQueueOptions): Promise<void>;
   play(): Promise<void>;
@@ -73,6 +81,13 @@ export interface MusicKitState {
   volume: number;
   shuffleMode: MusicKitShuffleMode;
   repeatMode: MusicKitRepeatMode;
+}
+
+/** Why MusicKit couldn't play. */
+export interface MusicKitError {
+  message: string;
+  /** Signed in without an Apple Music membership: offer `openSignUp`. */
+  membershipRequired: boolean;
 }
 
 /** A queued song as MusicKit describes it. */

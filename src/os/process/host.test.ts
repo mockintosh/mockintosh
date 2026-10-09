@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MUSIC_KIT_IDLE, type AppContext, type MusicKitService, type MusicKitState, type WindowSpec } from "@mockintosh/sdk";
+import { MUSIC_KIT_IDLE, type AppContext, type MusicKitError, type MusicKitService, type MusicKitState, type WindowSpec } from "@mockintosh/sdk";
 import type { OSServices } from "../context";
 import { registerApp, unregisterApp } from "../apps";
 import { AppProcess } from "./host";
@@ -73,18 +73,19 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 /** A MusicKit the test drives: `change` and `fail` play the page's events. */
 function fakeMusicKit() {
   const changes = new Set<(state: MusicKitState) => void>();
-  const errors = new Set<(message: string) => void>();
+  const errors = new Set<(error: MusicKitError) => void>();
   const musicKit = {
     state: MUSIC_KIT_IDLE,
     onChange: (listener: (state: MusicKitState) => void) => (changes.add(listener), () => void changes.delete(listener)),
-    onError: (listener: (message: string) => void) => (errors.add(listener), () => void errors.delete(listener)),
+    onError: (listener: (error: MusicKitError) => void) => (errors.add(listener), () => void errors.delete(listener)),
     setQueue: vi.fn(async () => {}),
     setVolume: vi.fn(),
+    openSignUp: vi.fn(async () => {}),
   } as unknown as MusicKitService;
   return {
     musicKit,
     change: (state: MusicKitState) => changes.forEach((listener) => listener(state)),
-    fail: (message: string) => errors.forEach((listener) => listener(message)),
+    fail: (error: MusicKitError) => errors.forEach((listener) => listener(error)),
   };
 }
 
@@ -145,9 +146,10 @@ describe("AppProcess", () => {
 
     receive({ t: "call", id: 0, method: "musicKit.listen", args: [] });
     change(playing);
-    fail("Apple Music couldn't play that.");
+    const refused = { message: "Apple Music membership required", membershipRequired: true };
+    fail(refused);
     expect(posted.map((p) => p.message)).toContainEqual({ t: "musicKit", state: playing });
-    expect(posted.map((p) => p.message)).toContainEqual({ t: "musicKitError", message: "Apple Music couldn't play that." });
+    expect(posted.map((p) => p.message)).toContainEqual({ t: "musicKitError", error: refused });
 
     proc.stop();
     const sent = posted.length;
@@ -160,10 +162,12 @@ describe("AppProcess", () => {
     const { posted, receive } = setup({ musicKit });
     receive({ t: "call", id: 11, method: "musicKit.setQueue", args: [{ playlist: "pl.1", startPlaying: true }] });
     receive({ t: "call", id: 0, method: "musicKit.setVolume", args: [0.4] });
+    receive({ t: "call", id: 12, method: "musicKit.openSignUp", args: [] });
     await settle();
+    expect(musicKit.openSignUp).toHaveBeenCalledTimes(1);
     expect(musicKit.setQueue).toHaveBeenCalledWith({ playlist: "pl.1", startPlaying: true });
     expect(musicKit.setVolume).toHaveBeenCalledWith(0.4);
-    expect(posted.at(-1)!.message).toEqual({ t: "reply", id: 11, ok: true, value: undefined });
+    expect(posted.map((p) => p.message)).toContainEqual({ t: "reply", id: 11, ok: true, value: undefined });
   });
 
   it("sends the worker which app opens which file type, again when an app is installed", () => {

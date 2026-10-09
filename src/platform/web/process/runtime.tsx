@@ -765,7 +765,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         scheduleFrame();
         return;
       case "musicKitError":
-        musicKit?.error(msg.message);
+        musicKit?.error(msg.error);
         flush();
         scheduleFrame();
         return;

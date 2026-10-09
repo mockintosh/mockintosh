@@ -4,7 +4,7 @@
  * host, and the host pushes each new state once the app first listens, so a
  * process that never asks isn't sent the playback clock.
  */
-import type { MusicKitService, MusicKitState } from "@mockintosh/sdk";
+import type { MusicKitError, MusicKitService, MusicKitState } from "@mockintosh/sdk";
 
 type Call = (method: string, args: unknown[]) => Promise<unknown>;
 
@@ -13,14 +13,14 @@ export interface WorkerMusicKit {
   /** A `musicKit` push: the player's new state. */
   update(state: MusicKitState): void;
   /** A `musicKitError` push. */
-  error(message: string): void;
+  error(error: MusicKitError): void;
 }
 
 export function createWorkerMusicKit(call: Call, notify: (method: string, ...args: unknown[]) => void, initial: MusicKitState): WorkerMusicKit {
   let state = initial;
   let listening = false;
   const changeListeners = new Set<(state: MusicKitState) => void>();
-  const errorListeners = new Set<(message: string) => void>();
+  const errorListeners = new Set<(error: MusicKitError) => void>();
 
   function listen(): void {
     if (listening) return;
@@ -52,6 +52,7 @@ export function createWorkerMusicKit(call: Call, notify: (method: string, ...arg
     },
     authorize: () => call("musicKit.authorize", []) as Promise<string>,
     unauthorize: () => call("musicKit.unauthorize", []) as Promise<void>,
+    openSignUp: () => call("musicKit.openSignUp", []) as Promise<void>,
     setQueue: (options) => call("musicKit.setQueue", [options]) as Promise<void>,
     play: () => call("musicKit.play", []) as Promise<void>,
     pause: () => call("musicKit.pause", []) as Promise<void>,
@@ -66,8 +67,8 @@ export function createWorkerMusicKit(call: Call, notify: (method: string, ...arg
   return {
     service,
     update,
-    error(message) {
-      for (const listener of errorListeners) listener(message);
+    error(error) {
+      for (const listener of errorListeners) listener(error);
     },
   };
 }

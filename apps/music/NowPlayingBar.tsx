@@ -42,30 +42,34 @@ export interface Player {
   onShuffle: () => void;
   onRepeat: () => void;
   onVolume: (volume: number) => void;
+  /** Set when the account has no Apple Music membership: the transport makes way for signing up. */
+  onSignUp?: () => void;
 }
 
-/** Shuffle, back, play or pause, forward, repeat. */
+/** Shuffle, back, play or pause, forward, repeat; or, for an account without a membership, a way to sign up. */
 export function Transport(props: { player: Player }): JSX.Element {
   const p = () => props.player;
   return (
-    <box flexDirection="row" alignItems="center" gap={PAD} flexShrink={0}>
-      <Button name="music-shuffle" label="" icon={p().icons.shuffle} selected={p().shuffle} onClick={p().onShuffle} />
-      <Button name="music-previous" label="" icon={p().icons.previous} onClick={p().onPrevious} />
-      <Button
-        name={p().playing ? "music-pause" : "music-play"}
-        label=""
-        icon={p().playing ? p().icons.pause : p().icons.play}
-        onClick={p().onPlayPause}
-      />
-      <Button name="music-next" label="" icon={p().icons.next} onClick={p().onNext} />
-      <Button
-        name="music-repeat"
-        label=""
-        icon={p().repeat === "one" ? p().icons.repeatOne : p().icons.repeat}
-        selected={p().repeat !== "none"}
-        onClick={p().onRepeat}
-      />
-    </box>
+    <Show when={!p().onSignUp} fallback={<Button name="music-sign-up" label="Try Apple Music" onClick={() => p().onSignUp?.()} />}>
+      <box flexDirection="row" alignItems="center" gap={PAD} flexShrink={0}>
+        <Button name="music-shuffle" label="" icon={p().icons.shuffle} selected={p().shuffle} onClick={p().onShuffle} />
+        <Button name="music-previous" label="" icon={p().icons.previous} onClick={p().onPrevious} />
+        <Button
+          name={p().playing ? "music-pause" : "music-play"}
+          label=""
+          icon={p().playing ? p().icons.pause : p().icons.play}
+          onClick={p().onPlayPause}
+        />
+        <Button name="music-next" label="" icon={p().icons.next} onClick={p().onNext} />
+        <Button
+          name="music-repeat"
+          label=""
+          icon={p().repeat === "one" ? p().icons.repeatOne : p().icons.repeat}
+          selected={p().repeat !== "none"}
+          onClick={p().onRepeat}
+        />
+      </box>
+    </Show>
   );
 }
 

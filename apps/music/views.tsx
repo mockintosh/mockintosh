@@ -128,6 +128,8 @@ export function Sidebar(props: {
   playlists: Collection[];
   onSelect: (route: Route) => void;
   onSignIn: () => void;
+  /** Apple Music's sign-up page, for someone without a membership. */
+  onSignUp: () => void;
 }): JSX.Element {
   const isSelected = (route: Route) => {
     const current = props.route;
@@ -157,6 +159,8 @@ export function Sidebar(props: {
               <text font="body" wrap>Playing 30-second previews.</text>
               <text font="body" wrap>Sign in to play whole songs and your library.</text>
               <Button label="Sign In…" disabled={props.signingIn} onClick={props.onSignIn} />
+              <text font="body" wrap>New to Apple Music?</text>
+              <Button name="music-sign-up" label="Try It" onClick={props.onSignUp} />
             </box>
           }
         >

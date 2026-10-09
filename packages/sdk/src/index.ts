@@ -203,6 +203,7 @@ export {
   MUSIC_KIT_IDLE,
   type MusicKitService,
   type MusicKitState,
+  type MusicKitError,
   type MusicKitItem,
   type MusicKitQueueOptions,
   type MusicKitShuffleMode,
