@@ -29,12 +29,14 @@ import {
   setAppMenus,
   getWindows,
   FINDER_APP_ID,
+  openContextMenu,
   type OSWindow,
 } from "../src/os/state";
 import { registerApp } from "../src/os/apps";
 import { useWindow } from "../src/os/windowContext";
 import { MAX_NAME_LENGTH, ROOT_ID, isFSError, type FileSystem, type FSNode } from "@mockintosh/fs";
-import { WindowHeader, type MenubarDefinition } from "@mockintosh/sdk";
+import { WindowHeader, type MenubarDefinition, type MenubarItemDef } from "@mockintosh/sdk";
+import { openControlPanel } from "./finder/ControlPanel";
 import {
   bumpZOrder,
   finderAttributes,
@@ -740,6 +742,23 @@ export function FinderDesktop(): JSX.Element {
 
   const desktopIconOffsetX = Math.floor((DESKTOP_ICON_CELL_W - ICON_SIZE) / 2);
 
+  /** What ⌃-clicking the desktop itself offers. */
+  function desktopContextMenu(): MenubarItemDef[] {
+    const desktopId = getDesktopFolderId(os.fs);
+    return [
+      {
+        label: "New Folder",
+        disabled: !desktopId,
+        onClick: () => {
+          if (desktopId) setSelectedSet(new Set([os.fs.mkdir(desktopId, os.fs.availableName(desktopId, "Empty folder")).id]));
+        },
+      },
+      { label: "Clean Up Desktop", onClick: () => layout.cleanUp() },
+      { type: "separator" },
+      { label: "Change Desktop Pattern…", onClick: () => openControlPanel(os) },
+    ];
+  }
+
   function updateMarqueeSelection(m: MarqueeState) {
     const mr = marqueeRect(m);
     const sel = new Set<string>();
@@ -804,6 +823,11 @@ export function FinderDesktop(): JSX.Element {
         width={os.resolution.width}
         height={os.resolution.height - os.menubarHeight}
         {...marqueeHandlers}
+        onContextMenu={(_lx, _ly, x, y) => {
+          setRenamingNodeId(null);
+          setSelectedSet(new Set<string>());
+          openContextMenu(desktopContextMenu(), x, y);
+        }}
       />
 
       {/* Desktop icons — sorted by zOrder so recently moved icons render on top */}

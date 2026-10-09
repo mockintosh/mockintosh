@@ -16,6 +16,8 @@ import {
   getWindows,
   setHighlightedMenuItem,
   setOpenMenuIndex,
+  getContextMenu,
+  closeContextMenu,
 } from "../state";
 import type {
   MenubarDefinition,
@@ -398,6 +400,71 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
         )}
       </Show>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ContextMenu — a menu popped up at the pointer by a secondary click
+// ---------------------------------------------------------------------------
+
+/**
+ * The button that popped up the contextual menu came up. Over an item, that
+ * chooses it. A click that didn't move leaves the menu up to choose from with
+ * another click; a drag that ends off the menu closes it.
+ */
+export function releaseContextMenu(moved: boolean): void {
+  if (!getContextMenu()) return;
+  const run = armed;
+  if (!run && !moved) return;
+  arm(null);
+  closeContextMenu();
+  run?.();
+}
+
+/** The open contextual menu, if any, above everything else on the screen. */
+export function ContextMenu(): JSX.Element {
+  const os = useOS();
+  const [highlighted, setHighlighted] = createSignal<number | null>(null);
+
+  function close() {
+    arm(null);
+    setHighlighted(null);
+    closeContextMenu();
+  }
+
+  return (
+    <Show when={getContextMenu()} keyed>
+      {(menu) => {
+        const w = menuDropdownWidth(menu.items);
+        return (
+          <>
+            {/* A press anywhere off the menu only closes it. */}
+            <box
+              position="absolute"
+              left={0}
+              top={0}
+              width={os.resolution.width}
+              height={os.resolution.height}
+              onMouseDown={close}
+            />
+            <MenuPanel
+              items={menu.items}
+              left={Math.max(0, Math.min(menu.x, os.resolution.width - w - 1))}
+              top={menu.y}
+              screenWidth={os.resolution.width}
+              screenBottom={os.resolution.height - 1}
+              highlighted={highlighted}
+              setHighlighted={setHighlighted}
+              onClose={close}
+              onRun={(item) => {
+                close();
+                if (!item.disabled && item.onClick) runMenuItem(item);
+              }}
+            />
+          </>
+        );
+      }}
+    </Show>
   );
 }
 

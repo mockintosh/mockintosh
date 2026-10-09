@@ -30,7 +30,7 @@ import { isModalWindow, sortWindowsForPaint, windowLayer } from "./layering";
 import { tuckMenubar } from "./menubarReveal";
 import { disposeAllWindowContent, disposeWindowContent } from "./windowContent";
 import { windowDefinition, type OSWindowKind } from "./windowKinds";
-import type { MenubarDefinition } from "@mockintosh/sdk";
+import type { MenubarDefinition, MenubarItemDef } from "@mockintosh/sdk";
 
 export type { OSWindowKind } from "./windowKinds";
 
@@ -286,6 +286,29 @@ export function showAllApps(): void {
 
 export const [getOpenMenuIndex, setOpenMenuIndex] = lazySignal<number | null>(null);
 export const [getHighlightedMenuItem, setHighlightedMenuItem] = lazySignal<number | null>(null);
+
+/** A contextual menu popped up by a secondary click, at its screen position. */
+export interface ContextMenuState {
+  items: MenubarItemDef[];
+  x: number;
+  y: number;
+}
+
+export const [getContextMenu, setContextMenu] = lazySignal<ContextMenuState | null>(null);
+
+/**
+ * Pop up a contextual menu at screen (x, y), as Mac OS 8 does on ⌃-click.
+ * Call it from an `onContextMenu` handler; the press that opened it can
+ * drag onto an item and let go, or click and choose afterwards.
+ */
+export function openContextMenu(items: MenubarItemDef[], x: number, y: number): void {
+  setOpenMenuIndex(null);
+  setContextMenu({ items, x, y });
+}
+
+export function closeContextMenu(): void {
+  if (getContextMenu()) setContextMenu(null);
+}
 
 export const [getSplashVisible, setSplashVisible] = lazySignal(true);
 

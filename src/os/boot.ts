@@ -17,7 +17,7 @@ import { registerFileOperations } from "./kernel/files";
 
 import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd, type Rect } from "@mockintosh/quickdraw";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
-import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
+import { copyBitMapBytes, createDoubleClickTracker, DOUBLE_CLICK_DIST, createUI, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
 import { FileSystem } from "@mockintosh/fs";
 import type { AppContext } from "@mockintosh/sdk";
 import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEvent } from "../platform/types";
@@ -49,7 +49,10 @@ import {
   FINDER_APP_ID,
   hideApps as hideAppsInState,
   isAppHidden,
+  getContextMenu,
+  closeContextMenu,
 } from "./state";
+import { releaseContextMenu } from "./components/Menubar.solid";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
 import { bundledApps, getBundledApp } from "./bundledApps";
@@ -735,6 +738,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
 
   // --- Input ---
   const doubleClick = createDoubleClickTracker();
+  /** Where the press that popped up a contextual menu went down, until it comes up. */
+  let contextPress: { x: number; y: number } | null = null;
+
+  /** The right button, or ⌃ with the only button a Mac mouse had. */
+  function isContextClick(e: PlatformPointerEvent): boolean {
+    if (e.button === 2) return true;
+    return (e.button ?? 0) === 0 && !!e.modifiers?.ctrl && !e.modifiers.meta;
+  }
 
   function onPointer(e: PlatformPointerEvent): void {
     if (stopped) throw new ServiceError("disconnect", "Boot has ended");
@@ -774,6 +785,15 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       case "down": {
         cursorX = e.x;
         cursorY = e.y;
+        if (isContextClick(e)) {
+          doubleClick.reset();
+          // A second secondary click only puts away the menu the first one opened.
+          if (getContextMenu()) closeContextMenu();
+          else if (ui.dispatchPointer("contextmenu", e.x, e.y, { modifiers: e.modifiers })) contextPress = { x: e.x, y: e.y };
+          trackCursor(e.x, e.y);
+          scheduleRepaint();
+          return;
+        }
         ui.dispatchPointer("mousedown", e.x, e.y, { modifiers: e.modifiers });
         if (doubleClick.down(e.x, e.y, scheduler.now())) {
           ui.dispatchPointer("dblclick", e.x, e.y);
@@ -785,6 +805,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       case "up":
         cursorX = e.x;
         cursorY = e.y;
+        if (contextPress) {
+          const moved = Math.abs(e.x - contextPress.x) >= DOUBLE_CLICK_DIST || Math.abs(e.y - contextPress.y) >= DOUBLE_CLICK_DIST;
+          contextPress = null;
+          releaseContextMenu(moved);
+          trackCursor(e.x, e.y);
+          scheduleRepaint();
+          return;
+        }
         ui.dispatchPointer("mouseup", e.x, e.y, { modifiers: e.modifiers });
         trackCursor(e.x, e.y);
         scheduleRepaint();
@@ -836,6 +864,11 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     const mods: Modifiers = e.modifiers;
     if (e.type === "up") {
       ui.dispatchKeyboard("keyup", e.key, mods);
+      return;
+    }
+    if (e.key === "Escape" && getContextMenu()) {
+      closeContextMenu();
+      scheduleRepaint();
       return;
     }
     const command = mods.meta || mods.ctrl;
