@@ -429,6 +429,7 @@ describe("bootOS on the headless platform", () => {
           items: [
             { label: "Save", shortcut: "S", disabled: true, onClick: () => ran.push("Save") },
             { label: "Record", shortcut: "R", onClick: () => ran.push("Record") },
+            { label: "Record Again", shortcut: "⇧R", onClick: () => ran.push("Record Again") },
           ],
         },
       ],
@@ -442,7 +443,8 @@ describe("bootOS on the headless platform", () => {
 
     expect(down("r")).toBe(true); // the app's Record, not the browser's Reload
     expect(down("s")).toBe(true); // a dimmed Save still owns ⌘S: no Save Page
-    expect(ran).toEqual(["Record"]);
+    expect(down("R", { ...meta, shift: true })).toBe(true); // ⇧⌘R is its own
+    expect(ran).toEqual(["Record", "Record Again"]);
     expect(down("l")).toBe(false); // nothing here has ⌘L
     expect(down("ArrowLeft")).toBe(false); // no editor focused: Back stays the browser's
     expect(down("x", none)).toBe(false);

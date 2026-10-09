@@ -107,7 +107,10 @@ Keys that only have a default action (⌘R, ⌘[, ⌘=, ⌘5…) don't need rema
    - Pointer modifiers are not translated, so on a PC, Ctrl-click is not ⌘-click.
    - On a PC, Ctrl+← now means line start (⌘←) rather than the PC's word left.
    - Menus still show only ⌘. A hint such as "⌃ works as ⌘" in About or Help is still to come.
-3. **Shortcut grammar** with exact matching and rendering. Add ⇧⌘Z Redo to apps that have Undo.
+3. **Shortcut grammar** with exact matching and rendering. Add ⇧⌘Z Redo to apps that have Undo. *Done.* The parser, label and matcher live in `src/os/shortcuts.ts`.
+   - Matching needs the physical key, so `PlatformKeyEvent` gained an optional `code`. A letter is found by where it is on the keyboard when ⌥ or the layout typed something else (⌥S types ß, and Cyrillic layouts type other letters). A character typed with ⇧, like `?`, matches as itself.
+   - The menu font gained ⇧ and ⌥ glyphs, and the shortcut column is measured instead of fixed at 36px. A dimmed item's shortcut is now greyed along with its label.
+   - Canvas is the only app with a real Redo, so it alone got ⇧⌘Z.
 4. **Policy table and `validateMenubar`.** Apply the remaps above.
 5. **Optional:** Keyboard Lock in full screen, and a Keyboard Shortcuts page (Help menu and `sites/` docs) generated from the menubars and the table.
 

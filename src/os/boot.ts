@@ -76,6 +76,7 @@ import { createSystemPrinters } from "./printers/manager";
 
 import { createDesktopSettings, registerDesktopSettings } from "./kernel/settings";
 import { menuCommands, runMenuItem } from "./kernel/menus";
+import { shortcutMatches } from "./shortcuts";
 import { registerShell } from "./shell";
 import { registerUIOperations } from "./kernel/uiService";
 import { Cancellation } from "./kernel/cancellation";
@@ -803,12 +804,12 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
    * ⌘-shortcut from the current menubar: `"ran"` when an enabled item took
    * it, `"disabled"` when the key only belongs to a dimmed item, else null.
    */
-  function runMenuShortcut(key: string): "ran" | "disabled" | null {
+  function runMenuShortcut(e: PlatformKeyEvent): "ran" | "disabled" | null {
     let dimmed = false;
     for (const menu of getMenubarMenus()) {
       for (const item of menuCommands(menu.items)) {
         if (item.type === "radiogroup") continue;
-        if (!item.shortcut || item.shortcut.toLowerCase() !== key.toLowerCase()) continue;
+        if (!item.shortcut || !shortcutMatches(item.shortcut, e.key, e.code, e.modifiers)) continue;
         if (item.disabled) {
           dimmed = true;
           continue;
@@ -862,11 +863,11 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     }
     // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
     if (command && e.key.toLowerCase() === "v") {
-      if (runMenuShortcut(e.key) !== "ran") pasteFromClipboard();
+      if (runMenuShortcut(e) !== "ran") pasteFromClipboard();
       scheduleRepaint();
       return true;
     }
-    const shortcut = command && e.key.length === 1 ? runMenuShortcut(e.key) : null;
+    const shortcut = command && e.key.length === 1 ? runMenuShortcut(e) : null;
     if (shortcut === "ran") {
       scheduleRepaint();
       return true;

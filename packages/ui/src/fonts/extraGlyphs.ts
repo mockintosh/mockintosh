@@ -39,6 +39,8 @@ export interface ExtraGlyphDefinition {
 export const COMMAND_KEY = "\u2318";
 export const CHECK_MARK = "\u2713";
 export const BULLET = "\u2022";
+export const SHIFT_KEY = "\u21E7";
+export const OPTION_KEY = "\u2325";
 
 /**
  * The single source of truth for Mockintosh symbols. Order matters: the ordinal is
@@ -270,6 +272,46 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
           "###",
           "###",
           "###",
+        ],
+      },
+    },
+  },
+  {
+    char: SHIFT_KEY,
+    name: "shift key",
+    perFont: {
+      // Chicago 12, beside ⌘ in a menu's ⇧⌘S: a hollow arrow on cap height.
+      menu: {
+        top: 1,
+        rows: [
+          "....#....",
+          "...#.#...",
+          "..#...#..",
+          ".#.....#.",
+          "###...###",
+          "..#...#..",
+          "..#...#..",
+          "..#...#..",
+          "..#####..",
+        ],
+      },
+    },
+  },
+  {
+    char: OPTION_KEY,
+    name: "option key",
+    perFont: {
+      // Chicago 12, beside ⌘ in a menu's ⌥⌘S: on the x-height, like the original.
+      menu: {
+        top: 3,
+        rows: [
+          "###..####",
+          "...#.....",
+          "...#.....",
+          "....#....",
+          "....#....",
+          ".....#...",
+          ".....####",
         ],
       },
     },

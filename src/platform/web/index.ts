@@ -269,6 +269,7 @@ function createDOMInput(
   const keyEvent = (type: "down" | "up", e: KeyboardEvent): PlatformKeyEvent => ({
     type,
     key: e.key,
+    code: e.code,
     modifiers: modifiers(e),
   });
   window.addEventListener("keydown", (e) => {

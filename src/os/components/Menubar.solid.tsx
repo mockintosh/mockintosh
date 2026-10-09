@@ -1,7 +1,8 @@
 import { appleMenu, runMenuItem, runRadioItem } from "../kernel/menus";
 import { For, Show, createMemo, createSignal } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { measureText, COMMAND_KEY, CHECK_MARK, smallIcon, type Sprite } from "@mockintosh/ui";
+import { measureText, CHECK_MARK, smallIcon, type Sprite } from "@mockintosh/ui";
+import { shortcutLabel } from "../shortcuts";
 import { getApp } from "../apps";
 import { runningAppIds } from "../appSwitcher";
 import { useOS } from "../context";
@@ -82,7 +83,7 @@ function menuDropdownWidth(items: MenubarItemDef[]): number {
   for (const item of items) {
     if ("label" in item && item.label) {
       const shortcut = "shortcut" in item ? (item as MenubarActionItem).shortcut : undefined;
-      const sw = shortcut ? measureText(`${COMMAND_KEY}${shortcut}`, MENU_FONT) + 16
+      const sw = shortcut ? measureText(shortcutLabel(shortcut), MENU_FONT) + 16
         : item.type === "submenu" ? SUBMENU_ARROW.width + 16 : 0;
       max = Math.max(max, TEXT_X + measureText(item.label, MENU_FONT) + sw);
     } else if ((item as MenubarRadioGroupDef).type === "radiogroup") {
@@ -603,12 +604,18 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
             </text>
           </box>
           <Show when={ai.shortcut}>
-            <box position="absolute" left={rowW - 40} top={0} width={36} height={ITEM_H} justifyContent="center">
-              <text font={MENU_FONT} nowrap align="right" verticalAlign="middle"
-                color={isHighlighted() && !ai.disabled ? 0 : 1}>
-                {`${COMMAND_KEY}${ai.shortcut}`}
-              </text>
-            </box>
+            {(shortcut) => {
+              const label = shortcutLabel(shortcut());
+              const width = Math.max(36, measureText(label, MENU_FONT));
+              return (
+                <box position="absolute" left={rowW - 4 - width} top={0} width={width} height={ITEM_H} justifyContent="center">
+                  <text font={MENU_FONT} nowrap align="right" verticalAlign="middle"
+                    color={isHighlighted() && !ai.disabled ? 0 : 1} stipple={ai.disabled}>
+                    {label}
+                  </text>
+                </box>
+              );
+            }}
           </Show>
         </box>
       );

@@ -158,7 +158,7 @@ export { fontFamilyId, fontFamilyName } from "./fonts/strike";
 export { drawPixels } from "./portDraw";
 export { faceMetrics, faceMetricsByName, alignmentHeight, cdefBaseline, middleCellTop } from "./fonts/metrics";
 export type { FontFaceMetrics, FontInfo } from "./fonts/metrics";
-export { COMMAND_KEY, CHECK_MARK, BULLET } from "./fonts/extraGlyphs";
+export { COMMAND_KEY, CHECK_MARK, BULLET, SHIFT_KEY, OPTION_KEY } from "./fonts/extraGlyphs";
 export { textSelectionOf, selectedPlainText } from "./selectable";
 export type { TextSelection } from "./selectable";
 export { inspectTree, type InspectionNode, type SemanticMetadata } from "./inspection";

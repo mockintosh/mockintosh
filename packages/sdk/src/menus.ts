@@ -16,10 +16,15 @@ export type MenubarItemDef =
   | MenubarSubmenuDef
   | MenubarSeparator;
 
-/** A clickable command. `shortcut` is a single character, shown and bound as ⌘+key. */
+/** A clickable command. */
 export interface MenubarActionItem {
   type?: "action";
   label: string;
+  /**
+   * The key pressed with ⌘, after any of ⌥ and ⇧: `"S"` is ⌘S, `"⇧S"` is
+   * ⇧⌘S, `"⌥⇧S"` is ⌥⇧⌘S. Exactly those modifiers: ⇧⌘S is not ⌘S. ⌃ (a PC's
+   * Ctrl) works as ⌘ too, which reaches ⌘W, ⌘N and ⌘Q the browser keeps.
+   */
   shortcut?: string;
   disabled?: boolean;
   /** Draw a check mark beside the item (`CheckItem`). */

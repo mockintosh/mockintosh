@@ -332,7 +332,7 @@ platform.input (raw down/up/move/scroll, key down/up)
    → ui.dispatchPointer / dispatchKeyboard
 ```
 
-`onKey` first reads the host key in the Macintosh's terms (`macKey`): ⌘ and ⌃ (a PC's Ctrl) are both ⌘, since a browser keeps ⌘W, ⌘N and ⌘Q for itself, except while a terminal has focus, where ⌃ stays ⌃ and ⌃⇧ with a letter is ⌘. It then returns whether the Macintosh used the key: a menu shortcut (a dimmed one too, though the focused field still gets it), paste, Force Quit, a terminal's raw ⌃ key, or a focused editor's ⌘A/⌘Z/⌘←. The web platform then cancels the browser's own action for it (Save Page on ⌘S, Reload on ⌘R); any other key stays the browser's. Keys the browser never hands the page (⌘Q, ⌘W, ⌘N, ⌘T) can't be caught, so a production build asks before leaving while any app runs (`guardUnload`). See `docs/keyboard-shortcuts-plan.md`.
+`onKey` first reads the host key in the Macintosh's terms (`macKey`): ⌘ and ⌃ (a PC's Ctrl) are both ⌘, since a browser keeps ⌘W, ⌘N and ⌘Q for itself, except while a terminal has focus, where ⌃ stays ⌃ and ⌃⇧ with a letter is ⌘. A menu item's `shortcut` is a key after any of ⌥ and ⇧ (`"⇧S"`), matched with exactly those modifiers (`src/os/shortcuts.ts`). It then returns whether the Macintosh used the key: a menu shortcut (a dimmed one too, though the focused field still gets it), paste, Force Quit, a terminal's raw ⌃ key, or a focused editor's ⌘A/⌘Z/⌘←. The web platform then cancels the browser's own action for it (Save Page on ⌘S, Reload on ⌘R); any other key stays the browser's. Keys the browser never hands the page (⌘Q, ⌘W, ⌘N, ⌘T) can't be caught, so a production build asks before leaving while any app runs (`guardUnload`). See `docs/keyboard-shortcuts-plan.md`.
 
 ## File System
 

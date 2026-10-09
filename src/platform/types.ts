@@ -67,6 +67,11 @@ export interface PlatformKeyEvent {
   type: "down" | "up";
   /** Key value as in `KeyboardEvent.key` ("a", "Enter", "ArrowLeft", …). */
   key: string;
+  /**
+   * Where the key is, as `KeyboardEvent.code` ("KeyS", "Digit5"), for when a
+   * modifier changed what it typed (⌥S types ß on a Mac). Absent = unknown.
+   */
+  code?: string;
   modifiers: Modifiers;
 }
 
