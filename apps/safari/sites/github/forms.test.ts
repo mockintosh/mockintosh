@@ -8,7 +8,7 @@ function reply(body: unknown, status = 200): FetchResponse {
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: () => "application/json" },
+    headers: { get: (name) => (name.toLowerCase() === "content-type" ? "application/json" : null) },
     text: async () => JSON.stringify(body),
     json: async () => body,
     arrayBuffer: async () => new ArrayBuffer(0),
@@ -416,6 +416,30 @@ describe("GitHub stars", () => {
     expect(all).toContain("Safari's sign-in doesn't let it watch repositories. Sign in again to allow it.");
     const again = forms(shown.nodes).find((form) => form.controls.some((control) => control.kind === "submit" && control.label === "Sign In Again"));
     expect(again?.controls).toContainEqual({ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello" });
+  });
+
+  /** api.github.com for a token GitHub says has `scopes`. */
+  const scoped = (scopes: string) => fakeGithub((call) => {
+    if (!call.url.endsWith("/user")) return undefined;
+    const response = reply({ login: "octocat" });
+    return { ...response, headers: { get: (name) => (name.toLowerCase() === "x-oauth-scopes" ? scopes : null) } };
+  });
+
+  it("asks to sign in again from Watch, without asking GitHub, when the sign-in was granted without notifications", async () => {
+    const { fetch, calls } = scoped("public_repo");
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "no-notifications")));
+    expect(starForm(shown.nodes)?.controls[0]).toMatchObject({ value: "watch", tooltip: "Sign in again to watch" });
+    const pressed = await page(await loadPage(post("https://github.com/octocat/hello", { watch: "watch" }), context(fetch, "no-notifications")));
+    expect(calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(texts(pressed.nodes)).toContain("Safari's sign-in doesn't let it watch repositories. Sign in again to allow it.");
+  });
+
+  it("watches when the sign-in has notifications, or repo", async () => {
+    for (const scopes of ["notifications, public_repo", "repo"]) {
+      const { fetch, calls } = scoped(scopes);
+      await loadPage(post("https://github.com/octocat/hello", { watch: "watch" }), context(fetch, `with-${scopes}`));
+      expect(calls.some((call) => call.method === "PUT")).toBe(true);
+    }
   });
 
   it("doesn't count ignoring a repository as watching it", async () => {

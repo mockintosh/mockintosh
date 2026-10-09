@@ -3,6 +3,8 @@ import { PageError, type DocumentPage, type SiteContext, type SiteAdapter } from
 import {
   GithubError,
   MissingScopeError,
+  canWatch,
+  watchScopeError,
   NOT_FOUND,
   RateLimitError,
   addDiscussionComment,
@@ -85,6 +87,8 @@ export interface PageForms extends FormState {
   signedIn: boolean;
   /** Who is signed in; empty when signed out, or when GitHub won't say. */
   viewer?: string;
+  /** False when the sign-in can't watch repositories, so Watch asks to sign in again. */
+  canWatch?: boolean;
 }
 
 function locationOf(url: WebUrl): GithubLocation {
@@ -123,7 +127,7 @@ async function loadBody(location: Exclude<GithubLocation, { kind: "login" | "log
   const target: ApiLocation = jump ? { kind: "tree", owner: jump[1], repo: jump[2], ref: "", path: "" } : location;
   try {
     const [page, viewer] = await Promise.all([loadPage(context.fetch, token, target), token ? viewerOf(context) : null]);
-    return githubPage(page, Date.now(), { signedIn: token !== "", viewer: viewer?.login ?? "", ...state });
+    return githubPage(page, Date.now(), { signedIn: token !== "", viewer: viewer?.login ?? "", canWatch: viewer ? canWatch(viewer) : true, ...state });
   } catch (error) {
     // A GitHub page still, header and all, so signing in or searching is a click away.
     if (error instanceof GithubError) return errorPage(location, error, token !== "", Date.now());
@@ -150,7 +154,7 @@ function viewerOf(context: SiteContext): Promise<Viewer> {
   if (!viewer) {
     viewer = getViewer(context.fetch, token).catch(() => {
       viewers.delete(token);
-      return { login: "", avatarUrl: "" };
+      return { login: "", avatarUrl: "", scopes: null };
     });
     viewers.set(token, viewer);
   }
@@ -327,6 +331,8 @@ async function post(posted: Posted, fields: Record<string, string>, context: Sit
   if (!token) throw new GithubError("Sign in to GitHub first.", 401);
   const { owner, repo } = posted;
   if (posted.kind === "watch") {
+    // Don't ask GitHub for what the sign-in can't do: it would only say "Not found".
+    if (!canWatch(await viewerOf(context))) throw watchScopeError(posted.watching);
     await setWatching(fetch, token, owner, repo, posted.watching);
     return posted.form;
   }
@@ -961,7 +967,7 @@ const REPO_BUTTONS_WIDTH = 310;
  * outline star to star with, a filled one once starred). Signed out
  * (`starred` null), all three sign in and come back.
  */
-function repoButtons(repo: RepoInfo, starred: boolean | null, watching: boolean | null, here: GithubLocation): LayoutNode {
+function repoButtons(repo: RepoInfo, starred: boolean | null, watching: boolean | null, here: GithubLocation, watchable = true): LayoutNode {
   const watchers = formatCount(repo.watchers);
   const forks = `Fork ${formatCount(repo.forks)}`;
   const stars = formatCount(repo.stars);
@@ -991,7 +997,7 @@ function repoButtons(repo: RepoInfo, starred: boolean | null, watching: boolean 
       controls: [
         watching
           ? { kind: "submit", name: "watch", value: "unwatch", label: `Unwatch ${watchers}`, icon: GITHUB_WATCH, tooltip: `Unwatch ${name}` }
-          : { kind: "submit", name: "watch", value: "watch", label: `Watch ${watchers}`, icon: GITHUB_WATCH, tooltip: `Watch ${name}` },
+          : { kind: "submit", name: "watch", value: "watch", label: `Watch ${watchers}`, icon: GITHUB_WATCH, tooltip: watchable ? `Watch ${name}` : "Sign in again to watch" },
         { kind: "submit", name: "fork", value: "fork", label: forks, icon: GITHUB_FORK, tooltip: `Fork ${name}` },
         starred
           ? { kind: "submit", name: "star", value: "unstar", label: `Starred ${stars}`, icon: GITHUB_STARRED, tooltip: `Unstar ${name}` }
@@ -1101,7 +1107,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
           gap: 8,
           minWidth: 0,
           center: true,
-          columns: [{ nodes: [heading(1, repo.name)] }, { width: REPO_BUTTONS_WIDTH, nodes: [repoButtons(repo, page.starred, page.watching, location)] }],
+          columns: [{ nodes: [heading(1, repo.name)] }, { width: REPO_BUTTONS_WIDTH, nodes: [repoButtons(repo, page.starred, page.watching, location, forms.canWatch)] }],
         },
         RULE_GAP,
         { type: "hr", dotted: true },

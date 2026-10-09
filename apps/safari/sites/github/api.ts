@@ -1,5 +1,5 @@
 import { decodeBase64 } from "@mockintosh/ui";
-import type { FetchFunction } from "@mockintosh/sdk";
+import type { FetchFunction, FetchResponse } from "@mockintosh/sdk";
 import type { GithubLocation, ProfileTab } from "./location";
 
 export class GithubError extends Error {
@@ -548,11 +548,33 @@ export interface Viewer {
   login: string;
   /** `avatars.githubusercontent.com` URL; empty when the API gave none. */
   avatarUrl: string;
+  /**
+   * What the token may do, as GitHub lists it: someone signing in can grant
+   * less than Safari asks for, and an older sign-in has what was asked for
+   * then. Null when GitHub doesn't say, as for a fine-grained token.
+   */
+  scopes: string[] | null;
 }
 
 export async function getViewer(fetch: FetchFunction, token: string): Promise<Viewer> {
-  const user = asRecord(await gh(fetch, token, "/user"));
-  return { login: stringField(user, "login"), avatarUrl: stringField(user, "avatar_url") };
+  const response = await ghResponse(fetch, token, "/user");
+  const user = asRecord(await response.json());
+  const scopes = response.headers.get("x-oauth-scopes");
+  return {
+    login: stringField(user, "login"),
+    avatarUrl: stringField(user, "avatar_url"),
+    scopes: scopes === null ? null : scopes.split(",").map((scope) => scope.trim()).filter(Boolean),
+  };
+}
+
+/** Can the token watch repositories? `notifications` lets it, as does `repo`, which has everything; unknown scopes might. */
+export function canWatch(viewer: Viewer): boolean {
+  return viewer.scopes === null || viewer.scopes.includes("notifications") || viewer.scopes.includes("repo");
+}
+
+/** Watching, or unwatching, needs a scope this sign-in doesn't have. */
+export function watchScopeError(watching: boolean): MissingScopeError {
+  return new MissingScopeError(`Safari's sign-in doesn't let it ${watching ? "watch" : "unwatch"} repositories. Sign in again to allow it.`);
 }
 
 /** Opens an issue; resolves with its number. */
@@ -791,7 +813,7 @@ export async function setWatching(fetch: FetchFunction, token: string, owner: st
   if (response.ok) return;
   // The repository is there (its page had the button), so a 404 is GitHub hiding what the token can't do:
   // watching needs the notifications scope, which sign-ins from before it was asked for don't have.
-  if (response.status === 404) throw new MissingScopeError(`Safari's sign-in doesn't let it ${watching ? "watch" : "unwatch"} repositories. Sign in again to allow it.`);
+  if (response.status === 404) throw watchScopeError(watching);
   const detail = await errorMessage(response);
   throw new GithubError(detail || `GitHub wouldn't ${watching ? "watch" : "unwatch"} the repository (${response.status}).`, response.status);
 }
@@ -825,6 +847,11 @@ const FORK_WAIT: ForkWait = { tries: 8, every: 750, pause: (ms) => new Promise((
 
 /** A REST call: GET, or POST with `json`. */
 async function gh(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<unknown> {
+  return (await ghResponse(fetch, token, path, json)).json();
+}
+
+/** `gh`, keeping the answer whole, for its headers. */
+async function ghResponse(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<FetchResponse> {
   const headers = restHeaders(token);
   if (json !== undefined) headers["Content-Type"] = "application/json";
   // GitHub lets browsers keep its answers for a minute: ask it whether they're current, so a star, an issue or a
@@ -841,7 +868,7 @@ async function gh(fetch: FetchFunction, token: string, path: string, json?: unkn
     }
     throw new GithubError(detail || `GitHub returned ${response.status}.`, response.status);
   }
-  return response.json();
+  return response;
 }
 
 /** GitHub's GraphQL API, which alone has discussions. It always needs a token. */
