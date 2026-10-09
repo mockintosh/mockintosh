@@ -17,6 +17,9 @@ node_modules
 /build
 dist
 
+# generated on install and before dev and build (`npm run context`)
+/api/mockintosh-context.generated.ts
+
 # misc
 .DS_Store
 .vscode
