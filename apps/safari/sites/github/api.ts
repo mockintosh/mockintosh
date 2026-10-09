@@ -1,10 +1,27 @@
 import { decodeBase64 } from "@mockintosh/ui";
-import type { FetchFunction } from "@mockintosh/sdk";
+import type { FetchFunction, FetchResponse } from "@mockintosh/sdk";
 import type { GithubLocation, ProfileTab } from "./location";
 
 export class GithubError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
+  }
+}
+
+/** The sign-in doesn't let Safari do this: it was made before Safari asked for the permission. Signing in again grants it. */
+export class MissingScopeError extends GithubError {
+  constructor(message: string) {
+    super(message, 403);
+  }
+}
+
+/** What a 404 says when GitHub gives no more reason than that. */
+export const NOT_FOUND = "Not found on GitHub.";
+
+/** GitHub has answered all the requests it will this hour, for this address signed out or this account signed in; it answers again from `resetsAt` (ms), when it says. */
+export class RateLimitError extends GithubError {
+  constructor(readonly resetsAt: number | null) {
+    super("GitHub has answered all the requests it will for now. Try again later.", 403);
   }
 }
 
@@ -531,11 +548,33 @@ export interface Viewer {
   login: string;
   /** `avatars.githubusercontent.com` URL; empty when the API gave none. */
   avatarUrl: string;
+  /**
+   * What the token may do, as GitHub lists it: someone signing in can grant
+   * less than Safari asks for, and an older sign-in has what was asked for
+   * then. Null when GitHub doesn't say, as for a fine-grained token.
+   */
+  scopes: string[] | null;
 }
 
 export async function getViewer(fetch: FetchFunction, token: string): Promise<Viewer> {
-  const user = asRecord(await gh(fetch, token, "/user"));
-  return { login: stringField(user, "login"), avatarUrl: stringField(user, "avatar_url") };
+  const response = await ghResponse(fetch, token, "/user");
+  const user = asRecord(await response.json());
+  const scopes = response.headers.get("x-oauth-scopes");
+  return {
+    login: stringField(user, "login"),
+    avatarUrl: stringField(user, "avatar_url"),
+    scopes: scopes === null ? null : scopes.split(",").map((scope) => scope.trim()).filter(Boolean),
+  };
+}
+
+/** Can the token watch repositories? `notifications` lets it, as does `repo`, which has everything; unknown scopes might. */
+export function canWatch(viewer: Viewer): boolean {
+  return viewer.scopes === null || viewer.scopes.includes("notifications") || viewer.scopes.includes("repo");
+}
+
+/** Watching, or unwatching, needs a scope this sign-in doesn't have. */
+export function watchScopeError(watching: boolean): MissingScopeError {
+  return new MissingScopeError(`Safari's sign-in doesn't let it ${watching ? "watch" : "unwatch"} repositories. Sign in again to allow it.`);
 }
 
 /** Opens an issue; resolves with its number. */
@@ -585,7 +624,7 @@ async function getDiscussion(
     }
   }`, { owner: repo.owner, name: repo.name, number });
   const record = asRecord(asRecord(asRecord(data).repository).discussion);
-  if (!record.id) throw new GithubError("Not found on GitHub.", 404);
+  if (!record.id) throw new GithubError(NOT_FOUND, 404);
   const nodes = asRecord(record.thread).nodes;
   const comments = Array.isArray(nodes)
     ? nodes.map((node) => {
@@ -772,6 +811,9 @@ export async function setWatching(fetch: FetchFunction, token: string, owner: st
     ? { method: "PUT", headers: { ...restHeaders(token), "Content-Type": "application/json" }, body: JSON.stringify({ subscribed: true }) }
     : { method: "DELETE", headers: restHeaders(token) });
   if (response.ok) return;
+  // The repository is there (its page had the button), so a 404 is GitHub hiding what the token can't do:
+  // watching needs the notifications scope, which sign-ins from before it was asked for don't have.
+  if (response.status === 404) throw watchScopeError(watching);
   const detail = await errorMessage(response);
   throw new GithubError(detail || `GitHub wouldn't ${watching ? "watch" : "unwatch"} the repository (${response.status}).`, response.status);
 }
@@ -805,20 +847,28 @@ const FORK_WAIT: ForkWait = { tries: 8, every: 750, pause: (ms) => new Promise((
 
 /** A REST call: GET, or POST with `json`. */
 async function gh(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<unknown> {
+  return (await ghResponse(fetch, token, path, json)).json();
+}
+
+/** `gh`, keeping the answer whole, for its headers. */
+async function ghResponse(fetch: FetchFunction, token: string, path: string, json?: unknown): Promise<FetchResponse> {
   const headers = restHeaders(token);
   if (json !== undefined) headers["Content-Type"] = "application/json";
   // GitHub lets browsers keep its answers for a minute: ask it whether they're current, so a star, an issue or a
   // comment just made shows at once. An unchanged answer costs a 304, which doesn't count against the rate limit.
   const response = await fetch(`${API}${path}`, json === undefined ? { headers, cache: "no-cache" } : { method: "POST", headers, body: JSON.stringify(json) });
-  if (response.status === 404) throw new GithubError("Not found on GitHub.", 404);
+  if (response.status === 404) throw new GithubError(NOT_FOUND, 404);
   if (!response.ok) {
     const detail = await errorMessage(response);
+    if ((response.status === 403 || response.status === 429) && (response.headers.get("x-ratelimit-remaining") === "0" || /rate limit/i.test(detail))) {
+      throw new RateLimitError(resetTime(response));
+    }
     if (response.status === 401 || response.status === 403) {
-      throw new GithubError(detail || "GitHub refused the request. A token raises the rate limit.", response.status);
+      throw new GithubError(detail || "GitHub refused the request.", response.status);
     }
     throw new GithubError(detail || `GitHub returned ${response.status}.`, response.status);
   }
-  return response.json();
+  return response;
 }
 
 /** GitHub's GraphQL API, which alone has discussions. It always needs a token. */
@@ -827,10 +877,19 @@ async function graphql(fetch: FetchFunction, token: string, query: string, varia
   const data = asRecord(await gh(fetch, token, "/graphql", { query, variables }));
   const errors = Array.isArray(data.errors) ? data.errors.map((error) => stringField(asRecord(error), "message")).filter(Boolean) : [];
   if (errors.length > 0) {
+    if (Array.isArray(data.errors) && data.errors.some((error) => asRecord(error).type === "RATE_LIMITED")) throw new RateLimitError(null);
     const missing = Array.isArray(data.errors) && data.errors.some((error) => asRecord(error).type === "NOT_FOUND");
-    throw new GithubError(missing ? "Not found on GitHub." : errors.join(" "), missing ? 404 : 422);
+    throw new GithubError(missing ? NOT_FOUND : errors.join(" "), missing ? 404 : 422);
   }
   return data.data;
+}
+
+/** When GitHub answers again: its reset time, or a wait it asks for; null when it doesn't say. */
+function resetTime(response: { headers: { get(name: string): string | null } }): number | null {
+  const reset = Number(response.headers.get("x-ratelimit-reset"));
+  if (reset > 0) return reset * 1000;
+  const wait = Number(response.headers.get("retry-after"));
+  return wait > 0 ? Date.now() + wait * 1000 : null;
 }
 
 async function errorMessage(response: { json(): Promise<unknown> }): Promise<string> {

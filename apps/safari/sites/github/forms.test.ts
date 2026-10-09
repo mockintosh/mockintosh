@@ -8,7 +8,7 @@ function reply(body: unknown, status = 200): FetchResponse {
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: () => "application/json" },
+    headers: { get: (name) => (name.toLowerCase() === "content-type" ? "application/json" : null) },
     text: async () => JSON.stringify(body),
     json: async () => body,
     arrayBuffer: async () => new ArrayBuffer(0),
@@ -408,6 +408,40 @@ describe("GitHub stars", () => {
     expect(watching.calls.find((call) => call.method === "DELETE")).toMatchObject({ url: "https://api.github.com/repos/octocat/hello/subscription" });
   });
 
+  it("asks to sign in again when the sign-in can't watch, as ones from before Safari asked for notifications can't", async () => {
+    const { fetch } = fakeGithub((call) => (call.url.endsWith("/subscription") && call.method === "PUT" ? reply({ message: "Not Found" }, 404) : undefined));
+    const shown = await page(await loadPage(post("https://github.com/octocat/hello", { watch: "watch" }), context(fetch, "tok")));
+    const all = texts(shown.nodes);
+    expect(all).toContain("octocat / hello");
+    expect(all).toContain("Safari's sign-in doesn't let it watch repositories. Sign in again to allow it.");
+    const again = forms(shown.nodes).find((form) => form.controls.some((control) => control.kind === "submit" && control.label === "Sign In Again"));
+    expect(again?.controls).toContainEqual({ kind: "hidden", name: "return_to", value: "https://github.com/octocat/hello" });
+  });
+
+  /** api.github.com for a token GitHub says has `scopes`. */
+  const scoped = (scopes: string) => fakeGithub((call) => {
+    if (!call.url.endsWith("/user")) return undefined;
+    const response = reply({ login: "octocat" });
+    return { ...response, headers: { get: (name) => (name.toLowerCase() === "x-oauth-scopes" ? scopes : null) } };
+  });
+
+  it("asks to sign in again from Watch, without asking GitHub, when the sign-in was granted without notifications", async () => {
+    const { fetch, calls } = scoped("public_repo");
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "no-notifications")));
+    expect(starForm(shown.nodes)?.controls[0]).toMatchObject({ value: "watch", tooltip: "Sign in again to watch" });
+    const pressed = await page(await loadPage(post("https://github.com/octocat/hello", { watch: "watch" }), context(fetch, "no-notifications")));
+    expect(calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(texts(pressed.nodes)).toContain("Safari's sign-in doesn't let it watch repositories. Sign in again to allow it.");
+  });
+
+  it("watches when the sign-in has notifications, or repo", async () => {
+    for (const scopes of ["notifications, public_repo", "repo"]) {
+      const { fetch, calls } = scoped(scopes);
+      await loadPage(post("https://github.com/octocat/hello", { watch: "watch" }), context(fetch, `with-${scopes}`));
+      expect(calls.some((call) => call.method === "PUT")).toBe(true);
+    }
+  });
+
   it("doesn't count ignoring a repository as watching it", async () => {
     const { fetch } = fakeGithub((call) => (call.url.endsWith("/subscription") && call.method === "GET" ? reply({ subscribed: false, ignored: true }) : undefined));
     const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "tok")));
@@ -599,5 +633,66 @@ describe("GitHub forms", () => {
       width: 16,
       nodes: [{ type: "menu", label: "octocat", image: { src: "https://avatars.githubusercontent.com/u/583231?v=4&s=16", size: 16, border: true } }],
     });
+  });
+});
+
+describe("GitHub's rate limit", () => {
+  /** api.github.com out of requests until 12:10 UTC, the way it says so. */
+  const limited = (call: Call): FetchResponse | undefined => {
+    if (!call.url.includes("/repos/octocat/hello")) return undefined;
+    const response = reply({ message: "API rate limit exceeded for 1.2.3.4. (But here's the good news: …)" }, 403);
+    const headers: Record<string, string> = { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Date.parse("2026-10-08T12:10:00Z") / 1000) };
+    return { ...response, headers: { get: (name) => headers[name.toLowerCase()] ?? null } };
+  };
+
+  beforeEach(() => vi.useFakeTimers({ now: new Date("2026-10-08T12:00:00Z") }));
+  afterEach(() => vi.useRealTimers());
+
+  it("keeps the header, says when GitHub answers again, and offers to sign in", async () => {
+    const { fetch } = fakeGithub(limited);
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")));
+    expect(shown.title).toBe("GitHub needs a break");
+    const all = texts(shown.nodes);
+    expect(all).toContain("octocat / hello");
+    expect(all).toContain("GitHub answers again in 10 minutes. Try Again");
+    expect(all).toContain("Signed in, GitHub answers 5,000 an hour, and opens this page at once.");
+    expect(all).not.toContain("good news");
+    const signIns = forms(shown.nodes).filter((form) => form.action === "https://github.com/login");
+    // The header's, and the page's own.
+    expect(signIns).toHaveLength(2);
+    expect(signIns.every((form) => form.controls.some((control) => control.kind === "hidden" && control.value === "https://github.com/octocat/hello"))).toBe(true);
+  });
+
+  it("signed in, only says when GitHub answers again", async () => {
+    const { fetch } = fakeGithub(limited);
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "token")));
+    expect(texts(shown.nodes)).toContain("GitHub answers 5,000 requests an hour for each account, and Safari has used them up.");
+    expect(forms(shown.nodes).some((form) => form.action === "https://github.com/login")).toBe(false);
+  });
+});
+
+describe("GitHub's other errors", () => {
+  it("keeps the header when a repository isn't there, and signed out offers to sign in in case it's private", async () => {
+    const { fetch } = fakeGithub();
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/secret"), context(fetch, "")));
+    expect(shown.title).toBe("Not found");
+    const all = texts(shown.nodes);
+    expect(all).toContain("octocat / secret");
+    expect(all).toContain("Signed in, Safari can open private repositories you have access to.");
+    expect(forms(shown.nodes).filter((form) => form.action === "https://github.com/login")).toHaveLength(2);
+  });
+
+  it("asks to sign in again when GitHub no longer takes the token", async () => {
+    const { fetch } = fakeGithub((call) => (call.url.includes("/repos/octocat/hello") ? reply({ message: "Bad credentials" }, 401) : undefined));
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "expired")));
+    expect(texts(shown.nodes)).toContain("GitHub no longer accepts Safari's sign-in. It may have expired or been revoked.");
+    expect(forms(shown.nodes).some((form) => form.controls.some((control) => control.kind === "submit" && control.label === "Sign In Again"))).toBe(true);
+  });
+
+  it("says what else went wrong, with a way to try again", async () => {
+    const { fetch } = fakeGithub((call) => (call.url.includes("/repos/octocat/hello") ? reply({ message: "Server Error" }, 500) : undefined));
+    const shown = await page(await loadPage(pageRequest("https://github.com/octocat/hello"), context(fetch, "")));
+    expect(shown.title).toBe("GitHub can't open this page");
+    expect(texts(shown.nodes)).toContain("Server Error Try Again");
   });
 });
