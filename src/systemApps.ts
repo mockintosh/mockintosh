@@ -18,6 +18,7 @@ import IconGallery from "@/apps/IconGallery";
 import { sprites as ditherSprites } from "@/apps/dither/icons";
 import { sprites as traceSprites } from "@/apps/trace/icons";
 import { spotifySprites } from "@/apps/sprites/spotify";
+import { sprites as appleMusicSprites } from "@/apps/applemusic/icons";
 import { sprites as macpaintSprites } from "@/apps/macpaint/icons";
 import { sprites as canvasSprites } from "@/apps/canvas/icons";
 import { sprites as surfaceSprites } from "@/apps/surface/icons";
@@ -80,6 +81,17 @@ registerBundledApp({
   sprites: spotifySprites,
   requires: ["network", "browser", "sign-in"],
   load: () => import("@/apps/SpotifyPlayer"),
+});
+
+registerBundledApp({
+  id: "applemusic",
+  declaration: declared["applemusic"],
+  title: "Apple Music",
+  description: "Plays your Apple Music library.",
+  icon: "applemusic/icon",
+  sprites: appleMusicSprites,
+  requires: ["network", "browser"],
+  load: () => import("@/apps/AppleMusic"),
 });
 
 registerBundledApp({

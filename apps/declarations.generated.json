@@ -154,6 +154,11 @@
     "width": 10,
     "height": 11,
     "data": "KAKIIIKCCCKAKAgCACCAAKAACgACCAAggACgAA=="
+   },
+   "safari/github-watch": {
+    "width": 11,
+    "height": 7,
+    "data": "AqoAoAKICoCgqoKAqAigAoAqoAA="
    }
   }
  },
@@ -470,6 +475,38 @@
     "width": 12,
     "height": 12,
     "data": "AAAAAAgAACgACKgAKKogKKoiKKoiKKogCKgAACgAAAgAAAAA"
+   }
+  }
+ },
+ "applemusic": {
+  "id": "applemusic",
+  "title": "Apple Music",
+  "icon": "applemusic/icon",
+  "defaultSize": {
+   "width": 480,
+   "height": 300
+  },
+  "smallIcon": "applemusic/icon-16x16",
+  "requires": [
+   "network",
+   "browser"
+  ],
+  "scrollable": true,
+  "resizable": true,
+  "minSize": {
+   "width": 380,
+   "height": 220
+  },
+  "sprites": {
+   "applemusic/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAACqqqqqqgAACqqqqqqqoAAqqqqqqqqoAKqqqqqqqqoAqqqqqqqqqgKqqqqqqpWqgqqqqqqVVaqCqqqqlVVVqoKqqqlVVVWqgqqqqVVVVaqCqqqpVVqlqoKqqqlaqqWqgqqqqWqqpaqCqqqpaqqlqoKqqqlqqqWqgqqqqWqqpaqCqqqpaqqlqoKqqqlqpVVqgqqqqWqVVWqCqqpValVVaoKqpVVqVVVqgqqVVWqVVaqCqpVVaqlaqoKqpVVqqqqqgqqqVqqqqqqAqqqqqqqqqgCqqqqqqqqqACqqqqqqqqgACqqqqqqqoAAAqqqqqqoAAAAAAAAAAAAA=="
+   },
+   "applemusic/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AAAAAAqqqqAqqqqoKqqlqCqqVagqpVmoKqWpqCqmqagqpqmoKqapqCqmqagqVpWoKVZVqCpalqgKqqqgAAAAAA=="
    }
   }
  },
