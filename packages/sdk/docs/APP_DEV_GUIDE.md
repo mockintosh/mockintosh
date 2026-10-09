@@ -41,7 +41,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Terminal | `Terminal.tsx` | SDK-clean |
 | Assistant | `Assistant.tsx` | SDK-clean |
 | Spotify | `SpotifyPlayer.tsx` | SDK-clean |
-| Apple Music | `AppleMusic.tsx` | SDK-clean |
+| Music | `Music.tsx` | SDK-clean |
 | Finder | `Finder.solid.tsx` | Shell |
 | App Store | `AppStore.tsx` | Shell |
 | Icon Gallery | `IconGallery.tsx` | Shell |

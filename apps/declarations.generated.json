@@ -478,15 +478,15 @@
    }
   }
  },
- "applemusic": {
-  "id": "applemusic",
-  "title": "Apple Music",
-  "icon": "applemusic/icon",
+ "music": {
+  "id": "music",
+  "title": "Music",
+  "icon": "music/icon",
   "defaultSize": {
    "width": 480,
    "height": 300
   },
-  "smallIcon": "applemusic/icon-16x16",
+  "smallIcon": "music/icon-16x16",
   "requires": [
    "network",
    "browser"
@@ -498,12 +498,32 @@
    "height": 220
   },
   "sprites": {
-   "applemusic/icon": {
+   "music/search": {
+    "width": 11,
+    "height": 10,
+    "data": "CqAAgCAIACAgAICAAgIACAIAgAKooAAAoAAAoA=="
+   },
+   "music/shuffle": {
+    "width": 13,
+    "height": 9,
+    "data": "AAAKKgAqoCAgoAIgAAAgAAAiAAAgIKKgAqoAAAoA"
+   },
+   "music/repeat": {
+    "width": 13,
+    "height": 9,
+    "data": "AAAoAqqqggACgIAACCAAAggAAICgACCqqqAKAAAA"
+   },
+   "music/repeat-one": {
+    "width": 13,
+    "height": 9,
+    "data": "AAAoAqqqggACgIAoCCACAggAgICgICCqqqAKAAAA"
+   },
+   "music/icon": {
     "width": 32,
     "height": 32,
     "data": "AAAAAAAAAAAACqqqqqqgAACqqqqqqqoAAqqqqqqqqoAKqqqqqqqqoAqqqqqqqqqgKqqqqqqpWqgqqqqqqVVaqCqqqqlVVVqoKqqqlVVVWqgqqqqVVVVaqCqqqpVVqlqoKqqqlaqqWqgqqqqWqqpaqCqqqpaqqlqoKqqqlqqqWqgqqqqWqqpaqCqqqpaqqlqoKqqqlqpVVqgqqqqWqVVWqCqqpValVVaoKqpVVqVVVqgqqVVWqVVaqCqpVVaqlaqoKqpVVqqqqqgqqqVqqqqqqAqqqqqqqqqgCqqqqqqqqqACqqqqqqqqgACqqqqqqqoAAAqqqqqqoAAAAAAAAAAAAA=="
    },
-   "applemusic/icon-16x16": {
+   "music/icon-16x16": {
     "width": 16,
     "height": 16,
     "data": "AAAAAAqqqqAqqqqoKqqlqCqqVagqpVmoKqWpqCqmqagqpqmoKqapqCqmqagqVpWoKVZVqCpalqgKqqqgAAAAAA=="

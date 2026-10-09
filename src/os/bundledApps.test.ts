@@ -11,7 +11,7 @@ describe("bundled app listings", () => {
       "trace",
       "assistant",
       "spotify",
-      "applemusic",
+      "music",
       "macpaint",
       "canvas",
       "surface",

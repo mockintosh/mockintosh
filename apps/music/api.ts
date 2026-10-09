@@ -117,8 +117,10 @@ interface Resource {
     durationInMillis?: number;
     artwork?: { url?: string };
     playParams?: { id?: string; catalogId?: string };
-    /** A recommendation's heading. */
+    /** A recommendation's heading, the line under it, and what kind of shelf it is. */
     title?: { stringForDisplay?: string };
+    reason?: { stringForDisplay?: string };
+    kind?: string;
   };
   relationships?: { contents?: { data?: Resource[] } };
 }
@@ -281,6 +283,8 @@ export function fetchPlaylists(session: AppleMusicSession): Promise<Collection[]
 /** A titled row of albums, playlists and stations on Home. */
 export interface Shelf {
   title: string;
+  /** The line under the title ("Playlists curated by our experts."). */
+  subtitle: string;
   items: Collection[];
 }
 
@@ -297,14 +301,19 @@ export function fetchRecentlyPlayed(session: AppleMusicSession): Promise<Collect
   return fetchAll("/v1/me/recent/played?limit=10", session, toCollection, 30);
 }
 
-/** Apple's personal recommendations: each a titled shelf, its contents nested inside. */
+/**
+ * Apple's personal recommendations: each a titled shelf, its contents nested
+ * inside. Apple's own recently-played shelf is left out: Home has its own.
+ */
 export async function fetchRecommendations(session: AppleMusicSession): Promise<Shelf[]> {
   const page = await apiGet("/v1/me/recommendations?limit=10", session);
   const shelves: Shelf[] = [];
   for (const recommendation of page?.data ?? []) {
+    const a = recommendation.attributes ?? {};
+    if (a.kind === "recently-played") continue;
     const items = collections(recommendation.relationships?.contents?.data);
-    const title = recommendation.attributes?.title?.stringForDisplay;
-    if (title && items.length) shelves.push({ title, items });
+    const title = plainText(a.title?.stringForDisplay);
+    if (title && items.length) shelves.push({ title, subtitle: plainText(a.reason?.stringForDisplay), items });
   }
   return shelves;
 }
@@ -506,10 +515,8 @@ export async function playTracks(music: MusicKitInstance, tracks: Track[], start
   await music.setQueue({ songs: tracks.map((t) => t.id), startWith, startPlaying: true });
 }
 
-/** What's playing, read from MusicKit's media item, whichever shape it takes. */
-export function nowPlaying(music: MusicKitInstance): NowPlaying | null {
-  const item = music.nowPlayingItem;
-  if (!item) return null;
+/** A MusicKit media item as the app shows it, whichever shape MusicKit gives it. */
+function mediaItemAsNowPlaying(item: MusicKitMediaItem): NowPlaying {
   const a = item.attributes ?? {};
   const ids = [item.id, a.playParams?.id, a.playParams?.catalogId].filter((id): id is string => !!id);
   return {
@@ -519,6 +526,12 @@ export function nowPlaying(music: MusicKitInstance): NowPlaying | null {
     album: plainText(item.albumName ?? a.albumName),
     artworkUrl: a.artwork?.url ?? null,
   };
+}
+
+/** What's playing, read from MusicKit's media item. */
+export function nowPlaying(music: MusicKitInstance): NowPlaying | null {
+  const item = music.nowPlayingItem;
+  return item ? mediaItemAsNowPlaying(item) : null;
 }
 
 /** What the now-playing bar shows for `track` while MusicKit is still fetching it. */

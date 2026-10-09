@@ -77,11 +77,29 @@ const LIBRARY: Array<{ label: string; route: Route }> = [
   { label: "Songs", route: { view: "songs" } },
 ];
 
+/** How far rows sit in from the sidebar's edges. */
+const SIDEBAR_INSET = 4;
+/** The round of a selected row's corners, in the sidebar and in track lists alike. */
+const ROW_RADIUS = 5;
+/** Where a row's text starts, inside its inset: headings line up with it. */
+const SIDEBAR_TEXT_X = SIDEBAR_INSET + PAD;
+
 function SidebarRow(props: { label: string; selected: boolean; onClick: () => void }): JSX.Element {
   return (
-    <box height={ROW_H} flexDirection="row" alignItems="center" paddingLeft={PAD} paddingRight={4} background={props.selected ? 1 : 0} onClick={props.onClick}>
+    <box
+      height={ROW_H}
+      marginLeft={SIDEBAR_INSET}
+      marginRight={SIDEBAR_INSET}
+      flexDirection="row"
+      alignItems="center"
+      paddingLeft={PAD}
+      paddingRight={PAD}
+      background={props.selected ? 1 : 0}
+      borderRadius={ROW_RADIUS}
+      onClick={props.onClick}
+    >
       <text font="body" color={props.selected ? 0 : 1} nowrap>
-        {fit(props.label, SIDEBAR_W - PAD - 8)}
+        {fit(props.label, SIDEBAR_W - 1 - SIDEBAR_INSET * 2 - PAD * 2)}
       </text>
     </box>
   );
@@ -89,7 +107,7 @@ function SidebarRow(props: { label: string; selected: boolean; onClick: () => vo
 
 function SidebarHeading(props: { children: string }): JSX.Element {
   return (
-    <box height={ROW_H + 4} flexDirection="row" alignItems="flex-end" paddingLeft={4}>
+    <box height={ROW_H + 6} flexDirection="row" alignItems="flex-end" paddingLeft={SIDEBAR_TEXT_X} paddingBottom={2}>
       <text font="body" bold nowrap>{props.children}</text>
     </box>
   );
@@ -127,7 +145,7 @@ export function Sidebar(props: {
       background={0}
       semantic={{ name: "music-sidebar" }}
     >
-      <box width={SIDEBAR_W - 1} height={props.height} flexDirection="column" overflow="scroll">
+      <box width={SIDEBAR_W - 1} height={props.height} flexDirection="column" overflow="scroll" paddingBottom={SIDEBAR_INSET}>
         <SidebarHeading>Apple Music</SidebarHeading>
         <For each={CATALOG.filter((item) => props.signedIn || !item.signedIn)}>
           {(item) => <SidebarRow label={item.label} selected={isSelected(item.route)} onClick={() => props.onSelect(item.route)} />}
@@ -135,7 +153,7 @@ export function Sidebar(props: {
         <Show
           when={props.signedIn}
           fallback={
-            <box flexDirection="column" gap={4} paddingLeft={PAD} paddingRight={PAD} paddingTop={10} semantic={{ name: "music-preview-note" }}>
+            <box flexDirection="column" gap={4} paddingLeft={SIDEBAR_TEXT_X} paddingRight={SIDEBAR_TEXT_X} paddingTop={10} semantic={{ name: "music-preview-note" }}>
               <text font="body" wrap>Playing 30-second previews.</text>
               <text font="body" wrap>Sign in to play whole songs and your library.</text>
               <Button label="Sign In…" disabled={props.signingIn} onClick={props.onSignIn} />
@@ -171,10 +189,11 @@ export function Loading(): JSX.Element {
 }
 
 /** A heading within a page, over a shelf of tiles or a list. */
-export function SectionTitle(props: { children: string }): JSX.Element {
+export function SectionTitle(props: { children: string; subtitle?: string }): JSX.Element {
   return (
-    <box paddingTop={6} paddingBottom={4}>
+    <box paddingTop={6} paddingBottom={4} flexDirection="column">
       <text font="body" bold nowrap>{props.children}</text>
+      <Show when={props.subtitle}>{(subtitle) => <text font="body" nowrap>{subtitle()}</text>}</Show>
     </box>
   );
 }
@@ -287,6 +306,7 @@ export function TrackList(props: {
               flexDirection="row"
               alignItems="center"
               gap={COLUMN_GAP}
+              borderRadius={ROW_RADIUS}
               background={inverted() ? 1 : 0}
               onClick={() => setSelected(i())}
               onDoubleClick={() => props.onPlay(i())}

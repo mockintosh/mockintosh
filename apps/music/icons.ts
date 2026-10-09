@@ -113,10 +113,10 @@ const SEARCH = fromGrid(11, 10, [
 ]);
 
 export const sprites: Record<string, Sprite> = {
-  "applemusic/search": SEARCH,
-  "applemusic/shuffle": SHUFFLE,
-  "applemusic/repeat": REPEAT,
-  "applemusic/repeat-one": REPEAT_ONE,
-  "applemusic/icon": ICON_APPLE_MUSIC,
-  "applemusic/icon-16x16": ICON_APPLE_MUSIC_16,
+  "music/search": SEARCH,
+  "music/shuffle": SHUFFLE,
+  "music/repeat": REPEAT,
+  "music/repeat-one": REPEAT_ONE,
+  "music/icon": ICON_APPLE_MUSIC,
+  "music/icon-16x16": ICON_APPLE_MUSIC_16,
 };

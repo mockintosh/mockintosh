@@ -34,9 +34,10 @@ import {
   setRepeatMode,
   signIn,
   trackAsNowPlaying,
-} from "./applemusic/api";
-import { createArtworkLoader } from "./applemusic/Artwork";
-import { NOW_PLAYING_H, NowPlayingBar } from "./applemusic/NowPlayingBar";
+} from "./music/api";
+import { createArtworkLoader } from "./music/Artwork";
+import { NOW_PLAYING_H, NowPlayingBar, type Player } from "./music/NowPlayingBar";
+import { NowPlayingScreen } from "./music/NowPlayingScreen";
 import {
   NameList,
   CollectionGrid,
@@ -49,10 +50,10 @@ import {
   TrackList,
   useLoaded,
   type Route,
-} from "./applemusic/views";
-import { sprites } from "./applemusic/icons";
+} from "./music/views";
+import { sprites } from "./music/icons";
 
-/** Key in the app's storage folder (System Folder/Preferences/applemusic/). */
+/** Key in the app's storage folder (System Folder/Preferences/music/). */
 const TOKEN_KEY = "user-token.json";
 
 const PAD = 6;
@@ -60,13 +61,16 @@ const PAD = 6;
 const TIME_EVENTS = ["playbackTimeDidChange", "playbackDurationDidChange", "nowPlayingItemDidChange"];
 const MODE_EVENTS = ["shuffleModeDidChange", "repeatModeDidChange"];
 
+/** How long a play or pause click may show before MusicKit confirms it; then the button shows MusicKit's state. */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 /** How long typing pauses before the search runs. */
 const SEARCH_DELAY_MS = 350;
 
 /** How long the position slider waits for the drag to rest before seeking. */
 const SEEK_DELAY_MS = 150;
 
-function AppleMusic(_props: Record<string, unknown>): JSX.Element {
+function Music(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
   const win = app.window;
   const { storage } = app;
@@ -81,7 +85,22 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   /** What was asked to play and hasn't started yet: shown at once, so a click is answered. */
   const [pending, setPending] = createSignal<NowPlaying | null>(null);
   const shown = () => pending() ?? current();
+  /** The bar shows while there's a track (playing, paused or loading) or something to report. */
+  const barShown = () => !!shown() || !!error();
+  const barH = () => (barShown() ? NOW_PLAYING_H : 0);
   const [playing, setPlaying] = createSignal(false);
+  /**
+   * Playing or paused as last asked, until MusicKit gets there: the play
+   * button answers the click at once instead of when the music starts.
+   */
+  const [requested, setRequested] = createSignal<boolean | null>(null);
+  const shownPlaying = () => requested() ?? playing();
+  let requestTimer: ReturnType<typeof setTimeout> | undefined;
+  function request(next: boolean | null): void {
+    setRequested(next);
+    clearTimeout(requestTimer);
+    if (next !== null) requestTimer = setTimeout(() => setRequested(null), REQUEST_TIMEOUT_MS);
+  }
   const [volume, setVolume] = createSignal(50);
   const [time, setTime] = createSignal(0);
   const [duration, setDuration] = createSignal(0);
@@ -89,6 +108,9 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   const [scrubTo, setScrubTo] = createSignal<number | null>(null);
   const [shuffle, setShuffle] = createSignal(false);
   const [repeat, setRepeat] = createSignal<RepeatMode>("none");
+  /** The Now Playing screen in place of the pages, and where the page was scrolled to before it. */
+  const [nowPlayingOpen, setNowPlayingOpen] = createSignal(false);
+  let pageScrollY = 0;
   const [error, setError] = createSignal("");
   /** What's in the search field, and the term last searched for: kept while you look at the results' pages. */
   const [query, setQuery] = createSignal("");
@@ -204,10 +226,18 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   );
 
   const showNowPlaying = () => setCurrent(music ? nowPlaying(music) : null);
+  /**
+   * While a new queue is being set, MusicKit's playback states are the old
+   * song's winding down (playing, stopped, loading…): they neither confirm
+   * the new song nor deny it, so they leave the button and the bar alone.
+   */
+  let queueing = false;
   const onPlaybackState = () => {
     const isPlaying = !!music?.isPlaying;
     setPlaying(isPlaying);
+    if (queueing) return;
     if (isPlaying) setPending(null);
+    if (requested() === isPlaying) request(null);
   };
   const onTime = () => {
     if (!music) return;
@@ -221,6 +251,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
   };
   const onPlaybackError = () => {
     setPending(null);
+    request(null);
     setError("Apple Music couldn't play that.");
   };
 
@@ -271,6 +302,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     if (!music) return;
     listen(music, false);
     clearTimeout(seekTimer);
+    clearTimeout(requestTimer);
     music.pause();
   });
 
@@ -294,19 +326,30 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     }
     setError("");
     void Promise.resolve(action(music)).catch((e: unknown) => {
+      request(null);
       setError(e instanceof Error ? e.message : "Couldn't play that");
     });
   }
 
   /** Start `play`, showing `what` in the bar until the music actually starts. */
   function startPlaying(what: NowPlaying, play: (m: MusicKitInstance) => Promise<unknown>): void {
-    if (music) setPending(what);
-    withMusic((m) =>
-      play(m).catch((e: unknown) => {
-        setPending(null);
-        throw e;
-      }),
-    );
+    if (music) {
+      setPending(what);
+      request(true);
+    }
+    withMusic((m) => {
+      queueing = true;
+      return play(m)
+        .catch((e: unknown) => {
+          setPending(null);
+          throw e;
+        })
+        .finally(() => {
+          queueing = false;
+          // The queue is set: from here MusicKit's state is the new song's.
+          onPlaybackState();
+        });
+    });
   }
 
   function changeVolume(next: number): void {
@@ -336,6 +379,17 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
       setRepeatMode(m, nextRepeatMode(repeatModeOf(m)));
       onModes();
     });
+  }
+
+  function openNowPlaying(): void {
+    pageScrollY = win.scrollY();
+    // To the top first, so the screen is never laid out at the page's scroll.
+    win.scrollTo(0);
+    setNowPlayingOpen(true);
+  }
+  function closeNowPlaying(): void {
+    setNowPlayingOpen(false);
+    win.scrollTo(pageScrollY);
   }
 
   /** A sidebar choice starts a fresh trail; opening something from a page adds to it. */
@@ -613,12 +667,6 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
       () => "recommendations",
       (key) => cached(key, () => fetchRecommendations(session).catch(() => [])),
     );
-    // Apple's recommendations include their own recently-played shelf (in the
-    // store's language): hide any shelf that mostly repeats ours.
-    const freshShelves = () => {
-      const played = new Set((recent() ?? []).map((c) => c.id));
-      return (shelves() ?? []).filter((shelf) => shelf.items.filter((c) => played.has(c.id)).length * 2 < shelf.items.length);
-    };
     return (
       <>
         <Title width={contentW()}>Home</Title>
@@ -633,10 +681,10 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
         <Show when={recent()?.length === 0 && shelves()?.length === 0}>
           <text font="body">Play something, and it will show up here.</text>
         </Show>
-        <For each={freshShelves()}>
+        <For each={shelves() ?? []}>
           {(shelf) => (
             <>
-              <SectionTitle>{shelf.title}</SectionTitle>
+              <SectionTitle subtitle={shelf.subtitle}>{shelf.title}</SectionTitle>
               <CollectionGrid items={shelf.items} width={contentW()} maxRows={1} loader={artwork} onOpen={openCollection} />
             </>
           )}
@@ -673,11 +721,60 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
     }
   }
 
-  const searchIcon = app.getSprite("applemusic/search");
+  const searchIcon = app.getSprite("music/search");
+
+  // One object for the bar and the screen; its getters keep each read live.
+  const player: Player = {
+    get shown() {
+      return shown();
+    },
+    get loading() {
+      return !!pending();
+    },
+    get error() {
+      return error();
+    },
+    get playing() {
+      return shownPlaying();
+    },
+    get time() {
+      return scrubTo() ?? time();
+    },
+    get duration() {
+      return duration();
+    },
+    get shuffle() {
+      return shuffle();
+    },
+    get repeat() {
+      return repeat();
+    },
+    get volume() {
+      return volume();
+    },
+    get icons() {
+      return icons;
+    },
+    onPrevious: () => withMusic((m) => m.skipToPreviousItem()),
+    onPlayPause: () => {
+      const next = !shownPlaying();
+      if (music) request(next);
+      withMusic((m) => (next ? m.play() : m.pause()));
+    },
+    onNext: () => withMusic((m) => m.skipToNextItem()),
+    onSeek: seek,
+    onShuffle: toggleShuffle,
+    onRepeat: cycleRepeat,
+    onVolume: changeVolume,
+  };
   const icons = {
-    shuffle: app.getSprite("applemusic/shuffle"),
-    repeat: app.getSprite("applemusic/repeat"),
-    repeatOne: app.getSprite("applemusic/repeat-one"),
+    play: app.getSprite("transport/play"),
+    pause: app.getSprite("transport/pause"),
+    previous: app.getSprite("transport/previous"),
+    next: app.getSprite("transport/next"),
+    shuffle: app.getSprite("music/shuffle"),
+    repeat: app.getSprite("music/repeat"),
+    repeatOne: app.getSprite("music/repeat-one"),
   };
 
   return (
@@ -688,7 +785,13 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
           <text font="body">{configError()}</text>
         </box>
       </Show>
-      <Show when={ready()}>
+      <Show when={ready() && nowPlayingOpen()}>
+        {/* It fits the window, so it reports the window's height: nothing to scroll. */}
+        <box onLayout={({ height }) => win.setContentSize(win.width(), height)}>
+          <NowPlayingScreen width={win.width()} height={win.height()} loader={artwork} player={player} onClose={closeNowPlaying} />
+        </box>
+      </Show>
+      <Show when={ready() && !nowPlayingOpen()}>
         {/*
           The page scrolls with the window's own scroll bar, which runs the
           window's full height. The sidebar and the now-playing bar are drawn
@@ -705,7 +808,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
             marginLeft={SIDEBAR_W}
             width={win.width() - SIDEBAR_W}
             padding={PAD}
-            paddingBottom={NOW_PLAYING_H + PAD}
+            paddingBottom={barH() + PAD}
             flexDirection="column"
             semantic={{ name: "music-content" }}
           >
@@ -714,7 +817,7 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
           </box>
           <Sidebar
             top={win.scrollY()}
-            height={win.height() - NOW_PLAYING_H}
+            height={win.height() - barH()}
             route={history()[0] ?? route()}
             signedIn={!!userToken()}
             signingIn={signingIn()}
@@ -722,28 +825,15 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
             onSelect={select}
             onSignIn={() => void startSignIn()}
           />
-          <NowPlayingBar
-            top={win.scrollY() + win.height() - NOW_PLAYING_H}
-            width={win.width()}
-            loader={artwork}
-            shown={shown()}
-            loading={!!pending()}
-            error={error()}
-            playing={playing()}
-            time={scrubTo() ?? time()}
-            duration={duration()}
-            shuffle={shuffle()}
-            repeat={repeat()}
-            volume={volume()}
-            icons={icons}
-            onPrevious={() => withMusic((m) => m.skipToPreviousItem())}
-            onPlayPause={() => withMusic((m) => (playing() ? m.pause() : m.play()))}
-            onNext={() => withMusic((m) => m.skipToNextItem())}
-            onSeek={seek}
-            onShuffle={toggleShuffle}
-            onRepeat={cycleRepeat}
-            onVolume={changeVolume}
-          />
+          <Show when={barShown()}>
+            <NowPlayingBar
+              top={win.scrollY() + win.height() - NOW_PLAYING_H}
+              width={win.width()}
+              loader={artwork}
+              player={player}
+              onOpen={openNowPlaying}
+            />
+          </Show>
         </box>
       </Show>
     </>
@@ -751,16 +841,16 @@ function AppleMusic(_props: Record<string, unknown>): JSX.Element {
 }
 
 export default defineApp({
-  id: "applemusic",
+  id: "music",
   // MusicKit plays in the page, as a live object a process can't hold.
   requires: ["network", "browser"],
-  title: "Apple Music",
-  icon: "applemusic/icon",
-  smallIcon: "applemusic/icon-16x16",
+  title: "Music",
+  icon: "music/icon",
+  smallIcon: "music/icon-16x16",
   sprites,
   defaultSize: { width: 480, height: 300 },
   resizable: true,
   minSize: { width: 380, height: 220 },
   scrollable: true,
-  Component: AppleMusic,
+  Component: Music,
 });
