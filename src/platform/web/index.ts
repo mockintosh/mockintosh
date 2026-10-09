@@ -37,6 +37,7 @@ import { createWebAgentRuntime } from "./agentRuntime";
 import { createWebCrypto } from "./crypto";
 import { createWebSourceProvider } from "./source";
 import { createWebBrowserService } from "./browser";
+import { createWebMusicKit } from "./musicKit";
 import { createWebSignInRelay } from "./signInRelay";
 import { createWebFontRasterService } from "./fontRaster";
 import { leaveOnPurpose } from "./unloadGuard";
@@ -127,6 +128,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
 
   const hostCapabilities: HostCapability[] = [];
   const fetch = globalThis.fetch.bind(globalThis);
+  const browser = createWebBrowserService();
 
   return {
     display,
@@ -139,7 +141,8 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     },
     hostCapabilities,
     crypto: createWebCrypto(),
-    browser: createWebBrowserService(),
+    browser,
+    musicKit: createWebMusicKit(browser, location.origin),
     signInRelay: createWebSignInRelay(webFetch, location.origin),
     clipboard,
     printerLinks: createWebPrinterLinks(),

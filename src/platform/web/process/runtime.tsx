@@ -55,6 +55,7 @@ import { createWorkerMedia } from "./media";
 import { createWebGpuService } from "../media/gpu";
 import { createFsMirror } from "./fsMirror";
 import { createWorkerVideo } from "./video";
+import { createWorkerMusicKit, type WorkerMusicKit } from "./musicKit";
 import { webFetch } from "../fetch";
 
 /** The worker's global scope, as far as a process uses it. */
@@ -159,6 +160,8 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
   const microphone = createWorkerMicrophone(call, notify);
   const media = createWorkerMedia(call, notify);
   const video = createWorkerVideo(call, notify);
+  /** Made at start, from the state the host sent; `null` when the host holds no MusicKit. */
+  let musicKit: WorkerMusicKit | null = null;
   const menuActions: MenuActions = new Map();
   let nextMenuId = 0;
 
@@ -288,6 +291,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
   }
 
   function createContext(start: ProcessStart): AppContext {
+    musicKit = start.musicKit ? createWorkerMusicKit(call, notify, start.musicKit) : null;
     const capabilities = new Set(start.capabilities as Capability[]);
     [printerConnected, setPrinterConnected] = createSignal(start.print?.connected ?? false, { ownedWrite: true });
     openers = start.openers;
@@ -377,6 +381,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         redirectUri: start.signIn.redirectUri,
         authorize: (url) => call("signIn.authorize", [url]) as Promise<Record<string, string> | null>,
       },
+      musicKit: musicKit?.service,
       audio: start.audio ? audio.service : undefined,
       video:
         start.video || start.videoPlayback
@@ -753,6 +758,16 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         return;
       case "kernelStream":
         kernelStreams.get(msg.id)?.[msg.stream]?.(msg.bytes);
+        return;
+      case "musicKit":
+        musicKit?.update(msg.state);
+        flush();
+        scheduleFrame();
+        return;
+      case "musicKitError":
+        musicKit?.error(msg.error);
+        flush();
+        scheduleFrame();
         return;
       case "reply": {
         const waiter = pending.get(msg.id);

@@ -11,7 +11,7 @@
 import type { CursorSpec, FontRegistration, Modifiers, Sprite } from "@mockintosh/ui";
 import type { FSNode } from "@mockintosh/fs";
 import type { OpenerEntry } from "../openerTable";
-import type { OperationContract, VideoExcerpt, VideoPicture, WindowKind, WindowSpec } from "@mockintosh/sdk";
+import type { MusicKitError, MusicKitState, OperationContract, VideoExcerpt, VideoPicture, WindowKind, WindowSpec } from "@mockintosh/sdk";
 
 export type PointerKind = "mousemove" | "mousedown" | "mouseup" | "dblclick" | "scroll";
 export type KeyKind = "keydown" | "keyup" | "keypress";
@@ -69,6 +69,8 @@ export interface ProcessStart {
   download: boolean;
   /** Phone sign-in (`AppContext.signIn`); absent when the Macintosh has no relay. */
   signIn?: { redirectUri: string };
+  /** Apple Music (`AppContext.musicKit`) as it stands; absent when the host holds no MusicKit. */
+  musicKit?: MusicKitState;
   /** The host can decode video excerpts (`VideoService.excerpt`). */
   video: boolean;
   /** The host can play video live (`VideoService.open`). */
@@ -149,6 +151,10 @@ export type HostToProcess =
   | { t: "video"; event: VideoEvent }
   /** The latest picture of a live video or camera source the worker asked for. */
   | { t: "mediaFrame"; id: number; frame: { width: number; height: number; rgba: Uint8ClampedArray }; currentTime: number; duration: number }
+  /** MusicKit's new state, once the app has listened (`musicKit.listen`). */
+  | { t: "musicKit"; state: MusicKitState }
+  /** MusicKit couldn't play what was asked. */
+  | { t: "musicKitError"; error: MusicKitError }
   /** Output of the `kernel.invoke` call `id`, while it runs. */
   | { t: "kernelStream"; id: number; stream: "stdout" | "stderr"; bytes: Uint8Array }
   | { t: "reply"; id: number; ok: true; value: unknown }

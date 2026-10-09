@@ -19,6 +19,11 @@ export interface ButtonProps {
   icon?: Sprite;
   onClick: () => void;
   disabled?: boolean;
+  /**
+   * Latched on: drawn inverted, as while pressed, until it is turned off —
+   * a mode such as shuffle. The press still inverts it back while held.
+   */
+  selected?: boolean;
   /** Face type. Defaults to `"body"`. */
   font?: string;
   /** Native point size when `font` is a family with more than one strike. */
@@ -70,8 +75,10 @@ export function Button(props: ButtonProps): JSX.Element {
   const inset = () => depress() && press.pressed() && !shadow();
   const radius = useRadius("md");
 
+  // Inverted while pressed, or while latched on and not pressed.
+  const inverted = () => press.pressed() !== !!props.selected;
   const background = (): Ink | PatternName =>
-    press.pressed() ? 1 : props.disabled ? "checker" : 0;
+    inverted() ? 1 : props.disabled ? "checker" : 0;
 
   const borderStyle = (): "solid" | "dotted" =>
     props.disabled ? "dotted" : "solid";
@@ -117,11 +124,14 @@ export function Button(props: ButtonProps): JSX.Element {
             alignItems="center"
           >
             <Show when={props.icon}>
-              {(icon) => <image src={icon()} width={icon().width} height={icon().height} mode={press.pressed() ? "inverted" : "normal"} />}
+              {(icon) => <image src={icon()} width={icon().width} height={icon().height} mode={inverted() ? "inverted" : "normal"} />}
             </Show>
-            <text font={props.font ?? "body"} size={props.size} bold={props.bold} italic={props.italic} color={press.pressed() ? 0 : 1} align="center" verticalAlign="middle" nowrap>
-              {props.label}
-            </text>
+            {/* An icon-only button has no label, and no gap after its icon. */}
+            <Show when={props.label}>
+              <text font={props.font ?? "body"} size={props.size} bold={props.bold} italic={props.italic} color={inverted() ? 0 : 1} align="center" verticalAlign="middle" nowrap>
+                {props.label}
+              </text>
+            </Show>
           </box>
         </box>
       </box>

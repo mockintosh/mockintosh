@@ -155,6 +155,7 @@ Everything an app declares or reaches for through `useApp()` works in a process,
 - **Kernel sessions:** traps with streamed output and cancellation.
 - **Agents:** the process runs fx's engine itself (`AgentRuntime`, libfx with JSPI), so fx and Terminal's `fx` run in processes.
 - **Sign-in:** `signIn.authorize` puts up the OS's sheet and answers when it closes. Safari signs in to GitHub from its process.
+- **Apple Music:** MusicKit stays in the page (a live object, playing through the page's media element); the process drives it by name and is sent each new state once it listens (`musicKit.listen`). Music runs in its process.
 - **Windows:** scrolling windows, `WindowHeader` / `WindowFooter` bands (drawn in the process's band), full screen, custom About boxes (drawn by the OS from its copy of the module).
 
 ### Still on the OS's thread

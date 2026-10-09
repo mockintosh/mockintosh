@@ -22,6 +22,7 @@ import type { KernelClient, KernelPermission } from "./kernel";
 import type { AppCrypto } from "./crypto";
 import type { BrowserService } from "./browser";
 import type { SignInDeclaration, SignInService } from "./signIn";
+import type { MusicKitService } from "./musicKit";
 
 export type { MenubarDefinition, MenubarItemDef, MenubarActionItem, MenubarRadioGroupDef, MenubarSubmenuDef, MenubarSeparator } from "./menus";
 
@@ -198,6 +199,16 @@ import type { AppDeclaration } from "./declaration";
 export type { AppCrypto } from "./crypto";
 export type { BrowserService } from "./browser";
 export type { SignInService, SignInDeclaration } from "./signIn";
+export {
+  MUSIC_KIT_IDLE,
+  type MusicKitService,
+  type MusicKitState,
+  type MusicKitError,
+  type MusicKitItem,
+  type MusicKitQueueOptions,
+  type MusicKitShuffleMode,
+  type MusicKitRepeatMode,
+} from "./musicKit";
 export { encodeQR } from "./qr";
 export type { Resource, Job, Diagnostic, ChatMessage, CompleteResult, OpenAITool, ContentPart, ChatContent } from "@mockintosh/protocol";
 export { parse, resource, jobSchema } from "@mockintosh/protocol";
@@ -513,6 +524,8 @@ export interface AppContext {
   browser?: BrowserService;
   /** Sign in to an OAuth provider from the user's phone, when this Macintosh can. */
   signIn?: SignInService;
+  /** Apple Music playback, MusicKit held by the OS; see `MusicKitService`. */
+  musicKit?: MusicKitService;
   /**
    * What this Macintosh can do. Apps that work with or without a feature
    * check here instead of declaring it in `requires`.
@@ -591,13 +604,14 @@ export type FetchFunction = (url: string, options?: FetchRequest) => Promise<Fet
  * - `microphone` — `useApp().microphone` is available
  * - `browser`   — `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`)
  * - `sign-in`   — `useApp().signIn` is available (sign in from a phone; see `SignInService`)
+ * - `music-kit` — `useApp().musicKit` is available (Apple Music playback; see `MusicKitService`)
  * - `agent-runtime` — `useApp().agentRuntime` is available (language-model agents; see `AgentRuntime`)
  * - `fonts`     — `useApp().fontRaster` is available
  * - `gpu`       — `useApp().gpu` is available (pixel programs; see `GpuService`)
  */
 export type Capability =
   | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in"
-  | "agent-runtime" | "fonts" | "gpu";
+  | "music-kit" | "agent-runtime" | "fonts" | "gpu";
 
 /**
  * What "About <app>…" — the first Apple-menu item while the app is frontmost —

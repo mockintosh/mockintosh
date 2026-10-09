@@ -482,6 +482,62 @@
    }
   }
  },
+ "music": {
+  "id": "music",
+  "title": "Music",
+  "icon": "music/icon",
+  "defaultSize": {
+   "width": 480,
+   "height": 300
+  },
+  "smallIcon": "music/icon-16x16",
+  "requires": [
+   "network",
+   "music-kit"
+  ],
+  "scrollable": true,
+  "resizable": true,
+  "minSize": {
+   "width": 380,
+   "height": 220
+  },
+  "about": {
+   "version": "1.0",
+   "description": "Plays Apple Music: 30-second previews for anyone, and whole songs and your library with a membership. Not affiliated with, sponsored or endorsed by Apple. Apple and Apple Music are trademarks of Apple Inc., registered in the U.S. and other countries."
+  },
+  "sprites": {
+   "music/search": {
+    "width": 11,
+    "height": 10,
+    "data": "CqAAgCAIACAgAICAAgIACAIAgAKooAAAoAAAoA=="
+   },
+   "music/shuffle": {
+    "width": 13,
+    "height": 9,
+    "data": "AAAKKgAqoCAgoAIgAAAgAAAiAAAgIKKgAqoAAAoA"
+   },
+   "music/repeat": {
+    "width": 13,
+    "height": 9,
+    "data": "AAAoAqqqggACgIAACCAAAggAAICgACCqqqAKAAAA"
+   },
+   "music/repeat-one": {
+    "width": 13,
+    "height": 9,
+    "data": "AAAoAqqqggACgIAoCCACAggAgICgICCqqqAKAAAA"
+   },
+   "music/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAqqoAAAAAACqqqqgAAAACqqqqqoAAAAqqqqqqoAAAKqWqqqqoAACqmqqqqqoAAqpqqqqqqoAKqaWqqqqqoAqmmqqqqqqgKppqqqqqqqgqaaqlWqqqqCppqlVVqqqoqqqpVVVqqqqqqqlVVWqqqqqqpVVVWqqqqqqlVpVaqqqqqqVWlVqqqqqqpVVVWqqqqqqpVVVqqqqqqqlVVWqqqiqqqlVVqmmoKqqqpVqqaagqqqqqqqmmqAqqqqqqppqgCqqqqqpaaqACqqqqqqmqgACqqqqqpqoAACqqqqpaqAAACqqqqqqgAAACqqqqqoAAAAAqqqqoAAAAAACqqgAAAA=="
+   },
+   "music/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "ACqoAAKqqoAKmqqgKmqqqCmqqqimpVqqqpVWqqqWlqqqlpaqqpVWqqqlWpoqqqpoKqqpqAqqpqACqqqAACqoAA=="
+   }
+  }
+ },
  "macpaint": {
   "id": "macpaint",
   "title": "MacPaint",

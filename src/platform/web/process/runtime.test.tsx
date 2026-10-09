@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WindowHeader, defineApp, showPrintDialog, type AppContext } from "@mockintosh/sdk";
+import { MUSIC_KIT_IDLE, WindowHeader, defineApp, showPrintDialog, type AppContext, type MusicKitState } from "@mockintosh/sdk";
 import { getBit, makeRect } from "@mockintosh/quickdraw/bits";
 import { PaintRect } from "@mockintosh/quickdraw";
 import type { HostToProcess, ProcessStart, ProcessToHost } from "../../../os/process/protocol";
@@ -185,6 +185,59 @@ describe("an app process", () => {
     send({ t: "reply", id: request.id, ok: true, value: "done" });
     await expect(invoked).resolves.toBe("done");
     expect(out).toEqual([104, 105]);
+  });
+
+  it("gives the app MusicKit's state, listens on first ask, and sends its calls to the OS", async () => {
+    let musicKit: AppContext["musicKit"];
+    const seen: MusicKitState[] = [];
+    const app = defineApp({
+      id: "music-client",
+      title: "M",
+      icon: "x",
+      defaultSize: { width: 8, height: 8 },
+      Component: () => null,
+      onOpen(ctx) {
+        musicKit = ctx.musicKit;
+      },
+    });
+    const { scope, posted, send } = fakeScope();
+    runProcess(scope, async () => app);
+    send({ t: "start", start: { ...START, appId: app.id, source: { kind: "bundled", id: app.id }, musicKit: MUSIC_KIT_IDLE } });
+    await settle();
+    expect(musicKit!.state).toEqual(MUSIC_KIT_IDLE);
+    expect(posted.some((m) => m.t === "call" && m.method === "musicKit.listen")).toBe(false);
+
+    musicKit!.onChange((state) => seen.push(state));
+    expect(posted.filter((m) => m.t === "call" && m.method === "musicKit.listen")).toHaveLength(1);
+    const playing = { ...MUSIC_KIT_IDLE, ready: true, playing: true, time: 3 };
+    send({ t: "musicKit", state: playing });
+    expect(seen).toEqual([playing]);
+    expect(musicKit!.state).toEqual(playing);
+
+    const queued = musicKit!.setQueue({ songs: ["1", "2"], startPlaying: true });
+    const request = posted.find((m) => m.t === "call" && m.method === "musicKit.setQueue") as Extract<ProcessToHost, { t: "call" }>;
+    expect(request.args).toEqual([{ songs: ["1", "2"], startPlaying: true }]);
+    send({ t: "reply", id: request.id, ok: true, value: undefined });
+    await expect(queued).resolves.toBeUndefined();
+  });
+
+  it("gives an app no MusicKit when the OS holds none", async () => {
+    let musicKit: AppContext["musicKit"] | "unset" = "unset";
+    const app = defineApp({
+      id: "no-music",
+      title: "N",
+      icon: "x",
+      defaultSize: { width: 8, height: 8 },
+      Component: () => null,
+      onOpen(ctx) {
+        musicKit = ctx.musicKit;
+      },
+    });
+    const { scope, send } = fakeScope();
+    runProcess(scope, async () => app);
+    send({ t: "start", start: { ...START, appId: app.id, source: { kind: "bundled", id: app.id } } });
+    await settle();
+    expect(musicKit).toBeUndefined();
   });
 
   it("draws a page for printPage here and hands the OS the finished bits", async () => {
