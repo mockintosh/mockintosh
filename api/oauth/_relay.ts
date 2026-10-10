@@ -25,6 +25,10 @@
  * process and falls back to memory.
  */
 
+import { html } from "../_page";
+
+export { html, page } from "../_page";
+
 export const CALLBACK_PATH = "/api/oauth/callback";
 export const PAIRING_TTL_SECONDS = 600;
 export const COMPLETED_TTL_SECONDS = 120;
@@ -135,52 +139,6 @@ export function json(body: unknown, status = 200): Response {
     status,
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-}
-
-/**
- * The script that redraws a page in 1-bit (`src/relay/main.tsx`): the
- * built file on a deployment, the source through Vite in development.
- */
-const PAGE_SCRIPT = process.env.VERCEL ? "/relay.js" : "/src/relay/main.tsx";
-
-/**
- * A page for the phone. `body` is trusted HTML; interpolate through `html`.
- * Keep it to paragraphs and `a.button` links: the page script redraws
- * those in 1-bit, and the HTML stays for screen readers.
- */
-export function page(body: string, status = 200): Response {
-  const doc = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer">
-<title>Mockintosh Sign In</title>
-<style>
-  body { font: 18px/1.45 -apple-system, system-ui, sans-serif; margin: 3em 1.5em; text-align: center; color: #000; background: #fff; }
-  a.button { display: inline-block; margin: 1em 0; padding: .6em 1.4em; border: 2px solid #000; border-radius: 10px; color: #000; text-decoration: none; font-weight: 600; }
-  .small { font-size: 14px; color: #555; }
-  #screen { position: fixed; inset: 0; display: none; }
-  .drawn #screen { display: block; }
-  /* Drawn in 1-bit over the page; still read aloud. */
-  .drawn #content { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-</style>
-</head>
-<body><div id="content">${body}</div><div id="screen" aria-hidden="true"></div><script type="module" src="${PAGE_SCRIPT}"></script></body>
-</html>`;
-  return new Response(doc, {
-    status,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
-  });
-}
-
-/** Tagged template that escapes every interpolated value. */
-export function html(strings: TemplateStringsArray, ...values: Array<string | number>): string {
-  return strings.reduce((out, s, i) => out + s + (i < values.length ? escapeHtml(String(values[i])) : ""), "");
 }
 
 export const EXPIRED_PAGE = html`<p>This code has expired. Show a new one on your Mockintosh and scan again.</p>`;

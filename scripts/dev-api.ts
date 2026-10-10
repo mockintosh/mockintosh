@@ -1,23 +1,16 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseEnv } from "node:util";
 
 const PORT = 3001;
 
 function loadEnvLocal() {
   try {
     const envPath = resolve(import.meta.dirname!, "..", ".env.local");
-    const content = readFileSync(envPath, "utf-8");
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      const value = trimmed.slice(eqIdx + 1).trim();
-      if (!process.env[key]) {
-        process.env[key] = value;
-      }
+    // `vercel env pull` quotes its values; parseEnv reads them as dotenv does.
+    for (const [key, value] of Object.entries(parseEnv(readFileSync(envPath, "utf-8")))) {
+      if (!process.env[key]) process.env[key] = value;
     }
   } catch {
     console.warn(
@@ -47,7 +40,11 @@ async function nodeToWebRequest(
 }
 
 async function webToNodeResponse(webRes: Response, res: ServerResponse) {
-  res.writeHead(webRes.status, Object.fromEntries(webRes.headers.entries()));
+  const headers: Record<string, string | string[]> = Object.fromEntries(webRes.headers.entries());
+  // Better Auth sets more than one cookie; fromEntries would keep the last.
+  const cookies = webRes.headers.getSetCookie();
+  if (cookies.length) headers["set-cookie"] = cookies;
+  res.writeHead(webRes.status, headers);
 
   if (!webRes.body) {
     res.end();
@@ -81,6 +78,9 @@ const { default: webImageHandler } = await import("../api/web-image.js");
 const { default: githubTokenHandler } = await import("../api/github/token.js");
 const { default: appleMusicTokenHandler } = await import("../api/apple-music/token.js");
 const { default: appleMusicSignInHandler } = await import("../api/apple-music/sign-in.js");
+const { default: authHandler } = await import("../api/auth/[...all].js");
+const { default: clubVerifiedHandler } = await import("../api/club/verified.js");
+const { default: clubResetPasswordHandler } = await import("../api/club/reset-password.js");
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/chat": chatHandler,
@@ -94,7 +94,12 @@ const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/github/token": githubTokenHandler,
   "/api/apple-music/token": appleMusicTokenHandler,
   "/api/apple-music/sign-in": appleMusicSignInHandler,
+  "/api/club/verified": clubVerifiedHandler,
+  "/api/club/reset-password": clubResetPasswordHandler,
 };
+
+/** Catch-all functions (`api/auth/[...all].ts`), by path prefix. */
+const prefixRoutes: Array<[string, (req: Request) => Promise<Response>]> = [["/api/auth/", authHandler]];
 
 const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
@@ -108,7 +113,7 @@ const server = createServer(async (req, res) => {
   }
 
   const path = new URL(req.url ?? "/", `http://localhost:${PORT}`).pathname;
-  const handler = routes[path];
+  const handler = routes[path] ?? prefixRoutes.find(([prefix]) => path.startsWith(prefix))?.[1];
 
   if (!handler) {
     res.writeHead(404, { "Content-Type": "application/json" });

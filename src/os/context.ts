@@ -77,6 +77,8 @@ export interface OSServices {
   musicKit?: import("@mockintosh/sdk").MusicKitService;
   /** Phone sign-in (`useApp().signIn`), when the platform has a relay. */
   signIn?: import("./signIn").SystemSignIn;
+  /** The Mockintosh Computer Club (accounts), when the platform has a server for it. */
+  club?: import("./club").SystemClub;
   /** Installs App Store apps. Remote bundles also need `Platform.loadModule`. */
   installer?: AppInstaller;
   /**

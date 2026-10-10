@@ -8,14 +8,30 @@ const LIMITS: RouteLimits = {
   global: { max: 3, windowSeconds: 86400 },
 };
 
+/** Session cookies the fake session store knows, and whose they are. */
+const SESSIONS: Record<string, string> = { "session=ada": "user-ada", "session=bob": "user-bob" };
+
 function hostedEnv(clock = { t: 0 }): GuardEnv {
   const now = () => clock.t;
-  return { accessToken: "s3cret", hosted: true, allowedOrigins: ["https://mockintosh.com"], store: createMemoryCounters(now), now };
+  return {
+    accessToken: "s3cret",
+    async member(req) {
+      const id = SESSIONS[req.headers.get("cookie") ?? ""];
+      return id ? { id } : null;
+    },
+    hosted: true,
+    allowedOrigins: ["https://mockintosh.com"],
+    store: createMemoryCounters(now),
+    now,
+  };
 }
 
-function post(options: { origin?: string | null; ip?: string; body?: string; host?: string; auth?: string | null } = {}): Request {
+function post(
+  options: { origin?: string | null; ip?: string; body?: string; host?: string; auth?: string | null; cookie?: string } = {},
+): Request {
   const headers: Record<string, string> = { "Content-Type": "application/json", host: options.host ?? "app.vercel.app" };
-  if (options.auth !== null) headers.authorization = options.auth ?? "Bearer s3cret";
+  if (options.cookie) headers.cookie = options.cookie;
+  if (options.auth !== null && !options.cookie) headers.authorization = options.auth ?? "Bearer s3cret";
   if (options.origin !== null) headers.origin = options.origin ?? "https://app.vercel.app";
   if (options.ip) headers["x-forwarded-for"] = `${options.ip}, 10.0.0.1`;
   return new Request("https://app.vercel.app/api/test", { method: "POST", headers, body: options.body ?? "{}" });
@@ -24,7 +40,38 @@ function post(options: { origin?: string | null; ip?: string; body?: string; hos
 describe("guardRequest", () => {
   it("passes a same-origin POST and returns its body", async () => {
     const result = await guardRequest(post({ body: '{"a":1}' }), LIMITS, hostedEnv());
-    expect(result).toEqual({ ok: true, body: '{"a":1}' });
+    expect(result).toEqual({ ok: true, body: '{"a":1}', caller: { kind: "service" } });
+  });
+
+  it("passes a Computer Club member's session without a token", async () => {
+    const result = await guardRequest(post({ cookie: "session=ada" }), LIMITS, hostedEnv());
+    expect(result).toEqual({ ok: true, body: "{}", caller: { kind: "member", id: "user-ada" } });
+  });
+
+  it("tells a caller with neither a session nor the token to join the Club", async () => {
+    const result = await guardRequest(post({ auth: null, cookie: "session=stranger" }), LIMITS, hostedEnv());
+    expect(!result.ok && result.response.status).toBe(401);
+    if (!result.ok) expect(await result.response.json()).toMatchObject({ code: "not_a_member" });
+  });
+
+  it("refuses another site spending a member's session", async () => {
+    const result = await guardRequest(post({ cookie: "session=ada", origin: "https://evil.example" }), LIMITS, hostedEnv());
+    expect(!result.ok && result.response.status).toBe(403);
+  });
+
+  it("counts a member's requests together, whatever their address", async () => {
+    const env = hostedEnv();
+    expect((await guardRequest(post({ cookie: "session=ada", ip: "1.1.1.1" }), LIMITS, env)).ok).toBe(true);
+    expect((await guardRequest(post({ cookie: "session=ada", ip: "2.2.2.2" }), LIMITS, env)).ok).toBe(true);
+    const third = await guardRequest(post({ cookie: "session=ada", ip: "3.3.3.3" }), LIMITS, env);
+    expect(!third.ok && third.response.status).toBe(429);
+    expect((await guardRequest(post({ cookie: "session=bob", ip: "1.1.1.1" }), LIMITS, env)).ok).toBe(true);
+  });
+
+  it("refuses while sessions can't be looked up", async () => {
+    const env = { ...hostedEnv(), member: () => Promise.reject(new Error("database down")) };
+    const result = await guardRequest(post({ cookie: "session=ada" }), LIMITS, env);
+    expect(!result.ok && result.response.status).toBe(503);
   });
 
   it("refuses a missing or wrong token, hosted or not", async () => {

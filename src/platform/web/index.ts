@@ -39,6 +39,7 @@ import { createWebSourceProvider } from "./source";
 import { createWebBrowserService } from "./browser";
 import { createWebMusicKit } from "./musicKit";
 import { createWebSignInRelay } from "./signInRelay";
+import { createWebClubAccounts } from "./club";
 import { createWebFontRasterService } from "./fontRaster";
 import { leaveOnPurpose } from "./unloadGuard";
 export interface WebPlatformOptions {
@@ -144,6 +145,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     browser,
     musicKit: createWebMusicKit(browser, location.origin),
     signInRelay: createWebSignInRelay(webFetch, location.origin),
+    club: createWebClubAccounts(webFetch, location.origin),
     clipboard,
     printerLinks: createWebPrinterLinks(),
     download: createWebDownloadService(),

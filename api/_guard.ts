@@ -4,16 +4,19 @@
  * ones that fetch the web for Safari. Anyone who can reach the function
  * can send it a request, so each one passes, in order:
  *
- *   0. Authentication — `Authorization: Bearer <API_ACCESS_TOKEN>`. With no
- *      token configured every request is refused, on every host: there are
- *      no anonymous model responses. The limits below still apply, in case
- *      the token leaks.
+ *   0. Authentication — a Mockintosh Computer Club member's session cookie
+ *      (`api/_auth.ts`), or `Authorization: Bearer <API_ACCESS_TOKEN>` for
+ *      our own scripts (`npm run agent:eval`). Anyone else is refused, on
+ *      every host: there are no anonymous model responses. The limits
+ *      below still apply, in case a token leaks.
  *   1. Origin — a browser always sends `Origin` on a POST; it must be this
  *      deployment (or `ALLOWED_ORIGINS`). This stops other sites and casual
- *      scripts, not a determined caller, who can forge the header.
+ *      scripts, not a determined caller, who can forge the header. For a
+ *      member it is also what stops another site spending their cookie.
  *   2. Size — the body is read up to a cap, whatever `Content-Length` says.
- *   3. Limits — a fixed-window count per client IP, and one per day for
- *      everyone together. These are what actually bound the bill.
+ *   3. Limits — a fixed-window count per member (per client IP for the
+ *      token), and one per day for everyone together. These are what
+ *      actually bound the bill.
  *
  * Counters live in the same Redis REST store as the sign-in relay
  * (`KV_REST_API_URL` / `KV_REST_API_TOKEN`). On Vercel without one the
@@ -42,9 +45,17 @@ export interface CounterStore {
   hit(key: string, ttlSeconds: number): Promise<number>;
 }
 
+/** Who a request comes from, once it is authenticated. */
+export type Caller =
+  | { kind: "member"; id: string }
+  /** Our own scripts, with `API_ACCESS_TOKEN`. */
+  | { kind: "service" };
+
 export interface GuardEnv {
-  /** The bearer token callers must present; `null` refuses everyone. */
+  /** The bearer token our own scripts present; `null` = none accepted. */
   accessToken: string | null;
+  /** The Computer Club member whose session the request carries, if any. */
+  member(req: Request): Promise<{ id: string } | null>;
   /** True on a hosted deployment, where callers are strangers. */
   hosted: boolean;
   /** Origins besides the request's own host, e.g. a custom domain. */
@@ -54,13 +65,17 @@ export interface GuardEnv {
 }
 
 export type GuardResult =
-  | { ok: true; body: string }
+  | { ok: true; body: string; caller: Caller }
   | { ok: false; response: Response };
 
-function reply(status: number, error: string, headers: Record<string, string> = {}): GuardResult {
+/** Why a request without a member's session is refused; the Assistant shows it as its reply. */
+export const NOT_A_MEMBER =
+  "That needs a Mockintosh Computer Club membership. Choose Join Mockintosh Computer Club… from the Apple menu, then try again.";
+
+function reply(status: number, error: string, headers: Record<string, string> = {}, code?: string): GuardResult {
   return {
     ok: false,
-    response: new Response(JSON.stringify({ error }), {
+    response: new Response(JSON.stringify(code ? { error, code } : { error }), {
       status,
       headers: { "Content-Type": "application/json", ...headers },
     }),
@@ -128,7 +143,7 @@ export function guardEnvFromProcess(): GuardEnv {
       .map((host) => `https://${host}`),
   ];
   const accessToken = process.env.API_ACCESS_TOKEN?.trim() || null;
-  defaultEnv = { accessToken, hosted, allowedOrigins, store, now: Date.now };
+  defaultEnv = { accessToken, member: memberFromSession, hosted, allowedOrigins, store, now: Date.now };
   return defaultEnv;
 }
 
@@ -147,10 +162,22 @@ function sameSecret(a: string, b: string): boolean {
   return diff === 0;
 }
 
-function authenticated(req: Request, env: GuardEnv): boolean {
+/** Loaded on first use, so the free endpoints never load Better Auth. */
+async function memberFromSession(req: Request): Promise<{ id: string } | null> {
+  const { clubAuth, memberFromRequest } = await import("./_auth.js");
+  return memberFromRequest(clubAuth(), req);
+}
+
+function hasServiceToken(req: Request, env: GuardEnv): boolean {
   if (!env.accessToken) return false;
   const match = /^Bearer\s+(.+)$/i.exec(req.headers.get("authorization") ?? "");
   return !!match && sameSecret(match[1].trim(), env.accessToken);
+}
+
+async function authenticate(req: Request, env: GuardEnv): Promise<Caller | null> {
+  if (hasServiceToken(req, env)) return { kind: "service" };
+  const member = await env.member(req);
+  return member && { kind: "member", id: member.id };
 }
 
 function isOwnOrigin(origin: string | null, req: Request, env: GuardEnv): boolean {
@@ -216,13 +243,21 @@ function windowKey(route: string, scope: string, limit: Limit, now: number): str
  */
 export async function guardRequest(req: Request, limits: RouteLimits, env: GuardEnv = guardEnvFromProcess()): Promise<GuardResult> {
   if (req.method !== "POST") return reply(405, "Method not allowed");
-  if (!authenticated(req, env)) return reply(401, "Sign-in required.", { "WWW-Authenticate": "Bearer" });
+  let caller: Caller | null;
+  try {
+    caller = await authenticate(req, env);
+  } catch (error) {
+    console.error("Session lookup failed:", error);
+    return reply(503, "Service temporarily unavailable");
+  }
+  if (!caller) return reply(401, NOT_A_MEMBER, {}, "not_a_member");
   if (env.hosted && !originAllowed(req, env)) return reply(403, "Forbidden");
   if (!env.store) return reply(503, "This endpoint needs a Redis store for its limits: set KV_REST_API_URL and KV_REST_API_TOKEN");
 
   const now = env.now();
+  const scope = caller.kind === "member" ? `member:${caller.id}` : clientAddress(req);
   try {
-    const perClient = await env.store.hit(windowKey(limits.route, clientAddress(req), limits.perClient, now), limits.perClient.windowSeconds);
+    const perClient = await env.store.hit(windowKey(limits.route, scope, limits.perClient, now), limits.perClient.windowSeconds);
     if (perClient > limits.perClient.max) {
       return reply(429, "Too many requests. Try again later.", { "Retry-After": String(limits.perClient.windowSeconds) });
     }
@@ -237,5 +272,5 @@ export async function guardRequest(req: Request, limits: RouteLimits, env: Guard
 
   const body = await readCapped(req, limits.maxBodyBytes);
   if (body === null) return reply(413, "Request too large");
-  return { ok: true, body };
+  return { ok: true, body, caller };
 }

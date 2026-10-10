@@ -1,5 +1,5 @@
-import { envLimit, guardRequest, type RouteLimits } from "./_guard";
-import { GATEWAY_URL, gatewayToken } from "./_gateway";
+import { envLimit, guardRequest, type RouteLimits } from "./_guard.js";
+import { GATEWAY_URL, gatewayToken } from "./_gateway.js";
 
 const IMAGE_API_URL = `${GATEWAY_URL}/images/generations`;
 
@@ -96,4 +96,5 @@ export default async function handler(req: Request): Promise<Response> {
   }
 }
 
-export const config = { runtime: "edge" };
+/** Image generation can take a while; Node functions allow it. */
+export const maxDuration = 120;

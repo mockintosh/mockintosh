@@ -75,6 +75,7 @@ import { OPEN_DIALOG_SIZE, OpenDialog } from "./components/OpenDialog.solid";
 import { DESKTOP, placeExists, placeOf, type SFPlace } from "./standardFile";
 import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
 import type { SystemSignIn } from "./signIn";
+import { createSystemClub } from "./club";
 import { createAppInstaller, migrateBundledDesktopShortcuts } from "./installedApps";
 import {
   describeMissingCapabilities,
@@ -291,6 +292,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     browser: platform.browser,
     musicKit: platform.musicKit,
     signIn: platform.signInRelay && systemSignIn(platform.signInRelay),
+    club: platform.club && createSystemClub(platform.club),
     installer,
     openApp(appId, props = {}, fromRect?) {
       const app = getApp(appId);

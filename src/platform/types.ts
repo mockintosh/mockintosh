@@ -151,6 +151,38 @@ export interface SignInRelay {
   start(request: SignInStartRequest): Promise<SignInPairing>;
 }
 
+/** A Mockintosh Computer Club member, as this computer is signed in. */
+export interface ClubMember {
+  name: string;
+  email: string;
+  /** When they joined, in milliseconds since the epoch. */
+  since: number;
+}
+
+export type ClubSignInResult =
+  | { status: "signed-in"; member: ClubMember }
+  /** The email isn't verified yet: the link in the welcome email does that. */
+  | { status: "unverified" }
+  | { status: "wrong-password" };
+
+/**
+ * The Mockintosh Computer Club's accounts (`api/auth` on the web host). The
+ * session lives in an httpOnly cookie this side never sees; every call
+ * here, and the app processes' same-origin requests, carry it.
+ */
+export interface ClubAccounts {
+  /** Who this computer is signed in as, or `null`. */
+  session(): Promise<ClubMember | null>;
+  /** Start a membership. The server emails a link that verifies the address; until then sign-in answers `unverified`. */
+  join(details: { name: string; email: string; password: string }): Promise<void>;
+  /** Email the verification link again. */
+  resendVerification(email: string): Promise<void>;
+  signIn(email: string, password: string): Promise<ClubSignInResult>;
+  signOut(): Promise<void>;
+  /** Email a link for choosing a new password (sent only if the address has a membership). */
+  forgotPassword(email: string): Promise<void>;
+}
+
 /** Capabilities a platform declares outright; the rest follow from which services it provides. */
 export type HostCapability = "browser";
 
@@ -201,6 +233,8 @@ export interface Platform {
   musicKit?: MusicKitService;
   /** Phone sign-in for apps (`useApp().signIn`). Absent when no relay server is reachable. */
   signInRelay?: SignInRelay;
+  /** The Mockintosh Computer Club. Absent when the host has no accounts server. */
+  club?: ClubAccounts;
   /**
    * Load a JavaScript module by URL, for installing a remote app bundle.
    * Absent when the host cannot load modules at runtime. Bundled apps, whose
