@@ -39,6 +39,7 @@ import {
   type AppServices,
   type AppWindow,
   type Capability,
+  type ClubStatus,
   type MenubarDefinition,
   type PrintService,
   type SolidApp,
@@ -378,6 +379,9 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         },
       },
       download: start.download ? { save: (file) => call("download.save", [file]) as Promise<void> } : undefined,
+      club: start.club
+        ? { status: () => call("club.status", []) as Promise<ClubStatus>, open: () => void call("club.open", []) }
+        : undefined,
       signIn: start.signIn && {
         redirectUri: start.signIn.redirectUri,
         authorize: (url) => call("signIn.authorize", [url]) as Promise<Record<string, string> | null>,

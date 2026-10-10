@@ -159,6 +159,13 @@ export interface ClubMember {
   since: number;
 }
 
+/** A member's credits and their latest changes (`/api/club/credits`). */
+export interface ClubCredits {
+  balance: number;
+  /** Newest first. `at` is milliseconds since the epoch; `delta` is negative for use. */
+  recent: Array<{ at: number; kind: "grant" | "purchase" | "usage" | "refund" | "adjust"; delta: number; model: string | null }>;
+}
+
 export type ClubSignInResult =
   | { status: "signed-in"; member: ClubMember }
   /** The email isn't verified yet: the link in the welcome email does that. */
@@ -181,6 +188,8 @@ export interface ClubAccounts {
   signOut(): Promise<void>;
   /** Email a link for choosing a new password (sent only if the address has a membership). */
   forgotPassword(email: string): Promise<void>;
+  /** The signed-in member's credits, or `null` when signed out. */
+  credits(): Promise<ClubCredits | null>;
 }
 
 /** Capabilities a platform declares outright; the rest follow from which services it provides. */

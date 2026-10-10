@@ -15,8 +15,11 @@
  *      member it is also what stops another site spending their cookie.
  *   2. Size — the body is read up to a cap, whatever `Content-Length` says.
  *   3. Limits — a fixed-window count per member (per client IP for the
- *      token), and one per day for everyone together. These are what
- *      actually bound the bill.
+ *      token), and one per day for everyone together.
+ *   4. Credits — a member needs some left (`api/_credits.ts`), and may have
+ *      only a few requests running at once. Each is charged what it cost
+ *      once it is done, so a balance can dip a little below zero; the
+ *      in-flight cap bounds how far.
  *
  * Counters live in the same Redis REST store as the sign-in relay
  * (`KV_REST_API_URL` / `KV_REST_API_TOKEN`). On Vercel without one the
@@ -43,6 +46,8 @@ export interface RouteLimits {
 export interface CounterStore {
   /** Adds one to `key`, starting a `ttlSeconds` window on the first hit; returns the new count. */
   hit(key: string, ttlSeconds: number): Promise<number>;
+  /** Takes one back from `key`. */
+  release(key: string): Promise<void>;
 }
 
 /** Who a request comes from, once it is authenticated. */
@@ -56,6 +61,8 @@ export interface GuardEnv {
   accessToken: string | null;
   /** The Computer Club member whose session the request carries, if any. */
   member(req: Request): Promise<{ id: string } | null>;
+  /** A member's credits. */
+  balance(memberId: string): Promise<number>;
   /** True on a hosted deployment, where callers are strangers. */
   hosted: boolean;
   /** Origins besides the request's own host, e.g. a custom domain. */
@@ -65,12 +72,27 @@ export interface GuardEnv {
 }
 
 export type GuardResult =
-  | { ok: true; body: string; caller: Caller }
+  | {
+      ok: true;
+      body: string;
+      caller: Caller;
+      /** Call once the request is answered: frees the member's in-flight slot. */
+      done(): Promise<void>;
+    }
   | { ok: false; response: Response };
 
 /** Why a request without a member's session is refused; the Assistant shows it as its reply. */
 export const NOT_A_MEMBER =
   "That needs a Mockintosh Computer Club membership. Choose Join Mockintosh Computer Club… from the Apple menu, then try again.";
+
+/** Why a member without credits is refused. */
+export const OUT_OF_CREDITS =
+  "You're out of Computer Club credits. Choose Computer Club… from the Apple menu to see your balance.";
+
+/** Requests one member may have running at once (an agent runs one at a time). */
+export const MAX_IN_FLIGHT = 3;
+/** How long an in-flight slot lasts if its request never says it's done: the longest a function runs. */
+const IN_FLIGHT_SECONDS = 300;
 
 function reply(status: number, error: string, headers: Record<string, string> = {}, code?: string): GuardResult {
   return {
@@ -94,6 +116,10 @@ export function createMemoryCounters(now: () => number = Date.now): CounterStore
       entry.count += 1;
       return entry.count;
     },
+    async release(key) {
+      const entry = counts.get(key);
+      if (entry && entry.count > 0) entry.count -= 1;
+    },
   };
 }
 
@@ -114,6 +140,14 @@ function createRedisRestCounters(url: string, token: string): CounterStore {
       const count = results[0]?.result;
       if (typeof count !== "number") throw new Error(`Limit store error: ${results[0]?.error ?? "no count"}`);
       return count;
+    },
+    async release(key) {
+      const resp = await fetch(`${url.replace(/\/$/, "")}/pipeline`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify([["DECR", `api-limit:${key}`]]),
+      });
+      if (!resp.ok) throw new Error(`Limit store error: ${resp.status}`);
     },
   };
 }
@@ -143,7 +177,7 @@ export function guardEnvFromProcess(): GuardEnv {
       .map((host) => `https://${host}`),
   ];
   const accessToken = process.env.API_ACCESS_TOKEN?.trim() || null;
-  defaultEnv = { accessToken, member: memberFromSession, hosted, allowedOrigins, store, now: Date.now };
+  defaultEnv = { accessToken, member: memberFromSession, balance: memberBalance, hosted, allowedOrigins, store, now: Date.now };
   return defaultEnv;
 }
 
@@ -166,6 +200,13 @@ function sameSecret(a: string, b: string): boolean {
 async function memberFromSession(req: Request): Promise<{ id: string } | null> {
   const { clubAuth, memberFromRequest } = await import("./_auth.js");
   return memberFromRequest(clubAuth(), req);
+}
+
+async function memberBalance(memberId: string): Promise<number> {
+  const { clubCredits } = await import("./_credits.js");
+  const credits = clubCredits();
+  if (!credits) throw new Error("No database for credits");
+  return credits.balance(memberId);
 }
 
 function hasServiceToken(req: Request, env: GuardEnv): boolean {
@@ -272,5 +313,25 @@ export async function guardRequest(req: Request, limits: RouteLimits, env: Guard
 
   const body = await readCapped(req, limits.maxBodyBytes);
   if (body === null) return reply(413, "Request too large");
-  return { ok: true, body, caller };
+  if (caller.kind === "service") return { ok: true, body, caller, done: async () => {} };
+
+  const store = env.store;
+  const slot = `${limits.route}:in-flight:member:${caller.id}`;
+  try {
+    if ((await env.balance(caller.id)) <= 0) return reply(402, OUT_OF_CREDITS, {}, "out_of_credits");
+    if ((await store.hit(slot, IN_FLIGHT_SECONDS)) > MAX_IN_FLIGHT) {
+      await store.release(slot);
+      return reply(429, "Wait for your other requests to finish, then try again.", { "Retry-After": "5" });
+    }
+  } catch (error) {
+    console.error("Credit check failed:", error);
+    return reply(503, "Service temporarily unavailable");
+  }
+  let released = false;
+  const done = async () => {
+    if (released) return;
+    released = true;
+    await store.release(slot).catch((error) => console.error("Couldn't free an in-flight slot:", error));
+  };
+  return { ok: true, body, caller, done };
 }

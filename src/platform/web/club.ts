@@ -1,5 +1,5 @@
 import type { FetchFunction } from "@mockintosh/sdk";
-import type { ClubAccounts, ClubMember, ClubSignInResult } from "../types";
+import type { ClubAccounts, ClubCredits, ClubMember, ClubSignInResult } from "../types";
 
 /** Where Better Auth sends a verification link once it has checked it (`api/club/verified.ts`). */
 const VERIFIED_PAGE = "/api/club/verified";
@@ -79,6 +79,14 @@ export function createWebClubAccounts(fetch: FetchFunction, origin: string): Clu
     async forgotPassword(email) {
       const { status, data } = await call("/request-password-reset", { email, redirectTo: RESET_PAGE });
       if (status !== 200) throw failure(status, data);
+    },
+
+    async credits(): Promise<ClubCredits | null> {
+      const resp = await fetch(`${origin}/api/club/credits`);
+      if (resp.status === 401) return null;
+      const data: any = await resp.json().catch(() => null);
+      if (!resp.ok || typeof data?.balance !== "number") throw failure(resp.status, data);
+      return { balance: data.balance, recent: Array.isArray(data.recent) ? data.recent : [] };
     },
   };
 }

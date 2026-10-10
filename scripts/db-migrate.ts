@@ -1,8 +1,7 @@
 /**
- * Brings the Computer Club's database up to date: Better Auth's tables
- * (`user`, `session`, `account`, `verification`), compared with what is
- * there and changed in place. Uses `DATABASE_URL` from the environment or
- * `.env.local` (`vercel env pull`).
+ * Brings the Computer Club's database up to date (`db/migrate.ts`): Better
+ * Auth's tables, then `db/migrations/*.sql`. Uses `DATABASE_URL` from the
+ * environment or `.env.local` (`vercel env pull`).
  *
  *   npm run db:migrate              apply
  *   npm run db:migrate -- --print   print the SQL instead
@@ -10,9 +9,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
-import { getMigrations } from "better-auth/db/migration";
-import { clubAuthOptions } from "../api/_auth";
 import { databaseDialect } from "../api/_db";
+import { migrate } from "../db/migrate";
 
 try {
   const env = parseEnv(readFileSync(resolve(import.meta.dirname, "..", ".env.local"), "utf-8"));
@@ -27,17 +25,7 @@ if (!dialect) {
   process.exit(1);
 }
 
-// Migrations only read the schema the options describe; nothing is signed or sent.
-const options = clubAuthOptions({ dialect, secret: "migrate", sendEmail: async () => {}, hosts: [] });
-const { toBeCreated, toBeAdded, runMigrations, compileMigrations } = await getMigrations(options);
-
-if (toBeCreated.length === 0 && toBeAdded.length === 0) {
-  console.log("The database is up to date.");
-} else if (process.argv.includes("--print")) {
-  console.log(await compileMigrations());
-} else {
-  await runMigrations();
-  for (const { table } of toBeCreated) console.log(`Created ${table}`);
-  for (const { table, fields } of toBeAdded) console.log(`Added ${Object.keys(fields).join(", ")} to ${table}`);
-}
+const report = await migrate(dialect, { print: process.argv.includes("--print") });
+if (report.sql !== undefined) console.log(report.sql || "The database is up to date.");
+else console.log(report.changes.length ? report.changes.join("\n") : "The database is up to date.");
 process.exit(0);

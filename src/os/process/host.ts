@@ -199,6 +199,7 @@ export class AppProcess {
         download: this.context.download !== undefined,
         signIn: this.context.signIn && { redirectUri: this.context.signIn.redirectUri },
         musicKit: this.context.musicKit?.state,
+        club: this.context.club !== undefined,
         video: typeof this.context.video?.excerpt === "function",
         videoPlayback: this.context.video !== undefined,
         camera: this.context.camera !== undefined,
@@ -502,6 +503,11 @@ export class AppProcess {
         return ctx.signIn.authorize(args[0] as string);
       case "musicKit":
         return this.musicKitCall(name, args);
+      case "club":
+        if (!ctx.club) throw new Error("This Macintosh has no Computer Club");
+        if (name === "status") return ctx.club.status();
+        if (name === "open") return ctx.club.open();
+        break;
       case "os":
         if (name === "showDialog") return ctx.os.showDialog(args[0] as never);
         if (name === "showOpenDialog") return ctx.os.showOpenDialog(args[0] as never);

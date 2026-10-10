@@ -1,7 +1,10 @@
-import { envLimit, guardRequest, type RouteLimits } from "./_guard.js";
+import { envLimit, guardRequest, type GuardResult, type RouteLimits } from "./_guard.js";
 import { GATEWAY_URL, gatewayToken } from "./_gateway.js";
+import { chargeCaller } from "./_credits.js";
+import { imageUsage } from "./_pricing.js";
 
 const IMAGE_API_URL = `${GATEWAY_URL}/images/generations`;
+const IMAGE_MODEL = "openai/gpt-image-1.5";
 
 /** Each image costs far more than a chat turn. */
 const IMAGE_LIMITS: RouteLimits = {
@@ -16,6 +19,14 @@ const MAX_PROMPT_CHARS = 2000;
 export default async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, IMAGE_LIMITS);
   if (!guard.ok) return guard.response;
+  try {
+    return await generate(req, guard);
+  } finally {
+    await guard.done();
+  }
+}
+
+async function generate(req: Request, guard: Extract<GuardResult, { ok: true }>): Promise<Response> {
 
   const token = gatewayToken(req);
   if (!token) {
@@ -55,7 +66,7 @@ export default async function handler(req: Request): Promise<Response> {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        model: "openai/gpt-image-1.5",
+        model: IMAGE_MODEL,
         prompt: prompt.trim(),
         n: 1,
         size: "1024x1024",
@@ -75,6 +86,12 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const data = await imgResponse.json();
+    const generation = data.providerMetadata?.gateway?.generationId;
+    const credits = await chargeCaller(
+      guard.caller,
+      imageUsage(IMAGE_MODEL, data),
+      `usage:${typeof generation === "string" ? generation : crypto.randomUUID()}`,
+    );
     const b64 = data.data?.[0]?.b64_json ?? null;
 
     if (!b64) {
@@ -84,7 +101,7 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    return new Response(JSON.stringify({ b64 }), {
+    return new Response(JSON.stringify(credits === undefined ? { b64 } : { b64, credits }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

@@ -1,5 +1,7 @@
 import { MOCKINTOSH_CHAT_CONTEXT } from "./mockintosh-context.js";
-import { envLimit, guardRequest, type RouteLimits } from "./_guard.js";
+import { envLimit, guardRequest, type GuardResult, type RouteLimits } from "./_guard.js";
+import { chargeCaller } from "./_credits.js";
+import { chatUsage } from "./_pricing.js";
 import { GATEWAY_URL, gatewayModel, gatewayToken } from "./_gateway.js";
 import { TYPE_DIGEST, SOURCE_MAP } from "./mockintosh-context.generated.js";
 import {
@@ -113,6 +115,14 @@ export function staticPromptPrefix(mode: "chat" | "build"): string {
 export default async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, CHAT_LIMITS);
   if (!guard.ok) return guard.response;
+  try {
+    return await answer(req, guard);
+  } finally {
+    await guard.done();
+  }
+}
+
+async function answer(req: Request, guard: Extract<GuardResult, { ok: true }>): Promise<Response> {
 
   const token = gatewayToken(req);
   if (!token) {
@@ -185,8 +195,13 @@ export default async function handler(req: Request): Promise<Response> {
       throw new Error(`LLM API error (${resp.status})`);
     }
     const data = await resp.json();
+    const credits = await chargeCaller(
+      guard.caller,
+      chatUsage(LLM_MODEL, data),
+      `usage:${typeof data.id === "string" ? data.id : crypto.randomUUID()}`,
+    );
     const result = completeFromLLMChoice(data.choices?.[0]);
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(credits === undefined ? result : { ...result, credits }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

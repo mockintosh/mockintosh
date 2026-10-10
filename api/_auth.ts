@@ -10,6 +10,8 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import type { Dialect } from "kysely";
 import { databaseDialect } from "./_db.js";
 import { emailSender, type SendEmail } from "./_email.js";
+import { clubCredits, welcomeMember } from "./_credits.js";
+import { clientAddress, guardEnvFromProcess } from "./_guard.js";
 
 /** Where Better Auth's routes live; the Club window calls them here. */
 export const AUTH_BASE_PATH = "/api/auth";
@@ -34,6 +36,8 @@ export interface ClubAuthEnv {
   hosts: readonly string[];
   /** Off Vercel: the API server's own URL, which email links point at. */
   localURL?: string;
+  /** Runs once a member's email is verified: their welcome credits. */
+  welcome?: (memberId: string, request?: Request) => Promise<void>;
 }
 
 export function clubAuthOptions(env: ClubAuthEnv) {
@@ -75,6 +79,9 @@ export function clubAuthOptions(env: ClubAuthEnv) {
       sendOnSignUp: true,
       // The Macintosh signs itself in once the link is opened, wherever that is.
       autoSignInAfterVerification: false,
+      async afterEmailVerification(user, request) {
+        await env.welcome?.(user.id, request);
+      },
       async sendVerificationEmail({ user, url }) {
         await env.sendEmail({
           to: user.email,
@@ -144,8 +151,21 @@ export function clubAuth(): ClubAuth | null {
     sendEmail: emailSender(),
     hosts: process.env.VERCEL ? deploymentHosts() : [],
     localURL: process.env.BETTER_AUTH_URL,
+    welcome: welcomeNewMember,
   });
   return auth;
+}
+
+/** Welcome credits, counted per address in the guard's store. Never stops verification. */
+async function welcomeNewMember(memberId: string, request?: Request): Promise<void> {
+  try {
+    const credits = clubCredits();
+    const counters = guardEnvFromProcess().store;
+    if (!credits || !counters) throw new Error("No database or limit store");
+    await welcomeMember(credits, counters, memberId, request ? clientAddress(request) : "unknown");
+  } catch (error) {
+    console.error(`No welcome credits for ${memberId}:`, error);
+  }
 }
 
 /** The signed-in member a request's session cookie names, if any. */

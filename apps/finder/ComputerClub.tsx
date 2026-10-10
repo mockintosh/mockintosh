@@ -5,12 +5,12 @@
  * signed in, then "Computer Club…"). Accounts are `os.club`
  * (src/os/club.ts); see docs/computer-club-plan.md.
  */
-import { Show, createSignal, onCleanup } from "solid-js";
+import { For, Show, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { Button, TextInput, useApp } from "@mockintosh/sdk";
 import { useOS, type OSServices } from "../../src/os/context";
 import { CLUB_NAME, type SystemClub } from "../../src/os/club";
-import type { ClubMember } from "../../src/platform/types";
+import type { ClubCredits, ClubMember } from "../../src/platform/types";
 import { FINDER_APP_ID } from "../../src/os/state";
 import { openSystemWindow } from "../../src/os/systemWindows";
 import { Divider, PAD, Row } from "./printerUi";
@@ -18,7 +18,7 @@ import { Divider, PAD, Row } from "./printerUi";
 export const JOIN_CLUB_LABEL = `Join ${CLUB_NAME}…`;
 export const CLUB_MENU_LABEL = "Computer Club…";
 
-const SIZE = { width: 300, height: 220 };
+const SIZE = { width: 300, height: 300 };
 const FIELD_LABEL_W = 60;
 /** How often the window tries signing in while it waits for the emailed link. */
 const VERIFY_POLL_MS = 5000;
@@ -27,8 +27,29 @@ const VERIFY_POLL_LIMIT_MS = 60 * 60 * 1000;
 
 type Panel = "join" | "sign-in" | "check-email";
 
+const LATEST_DATE_W = 44;
+
 const formatDate = (ms: number) =>
   new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+const formatShortDate = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const formatCredits = (credits: number) => credits.toLocaleString("en-US");
+const formatDelta = (delta: number) => `${delta > 0 ? "+" : "−"}${formatCredits(Math.abs(delta))}`;
+
+/** What a ledger entry was for, in a few words. */
+function entryLabel(entry: ClubCredits["recent"][number]): string {
+  switch (entry.kind) {
+    case "grant":
+      return "Welcome credits";
+    case "purchase":
+      return "Bought credits";
+    case "refund":
+      return "Refund";
+    case "adjust":
+      return "Adjustment";
+    case "usage":
+      return entry.model?.includes("image") ? "Assistant picture" : "Assistant reply";
+  }
+}
 
 export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
@@ -268,12 +289,34 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
     return (
       <>
         <text font="body" width={textWidth()}>
-          {`Welcome to the ${CLUB_NAME}. As a member you can use the Assistant.`}
+          {`Welcome to the ${CLUB_NAME}. Your credits pay for the Assistant's replies and pictures.`}
         </text>
         <Divider />
         <Row label="Member" name="club-member" value={props.member.name} />
         <Row label="Email" name="club-member-email" value={props.member.email} />
         <Row label="Since" name="club-member-since" value={formatDate(props.member.since)} />
+        <Row
+          label="Credits"
+          name="club-credits"
+          value={props.club.credits() ? formatCredits(props.club.credits()!.balance) : "…"}
+        />
+        <Show when={props.club.credits()?.recent.length}>
+          <Divider />
+          <text font="body" nowrap>Latest</text>
+          <For each={props.club.credits()!.recent}>
+            {(entry) => (
+              <box flexDirection="row" gap={4}>
+                <box width={LATEST_DATE_W}>
+                  <text font="body" nowrap>{formatShortDate(entry.at)}</text>
+                </box>
+                <box flexGrow={1}>
+                  <text font="body" nowrap>{entryLabel(entry)}</text>
+                </box>
+                <text font="body" nowrap>{formatDelta(entry.delta)}</text>
+              </box>
+            )}
+          </For>
+        </Show>
         <Divider />
         <Buttons>
           <Button name="club-sign-out" label="Sign Out" disabled={busy()} onClick={() => void run(() => props.club.signOut())} />

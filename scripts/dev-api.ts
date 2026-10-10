@@ -10,7 +10,7 @@ function loadEnvLocal() {
     const envPath = resolve(import.meta.dirname!, "..", ".env.local");
     // `vercel env pull` quotes its values; parseEnv reads them as dotenv does.
     for (const [key, value] of Object.entries(parseEnv(readFileSync(envPath, "utf-8")))) {
-      if (!process.env[key]) process.env[key] = value;
+      process.env[key] ??= value;
     }
   } catch {
     console.warn(
@@ -81,6 +81,7 @@ const { default: appleMusicSignInHandler } = await import("../api/apple-music/si
 const { default: authHandler } = await import("../api/auth/[...all].js");
 const { default: clubVerifiedHandler } = await import("../api/club/verified.js");
 const { default: clubResetPasswordHandler } = await import("../api/club/reset-password.js");
+const { default: clubCreditsHandler } = await import("../api/club/credits.js");
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/chat": chatHandler,
@@ -96,6 +97,7 @@ const routes: Record<string, (req: Request) => Promise<Response>> = {
   "/api/apple-music/sign-in": appleMusicSignInHandler,
   "/api/club/verified": clubVerifiedHandler,
   "/api/club/reset-password": clubResetPasswordHandler,
+  "/api/club/credits": clubCreditsHandler,
 };
 
 /** Catch-all functions (`api/auth/[...all].ts`), by path prefix. */

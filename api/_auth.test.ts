@@ -1,25 +1,28 @@
 import { PGlite } from "@electric-sql/pglite";
-import { getMigrations } from "better-auth/db/migration";
 import { PGliteDialect } from "kysely-pglite-dialect";
 import { beforeAll, describe, expect, it } from "vitest";
-import { clubAuthOptions, createClubAuth, memberFromRequest, type ClubAuth } from "./_auth";
+import { migrate } from "../db/migrate";
+import { createClubAuth, memberFromRequest, type ClubAuth } from "./_auth";
 import type { Email } from "./_email";
 
 const ORIGIN = "http://localhost:5199";
 const BASE = "http://localhost:3001";
 
 const sent: Email[] = [];
+const welcomed: string[] = [];
 let auth: ClubAuth;
 
 beforeAll(async () => {
+  const dialect = new PGliteDialect(new PGlite());
+  await migrate(dialect);
   const env = {
-    dialect: new PGliteDialect(new PGlite()),
+    dialect,
     secret: "test-secret-test-secret-test-secret",
     sendEmail: async (email: Email) => void sent.push(email),
     hosts: [],
     localURL: BASE,
+    welcome: async (memberId: string) => void welcomed.push(memberId),
   };
-  await (await getMigrations(clubAuthOptions(env))).runMigrations();
   auth = createClubAuth(env);
 }, 30_000);
 
@@ -57,9 +60,11 @@ describe("Computer Club accounts", () => {
     const early = await post("/sign-in/email", { email: member.email, password: member.password });
     expect(early.status).toBe(403);
 
+    expect(welcomed).toEqual([]);
     const verify = await auth.handler(new Request(linkIn(welcome!)));
     expect(verify.status).toBe(302);
     expect(verify.headers.get("location")).toContain("/api/club/verified");
+    expect(welcomed).toHaveLength(1);
 
     const wrong = await post("/sign-in/email", { email: member.email, password: "not the password" });
     expect(wrong.status).toBe(401);

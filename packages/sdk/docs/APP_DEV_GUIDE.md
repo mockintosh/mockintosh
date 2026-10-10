@@ -265,6 +265,7 @@ export default defineApp({
 - `crypto.randomBytes` / `crypto.sha256`
 - `browser` — `openExternal`, `authorize`, `loadScript`, when this Macintosh runs in a browser
 - `signIn` — sign in to an OAuth provider from the user's phone (see [Signing in](#signing-in))
+- `club` — the Mockintosh Computer Club: whether the user is a member, their AI credits, and the Club window (see [The Computer Club](#the-computer-club))
 
 `useApp()` reads a per-window context, so call it during component setup (not in a callback created elsewhere).
 
@@ -286,6 +287,7 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
 | `sign-in`   | `useApp().signIn` is available (see [Signing in](#signing-in))        |
 | `music-kit` | `useApp().musicKit` is available (see [Apple Music](#apple-music))    |
+| `club`      | `useApp().club` is available (see [The Computer Club](#the-computer-club)) |
 | `gpu`       | `useApp().gpu` is available: WGSL pixel programs rendered to an `ImageFrame`, and a rasterizer for meshes kept on the GPU, drawn by a WGSL corner program with a depth test (see `GpuService`) |
 | `agent-runtime` | `useApp().agentRuntime` is available (see [Agents](#agents))      |
 
@@ -380,6 +382,25 @@ The provider must support the **authorization code flow with PKCE**. The relay o
 5. Link what you show to Apple Music: Apple asks apps that play previews to link each one to its music. The Apple Music API gives catalog items a `url`, and `state.item.url` is the playing song's; `openInAppleMusic(url)` opens it in a new tab (and only `music.apple.com` links).
 
 The music stops when your app quits. `apps/Music.tsx` is a complete example.
+## The Computer Club
+
+The Macintosh's AI (`/api/chat`, `/api/generate-image`) is for members of the Mockintosh Computer Club, who join from the Apple menu and pay in credits. Your app's same-origin `fetch` carries the member's session, so you call those endpoints as you would any other. Each answer that cost credits says how many are left (`credits`). A refusal says why:
+
+- `401` with `code: "not_a_member"` — nobody is signed in to the Club.
+- `402` with `code: "out_of_credits"` — the member has none left.
+
+`useApp().club` (capability `club`) lets you show the balance and send people to the Club window:
+
+```tsx
+const { club, os } = useApp();
+const { member, credits } = await club!.status(); // credits: number | null
+// After a 401 or 402:
+if ((await os.showDialog({ message: "You're out of credits.", buttons: ["Cancel", "Computer Club…"] })) === "Computer Club…") {
+  club!.open();
+}
+```
+
+`apps/Assistant.tsx` is a complete example.
 
 ## Sound
 

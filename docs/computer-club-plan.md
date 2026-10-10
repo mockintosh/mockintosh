@@ -1,6 +1,6 @@
 # Mockintosh Computer Club: accounts and AI credits
 
-Plan, 9 October 2026. Phase 1 (accounts) is built, not yet deployed; the rest are proposals. Provisioned so far: a free Neon database `mockintosh-club` in us-east-1 (next to the functions in `iad1`), connected to the `mockintosh` project as `DATABASE_URL`, and Resend sending from `mail.mockintosh.com` with `RESEND_API_KEY`. Better Auth's tables are created. Polar is still to be set up. Companion to the [server infrastructure plan](server-infrastructure-plan.md) and the Polar section of [FUTURE.md](../FUTURE.md).
+Plan, 9 October 2026. Phases 1 (accounts) and 2 (credits) are built, not yet deployed; the rest are proposals. Provisioned so far: a free Neon database `mockintosh-club` in us-east-1 (next to the functions in `iad1`), connected to the `mockintosh` project as `DATABASE_URL`, and Resend sending from `mail.mockintosh.com` with `RESEND_API_KEY`. Better Auth's tables and the credit tables are created. Polar is still to be set up. Companion to the [server infrastructure plan](server-infrastructure-plan.md) and the Polar section of [FUTURE.md](../FUTURE.md).
 
 ## Context
 
@@ -50,7 +50,7 @@ Apple menu ▸ Join Mockintosh Computer Club…  ─▶  Computer Club window (F
 - **`credit_ledger(id, user_id, delta BIGINT, kind TEXT CHECK (kind IN ('grant','purchase','usage','refund','adjust')), ref TEXT UNIQUE, model TEXT, input_tokens INT, output_tokens INT, cost_microusd BIGINT, created_at)`**.
   - `ref` is the idempotency key. It holds the Polar order id, `signup:<userId>`, or the request id.
   - Every balance change is one transaction: insert the ledger row, then `UPDATE credit_balance`.
-- **Units**: store credits as integers. Assume 1 credit = $0.001 of retail value, with the model cost × markup set in `api/_pricing.ts`. The UI shows "credits" (exact pack sizes and prices are open questions below).
+- **Units**: credits are integers; 1 credit = $0.001 of retail value, so $10 buys 10,000. A call costs twice what the gateway reports it cost us (`usage.cost` for chat, `providerMetadata.gateway.cost` for images), rounded up, at least 1 (`api/_pricing.ts`). The UI shows "credits" (exact pack sizes and prices are open questions below).
 
 ## Server work
 
@@ -105,8 +105,8 @@ Apple menu ▸ Join Mockintosh Computer Club…  ─▶  Computer Club window (F
 
 ## Phases (each one shippable)
 
-1. **Accounts.** Add Better Auth with email/password, the migrations, the Club window (join, sign in, sign out), the Apple menu item, and session auth in the guard. Members can use the Assistant within the existing rate limits.
-2. **Credits.** Add the ledger, pricing and metering in chat and image, the free grant, 402 handling, and balance and usage in the Club window and the Assistant. **Do not open to the public before this phase.**
+1. **Accounts** (built). Add Better Auth with email/password, the migrations, the Club window (join, sign in, sign out), the Apple menu item, and session auth in the guard. Members can use the Assistant within the existing rate limits.
+2. **Credits** (built). Add the ledger, pricing and metering in chat and image, the free grant, 402 handling, and balance and usage in the Club window and the Assistant. **Do not open to the public before this phase.**
 3. **Purchases.** Create the Polar products (credit packs) and add the plugin, the checkout sheet, the webhook grant, the portal link and the thanks page.
 4. **GitHub and Google.** Add device authorization, the `/club/device` page, the QR sheet and cookie adoption.
 5. **Docs.** Fix the stale `api/checkout` / `api/verify-purchase` line in `ARCHITECTURE.md:432` and describe the Club. Update the Polar section of `FUTURE.md`: app licenses can now attach to a member. Update `todo.md:5`.
@@ -122,10 +122,15 @@ Apple menu ▸ Join Mockintosh Computer Club…  ─▶  Computer Club window (F
 - **Abuse of the free grant.** The grant requires a verified email and is capped per IP per day. The global daily limits stay as a backstop.
 - **Legal.** Add terms, a privacy page and account deletion (Better Auth `deleteUser`; the Polar plugin deletes the customer). Polar handles VAT, receipts and refunds; refunds go through the `order.refunded` webhook to a `refund` ledger row.
 
-## Open decisions (defaults assumed above)
+## Decisions
 
-- Credit pack sizes and prices, and the markup over gateway cost.
-- The free grant size (the default is about 20 typical chat replies).
+- **Markup: 2×** the gateway's cost. On a $10 pack bought with a non-US card, Polar's fees (5% + 50¢, +1.5%) take about 12%, which leaves about $3.85 after the AI it buys. That margin also pays for welcome credits and failed calls.
+- **Packs: $10, $20 and $50** (10,000, 20,000 and 50,000 credits), priced with VAT added at checkout rather than included.
+- **Welcome credits: 500**, granted once when the email is verified, at most 3 per IP address per day. Measured in October 2026: an Assistant reply costs about 15–20 credits when the gateway has its 17,500-token prompt cached, and about 175 when it doesn't (the first reply after a quiet spell). 500 is roughly 20–30 replies.
+- **Overdraft:** a member may have 3 requests in flight; each is charged once it is done.
+
+## Open decisions
+
 - Whether to add Apple sign-in later; it needs a paid developer account.
 
 ## Verification
