@@ -1,9 +1,11 @@
 {
   "framework": null,
-  "installCommand": "cd ../.. && npm ci",
   "buildCommand": "",
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/api/auth/:path*", "destination": "/api/auth/[...all]" }
+    {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth/[...all]"
+    }
   ]
 }
