@@ -92,6 +92,7 @@ const HOST_RESERVED: ReadonlyMap<string, RegExp | null> = new Map([
 const AUTHENTIC: Readonly<Record<string, readonly string[]>> = {
   macpaint: ["⌘M"], // Align Middle, as in MacPaint 1.0
   photobooth: ["⌘T"], // Take Photo, as in Photo Booth
+  calendar: ["⌘T"], // Go to Today, as in Calendar
 };
 
 /** Everything in `items` with a shortcut, inside submenus too (dimmed or not). */

@@ -29,6 +29,7 @@ export type PointerType =
   | "mousedown"
   | "mouseup"
   | "dblclick"
+  | "contextmenu"
   | "scroll";
 
 /** Host pointer. `"touch"` (and coarse fingers reported as mouse) can pan overflow. */
@@ -87,7 +88,8 @@ export function createDoubleClickTracker(options?: {
 export interface PointerDispatcher {
   /**
    * Deliver a pointer event. `"scroll"` returns whether an overflow pane
-   * moved or an `onScroll` handler claimed the delta. Other types return false.
+   * moved or an `onScroll` handler claimed the delta; `"contextmenu"` whether
+   * an `onContextMenu` handler took it. Other types return false.
    */
   dispatch(
     type: PointerType,
@@ -700,6 +702,19 @@ export function createPointerDispatcher(
         // A finger leaves no pointer. Do not keep the last box hovered.
         if (kind === "touch") pointerAt = null;
         setHovered(kind === "touch" ? null : hit);
+        return false;
+      }
+
+      if (type === "contextmenu") {
+        const hit = hitTest(root, x, y);
+        setHovered(hit);
+        for (let node = hit; node; node = node.parent) {
+          const handler = node._eventHandlers.onContextMenu;
+          if (!handler) continue;
+          const { lx, ly } = localOf(node, x, y);
+          handler(lx, ly, x, y);
+          return true;
+        }
         return false;
       }
 

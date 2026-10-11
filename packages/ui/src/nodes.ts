@@ -118,6 +118,12 @@ export interface MouseEventHandlers {
   onMouseMove?: (localX: number, localY: number) => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  /**
+   * A secondary click (right button, or ⌃-click) over this node or a
+   * descendant without a handler of its own: the innermost node with one
+   * gets it, with the screen position to put a contextual menu at.
+   */
+  onContextMenu?: (localX: number, localY: number, globalX: number, globalY: number) => void;
   /** The first move of a press. Reports where the press went down, so `onDrag` deltas from it lose no travel. */
   onDragStart?: (localX: number, localY: number, globalX: number, globalY: number) => void;
   onDrag?: (localX: number, localY: number, globalX: number, globalY: number) => void;
@@ -180,6 +186,7 @@ export function hasMouseHandlers(h: EventHandlers): boolean {
     h.onMouseMove ||
     h.onMouseEnter ||
     h.onMouseLeave ||
+    h.onContextMenu ||
     h.onDragStart ||
     h.onDrag ||
     h.onDragEnd ||
@@ -702,7 +709,7 @@ export function shadowRaise(node: CanvasNode): number {
 
 export const EVENT_PROP_NAMES = new Set<string>([
   "onClick", "onDoubleClick", "onMouseDown", "onMouseDownCapture", "onMouseUp",
-  "onMouseMove", "onMouseEnter", "onMouseLeave", "onDragStart", "onDrag", "onDragEnd",
+  "onMouseMove", "onMouseEnter", "onMouseLeave", "onContextMenu", "onDragStart", "onDrag", "onDragEnd",
   "onScroll", "onScrollX",
   "onKeyDown", "onKeyUp", "onKeyPress", "onPaste",
   "onFocus", "onBlur", "tabIndex", "autoFocus", "rawKeys", "tabKeys", "cursor",
