@@ -6,7 +6,7 @@
  */
 import { createSignal, type Accessor } from "solid-js";
 import type { FetchRequest, FetchResponse } from "@mockintosh/sdk";
-import type { ClubAccounts, ClubCredits, ClubMember, ClubSignInResult } from "../platform/types";
+import type { ClubAccounts, ClubConfig, ClubConnection, ClubCredits, ClubMember } from "../platform/types";
 
 export const CLUB_NAME = "Mockintosh Computer Club";
 
@@ -21,11 +21,14 @@ export interface SystemClub {
    * which may not show it until Solid flushes.
    */
   refresh(): Promise<{ member: ClubMember | null; credits: ClubCredits | null }>;
-  join(details: { name: string; email: string; password: string }): Promise<void>;
-  resendVerification(email: string): Promise<void>;
-  signIn(email: string, password: string): Promise<ClubSignInResult>;
+  /** How this computer signs in; asked once. */
+  config(): Promise<ClubConfig>;
+  sendCode(email: string): Promise<void>;
+  /** Signs in with an emailed code; `name` names a new member. */
+  signInWithCode(email: string, code: string, name?: string): Promise<ClubMember>;
+  /** Starts connecting on the Club's page; a `connected` poll signs this computer in. */
+  connect(): Promise<ClubConnection>;
   signOut(): Promise<void>;
-  forgotPassword(email: string): Promise<void>;
   /** A request to the Club for an app, with this computer's session (`useApp().club.fetch`). */
   fetch(path: string, init?: FetchRequest): Promise<FetchResponse>;
 }
@@ -62,28 +65,44 @@ export function createSystemClub(accounts: ClubAccounts): SystemClub {
     return { member: current, credits: await refreshCredits(!!current) };
   }
 
+  let config: Promise<ClubConfig> | undefined;
+
   void refresh();
 
   return {
     member,
     credits,
     refresh,
-    join: (details) => accounts.join(details),
-    resendVerification: (email) => accounts.resendVerification(email),
-    async signIn(email, password) {
-      const result = await accounts.signIn(email, password);
-      if (result.status === "signed-in") {
-        setMember(result.member);
-        await refreshCredits(true);
-      }
-      return result;
+    config() {
+      config ??= accounts.config().catch((error: unknown) => {
+        config = undefined;
+        throw error;
+      });
+      return config;
+    },
+    sendCode: (email) => accounts.sendCode(email),
+    async signInWithCode(email, code, name) {
+      const signedIn = await accounts.signInWithCode(email, code, name);
+      setMember(signedIn);
+      await refreshCredits(true);
+      return signedIn;
+    },
+    async connect() {
+      const connection = await accounts.connect();
+      return {
+        ...connection,
+        async poll() {
+          const answer = await connection.poll();
+          if (answer === "connected") await refresh();
+          return answer;
+        },
+      };
     },
     async signOut() {
       await accounts.signOut();
       setMember(null);
       setCredits(null);
     },
-    forgotPassword: (email) => accounts.forgotPassword(email),
     async fetch(path, init) {
       const resp = await accounts.fetch(path, init);
       // An app's request may have spent credits, or found the session over:

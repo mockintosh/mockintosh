@@ -1,10 +1,5 @@
 import type { FetchFunction, FetchResponse } from "@mockintosh/sdk";
-import type { ClubAccounts, ClubCredits, ClubMember, ClubSignInResult } from "../types";
-
-/** Where Better Auth sends a verification link once it has checked it (`sites/club/api/verified.ts`). */
-const VERIFIED_PAGE = "/api/verified";
-/** The page a password-reset link opens (`sites/club/api/reset-password.ts`). */
-const RESET_PAGE = "/api/reset-password";
+import type { ClubAccounts, ClubConfig, ClubConnection, ClubCredits, ClubMember } from "../types";
 
 interface AuthUser {
   name?: string;
@@ -14,10 +9,15 @@ interface AuthUser {
 
 /** What Better Auth's error bodies say, by `code`, in the Club window's words. */
 const MESSAGES: Record<string, string> = {
-  PASSWORD_TOO_SHORT: "Use a password of at least 8 characters.",
-  PASSWORD_TOO_LONG: "Use a password of at most 128 characters.",
   INVALID_EMAIL: "That doesn't look like an email address.",
+  INVALID_OTP: "That code didn't work. Check it, or send a new one.",
+  OTP_EXPIRED: "That code has expired. Send a new one.",
+  TOO_MANY_ATTEMPTS: "Too many tries with that code. Send a new one.",
 };
+
+/** What a device token answers while the member hasn't approved yet. */
+const STILL_WAITING = new Set(["authorization_pending", "slow_down"]);
+const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
 
 function member(user: AuthUser | undefined): ClubMember | null {
   if (!user?.email) return null;
@@ -98,25 +98,53 @@ export function createWebClubAccounts(fetch: FetchFunction, club: string): ClubA
       return signedIn;
     },
 
-    async join({ name, email, password }) {
-      const { status, data } = await call("/sign-up/email", { name, email, password, callbackURL: VERIFIED_PAGE });
+    async config(): Promise<ClubConfig> {
+      const resp = await fetch(`${club}/api/config`);
+      const data: any = await resp.json().catch(() => null);
+      if (!resp.ok || (data?.signIn !== "form" && data?.signIn !== "connect")) throw failure(resp.status, data);
+      const providers = Array.isArray(data.providers) ? data.providers.filter((p: unknown) => p === "github" || p === "google") : [];
+      return { signIn: data.signIn, providers };
+    },
+
+    async sendCode(email) {
+      const { status, data } = await call("/email-otp/send-verification-otp", { email, type: "sign-in" });
       if (status !== 200) throw failure(status, data);
     },
 
-    async resendVerification(email) {
-      const { status, data } = await call("/send-verification-email", { email, callbackURL: VERIFIED_PAGE });
-      if (status !== 200) throw failure(status, data);
-    },
-
-    async signIn(email, password): Promise<ClubSignInResult> {
-      const { status, data, resp } = await call("/sign-in/email", { email, password, rememberMe: true });
-      if (status === 403 && data?.code === "EMAIL_NOT_VERIFIED") return { status: "unverified" };
-      if (status === 401) return { status: "wrong-password" };
+    async signInWithCode(email, code, name) {
+      const otp = code.replace(/\D/g, "");
+      const { status, data, resp } = await call("/sign-in/email-otp", { email, otp, ...(name && { name }) });
       const signedIn = status === 200 ? member(data?.user) : null;
       const issued = resp.headers.get("set-auth-token") ?? (typeof data?.token === "string" ? data.token : null);
       if (!signedIn || !issued) throw failure(status, data);
       remember(issued);
-      return { status: "signed-in", member: signedIn };
+      return signedIn;
+    },
+
+    async connect(): Promise<ClubConnection> {
+      // The Club names this computer after the site in its request's Origin.
+      const { status, data } = await call("/device/code", {});
+      if (status !== 200 || typeof data?.device_code !== "string") throw failure(status, data);
+      const deviceCode: string = data.device_code;
+      const raw = String(data.user_code ?? "");
+      return {
+        code: raw.length === 8 ? `${raw.slice(0, 4)}-${raw.slice(4)}` : raw,
+        url: String(data.verification_uri_complete ?? data.verification_uri ?? `${club}/connect`),
+        expiresAt: Date.now() + Number(data.expires_in ?? 900) * 1000,
+        pollIntervalMs: Math.max(5, Number(data.interval ?? 5)) * 1000,
+        async poll() {
+          const answer = await call("/device/token", { grant_type: DEVICE_GRANT, device_code: deviceCode });
+          if (answer.status === 200 && typeof answer.data?.access_token === "string") {
+            remember(answer.data.access_token);
+            return "connected";
+          }
+          const error = answer.data?.error;
+          if (STILL_WAITING.has(error)) return "pending";
+          if (error === "access_denied") return "denied";
+          if (error === "expired_token") return "expired";
+          throw failure(answer.status, answer.data);
+        },
+      };
     },
 
     async signOut() {
@@ -126,11 +154,6 @@ export function createWebClubAccounts(fetch: FetchFunction, club: string): ClubA
       } finally {
         remember(null);
       }
-    },
-
-    async forgotPassword(email) {
-      const { status, data } = await call("/request-password-reset", { email, redirectTo: RESET_PAGE });
-      if (status !== 200) throw failure(status, data);
     },
 
     async credits(): Promise<ClubCredits | null> {

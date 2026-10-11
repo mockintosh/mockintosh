@@ -168,11 +168,31 @@ export interface ClubCredits {
   recent: Array<{ at: number; kind: "grant" | "purchase" | "usage" | "refund" | "adjust"; delta: number; model: string | null }>;
 }
 
-export type ClubSignInResult =
-  | { status: "signed-in"; member: ClubMember }
-  /** The email isn't verified yet: the link in the welcome email does that. */
-  | { status: "unverified" }
-  | { status: "wrong-password" };
+/** How this computer signs in to its Club (`GET /api/config` on the Club). */
+export interface ClubConfig {
+  /**
+   * `form`: the Club window asks for an email and the code the Club sends
+   * (Mockintosh's own sites only). `connect`: the member approves this
+   * computer on the Club's own page.
+   */
+  signIn: "form" | "connect";
+  /** Sign-in providers the Club's page offers (GitHub, Google), through `connect`. */
+  providers: Array<"github" | "google">;
+}
+
+/** A connection waiting for the member to approve it on the Club's page. */
+export interface ClubConnection {
+  /** What the page shows too, so the member can check they match: `ABCD-EFGH`. */
+  code: string;
+  /** The Club's page for this code, to open in a browser or show as a QR code. */
+  url: string;
+  /** Milliseconds since the epoch. */
+  expiresAt: number;
+  /** How often to call `poll`. */
+  pollIntervalMs: number;
+  /** Asks once; on `connected` this computer holds its new session. */
+  poll(): Promise<"pending" | "connected" | "denied" | "expired">;
+}
 
 /**
  * The Mockintosh Computer Club, a service of its own (`sites/club`) at the
@@ -182,14 +202,15 @@ export type ClubSignInResult =
 export interface ClubAccounts {
   /** Who this computer is signed in as, or `null`. */
   session(): Promise<ClubMember | null>;
-  /** Start a membership. The server emails a link that verifies the address; until then sign-in answers `unverified`. */
-  join(details: { name: string; email: string; password: string }): Promise<void>;
-  /** Email the verification link again. */
-  resendVerification(email: string): Promise<void>;
-  signIn(email: string, password: string): Promise<ClubSignInResult>;
+  /** How this computer may sign in. */
+  config(): Promise<ClubConfig>;
+  /** Emails a six-digit sign-in code (`form` only). The Club makes a membership for a new address. */
+  sendCode(email: string): Promise<void>;
+  /** Signs in with an emailed code; `name` names a new member. Throws when the code is wrong. */
+  signInWithCode(email: string, code: string, name?: string): Promise<ClubMember>;
+  /** Starts connecting this computer on the Club's page. */
+  connect(): Promise<ClubConnection>;
   signOut(): Promise<void>;
-  /** Email a link for choosing a new password (sent only if the address has a membership). */
-  forgotPassword(email: string): Promise<void>;
   /** The signed-in member's credits, or `null` when signed out. */
   credits(): Promise<ClubCredits | null>;
   /** A request to one of the Club's endpoints (`/api/chat`), with this computer's session. */

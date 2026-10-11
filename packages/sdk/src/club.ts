@@ -4,8 +4,9 @@ import type { FetchRequest, FetchResponse } from "./index";
  * The Mockintosh Computer Club: the account a person signs in to from the
  * Apple menu, a service of its own. Members pay for its AI (`/api/chat`,
  * `/api/generate-image`) in credits; a request without credits is refused
- * with `402` and `code: "out_of_credits"`, one without a membership with
- * `401` and `code: "not_a_member"`. An app calls the Club with `fetch`,
+ * with `402` and `code: "out_of_credits"`, one over the daily cap the
+ * member set for this Macintosh with `402` and `code: "over_daily_cap"`,
+ * one without a membership with `401` and `code: "not_a_member"`. An app calls the Club with `fetch`,
  * shows the balance with `status`, and sends people to the Club window
  * with `open`.
  */

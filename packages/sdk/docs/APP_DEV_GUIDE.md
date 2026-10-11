@@ -394,6 +394,7 @@ A refusal says why:
 
 - `401` with `code: "not_a_member"` — nobody is signed in to the Club.
 - `402` with `code: "out_of_credits"` — the member has none left.
+- `402` with `code: "over_daily_cap"` — the member capped what this Macintosh may spend a day, and it has; `error` says so in a sentence you can show.
 
 ```tsx
 const { club, os } = useApp();
