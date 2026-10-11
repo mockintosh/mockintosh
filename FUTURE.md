@@ -16,24 +16,21 @@ Full screen (the Macintosh "special presentation mode") and `onOpen` are in: an 
 
 Developers should be able to sell their apps in the App Store — either free or paid (one-time purchase or subscription). Payment processing would be handled by [Polar.sh](https://polar.sh), which acts as merchant of record and handles checkout, licensing, payouts, tax, and refunds.
 
+This now builds on the Mockintosh Computer Club ([plan](docs/computer-club-plan.md)), which already has accounts, Polar and a checkout for credits. A purchase belongs to a member instead of a licence key kept on one disk, and buying an app works like buying credits.
+
 ### Payment Flow
 
 ```
 User clicks "Buy $2.00" in App Store
-  → App Store calls POST /api/checkout { polar_product_id, origin }
-  → Edge Function creates Polar checkout session
-  → Returns { checkout_url, session_id }
-  → App Store opens PolarEmbedCheckout iframe overlay on canvas
-  → User completes payment in iframe
-  → Embed fires "success" event
-  → App Store calls POST /api/verify-purchase { session_id }
-  → Edge Function validates with Polar API
-  → Returns { license_key, entry_url }
+  → the Mac asks the Club for a checkout session (product, member)
+  → the Mac shows the payment sheet: a QR code for the phone, or "pay in this computer's browser"
+  → the member pays on Polar's own page (Apple Pay, Google Pay or a card)
+  → Polar's order.paid webhook records the purchase against the member, in the Club
+  → the Mac, polling the checkout, sees it paid and asks the Club for the bundle's entry URL
   → App Store loads the app bundle via AppLoader
-  → License stored in MockFS under /Mockintosh HD/System/Licenses/
 ```
 
-The checkout iframe is a real DOM element overlaid on the canvas — necessary because credit card input must live in Polar/Stripe's iframe for PCI compliance, and Apple Pay / Google Pay require real DOM elements.
+The earlier idea of Polar's embedded checkout in an iframe over the canvas is dropped. Card fields must stay Stripe's own frames, the page's cross-origin isolation (`COEP: credentialless`) may keep those frames from loading at all, and on copies of Mockintosh run by others the member couldn't tell a real checkout from a fake one. Polar's page in a real browser, usually on the phone, avoids all three.
 
 ### Registry Changes
 
@@ -50,40 +47,18 @@ The `registry.json` already supports `pricing` fields:
 }
 ```
 
-Types: `"free"` (public entry URL), `"one-time"` (pay once), `"subscription"` (monthly/yearly with `"interval"`). For paid apps, `"entry"` is `null` in the public registry — the real bundle URL is returned by `/api/verify-purchase` after license validation.
+Types: `"free"` (public entry URL), `"one-time"` (pay once), `"subscription"` (monthly/yearly with `"interval"`). For paid apps, `"entry"` is `null` in the public registry — the Club returns the real bundle URL to a member who owns the app.
 
-### New Backend Endpoints Needed
+### In the Club
 
-- **`/api/checkout`** — Creates a Polar checkout session. Requires `POLAR_ACCESS_TOKEN` env var.
-- **`/api/verify-purchase`** — Validates a completed purchase, returns `{ license_key, entry_url }`.
+- A checkout-session route for app products, next to the one for credit packs.
+- A `purchase` table: member, app, Polar order or subscription, status.
+- An entitlement route: the bundle's entry URL for an app the member owns (a subscription only while active).
+- On boot, the App Store asks the Club which apps the member owns, so purchases follow the member to another computer. Nothing is kept under `/System/Licenses/`.
 
-### License Storage
+### Open Question
 
-Licenses stored in MockFS as JSON files under `/Mockintosh HD/System/Licenses/`:
-
-```json
-{
-  "app_id": "cool-app",
-  "license_key": "lic_xxxxx",
-  "purchased_at": 1709740800000,
-  "pricing_type": "one-time"
-}
-```
-
-On reload, the boot sequence re-validates licenses:
-
-- **One-time purchases:** Call `/api/verify-purchase` to get a fresh `entry_url`.
-- **Subscriptions:** Same, but API checks if subscription is still active.
-
-### Dependencies Needed
-
-- `@polar-sh/checkout` — Embedded checkout iframe (OS `package.json`, not SDK)
-- `@polar-sh/sdk` — Server-side SDK for Edge Functions
-- `POLAR_ACCESS_TOKEN` — Environment variable in Vercel
-
-### No User Accounts Required
-
-The license key is the proof of purchase, stored locally in MockFS. If cleared, users re-enter their key (Polar sends it via email).
+Whose Polar organization sells a developer's app: the developer's own, with the Club creating checkouts through their token, or ours, paying developers out. The first keeps Mockintosh out of the money; the second makes one checkout and one receipt for everything.
 
 ### Developer Workflow
 
