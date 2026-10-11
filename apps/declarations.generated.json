@@ -273,6 +273,48 @@
    }
   }
  },
+ "calendar": {
+  "id": "calendar",
+  "title": "Calendar",
+  "icon": "calendar/icon",
+  "defaultSize": {
+   "width": 480,
+   "height": 300
+  },
+  "smallIcon": "calendar/icon-16x16",
+  "scrollable": true,
+  "resizable": true,
+  "minSize": {
+   "width": 380,
+   "height": 220
+  },
+  "about": {
+   "version": "1.0",
+   "description": "Keeps your events by the week. Drag in a day to add an event, drag it to move it or its bottom edge to change its length, and double-click it to rename it."
+  },
+  "sprites": {
+   "calendar/icon": {
+    "width": 32,
+    "height": 32,
+    "data": "AAAAAAAAAAAAAoAAAAoAAAACgAAACgAAAqqqqqqqqgAKqqqqqqqqoAqpZWVlZaqgCqlmZqmlqqAKqqZmqaqqoAqqpmapqqqgCqqlZWmqqqAKqqqqqqqqoAlVVVVVVVWgCVVVVVVVVaAJVVVVVVVVoAlVWlWqqVWgCVVqVaqpVaAJVapVVWlVoAlVWlVVpVWgCVVaVVWlVaAJVVpVVpVVoAlVWlVWlVWgCVVaVVpVVaAJVVpVWlVVoAlVWlVaVVWgCVWqpVpVVaAJVVVVVVVVoAlVVVVVVVWgCVVVVVVVVaACqqqqqqqqoACqqqqqqqqAAAAAAAAAAAAAAAAAAAAAAA=="
+   },
+   "calendar/icon-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "AIAIAACACAAKqqqAKmqmqCqqqqgqqqqoJVVVaCVlqWglpVloJWVZaCVlZWglZWVoJWVlaAqqqqgCqqqgAAAAAA=="
+   },
+   "calendar/previous": {
+    "width": 5,
+    "height": 7,
+    "data": "AoKCgoAoAoAo"
+   },
+   "calendar/next": {
+    "width": 5,
+    "height": 7,
+    "data": "oAoAoAoKCgoA"
+   }
+  }
+ },
  "showreel": {
   "id": "showreel",
   "title": "Showreel",

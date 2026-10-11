@@ -21,6 +21,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Foundry | `Foundry.tsx` | SDK-clean |
 | Safari | `Safari.tsx` | SDK-clean |
 | Maps | `Maps.tsx` | SDK-clean |
+| Calendar | `Calendar.tsx` | SDK-clean |
 | Testing | `Testing.tsx` | SDK-clean |
 | File | `FileViewer.tsx` | SDK-clean |
 | Preview | `Preview.tsx` | SDK-clean |
