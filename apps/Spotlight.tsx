@@ -11,8 +11,9 @@
  * when it is empty; so do ⌘Space and a click anywhere else. The panel opens
  * on the last search, selected, as Spotlight does.
  *
- * A shell app: it reads the app registry, the App Store's listings and the
- * whole file system, so it runs on the OS's thread and reaches the OS directly.
+ * Installed from the App Store. A shell app: it reads the app registry, the
+ * App Store's listings and the whole file system, so it runs on the OS's
+ * thread and reaches the OS directly.
  */
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
