@@ -54,7 +54,9 @@ function Segmented(props: { name: string; segments: readonly Segment[] }): JSX.E
                 {sprite() ? (
                   <image src={sprite()!} mode={inverted() ? "inverted" : "normal"} />
                 ) : (
-                  <text font="body" color={inverted() ? 0 : 1} stipple={segment().disabled} nowrap>
+                  // The line box holds the descenders below the capitals, so centring the box sets them high: start
+                  // the line where the capitals have as much room above as below.
+                  <text font="body" height={SEGMENT_H - 2} paddingTop={2} color={inverted() ? 0 : 1} stipple={segment().disabled} nowrap>
                     {segment().label}
                   </text>
                 )}
