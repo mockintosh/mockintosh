@@ -6,7 +6,7 @@
  * Dragging an event leaves it where it is and draws where it would land over
  * the grid, so the node that took the press keeps it until release.
  */
-import { For, Show, createMemo, createSignal, onSettled } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { TextInput, fontLineHeight, measureText } from "@mockintosh/ui";
 import { WindowHeader, useApp } from "@mockintosh/sdk";
@@ -96,8 +96,10 @@ export function TimeGrid(props: ViewProps & { days: readonly Date[] }): JSX.Elem
   const allDayH = () => Math.max(1, lanes()) * LANE_H + 3;
   const todayIndex = () => props.days.findIndex((day) => sameDay(day, props.now));
 
+  // The grid is as wide as the window, whatever it's resized to: nothing to scroll across.
+  createEffect(width, (w) => win.setContentSize(w, GRID_H));
+
   onSettled(() => {
-    win.setContentSize(width(), GRID_H);
     // Half an hour above, so the hour's own label shows.
     win.scrollTo(FIRST_HOUR * HOUR_H - HOUR_H / 2);
   });
