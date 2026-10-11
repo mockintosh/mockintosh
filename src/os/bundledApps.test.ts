@@ -7,6 +7,7 @@ describe("bundled app listings", () => {
   it("matches each app's defineApp export", async () => {
     const listings = bundledApps();
     expect(listings.map((listing) => listing.id)).toEqual([
+      "spotlight",
       "dither",
       "trace",
       "assistant",
