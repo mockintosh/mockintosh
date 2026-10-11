@@ -366,9 +366,13 @@ function drawNode(
     const savedClip = snapshotClip(port);
     // Clip to the padding box so children can never paint over the border.
     const bw = resolveBorderWidth(node);
-    intersectClip(port, makeRect(y + bw, x + bw, y + height - bw, x + width - bw));
+    const inside = makeRect(y + bw, x + bw, y + height - bw, x + width - bw);
+    intersectClip(port, inside);
+    // Rounded, the padding box is the round rect inside the frame: the frame's
+    // curve cuts into the padding box's corners, and children would paint
+    // over those pixels if clipped to the outer round rect.
     const ovSize = boxOvalSize(node);
-    if (ovSize > 0) intersectClipRoundRect(port, r, ovSize);
+    if (ovSize > 0) intersectClipRoundRect(port, inside, Math.max(0, ovSize - 2 * bw));
     for (const child of node.children) drawNode(child, ctx, zIndex + 1, childOx, childOy);
     if (overflow === "scroll") paintOverflowScrollTrack(node, x, y, width, height);
     restoreClip(port, savedClip);

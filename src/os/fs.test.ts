@@ -39,7 +39,7 @@ describe("bootstrapFileSystem", () => {
     await bootstrapFileSystem(fs);
 
     const names = fs.children(fs.locate("desktop")!.id).map((n) => n.name);
-    const firstBoot = ["Photo Booth", "1984.mp4", "Safari", "Maps", "App Store", "Icon Gallery", "Showreel", "Terminal"];
+    const firstBoot = ["Photo Booth", "1984.mp4", "Safari", "Maps", "Calendar", "App Store", "Icon Gallery", "Showreel", "Terminal"];
     expect(names).toEqual([...firstBoot].sort((a, b) => a.localeCompare(b)));
     expect(names).not.toContain("Canvas");
     expect(names).not.toContain("MacPaint");

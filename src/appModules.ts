@@ -18,6 +18,7 @@ export const APP_MODULES: Readonly<Record<string, AppModuleLoader>> = {
   photobooth: () => import("@/apps/PhotoBooth"),
   safari: () => import("@/apps/Safari"),
   maps: () => import("@/apps/Maps"),
+  calendar: () => import("@/apps/Calendar"),
   showreel: () => import("@/apps/Showreel"),
   dither: () => import("@/apps/Dither"),
   trace: () => import("@/apps/Trace"),
