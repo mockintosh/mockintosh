@@ -20,8 +20,12 @@ export const CLUB_MENU_LABEL = "Computer Club…";
 
 const SIZE = { width: 300, height: 300 };
 const FIELD_LABEL_W = 60;
-/** How often the window tries signing in while it waits for the emailed link. */
-const VERIFY_POLL_MS = 5000;
+/**
+ * How often the window tries signing in while it waits for the emailed
+ * link. The Club allows 3 sign-in attempts per 10 seconds from one address;
+ * one a quarter-minute leaves room for the member's own Sign In.
+ */
+const VERIFY_POLL_MS = 15_000;
 /** When it stops trying: the link expires after an hour. */
 const VERIFY_POLL_LIMIT_MS = 60 * 60 * 1000;
 
