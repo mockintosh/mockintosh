@@ -1,5 +1,6 @@
 {
   "framework": null,
+  "installCommand": "cd ../.. && npm ci",
   "buildCommand": "",
   "outputDirectory": "public",
   "rewrites": [
