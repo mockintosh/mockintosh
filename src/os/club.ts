@@ -84,6 +84,13 @@ export function createSystemClub(accounts: ClubAccounts): SystemClub {
       setCredits(null);
     },
     forgotPassword: (email) => accounts.forgotPassword(email),
-    fetch: (path, init) => accounts.fetch(path, init),
+    async fetch(path, init) {
+      const resp = await accounts.fetch(path, init);
+      // An app's request may have spent credits, or found the session over:
+      // the Club window and menu catch up without waiting to be reopened.
+      if (resp.status === 401) void refresh();
+      else if (member()) void refreshCredits(true);
+      return resp;
+    },
   };
 }
