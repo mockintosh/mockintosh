@@ -26,7 +26,7 @@ function form(token: string, problem?: string): string {
 </form>`;
 }
 
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   if (req.method === "GET") {
     const query = new URL(req.url).searchParams;
     const token = query.get("token");
@@ -60,3 +60,6 @@ export default async function handler(req: Request): Promise<Response> {
     { title: TITLE },
   );
 }
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };

@@ -15,7 +15,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export default withCors(async (req) => {
+const handler = withCors(async (req) => {
   if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
   const credits = clubCredits();
   const auth = clubAuth();
@@ -25,3 +25,6 @@ export default withCors(async (req) => {
   const [balance, recent] = await Promise.all([credits.balance(member.id), credits.recent(member.id, RECENT)]);
   return json({ balance, recent });
 });
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };

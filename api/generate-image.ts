@@ -15,7 +15,7 @@ export const IMAGE_LIMITS: RouteLimits = {
 
 const MAX_PROMPT_CHARS = 2000;
 
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, IMAGE_LIMITS);
   if (!guard.ok) return guard.response;
   try {
@@ -114,3 +114,6 @@ export async function generateImage(
 
 /** Image generation can take a while; Node functions allow it. */
 export const maxDuration = 120;
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };

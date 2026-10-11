@@ -16,8 +16,11 @@ export function hostConfig(env: Record<string, string | undefined> = process.env
   return { club, ai: club ? "club" : env.AI_ACCESS === "open" ? "open" : "key" };
 }
 
-export default async function handler(): Promise<Response> {
+async function handler(): Promise<Response> {
   return new Response(JSON.stringify(hostConfig()), {
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };

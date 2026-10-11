@@ -13,7 +13,7 @@ import {
   thinkingFromText,
   type ChatMessage,
   type OpenAITool,
-} from "../src/shared/chatProtocol.js";
+} from "../packages/protocol/src/chatProtocol.js";
 
 const LLM_API_URL = `${GATEWAY_URL}/chat/completions`;
 const LLM_MODEL = gatewayModel(process.env.LLM_MODEL || "openai/gpt-5.6-sol");
@@ -117,7 +117,7 @@ export function staticPromptPrefix(mode: "chat" | "build"): string {
  */
 export type ChargeCall = (model: string, gatewayResponse: unknown) => Promise<number | undefined>;
 
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, CHAT_LIMITS);
   if (!guard.ok) return guard.response;
   try {
@@ -220,3 +220,6 @@ export async function answerChat(
 }
 
 export const maxDuration = 300;
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };

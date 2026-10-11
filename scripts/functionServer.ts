@@ -9,11 +9,19 @@ import { parseEnv } from "node:util";
 
 export type FunctionHandler = (req: Request) => Promise<Response>;
 
+/** A function module's default export: Vercel's `{ fetch }` (Node functions) or a plain function (Edge). */
+export type FunctionExport = FunctionHandler | { fetch: FunctionHandler };
+
+/** The handler a function module's default export names. */
+export function handlerOf(exported: FunctionExport): FunctionHandler {
+  return typeof exported === "function" ? exported : exported.fetch;
+}
+
 export interface FunctionRoutes {
   /** Handlers by exact path. */
-  exact: Record<string, FunctionHandler>;
+  exact: Record<string, FunctionExport>;
   /** Catch-all functions (`api/auth/[...all].ts`), by path prefix. */
-  prefix?: Array<[string, FunctionHandler]>;
+  prefix?: Array<[string, FunctionExport]>;
 }
 
 /**
@@ -92,14 +100,14 @@ export function serveFunctions(options: {
       return;
     }
     const path = new URL(req.url ?? "/", `http://localhost:${port}`).pathname;
-    const handler = routes.exact[path] ?? routes.prefix?.find(([prefix]) => path.startsWith(prefix))?.[1];
-    if (!handler) {
+    const exported = routes.exact[path] ?? routes.prefix?.find(([prefix]) => path.startsWith(prefix))?.[1];
+    if (!exported) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Not found" }));
       return;
     }
     try {
-      await sendWebResponse(await handler(toWebRequest(req, await readBody(req), port)), res);
+      await sendWebResponse(await handlerOf(exported)(toWebRequest(req, await readBody(req), port)), res);
     } catch (err) {
       console.error("Handler error:", err);
       res.writeHead(500, { "Content-Type": "application/json" });

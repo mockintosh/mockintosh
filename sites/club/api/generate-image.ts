@@ -8,7 +8,7 @@ import { guardRequest } from "../../../api/_guard.js";
 import { chargeImage, clubGuardEnv } from "./_club.js";
 import { withCors } from "./_cors.js";
 
-export default withCors(async (req) => {
+const handler = withCors(async (req) => {
   const guard = await guardRequest(req, IMAGE_LIMITS, clubGuardEnv());
   if (!guard.ok) return guard.response;
   try {
@@ -17,5 +17,8 @@ export default withCors(async (req) => {
     await guard.done();
   }
 });
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };
 
 export const maxDuration = 120;

@@ -6,7 +6,7 @@
 import { clubAuth } from "../_auth.js";
 import { withCors } from "../_cors.js";
 
-export default withCors(async (req) => {
+const handler = withCors(async (req) => {
   const auth = clubAuth();
   if (!auth) {
     return new Response(JSON.stringify({ message: "The Computer Club isn't open on this server yet." }), {
@@ -16,3 +16,6 @@ export default withCors(async (req) => {
   }
   return auth.handler(req);
 });
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };

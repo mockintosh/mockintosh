@@ -9,7 +9,7 @@
  * Writes scripts/agent-eval-out/<task>/{messages.json,summary.json,histogram.txt}
  */
 import { join } from "node:path";
-import handler from "../api/chat";
+import chat from "../api/chat";
 import { withHeadless } from "./companion/headless";
 import { runAgent } from "@mockintosh/agent";
 import { allAgentTools } from "../src/os/agent/tools";
@@ -51,7 +51,7 @@ const TASKS = [
 ];
 
 async function complete(messages: ChatMessage[], tools: OpenAITool[]): Promise<CompleteResult> {
-  const response = await handler(new Request("http://eval/api/chat", {
+  const response = await chat.fetch(new Request("http://eval/api/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

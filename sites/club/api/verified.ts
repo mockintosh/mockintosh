@@ -6,7 +6,7 @@ import { html, page } from "../../../api/_page.js";
 
 const TITLE = "Mockintosh Computer Club";
 
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   const error = new URL(req.url).searchParams.get("error");
   if (error) {
     return page(
@@ -21,3 +21,6 @@ export default async function handler(req: Request): Promise<Response> {
     { title: TITLE },
   );
 }
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };
