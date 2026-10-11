@@ -1,9 +1,10 @@
 /**
- * GET /api/club/credits — the signed-in member's credits and their latest
+ * GET /api/credits — the signed-in member's credits and their latest
  * changes, for the Computer Club window and apps' `useApp().club`.
  */
-import { clubAuth, memberFromRequest } from "../_auth.js";
-import { clubCredits } from "../_credits.js";
+import { clubAuth, memberFromRequest } from "./_auth.js";
+import { withCors } from "./_cors.js";
+import { clubCredits } from "./_credits.js";
 
 const RECENT = 8;
 
@@ -14,7 +15,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default withCors(async (req) => {
   if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
   const credits = clubCredits();
   const auth = clubAuth();
@@ -23,4 +24,4 @@ export default async function handler(req: Request): Promise<Response> {
   if (!member) return json({ error: "Not signed in", code: "not_a_member" }, 401);
   const [balance, recent] = await Promise.all([credits.balance(member.id), credits.recent(member.id, RECENT)]);
   return json({ balance, recent });
-}
+});

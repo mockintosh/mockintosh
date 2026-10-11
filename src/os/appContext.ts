@@ -242,6 +242,7 @@ function appClub(os: OSServices, club: SystemClub): ClubService {
       return { member: !!member, credits: credits?.balance ?? null };
     },
     open: () => void openComputerClub(os),
+    fetch: (path, init) => club.fetch(path, init),
   };
 }
 

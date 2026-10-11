@@ -30,7 +30,7 @@ export interface MigrationReport {
 
 export async function migrate(dialect: Dialect, options: { print?: boolean } = {}): Promise<MigrationReport> {
   // Migrations only read the schema the options describe; nothing is signed or sent.
-  const authOptions = clubAuthOptions({ dialect, secret: "migrate", sendEmail: async () => {}, hosts: [] });
+  const authOptions = clubAuthOptions({ dialect, secret: "migrate", sendEmail: async () => {}, hosts: [], macOrigins: [] });
   const auth = await getMigrations(authOptions);
   const db = new Kysely<any>({ dialect });
   const changes: string[] = [];

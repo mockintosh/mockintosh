@@ -4,7 +4,7 @@ import { PGliteDialect } from "kysely-pglite-dialect";
 import { beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../db/migrate";
 import { WELCOME_CREDITS, WELCOMES_PER_ADDRESS_PER_DAY, createCredits, welcomeMember, type Credits } from "./_credits";
-import { createMemoryCounters } from "./_guard";
+import { createMemoryCounters } from "../../../api/_guard";
 import type { Usage } from "./_pricing";
 
 let credits: Credits;

@@ -2,23 +2,33 @@
  * The Mockintosh Computer Club's accounts: Better Auth on the Club's
  * Postgres database, served at `/api/auth/*` (`api/auth/[...all].ts`).
  * Members join with email and password from the Club window; the email
- * must be verified before they can sign in. The session is an httpOnly
- * cookie on this origin, so app processes' same-origin `fetch` carries it
- * to `/api/chat` without seeing it. See docs/computer-club-plan.md.
+ * must be verified before they can sign in. Macintoshes on any site call
+ * the Club, so a session travels as a bearer token (`set-auth-token` on
+ * sign-in, `Authorization: Bearer` after), never as a cookie. See
+ * docs/computer-club-plan.md.
  */
 import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { bearer } from "better-auth/plugins";
 import type { Dialect } from "kysely";
 import { databaseDialect } from "./_db.js";
 import { emailSender, type SendEmail } from "./_email.js";
 import { clubCredits, welcomeMember } from "./_credits.js";
-import { clientAddress, guardEnvFromProcess } from "./_guard.js";
+import { clientAddress, guardEnvFromProcess } from "../../../api/_guard.js";
 
 /** Where Better Auth's routes live; the Club window calls them here. */
 export const AUTH_BASE_PATH = "/api/auth";
-/** Where a verification link lands once the email is verified (`api/club/verified.ts`). */
-export const VERIFIED_PATH = "/api/club/verified";
-/** The page a password-reset link opens (`api/club/reset-password.ts`). */
-export const RESET_PASSWORD_PATH = "/api/club/reset-password";
+/** Where a verification link lands once the email is verified (`api/verified.ts`). */
+export const VERIFIED_PATH = "/api/verified";
+/** The page a password-reset link opens (`api/reset-password.ts`). */
+export const RESET_PASSWORD_PATH = "/api/reset-password";
+
+/** Where `npm run dev:club` serves the Club. */
+export const LOCAL_URL = "http://localhost:3002";
+
+/** Mockintosh's own sites, whose Macs show the sign-in form: production, its previews, and `MAC_ORIGINS`. */
+export const OWN_MAC_ORIGINS = ["https://mockintosh.com", "https://*.mockintosh.com", "https://mockintosh-*-mossive.vercel.app"];
+/** Locally the Mac is on whatever port Vite got. */
+const LOCAL_MAC_ORIGINS = ["http://localhost:*", "http://127.0.0.1:*"];
 
 /** A member stays signed in on a Macintosh for 30 days after its last use. */
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
@@ -36,6 +46,12 @@ export interface ClubAuthEnv {
   hosts: readonly string[];
   /** Off Vercel: the API server's own URL, which email links point at. */
   localURL?: string;
+  /**
+   * Sites whose Macintosh may show the Club's own sign-in form (patterns,
+   * `https://*.mockintosh.com`). Better Auth refuses sign-up and sign-in
+   * from any other `Origin`; those Macs connect on the Club's pages.
+   */
+  macOrigins: readonly string[];
   /** Runs once a member's email is verified: their welcome credits. */
   welcome?: (memberId: string, request?: Request) => Promise<void>;
 }
@@ -48,9 +64,9 @@ export function clubAuthOptions(env: ClubAuthEnv) {
     basePath: AUTH_BASE_PATH,
     baseURL: hosted
       ? { allowedHosts: [...env.hosts], fallback: `https://${env.hosts[0]}` }
-      : (env.localURL ?? "http://localhost:3001"),
-    // The local API server sits behind Vite's proxy, on whatever port it got.
-    trustedOrigins: hosted ? [] : ["http://localhost:*", "http://127.0.0.1:*"],
+      : (env.localURL ?? LOCAL_URL),
+    trustedOrigins: [...env.macOrigins],
+    plugins: [bearer()],
     database: { dialect: env.dialect, type: "postgres", transaction: true },
     session: { expiresIn: SESSION_SECONDS },
     // Better Auth skips the origin check under a test runner; keep the production behaviour there too.
@@ -151,6 +167,11 @@ export function clubAuth(): ClubAuth | null {
     sendEmail: emailSender(),
     hosts: process.env.VERCEL ? deploymentHosts() : [],
     localURL: process.env.BETTER_AUTH_URL,
+    macOrigins: [
+      ...OWN_MAC_ORIGINS,
+      ...(process.env.VERCEL ? [] : LOCAL_MAC_ORIGINS),
+      ...(process.env.MAC_ORIGINS ?? "").split(",").map((origin) => origin.trim()).filter(Boolean),
+    ],
     welcome: welcomeNewMember,
   });
   return auth;

@@ -25,6 +25,8 @@ import type {
   GpuService,
   Capability,
   FetchFunction,
+  FetchRequest,
+  FetchResponse,
   DownloadService,
   FontRasterService,
   ImageService,
@@ -173,9 +175,9 @@ export type ClubSignInResult =
   | { status: "wrong-password" };
 
 /**
- * The Mockintosh Computer Club's accounts (`api/auth` on the web host). The
- * session lives in an httpOnly cookie this side never sees; every call
- * here, and the app processes' same-origin requests, carry it.
+ * The Mockintosh Computer Club, a service of its own (`sites/club`) at the
+ * URL the host's config names. This side holds the session token and
+ * sends it with every call; apps reach the Club only through `fetch` here.
  */
 export interface ClubAccounts {
   /** Who this computer is signed in as, or `null`. */
@@ -190,6 +192,8 @@ export interface ClubAccounts {
   forgotPassword(email: string): Promise<void>;
   /** The signed-in member's credits, or `null` when signed out. */
   credits(): Promise<ClubCredits | null>;
+  /** A request to one of the Club's endpoints (`/api/chat`), with this computer's session. */
+  fetch(path: string, init?: FetchRequest): Promise<FetchResponse>;
 }
 
 /** Capabilities a platform declares outright; the rest follow from which services it provides. */

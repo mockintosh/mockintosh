@@ -40,6 +40,7 @@ import { createWebBrowserService } from "./browser";
 import { createWebMusicKit } from "./musicKit";
 import { createWebSignInRelay } from "./signInRelay";
 import { createWebClubAccounts } from "./club";
+import { DEFAULT_HOST_CONFIG, parseHostConfig, type HostConfig } from "../../shared/hostConfig";
 import { createWebFontRasterService } from "./fontRaster";
 import { leaveOnPurpose } from "./unloadGuard";
 export interface WebPlatformOptions {
@@ -47,6 +48,24 @@ export interface WebPlatformOptions {
   root: HTMLElement;
   width: number;
   height: number;
+  /** How this deployment is set up (`fetchHostConfig`): its Computer Club, if any. */
+  host: HostConfig;
+}
+
+/** How long boot waits for `/api/config` before assuming the default. */
+const CONFIG_TIMEOUT_MS = 2000;
+
+/**
+ * This deployment's setup (`api/config.ts`), or the default (our Computer
+ * Club) when it can't say: plain files with no `/api`, or no answer in time.
+ */
+export async function fetchHostConfig(): Promise<HostConfig> {
+  try {
+    const resp = await fetch("/api/config", { signal: AbortSignal.timeout(CONFIG_TIMEOUT_MS) });
+    return resp.ok ? parseHostConfig(await resp.json()) : DEFAULT_HOST_CONFIG;
+  } catch {
+    return DEFAULT_HOST_CONFIG;
+  }
 }
 
 /** The classic 512×342 screen — what the web build boots with. */
@@ -145,7 +164,7 @@ export function createWebPlatform(options: WebPlatformOptions): Platform {
     browser,
     musicKit: createWebMusicKit(browser, location.origin),
     signInRelay: createWebSignInRelay(webFetch, location.origin),
-    club: createWebClubAccounts(webFetch, location.origin),
+    club: options.host.club ? createWebClubAccounts(webFetch, options.host.club) : undefined,
     clipboard,
     printerLinks: createWebPrinterLinks(),
     download: createWebDownloadService(),

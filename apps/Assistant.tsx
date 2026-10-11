@@ -3,7 +3,7 @@ import type { JSX } from "@mockintosh/ui";
 import { Button, TextInput } from "@mockintosh/ui";
 import { useApp, defineApp } from "@mockintosh/sdk";
 import { allAgentTools, runAgent } from "@mockintosh/agent";
-import type { ChatMessage, CompleteResult, OpenAITool } from "@mockintosh/sdk";
+import type { ChatMessage, CompleteResult, FetchRequest, OpenAITool } from "@mockintosh/sdk";
 
 interface Line {
   kind: "user" | "assistant" | "activity";
@@ -37,6 +37,8 @@ function Assistant(_props: Record<string, unknown>): JSX.Element {
     ]);
   });
   const fetch = app.fetch!;
+  /** The AI's endpoints: the Computer Club's, with the member's session, or this Macintosh's own. */
+  const ai = (path: string, init: FetchRequest) => (app.club ? app.club.fetch(path, init) : fetch(path, init));
   const kernel = app.kernel!;
   const tools = allAgentTools(kernel.describe());
   const [lines, setLines] = createSignal<Line[]>([], { ownedWrite: true });
@@ -87,7 +89,7 @@ function Assistant(_props: Record<string, unknown>): JSX.Element {
 
   async function complete(messages: ChatMessage[], nextTools: OpenAITool[]): Promise<CompleteResult> {
     await persist(messages);
-    const resp = await fetch("/api/chat", {
+    const resp = await ai("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages, tools: nextTools, mode }),
@@ -101,7 +103,7 @@ function Assistant(_props: Record<string, unknown>): JSX.Element {
   }
 
   async function generateImage(prompt: string): Promise<string> {
-    const resp = await fetch("/api/generate-image", {
+    const resp = await ai("/api/generate-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),

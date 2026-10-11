@@ -384,23 +384,30 @@ The provider must support the **authorization code flow with PKCE**. The relay o
 The music stops when your app quits. `apps/Music.tsx` is a complete example.
 ## The Computer Club
 
-The Macintosh's AI (`/api/chat`, `/api/generate-image`) is for members of the Mockintosh Computer Club, who join from the Apple menu and pay in credits. Your app's same-origin `fetch` carries the member's session, so you call those endpoints as you would any other. Each answer that cost credits says how many are left (`credits`). A refusal says why:
+The Macintosh's AI is run by the Mockintosh Computer Club, a service of its own that people join from the Apple menu and pay in credits. `useApp().club` (capability `club`) is how an app reaches it:
+
+- `club.fetch(path, init)` sends a request to one of the Club's endpoints (`"/api/chat"`, `"/api/generate-image"`) with the member's session, which your app never sees. Each answer that cost credits says how many are left (`credits`).
+- `club.status()` tells you whether someone is a member and their credits.
+- `club.open()` opens the Club window, where people join, sign in and see their credits.
+
+A refusal says why:
 
 - `401` with `code: "not_a_member"` — nobody is signed in to the Club.
 - `402` with `code: "out_of_credits"` — the member has none left.
 
-`useApp().club` (capability `club`) lets you show the balance and send people to the Club window:
-
 ```tsx
 const { club, os } = useApp();
-const { member, credits } = await club!.status(); // credits: number | null
-// After a 401 or 402:
-if ((await os.showDialog({ message: "You're out of credits.", buttons: ["Cancel", "Computer Club…"] })) === "Computer Club…") {
+const resp = await club!.fetch("/api/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }),
+});
+if (resp.status === 402 && (await os.showDialog({ message: "You're out of credits.", buttons: ["Cancel", "Computer Club…"] })) === "Computer Club…") {
   club!.open();
 }
 ```
 
-`apps/Assistant.tsx` is a complete example.
+`club` is absent on a Macintosh set up without a Club. `apps/Assistant.tsx` is a complete example.
 
 ## Sound
 

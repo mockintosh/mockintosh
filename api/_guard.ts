@@ -4,19 +4,20 @@
  * ones that fetch the web for Safari. Anyone who can reach the function
  * can send it a request, so each one passes, in order:
  *
- *   0. Authentication — a Mockintosh Computer Club member's session cookie
- *      (`api/_auth.ts`), or `Authorization: Bearer <API_ACCESS_TOKEN>` for
- *      our own scripts (`npm run agent:eval`). Anyone else is refused, on
- *      every host: there are no anonymous model responses. The limits
- *      below still apply, in case a token leaks.
+ *   0. Authentication — `Authorization: Bearer <API_ACCESS_TOKEN>` for our
+ *      own scripts (`npm run agent:eval`), or, where the Computer Club runs
+ *      this guard (`sites/club`), a member's session token. Anyone else is
+ *      refused, on every host: there are no anonymous model responses. The
+ *      limits below still apply, in case a token leaks.
  *   1. Origin — a browser always sends `Origin` on a POST; it must be this
  *      deployment (or `ALLOWED_ORIGINS`). This stops other sites and casual
- *      scripts, not a determined caller, who can forge the header. For a
- *      member it is also what stops another site spending their cookie.
+ *      scripts, not a determined caller, who can forge the header. The
+ *      Club skips it: its callers are Macintoshes on any site, and a bearer
+ *      token, unlike a cookie, isn't sent unless the caller has it.
  *   2. Size — the body is read up to a cap, whatever `Content-Length` says.
  *   3. Limits — a fixed-window count per member (per client IP for the
  *      token), and one per day for everyone together.
- *   4. Credits — a member needs some left (`api/_credits.ts`), and may have
+ *   4. Credits — a member needs some left (`sites/club/api/_credits.ts`), and may have
  *      only a few requests running at once. Each is charged what it cost
  *      once it is done, so a balance can dip a little below zero; the
  *      in-flight cap bounds how far.
@@ -59,12 +60,14 @@ export type Caller =
 export interface GuardEnv {
   /** The bearer token our own scripts present; `null` = none accepted. */
   accessToken: string | null;
-  /** The Computer Club member whose session the request carries, if any. */
-  member(req: Request): Promise<{ id: string } | null>;
-  /** A member's credits. */
-  balance(memberId: string): Promise<number>;
+  /** The Computer Club member whose session the request carries, if any. Absent = no members here. */
+  member?(req: Request): Promise<{ id: string } | null>;
+  /** A member's credits; needed wherever `member` is. */
+  balance?(memberId: string): Promise<number>;
   /** True on a hosted deployment, where callers are strangers. */
   hosted: boolean;
+  /** Check `Origin` on a hosted deployment (default). The Club turns it off. */
+  checkOrigin?: boolean;
   /** Origins besides the request's own host, e.g. a custom domain. */
   allowedOrigins: readonly string[];
   store: CounterStore | null;
@@ -177,7 +180,7 @@ export function guardEnvFromProcess(): GuardEnv {
       .map((host) => `https://${host}`),
   ];
   const accessToken = process.env.API_ACCESS_TOKEN?.trim() || null;
-  defaultEnv = { accessToken, member: memberFromSession, balance: memberBalance, hosted, allowedOrigins, store, now: Date.now };
+  defaultEnv = { accessToken, hosted, allowedOrigins, store, now: Date.now };
   return defaultEnv;
 }
 
@@ -196,19 +199,6 @@ function sameSecret(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** Loaded on first use, so the free endpoints never load Better Auth. */
-async function memberFromSession(req: Request): Promise<{ id: string } | null> {
-  const { clubAuth, memberFromRequest } = await import("./_auth.js");
-  return memberFromRequest(clubAuth(), req);
-}
-
-async function memberBalance(memberId: string): Promise<number> {
-  const { clubCredits } = await import("./_credits.js");
-  const credits = clubCredits();
-  if (!credits) throw new Error("No database for credits");
-  return credits.balance(memberId);
-}
-
 function hasServiceToken(req: Request, env: GuardEnv): boolean {
   if (!env.accessToken) return false;
   const match = /^Bearer\s+(.+)$/i.exec(req.headers.get("authorization") ?? "");
@@ -217,7 +207,7 @@ function hasServiceToken(req: Request, env: GuardEnv): boolean {
 
 async function authenticate(req: Request, env: GuardEnv): Promise<Caller | null> {
   if (hasServiceToken(req, env)) return { kind: "service" };
-  const member = await env.member(req);
+  const member = env.member ? await env.member(req) : null;
   return member && { kind: "member", id: member.id };
 }
 
@@ -292,7 +282,7 @@ export async function guardRequest(req: Request, limits: RouteLimits, env: Guard
     return reply(503, "Service temporarily unavailable");
   }
   if (!caller) return reply(401, NOT_A_MEMBER, {}, "not_a_member");
-  if (env.hosted && !originAllowed(req, env)) return reply(403, "Forbidden");
+  if (env.hosted && env.checkOrigin !== false && !originAllowed(req, env)) return reply(403, "Forbidden");
   if (!env.store) return reply(503, "This endpoint needs a Redis store for its limits: set KV_REST_API_URL and KV_REST_API_TOKEN");
 
   const now = env.now();
@@ -318,6 +308,7 @@ export async function guardRequest(req: Request, limits: RouteLimits, env: Guard
   const store = env.store;
   const slot = `${limits.route}:in-flight:member:${caller.id}`;
   try {
+    if (!env.balance) throw new Error("Members but no balances");
     if ((await env.balance(caller.id)) <= 0) return reply(402, OUT_OF_CREDITS, {}, "out_of_credits");
     if ((await store.hit(slot, IN_FLIGHT_SECONDS)) > MAX_IN_FLIGHT) {
       await store.release(slot);

@@ -1,13 +1,12 @@
 import { envLimit, guardRequest, type GuardResult, type RouteLimits } from "./_guard.js";
 import { GATEWAY_URL, gatewayToken } from "./_gateway.js";
-import { chargeCaller } from "./_credits.js";
-import { imageUsage } from "./_pricing.js";
+import type { ChargeCall } from "./chat.js";
 
 const IMAGE_API_URL = `${GATEWAY_URL}/images/generations`;
 const IMAGE_MODEL = "openai/gpt-image-1.5";
 
 /** Each image costs far more than a chat turn. */
-const IMAGE_LIMITS: RouteLimits = {
+export const IMAGE_LIMITS: RouteLimits = {
   route: "image",
   maxBodyBytes: 8_000,
   perClient: { max: envLimit("IMAGE_LIMIT_PER_HOUR", 20), windowSeconds: 3600 },
@@ -20,13 +19,18 @@ export default async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, IMAGE_LIMITS);
   if (!guard.ok) return guard.response;
   try {
-    return await generate(req, guard);
+    return await generateImage(req, guard);
   } finally {
     await guard.done();
   }
 }
 
-async function generate(req: Request, guard: Extract<GuardResult, { ok: true }>): Promise<Response> {
+/** Answers a request the guard has let through; `charge` as for chat (`ChargeCall`). */
+export async function generateImage(
+  req: Request,
+  guard: Extract<GuardResult, { ok: true }>,
+  charge?: ChargeCall,
+): Promise<Response> {
 
   const token = gatewayToken(req);
   if (!token) {
@@ -86,12 +90,7 @@ async function generate(req: Request, guard: Extract<GuardResult, { ok: true }>)
     }
 
     const data = await imgResponse.json();
-    const generation = data.providerMetadata?.gateway?.generationId;
-    const credits = await chargeCaller(
-      guard.caller,
-      imageUsage(IMAGE_MODEL, data),
-      `usage:${typeof generation === "string" ? generation : crypto.randomUUID()}`,
-    );
+    const credits = await charge?.(IMAGE_MODEL, data);
     const b64 = data.data?.[0]?.b64_json ?? null;
 
     if (!b64) {

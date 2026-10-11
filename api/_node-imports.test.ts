@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 
 const API = resolve(import.meta.dirname, ".");
 const ROOT = resolve(API, "..");
+/** The Computer Club's functions, its own Vercel project (`sites/club`). */
+const CLUB_API = resolve(ROOT, "sites/club/api");
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -50,13 +52,15 @@ function reachableImports(entry: string): Array<{ from: string; specifier: strin
 }
 
 describe("Node API functions", () => {
-  const entries = sourceFiles(API).filter((file) => !isEdge(readFileSync(file, "utf8")));
+  const entries = [...sourceFiles(API), ...sourceFiles(CLUB_API)].filter((file) => !isEdge(readFileSync(file, "utf8")));
 
   it("finds the Node functions", () => {
-    expect(entries.map((file) => relative(API, file))).toEqual(expect.arrayContaining(["browse.ts", "web-image.ts"]));
+    expect(entries.map((file) => relative(ROOT, file))).toEqual(
+      expect.arrayContaining(["api/browse.ts", "api/web-image.ts", "sites/club/api/chat.ts", "sites/club/api/auth/[...all].ts"]),
+    );
   });
 
-  it.each(entries.map((file) => [relative(API, file), file]))("%s imports relative modules with their .js", (_name, file) => {
+  it.each(entries.map((file) => [relative(ROOT, file), file]))("%s imports relative modules with their .js", (_name, file) => {
     const bare = reachableImports(file).filter(({ specifier }) => !specifier.endsWith(".js"));
     expect(bare).toEqual([]);
   });

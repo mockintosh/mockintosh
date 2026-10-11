@@ -5,6 +5,7 @@
  * (`Platform.club`); this keeps the answers in signals.
  */
 import { createSignal, type Accessor } from "solid-js";
+import type { FetchRequest, FetchResponse } from "@mockintosh/sdk";
 import type { ClubAccounts, ClubCredits, ClubMember, ClubSignInResult } from "../platform/types";
 
 export const CLUB_NAME = "Mockintosh Computer Club";
@@ -25,6 +26,8 @@ export interface SystemClub {
   signIn(email: string, password: string): Promise<ClubSignInResult>;
   signOut(): Promise<void>;
   forgotPassword(email: string): Promise<void>;
+  /** A request to the Club for an app, with this computer's session (`useApp().club.fetch`). */
+  fetch(path: string, init?: FetchRequest): Promise<FetchResponse>;
 }
 
 export function createSystemClub(accounts: ClubAccounts): SystemClub {
@@ -81,5 +84,6 @@ export function createSystemClub(accounts: ClubAccounts): SystemClub {
       setCredits(null);
     },
     forgotPassword: (email) => accounts.forgotPassword(email),
+    fetch: (path, init) => accounts.fetch(path, init),
   };
 }

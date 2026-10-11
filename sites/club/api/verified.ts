@@ -1,8 +1,8 @@
 /**
- * GET /api/club/verified — where a Computer Club verification link lands
+ * GET /api/verified — where a Computer Club verification link lands
  * once Better Auth has checked it (`?error=…` when it couldn't).
  */
-import { html, page } from "../_page.js";
+import { html, page } from "../../../api/_page.js";
 
 const TITLE = "Mockintosh Computer Club";
 

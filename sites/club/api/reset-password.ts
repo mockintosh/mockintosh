@@ -1,11 +1,11 @@
 /**
- * /api/club/reset-password — the page a password-reset email opens. Better
+ * /api/reset-password — the page a password-reset email opens. Better
  * Auth checks the link and sends it here with `?token=…` (or `?error=…`);
  * the form posts the new password back here, which hands it to Better Auth.
  */
 import { APIError } from "better-auth/api";
-import { clubAuth } from "../_auth.js";
-import { html, page } from "../_page.js";
+import { clubAuth } from "./_auth.js";
+import { html, page } from "../../../api/_page.js";
 
 const TITLE = "Reset Password";
 const MIN_LENGTH = 8;

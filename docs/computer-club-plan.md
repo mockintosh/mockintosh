@@ -1,6 +1,6 @@
 # Mockintosh Computer Club: accounts and AI credits
 
-Plan, 9 October 2026; revised 11 October 2026 to make the Club a separate service. Phases 1 (accounts) and 2 (credits) are built inside the OS's own `api/`, not yet deployed; everything from phase 3 on is a proposal. Provisioned so far: a free Neon database `mockintosh-club` in us-east-1 (next to the functions in `iad1`), connected to the `mockintosh` Vercel project as `DATABASE_URL`, with Better Auth's tables and the credit tables created; Resend sending from `mail.mockintosh.com` with `RESEND_API_KEY`; `BETTER_AUTH_SECRET` in every environment. Polar is not set up yet. Companion to the [server infrastructure plan](server-infrastructure-plan.md).
+Plan, 9 October 2026; revised 11 October 2026 to make the Club a separate service. Phases 1 (accounts), 2 (credits) and 3 (the separate service) are built and run locally; nothing is deployed yet, and the Club's Vercel project doesn't exist. Everything from phase 4 on is a proposal. Provisioned so far: a free Neon database `mockintosh-club` in us-east-1 (next to the functions in `iad1`), connected to the OS's `mockintosh` Vercel project as `DATABASE_URL`, with Better Auth's tables and the credit tables created; Resend sending from `mail.mockintosh.com` with `RESEND_API_KEY`; `BETTER_AUTH_SECRET` in every environment. These move to the Club's project when it is created. Polar is not set up yet. Companion to the [server infrastructure plan](server-infrastructure-plan.md).
 
 ## Context
 
@@ -25,15 +25,23 @@ Mockintosh is open source, and most people running their own copy don't want a d
 - **Copies built from this repo use our Club by default** (`CLUB_URL` defaults to `https://club.mockintosh.com`), so the Assistant works out of the box and their users pay us for the AI. Setting `CLUB_URL` to nothing gives `key` mode.
 - **Apple sign-in comes later**, next to GitHub and Google, through the same popup; there is a paid Apple developer account for it.
 
-## What's built (phases 1 and 2)
+## What's built (phases 1 to 3)
 
-Built inside the OS's deployment, with a session cookie on mockintosh.com. Phase 3 moves it into the Club service; the pieces carry over mostly unchanged.
-
-- **Accounts:** `api/_auth.ts` (Better Auth: email and password, verification email before the first sign-in, password resets, 30-day httpOnly session), `api/auth/[...all].ts`, `api/club/verified.ts` and `api/club/reset-password.ts` (the pages email links open), `api/_email.ts` (Resend), `api/_db.ts` (Neon pool through Kysely).
-- **Credits:** `api/_credits.ts` (balance, ledger, idempotent grants and charges, welcome credits), `api/_pricing.ts` (cost from the gateway's response, 2×), `api/club/credits.ts` (balance and latest changes).
-- **Spending:** `api/_guard.ts` lets a member's session or the scripts' token through, counts limits per member, refuses with 402 at zero, and caps requests in flight. `api/chat.ts` and `api/generate-image.ts` charge after each answer and return the balance.
-- **Schema:** `db/migrate.ts` (Better Auth's tables, then `db/migrations/*.sql`), run by `npm run db:migrate`.
-- **On the Mac:** the Apple menu's "Join Mockintosh Computer Club…" / "Computer Club…"; the Club window (`apps/finder/ComputerClub.tsx`: join, sign in, forgot password, wait for the emailed link, member card with credits and the latest changes, sign out); `os.club` (`src/os/club.ts`); `Platform.club` (`src/platform/web/club.ts`); `useApp().club` with capability `club` (status and open the window); the Assistant's balance line and its Join… / Computer Club… alerts.
+- **The Club service** (`sites/club`, its own workspace with its own dependencies):
+  - **Accounts:** `api/_auth.ts` (Better Auth: email and password, verification email before the first sign-in, password resets, 30-day sessions as bearer tokens), `api/auth/[...all].ts`, `api/verified.ts` and `api/reset-password.ts` (the pages email links open), `api/_email.ts` (Resend), `api/_db.ts` (Neon pool through Kysely).
+  - **Credits:** `api/_credits.ts` (balance, ledger, idempotent grants and charges, welcome credits), `api/_pricing.ts` (cost from the gateway's response, 2×), `api/credits.ts` (balance and latest changes).
+  - **The AI:** `api/chat.ts` and `api/generate-image.ts` run the OS's own answering code (the root `api/chat.ts` and `api/generate-image.ts`) behind the shared guard (`api/_guard.ts`, with the Club's hooks in `api/_club.ts`), and charge after each answer.
+  - **CORS:** `api/_cors.ts` answers any site, without cookies; preflights are cached a day.
+  - **Schema:** `db/migrate.ts` (Better Auth's tables, then `db/migrations/*.sql`), run by `npm run db:migrate`.
+  - **Local:** `npm run dev:club` on port 3002 (`scripts/dev.ts`, sharing `scripts/functionServer.ts` with the OS's `dev:api`); `vercel.json` and `public/` for its Vercel project.
+- **The OS:** `api/config.ts` names the Club (`src/shared/hostConfig.ts`); the root `api/chat.ts` and `api/generate-image.ts` take only the scripts' token for now (phase 5 adds `key` and `open`).
+- **On the Mac:**
+  - The web platform asks `/api/config` at boot (`fetchHostConfig`) and has a Club only when it names one.
+  - `src/platform/web/club.ts` talks to the Club's URL with the bearer token, kept in the page's `localStorage`, which app processes (workers) can't reach.
+  - The Apple menu's "Join Mockintosh Computer Club…" / "Computer Club…", and the Club window (`apps/finder/ComputerClub.tsx`: join, sign in, forgot password, wait for the emailed link, member card with credits and the latest changes, sign out), backed by `os.club` (`src/os/club.ts`).
+  - `useApp().club` with capability `club`: `status`, `open`, and `fetch`, which sends a request to the Club with the session, so apps never see it.
+  - The Assistant calls the Club through `club.fetch`, and shows its balance and the Join… / Computer Club… alerts.
+- **Differences from the design below, for now:** the token lives in `localStorage` rather than a system file; the Assistant's prompt is still built by the Club from its copy of the OS (the Mac doesn't send its own yet); and the email sign-in form works only on Mockintosh's own sites (`OWN_MAC_ORIGINS` in `api/_auth.ts`, plus `MAC_ORIGINS`), since other copies are meant to connect through the Club's pages (phase 4).
 
 ## Target architecture: the Club as a separate service
 
@@ -67,7 +75,7 @@ With no Club, `Platform.club` is absent, so the Apple menu item, the Club window
 
 - **Bearer tokens, not cookies.** Browsers block third-party cookies, and Safari blocks them outright, so a copy on another site can't carry a Club cookie. The Mac sends `Authorization: Bearer <token>` (Better Auth's `bearer` plugin) to every Club endpoint.
 - **CORS.** The Club answers any origin for its API, without cookies (`Access-Control-Allow-Origin` echoing the origin, `Authorization` and `Content-Type` allowed, `set-auth-token` exposed). `Access-Control-Max-Age: 86400` keeps the preflight a once-a-day request per Mac. The OS's cross-origin isolation (`COEP: credentialless`) doesn't affect CORS requests.
-- **Who holds the token.** The OS, in a system file outside `/disk`. Apps never see it: `useApp().club` gains `fetch(path, init)` for Club endpoints, which the OS sends with the token, so the Assistant calls `club.fetch("/chat", …)` instead of its own `/api/chat`. A token on disk can be read by code running on the same origin, unlike the httpOnly cookie, so each token is limited:
+- **Who holds the token.** The OS, where app processes can't reach it (today the page's `localStorage`, which workers have no access to). Apps never see it: `useApp().club` gains `fetch(path, init)` for Club endpoints, which the OS sends with the token, so the Assistant calls `club.fetch("/chat", …)` instead of its own `/api/chat`. A token on disk can be read by code running on the same origin, unlike the httpOnly cookie, so each token is limited:
   - one per connected Mac, named after its site ("mockintosh.com", "foo.example"), listed on the Club's account page with Disconnect;
   - an optional daily spending cap per token, set when connecting;
   - revoked on Sign Out.
@@ -127,7 +135,7 @@ A checkout drawn entirely on the canvas isn't possible: confirming a paid Polar 
 
 1. **Accounts** (built). Better Auth with email and password, the Club window, the Apple menu item, session auth in the guard.
 2. **Credits** (built). The ledger, pricing, charging in chat and image, welcome credits, 402 handling, balance and latest changes in the Club window and the Assistant. **Don't open to the public before this.**
-3. **The Club as a separate service.** Move the Club into `sites/club`; bearer tokens and CORS instead of the cookie; `useApp().club.fetch` and the Assistant calling the Club; the OS's `/api/config`. The Mac's existing forms keep working against the Club, so the move can be tested on its own. A second Vercel project, with the database and secrets moved to it.
+3. **The Club as a separate service** (built, runs locally). Move the Club into `sites/club`; bearer tokens and CORS instead of the cookie; `useApp().club.fetch` and the Assistant calling the Club; the OS's `/api/config`. The Mac's existing forms keep working against the Club, so the move can be tested on its own. Still to do: the second Vercel project (root `sites/club`), the database and secrets moved to it, and `club.mockintosh.com` pointed at it.
 4. **Signing in on the Club.** Email codes in the Mac's form on the Club's own sites (the origin allowlist and `GET /config`); "Connect to the Computer Club…" with the popup or QR code, the connect page and its consent line; GitHub and Google; the account page with connected Macs and Disconnect; per-token spending caps.
 5. **Copies without a Club.** `key` mode with "Set AI Gateway Key…" in the Assistant, `open` mode, no Club interface when unconfigured, and a "Running your own Mockintosh" section in the README.
 6. **Buying credits.** Polar products and checkout sessions, the pack choice in the Club window, the payment sheet with its QR code and short `pay` links, the `order.paid` / `order.refunded` webhooks, and "Manage Purchases…".

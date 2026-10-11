@@ -1,10 +1,10 @@
-import type { FetchFunction } from "@mockintosh/sdk";
+import type { FetchFunction, FetchResponse } from "@mockintosh/sdk";
 import type { ClubAccounts, ClubCredits, ClubMember, ClubSignInResult } from "../types";
 
-/** Where Better Auth sends a verification link once it has checked it (`api/club/verified.ts`). */
-const VERIFIED_PAGE = "/api/club/verified";
-/** The page a password-reset link opens (`api/club/reset-password.ts`). */
-const RESET_PAGE = "/api/club/reset-password";
+/** Where Better Auth sends a verification link once it has checked it (`sites/club/api/verified.ts`). */
+const VERIFIED_PAGE = "/api/verified";
+/** The page a password-reset link opens (`sites/club/api/reset-password.ts`). */
+const RESET_PAGE = "/api/reset-password";
 
 interface AuthUser {
   name?: string;
@@ -25,16 +25,58 @@ function member(user: AuthUser | undefined): ClubMember | null {
   return { name: user.name || user.email, email: user.email, since: Number.isFinite(since) ? since : Date.now() };
 }
 
-/** The Computer Club's accounts, `api/auth/*` next to the OS (see `api/_auth.ts`). */
-export function createWebClubAccounts(fetch: FetchFunction, origin: string): ClubAccounts {
-  async function call(path: string, body?: unknown): Promise<{ status: number; data: any }> {
-    const resp = await fetch(`${origin}/api/auth${path}`, {
+/**
+ * Where this computer keeps its session token for `club`: the page's
+ * `localStorage`, which app processes (workers) can't reach, unlike the
+ * disk. Missing or blocked storage just means signing in again.
+ */
+function tokenStore(club: string) {
+  const key = `mockintosh.club.token:${club}`;
+  return {
+    get(): string | null {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    },
+    set(token: string | null): void {
+      try {
+        if (token) localStorage.setItem(key, token);
+        else localStorage.removeItem(key);
+      } catch {
+        // Kept for this session only.
+      }
+    },
+  };
+}
+
+/**
+ * The Computer Club at `club`, its own service (`sites/club`). Every call
+ * carries this computer's session token as `Authorization: Bearer`; the
+ * Club hands a new one back in `set-auth-token` on sign-in.
+ */
+export function createWebClubAccounts(fetch: FetchFunction, club: string): ClubAccounts {
+  const token = tokenStore(club);
+  let held = token.get();
+
+  function authorized(headers: Record<string, string> = {}): Record<string, string> {
+    return held ? { ...headers, Authorization: `Bearer ${held}` } : headers;
+  }
+
+  function remember(next: string | null): void {
+    held = next;
+    token.set(next);
+  }
+
+  async function call(path: string, body?: unknown): Promise<{ status: number; data: any; resp: FetchResponse }> {
+    const resp = await fetch(`${club}/api/auth${path}`, {
       method: body === undefined ? "GET" : "POST",
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      headers: authorized(body === undefined ? {} : { "Content-Type": "application/json" }),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const data = await resp.json().catch(() => null);
-    return { status: resp.status, data };
+    return { status: resp.status, data, resp };
   }
 
   function failure(status: number, data: any): Error {
@@ -47,9 +89,13 @@ export function createWebClubAccounts(fetch: FetchFunction, origin: string): Clu
 
   return {
     async session() {
+      if (!held) return null;
       const { status, data } = await call("/get-session");
       if (status !== 200) throw failure(status, data);
-      return member(data?.user);
+      const signedIn = member(data?.user);
+      // The Club ended the session (signed out elsewhere, or expired).
+      if (!signedIn) remember(null);
+      return signedIn;
     },
 
     async join({ name, email, password }) {
@@ -63,17 +109,23 @@ export function createWebClubAccounts(fetch: FetchFunction, origin: string): Clu
     },
 
     async signIn(email, password): Promise<ClubSignInResult> {
-      const { status, data } = await call("/sign-in/email", { email, password, rememberMe: true });
+      const { status, data, resp } = await call("/sign-in/email", { email, password, rememberMe: true });
       if (status === 403 && data?.code === "EMAIL_NOT_VERIFIED") return { status: "unverified" };
       if (status === 401) return { status: "wrong-password" };
       const signedIn = status === 200 ? member(data?.user) : null;
-      if (!signedIn) throw failure(status, data);
+      const issued = resp.headers.get("set-auth-token") ?? (typeof data?.token === "string" ? data.token : null);
+      if (!signedIn || !issued) throw failure(status, data);
+      remember(issued);
       return { status: "signed-in", member: signedIn };
     },
 
     async signOut() {
-      const { status, data } = await call("/sign-out", {});
-      if (status !== 200) throw failure(status, data);
+      try {
+        const { status, data } = await call("/sign-out", {});
+        if (status !== 200) throw failure(status, data);
+      } finally {
+        remember(null);
+      }
     },
 
     async forgotPassword(email) {
@@ -82,11 +134,16 @@ export function createWebClubAccounts(fetch: FetchFunction, origin: string): Clu
     },
 
     async credits(): Promise<ClubCredits | null> {
-      const resp = await fetch(`${origin}/api/club/credits`);
+      if (!held) return null;
+      const resp = await fetch(`${club}/api/credits`, { headers: authorized() });
       if (resp.status === 401) return null;
       const data: any = await resp.json().catch(() => null);
       if (!resp.ok || typeof data?.balance !== "number") throw failure(resp.status, data);
       return { balance: data.balance, recent: Array.isArray(data.recent) ? data.recent : [] };
+    },
+
+    fetch(path, init = {}) {
+      return fetch(`${club}${path}`, { ...init, headers: authorized(init.headers) });
     },
   };
 }

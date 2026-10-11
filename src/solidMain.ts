@@ -3,16 +3,19 @@
  * the web build, and boot the OS on it.
  */
 import "./systemApps";
-import { DEFAULT_SCREEN, createWebPlatform, guardUnload } from "./platform/web";
+import { DEFAULT_SCREEN, createWebPlatform, fetchHostConfig, guardUnload } from "./platform/web";
 import { installCompanionUI } from "./platform/web/companion";
 import { bootOS } from "./os/boot";
 
-bootOS(
-  createWebPlatform({
-    root: document.getElementById("root")!,
-    width: DEFAULT_SCREEN.width,
-    height: DEFAULT_SCREEN.height,
-  })
+fetchHostConfig().then(host =>
+  bootOS(
+    createWebPlatform({
+      root: document.getElementById("root")!,
+      width: DEFAULT_SCREEN.width,
+      height: DEFAULT_SCREEN.height,
+      host,
+    })
+  )
 ).then(os => {
   // Only the Finder running is nothing to lose: the disk keeps itself. Not in
   // development, where Vite reloads the page itself.

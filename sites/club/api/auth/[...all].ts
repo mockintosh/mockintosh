@@ -4,8 +4,9 @@
  * `api/_auth.ts`.
  */
 import { clubAuth } from "../_auth.js";
+import { withCors } from "../_cors.js";
 
-export default async function handler(req: Request): Promise<Response> {
+export default withCors(async (req) => {
   const auth = clubAuth();
   if (!auth) {
     return new Response(JSON.stringify({ message: "The Computer Club isn't open on this server yet." }), {
@@ -14,4 +15,4 @@ export default async function handler(req: Request): Promise<Response> {
     });
   }
   return auth.handler(req);
-}
+});
