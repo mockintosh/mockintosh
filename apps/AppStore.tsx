@@ -1,27 +1,11 @@
-import { For, Show, createMemo, createSignal, Loading, Errored } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, untrack, Loading, Errored } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { Button, defineSprite, type Sprite } from "@mockintosh/ui";
-import { useApp, type AppDeclaration, type AppManifest, defineApp } from "@mockintosh/sdk";
+import { useApp, type AppManifest, defineApp } from "@mockintosh/sdk";
 import { useOS } from "../src/os/context";
 import { bundledApps, bundledManifest, type BundledAppListing } from "../src/os/bundledApps";
 import { installedAppIds } from "../src/os/installedApps";
-
-interface RegistryEntry {
-  id: string;
-  title: string;
-  author: string;
-  version: string;
-  sdk: string;
-  description: string;
-  icon?: string;
-  permissions?: string[];
-  entry: string | null;
-  /**
-   * The publisher's declaration (their `manifest.json`): the icon's pixels,
-   * so the listing shows the real icon, and what installing needs to know.
-   */
-  declaration?: AppDeclaration;
-}
+import { loadRegistry, pendingPage, takePendingPage, type RegistryEntry } from "../src/os/appStoreLink";
 
 /** One catalog row, whether it ships in this build or comes from the registry. */
 interface StoreApp {
@@ -38,17 +22,9 @@ interface StoreApp {
   install: () => void;
 }
 
-const REGISTRY_URL =
-  "https://raw.githubusercontent.com/mockintosh/app-registry/main/registry.json";
-
 /** Icon column. Wide enough for a 32px icon and a two-line name in Geneva 9. */
 const CELL_W = 88;
 const GRID_GAP = 6;
-
-function sdkMajor(sdk: string): number {
-  const m = sdk.match(/(\d+)/);
-  return m ? parseInt(m[1], 10) : 0;
-}
 
 function rowsOf<T>(items: readonly T[], columns: number): T[][] {
   const cols = Math.max(1, columns);
@@ -144,17 +120,17 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
   const fetch = app.fetch;
   // Installing apps is a shell privilege, not an SDK power: reach the OS directly.
   const os = useOS();
-  const catalog = createMemo(async () => {
-    if (!fetch) return [] as RegistryEntry[];
-    const r = await fetch(REGISTRY_URL);
-    const data = (await r.json()) as { apps?: RegistryEntry[] };
-    return (data.apps ?? []).filter((e) => sdkMajor(e.sdk) >= 3);
-  });
+  const catalog = createMemo(async () => (fetch ? await loadRegistry(fetch) : ([] as RegistryEntry[])));
   // Reactive: installing (or trashing a .app in the Finder) updates the list.
   const installed = createMemo(() => new Set(installedAppIds(os.fs)));
   const [status, setStatus] = createSignal("");
   const [busyId, setBusyId] = createSignal<string | null>(null);
-  const [page, setPage] = createSignal<StoreApp | null>(null);
+  // A window opened to show one app (a Spotlight result) starts on its page.
+  const firstListing = untrack(() => {
+    const request = pendingPage();
+    return request && bundledApps().find((l) => l.id === request.appId);
+  });
+  const [page, setPage] = createSignal<StoreApp | null>(firstListing ? bundledListing(firstListing) : null);
   const columns = createMemo(() => {
     const inner = Math.max(CELL_W, win.width() - 16);
     return Math.max(1, Math.floor((inner + GRID_GAP) / (CELL_W + GRID_GAP)));
@@ -245,6 +221,22 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
     setPage(null);
     win.scrollTo(shelfScrollY);
   }
+
+  // Asked to show one app (a Spotlight result): turn to its page.
+  createEffect(pendingPage, (request) => {
+    if (!request) return;
+    takePendingPage();
+    const listing = bundledApps().find((l) => l.id === request.appId);
+    if (listing) {
+      if (untrack(page)?.id !== listing.id) openPage(bundledListing(listing));
+      return;
+    }
+    if (!fetch) return;
+    void loadRegistry(fetch).then((entries) => {
+      const entry = entries.find((e) => e.id === request.appId);
+      if (entry) openPage(registryListing(entry));
+    }, () => setStatus("Failed to load catalog."));
+  });
 
   return (
     <box

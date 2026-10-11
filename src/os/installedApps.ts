@@ -2,7 +2,8 @@
  * Installed apps live in the file system: each is a `MIME.app` file in the
  * Applications folder whose body is the `AppManifest`. Opening one from the
  * Finder launches the app; trashing it uninstalls. Installing also leaves a
- * shortcut on the desktop.
+ * shortcut on the desktop, except for a menubar app, which has its icon in
+ * the menubar instead.
  *
  * A manifest's `entry` is either a bundle URL, loaded through
  * `Platform.loadModule`, or `bundled:<id>`, loaded from the host's bundled-app
@@ -126,9 +127,9 @@ export function createAppInstaller(options: AppInstallerOptions): AppInstaller {
 
   return {
     async install(manifest) {
-      const { declaration } = await load(manifest);
+      const { app, declaration } = await load(manifest);
       await writeManifest(fs, withDeclaration(manifest, declaration));
-      await ensureDesktopShortcut(fs, manifest);
+      if (app.kind !== "menubar") await ensureDesktopShortcut(fs, manifest);
     },
 
     async loadInstalled() {

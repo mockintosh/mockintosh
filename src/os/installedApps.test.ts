@@ -87,6 +87,25 @@ describe("AppInstaller", () => {
     expect(toys).toHaveLength(1);
   });
 
+  it("leaves no desktop shortcut for a menubar app: its icon is in the menubar", async () => {
+    const base = toyListing("bar");
+    const listing: BundledAppListing = {
+      ...base,
+      load: async () => ({ default: { ...((await base.load()) as { default: object }).default, kind: "menubar" } }),
+    };
+    registerBundledApp(listing);
+    const fs = await disk();
+    const installer = createAppInstaller({ fs, sprites: new SpriteRegistry(), capabilities: new Set() });
+
+    await installer.install(bundledManifest(listing));
+
+    expect(getApp("bar")?.kind).toBe("menubar");
+    expect(installedAppIds(fs)).toContain("bar");
+    const shortcuts = fs.children(fs.locate("desktop")!.id).filter((n) => n.kind === "file" && n.type === MIME.appShortcut);
+    const targets = await Promise.all(shortcuts.map((n) => fs.readJSON<{ appId: string }>(n.id)));
+    expect(targets.map((t) => t?.appId)).not.toContain("bar");
+  });
+
   it("refuses a bundle URL when the platform cannot load modules", async () => {
     const fs = await disk();
     const installer = createAppInstaller({

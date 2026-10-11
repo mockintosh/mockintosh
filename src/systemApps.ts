@@ -6,7 +6,8 @@
  * so the page loads an app's code only if it has to run it on the OS's
  * thread; in a process the app loads it there. The Finder registers itself:
  * it is part of the shell and the boot sequence depends on it. App Store and
- * Icon Gallery are shell apps too and are loaded here.
+ * Icon Gallery are shell apps too and are loaded here. Spotlight is a shell
+ * app the App Store installs; it runs on the OS's thread once it is.
  */
 import { registerApp } from "./os/apps";
 import { registerBundledApp } from "./os/bundledApps";
@@ -15,6 +16,7 @@ import { APP_MODULES } from "./appModules";
 import declarations from "@/apps/declarations.generated.json";
 import AppStore from "@/apps/AppStore";
 import IconGallery from "@/apps/IconGallery";
+import { sprites as spotlightSprites } from "@/apps/spotlight/icons";
 import { sprites as ditherSprites } from "@/apps/dither/icons";
 import { sprites as traceSprites } from "@/apps/trace/icons";
 import { spotifySprites } from "@/apps/sprites/spotify";
@@ -38,6 +40,16 @@ for (const app of [AppStore, IconGallery]) registerApp(app);
 for (const id of ["testing", "file", "preview", "video", "photobooth", "safari", "maps", "calendar", "showreel", "terminal"]) {
   registerApp(declaredApp(declared[id]!, APP_MODULES[id]!));
 }
+
+registerBundledApp({
+  id: "spotlight",
+  title: "Spotlight",
+  description:
+    "Finds anything from the menubar: applications, documents, folders, System panels and App Store apps, the answer to a sum, and the web. ⌘Space (Control-Space in a browser) brings it up from anywhere.",
+  icon: "spotlight/icon",
+  sprites: spotlightSprites,
+  load: () => import("@/apps/Spotlight"),
+});
 
 registerBundledApp({
   id: "dither",
