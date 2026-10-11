@@ -11,12 +11,29 @@ const CLUB = resolve(import.meta.dirname, "..");
 
 loadEnvFiles([resolve(CLUB, ".env.local"), resolve(CLUB, "..", "..", ".env.local")]);
 
+// Without DATABASE_URL (or with it set to nothing), a database of its own in
+// `.dev-db`, so the Club runs without Neon. Delete the folder to start over.
+const LOCAL_DB = resolve(CLUB, ".dev-db");
+if (!process.env.DATABASE_URL) {
+  const [{ PGlite }, { PGliteDialect }, { useLocalDatabase }, { migrate }] = await Promise.all([
+    import("@electric-sql/pglite"),
+    import("kysely-pglite-dialect"),
+    import("../api/_db.js"),
+    import("../db/migrate.js"),
+  ]);
+  const local = new PGliteDialect(new PGlite(LOCAL_DB));
+  const { changes } = await migrate(local);
+  for (const change of changes) console.log(`  ${change}`);
+  useLocalDatabase(local);
+}
+
 const { default: authHandler } = await import("../api/auth/[...all].js");
 const { default: chatHandler } = await import("../api/chat.js");
 const { default: generateImageHandler } = await import("../api/generate-image.js");
 const { default: creditsHandler } = await import("../api/credits.js");
-const { default: verifiedHandler } = await import("../api/verified.js");
-const { default: resetPasswordHandler } = await import("../api/reset-password.js");
+const { default: configHandler } = await import("../api/config.js");
+const { default: accountHandler } = await import("../api/account.js");
+const { default: connectHandler } = await import("../api/connect.js");
 
 serveFunctions({
   port: PORT,
@@ -25,14 +42,15 @@ serveFunctions({
       "/api/chat": chatHandler,
       "/api/generate-image": generateImageHandler,
       "/api/credits": creditsHandler,
-      "/api/verified": verifiedHandler,
-      "/api/reset-password": resetPasswordHandler,
+      "/api/config": configHandler,
+      "/": accountHandler,
+      "/connect": connectHandler,
     },
     prefix: [["/api/auth/", authHandler]],
   },
   onListen() {
-    console.log(`Computer Club listening on http://localhost:${PORT}`);
-    console.log(`  Database: ${process.env.DATABASE_URL ? "DATABASE_URL" : "NOT CONFIGURED — run vercel env pull"}`);
+    console.log(`Computer Club listening on http://localhost:${PORT} (account page at /, connect page at /connect)`);
+    console.log(`  Database: ${process.env.DATABASE_URL ? "DATABASE_URL" : `local, in ${LOCAL_DB}`}`);
     console.log(`  Email: ${process.env.RESEND_API_KEY ? "Resend" : "printed here"}`);
   },
 });

@@ -17,7 +17,8 @@
  *   2. Size — the body is read up to a cap, whatever `Content-Length` says.
  *   3. Limits — a fixed-window count per member (per client IP for the
  *      token), and one per day for everyone together.
- *   4. Credits — a member needs some left (`sites/club/api/_credits.ts`), and may have
+ *   4. Credits — a member needs some left (`sites/club/api/_credits.ts`), their
+ *      session must be under its daily cap if it has one, and they may have
  *      only a few requests running at once. Each is charged what it cost
  *      once it is done, so a balance can dip a little below zero; the
  *      in-flight cap bounds how far.
@@ -53,7 +54,8 @@ export interface CounterStore {
 
 /** Who a request comes from, once it is authenticated. */
 export type Caller =
-  | { kind: "member"; id: string }
+  /** `sessionId`: the member's session (one connected Macintosh), when the host tracks it. */
+  | { kind: "member"; id: string; sessionId?: string }
   /** Our own scripts, with `API_ACCESS_TOKEN`. */
   | { kind: "service" };
 
@@ -61,9 +63,11 @@ export interface GuardEnv {
   /** The bearer token our own scripts present; `null` = none accepted. */
   accessToken: string | null;
   /** The Computer Club member whose session the request carries, if any. Absent = no members here. */
-  member?(req: Request): Promise<{ id: string } | null>;
+  member?(req: Request): Promise<{ id: string; sessionId?: string } | null>;
   /** A member's credits; needed wherever `member` is. */
   balance?(memberId: string): Promise<number>;
+  /** What the member's session may still spend today under its cap; `null` = no cap. */
+  capLeft?(caller: { id: string; sessionId?: string }): Promise<number | null>;
   /** True on a hosted deployment, where callers are strangers. */
   hosted: boolean;
   /** Check `Origin` on a hosted deployment (default). The Club turns it off. */
@@ -91,6 +95,10 @@ export const NOT_A_MEMBER =
 /** Why a member without credits is refused. */
 export const OUT_OF_CREDITS =
   "You're out of Computer Club credits. Choose Computer Club… from the Apple menu to see your balance.";
+
+/** Why a session over its daily cap is refused. */
+export const OVER_DAILY_CAP =
+  "This Macintosh has spent its Computer Club allowance for today. Raise it on club.mockintosh.com, or try again tomorrow.";
 
 /** Requests one member may have running at once (an agent runs one at a time). */
 export const MAX_IN_FLIGHT = 3;
@@ -208,7 +216,7 @@ function hasServiceToken(req: Request, env: GuardEnv): boolean {
 async function authenticate(req: Request, env: GuardEnv): Promise<Caller | null> {
   if (hasServiceToken(req, env)) return { kind: "service" };
   const member = env.member ? await env.member(req) : null;
-  return member && { kind: "member", id: member.id };
+  return member && { kind: "member", id: member.id, ...(member.sessionId && { sessionId: member.sessionId }) };
 }
 
 function isOwnOrigin(origin: string | null, req: Request, env: GuardEnv): boolean {
@@ -310,6 +318,8 @@ export async function guardRequest(req: Request, limits: RouteLimits, env: Guard
   try {
     if (!env.balance) throw new Error("Members but no balances");
     if ((await env.balance(caller.id)) <= 0) return reply(402, OUT_OF_CREDITS, {}, "out_of_credits");
+    const capLeft = env.capLeft ? await env.capLeft(caller) : null;
+    if (capLeft !== null && capLeft <= 0) return reply(402, OVER_DAILY_CAP, {}, "over_daily_cap");
     if ((await store.hit(slot, IN_FLIGHT_SECONDS)) > MAX_IN_FLIGHT) {
       await store.release(slot);
       return reply(429, "Wait for your other requests to finish, then try again.", { "Retry-After": "5" });

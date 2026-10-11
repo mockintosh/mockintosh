@@ -23,6 +23,7 @@ interface Tables {
     input_tokens: number | null;
     output_tokens: number | null;
     cost_microusd: number | null;
+    session_id: string | null;
     created_at: Generated<Date>;
   };
 }
@@ -40,8 +41,13 @@ export interface Credits {
   balance(userId: string): Promise<number>;
   /** Adds `amount`; false when `ref` was already used (nothing changes). */
   grant(userId: string, amount: number, kind: Exclude<CreditKind, "usage">, ref: string): Promise<boolean>;
-  /** Takes what `usage` costs at our prices; returns the balance after. A repeated `ref` charges nothing. */
-  charge(userId: string, usage: Usage, ref: string): Promise<number>;
+  /**
+   * Takes what `usage` costs at our prices, spent by `sessionId` when known;
+   * returns the balance after. A repeated `ref` charges nothing.
+   */
+  charge(userId: string, usage: Usage, ref: string, sessionId?: string): Promise<number>;
+  /** Credits a session has spent since `since` (milliseconds since the epoch). */
+  spentBy(sessionId: string, since: number): Promise<number>;
   /** The latest changes, newest first. */
   recent(userId: string, limit?: number): Promise<LedgerEntry[]>;
 }
@@ -61,6 +67,7 @@ export function createCredits(dialect: Dialect): Credits {
     kind: CreditKind,
     ref: string,
     usage?: Usage,
+    sessionId?: string,
   ): Promise<number | null> {
     return db.transaction().execute(async (trx) => {
       const added = await trx
@@ -74,6 +81,7 @@ export function createCredits(dialect: Dialect): Credits {
           input_tokens: usage?.inputTokens ?? null,
           output_tokens: usage?.outputTokens ?? null,
           cost_microusd: usage?.costMicroUsd ?? null,
+          session_id: sessionId ?? null,
         })
         .onConflict((conflict) => conflict.column("ref").doNothing())
         .returning("id")
@@ -97,8 +105,18 @@ export function createCredits(dialect: Dialect): Credits {
       if (!Number.isInteger(amount) || amount <= 0) throw new Error(`Can't grant ${amount} credits`);
       return (await apply(userId, amount, kind, ref)) !== null;
     },
-    async charge(userId, usage, ref) {
-      return (await apply(userId, -creditsFor(usage.costMicroUsd), "usage", ref, usage)) ?? (await balance(userId));
+    async charge(userId, usage, ref, sessionId) {
+      return (await apply(userId, -creditsFor(usage.costMicroUsd), "usage", ref, usage, sessionId)) ?? (await balance(userId));
+    },
+    async spentBy(sessionId, since) {
+      const row = await db
+        .selectFrom("credit_ledger")
+        .select((eb) => eb.fn.coalesce(eb.fn.sum<string | number>("delta"), sql<number>`0`).as("total"))
+        .where("session_id", "=", sessionId)
+        .where("kind", "=", "usage")
+        .where("created_at", ">=", new Date(since))
+        .executeTakeFirst();
+      return Math.abs(Number(row?.total ?? 0));
     },
     async recent(userId, limit = 10) {
       const rows = await db
@@ -135,7 +153,7 @@ export function clubCredits(): Credits | null {
  * answered anyway; the failure is logged).
  */
 export async function chargeCaller(
-  caller: { kind: "member"; id: string } | { kind: "service" },
+  caller: { kind: "member"; id: string; sessionId?: string } | { kind: "service" },
   usage: Usage,
   ref: string,
 ): Promise<number | undefined> {
@@ -143,7 +161,7 @@ export async function chargeCaller(
   try {
     const credits = clubCredits();
     if (!credits) throw new Error("No database for credits");
-    return await credits.charge(caller.id, usage, ref);
+    return await credits.charge(caller.id, usage, ref, caller.sessionId);
   } catch (error) {
     console.error(`Couldn't charge ${caller.id} for ${ref}:`, error);
     return undefined;

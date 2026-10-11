@@ -20,6 +20,12 @@ function corsHeaders(req: Request): Record<string, string> {
   };
 }
 
+/** True when another site's page sent the request. */
+function crossOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  return !!origin && origin !== new URL(req.url).origin;
+}
+
 /** `handler`, answering preflights and adding CORS headers to every response. */
 export function withCors(handler: (req: Request) => Promise<Response>): (req: Request) => Promise<Response> {
   return async (req) => {
@@ -27,8 +33,9 @@ export function withCors(handler: (req: Request) => Promise<Response>): (req: Re
     const resp = await handler(req);
     const headers = new Headers(resp.headers);
     for (const [name, value] of Object.entries(corsHeaders(req))) headers.set(name, value);
-    // Cookies would be third-party on every other site; the Mac uses the bearer token instead.
-    headers.delete("set-cookie");
+    // A Mac on another site uses the bearer token, never a cookie. The Club's own pages
+    // and OAuth callbacks (no Origin, or the Club's) keep theirs.
+    if (crossOrigin(req)) headers.delete("set-cookie");
     return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers });
   };
 }

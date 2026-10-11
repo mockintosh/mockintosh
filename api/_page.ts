@@ -21,6 +21,12 @@ export interface PageOptions {
    * `a.button` links only, so a page with a form turns it off.
    */
   drawn?: boolean;
+  /**
+   * The page's referrer policy (default `no-referrer`). A page whose forms
+   * check `Origin` needs `same-origin`: with `no-referrer` a browser sends
+   * `Origin: null`.
+   */
+  referrer?: "no-referrer" | "same-origin";
 }
 
 /**
@@ -35,7 +41,7 @@ export function page(body: string, status = 200, options: PageOptions = {}): Res
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="${options.referrer ?? "no-referrer"}">
 <title>${escapeHtml(options.title ?? "Mockintosh Sign In")}</title>
 <style>
   body { font: 18px/1.45 -apple-system, system-ui, sans-serif; margin: 3em 1.5em; text-align: center; color: #000; background: #fff; }

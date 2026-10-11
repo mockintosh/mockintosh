@@ -9,15 +9,35 @@ import { clubAuth, memberFromRequest } from "./_auth.js";
 import { chargeCaller, clubCredits } from "./_credits.js";
 import { chatUsage, imageUsage } from "./_pricing.js";
 
-/** The guard's environment here: members by session token, credits, and any site may call. */
+/** A session's daily cap covers the last 24 hours of its spending. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function needCredits() {
+  const credits = clubCredits();
+  if (!credits) throw new Error("No database for credits");
+  return credits;
+}
+
+/** The guard's environment here: members by session token, credits, caps, and any site may call. */
 export function clubGuardEnv(): GuardEnv {
+  // The session's cap, from `member` to `capLeft` within one request.
+  const caps = new Map<string, number | null>();
   return {
     ...guardEnvFromProcess(),
-    member: (req) => memberFromRequest(clubAuth(), req),
+    async member(req) {
+      const member = await memberFromRequest(clubAuth(), req);
+      if (!member) return null;
+      caps.set(member.session.id, member.session.dailyCap);
+      return { id: member.id, sessionId: member.session.id };
+    },
     async balance(memberId) {
-      const credits = clubCredits();
-      if (!credits) throw new Error("No database for credits");
-      return credits.balance(memberId);
+      return needCredits().balance(memberId);
+    },
+    async capLeft(caller) {
+      const cap = caller.sessionId ? caps.get(caller.sessionId) : null;
+      caps.delete(caller.sessionId ?? "");
+      if (cap == null || !caller.sessionId) return null;
+      return cap - (await needCredits().spentBy(caller.sessionId, Date.now() - DAY_MS));
     },
     checkOrigin: false,
   };

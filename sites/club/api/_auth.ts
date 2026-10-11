@@ -1,14 +1,17 @@
 /**
  * The Mockintosh Computer Club's accounts: Better Auth on the Club's
  * Postgres database, served at `/api/auth/*` (`api/auth/[...all].ts`).
- * Members join with email and password from the Club window; the email
- * must be verified before they can sign in. Macintoshes on any site call
- * the Club, so a session travels as a bearer token (`set-auth-token` on
- * sign-in, `Authorization: Bearer` after), never as a cookie. See
- * docs/computer-club-plan.md.
+ * There are no passwords: a member signs in with a six-digit code sent to
+ * their email (which also makes a new member), or with GitHub or Google
+ * on the Club's own pages. A Macintosh on Mockintosh's own sites shows the
+ * email form itself; any other one connects through the Club's
+ * `/connect` page with a device code. Macs on any site carry their session
+ * as a bearer token, never a cookie; the Club's pages use a cookie. Every
+ * session records the site it is for (`site`) and may have a daily
+ * spending cap (`dailyCap`). See docs/computer-club-plan.md.
  */
 import { betterAuth, type BetterAuthOptions } from "better-auth";
-import { bearer } from "better-auth/plugins";
+import { bearer, deviceAuthorization, emailOTP } from "better-auth/plugins";
 import type { Dialect } from "kysely";
 import { databaseDialect } from "./_db.js";
 import { emailSender, type SendEmail } from "./_email.js";
@@ -17,10 +20,8 @@ import { clientAddress, guardEnvFromProcess } from "../../../api/_guard.js";
 
 /** Where Better Auth's routes live; the Club window calls them here. */
 export const AUTH_BASE_PATH = "/api/auth";
-/** Where a verification link lands once the email is verified (`api/verified.ts`). */
-export const VERIFIED_PATH = "/api/verified";
-/** The page a password-reset link opens (`api/reset-password.ts`). */
-export const RESET_PASSWORD_PATH = "/api/reset-password";
+/** The Club's page where a Macintosh elsewhere is connected (`api/connect.ts`). */
+export const CONNECT_PATH = "/connect";
 
 /** Where `npm run dev:club` serves the Club. */
 export const LOCAL_URL = "http://localhost:3002";
@@ -32,6 +33,20 @@ const LOCAL_MAC_ORIGINS = ["http://localhost:*", "http://127.0.0.1:*"];
 
 /** A member stays signed in on a Macintosh for 30 days after its last use. */
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
+/** How long an emailed code works. */
+const CODE_SECONDS = 10 * 60;
+/** How long a Macintosh's connect code waits for the member. */
+const CONNECT_EXPIRES = "15m";
+/** How often a Macintosh asks whether its connect code was approved. */
+const CONNECT_INTERVAL = "5s";
+
+/** The sign-in providers the Club offers on its pages, when they are configured. */
+export type Provider = "github" | "google";
+
+export interface ProviderCredentials {
+  clientId: string;
+  clientSecret: string;
+}
 
 export interface ClubAuthEnv {
   dialect: Dialect;
@@ -48,16 +63,55 @@ export interface ClubAuthEnv {
   localURL?: string;
   /**
    * Sites whose Macintosh may show the Club's own sign-in form (patterns,
-   * `https://*.mockintosh.com`). Better Auth refuses sign-up and sign-in
-   * from any other `Origin`; those Macs connect on the Club's pages.
+   * `https://*.mockintosh.com`). Better Auth refuses to send a code to any
+   * other `Origin`; those Macs connect on the Club's pages.
    */
   macOrigins: readonly string[];
-  /** Runs once a member's email is verified: their welcome credits. */
-  welcome?: (memberId: string, request?: Request) => Promise<void>;
+  /** GitHub and Google sign-in, each when its OAuth app is configured. */
+  providers?: Partial<Record<Provider, ProviderCredentials>>;
+  /** Runs once for each new member with a verified email: their welcome credits. */
+  welcome?: (memberId: string, headers?: Headers) => Promise<void>;
+}
+
+/** A connecting Macintosh's site, as `client_id`: a host name, with a port locally. */
+export function isSiteName(value: string): boolean {
+  return /^[a-z0-9.-]+(:\d{1,5})?$/i.test(value) && value.length <= 253;
+}
+
+/** The host of `origin` (`https://foo.example` → `foo.example`), or `null`. */
+export function siteOf(origin: string | null | undefined): string | null {
+  if (!origin) return null;
+  try {
+    const url = new URL(origin);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.host : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Who a new session is for: the connecting Macintosh's site, the Mac's own origin, or the Club's page. */
+function sessionSite(ctx: { path?: string; body?: unknown; headers?: Headers; request?: Request } | null): string | null {
+  const body = ctx?.body as { client_id?: unknown } | undefined;
+  if (ctx?.path === "/device/token" && typeof body?.client_id === "string") return body.client_id;
+  return siteOf((ctx?.headers ?? ctx?.request?.headers)?.get("origin"));
+}
+
+function codeEmail(otp: string): { subject: string; text: string } {
+  return {
+    subject: `${otp} is your Mockintosh Computer Club code`,
+    text: [
+      `Your code is ${otp}`,
+      "",
+      `Type it in the Computer Club window on mockintosh.com, or on the Club's own page (club.mockintosh.com). It works for ${CODE_SECONDS / 60} minutes.`,
+      "",
+      "Don't type it anywhere else: whoever has it can spend your credits. If you didn't ask for it, ignore this email.",
+    ].join("\n"),
+  };
 }
 
 export function clubAuthOptions(env: ClubAuthEnv) {
   const hosted = env.hosts.length > 0;
+  const providers = env.providers ?? {};
   return {
     appName: "Mockintosh Computer Club",
     secret: env.secret,
@@ -66,56 +120,54 @@ export function clubAuthOptions(env: ClubAuthEnv) {
       ? { allowedHosts: [...env.hosts], fallback: `https://${env.hosts[0]}` }
       : (env.localURL ?? LOCAL_URL),
     trustedOrigins: [...env.macOrigins],
-    plugins: [bearer()],
+    plugins: [
+      bearer(),
+      emailOTP({
+        expiresIn: CODE_SECONDS,
+        allowedAttempts: 5,
+        storeOTP: "hashed",
+        async sendVerificationOTP({ email, otp }) {
+          await env.sendEmail({ to: email, ...codeEmail(otp) });
+        },
+      }),
+      deviceAuthorization({
+        verificationUri: CONNECT_PATH,
+        expiresIn: CONNECT_EXPIRES,
+        interval: CONNECT_INTERVAL,
+        // `api/auth/[...all].ts` puts the Mac's site here, from its Origin.
+        validateClient: isSiteName,
+      }),
+    ],
+    socialProviders: {
+      ...(providers.github && { github: { ...providers.github } }),
+      ...(providers.google && { google: { ...providers.google, prompt: "select_account" as const } }),
+    },
     database: { dialect: env.dialect, type: "postgres", transaction: true },
-    session: { expiresIn: SESSION_SECONDS },
+    session: {
+      expiresIn: SESSION_SECONDS,
+      additionalFields: {
+        site: { type: "string", required: false, input: false },
+        dailyCap: { type: "number", required: false, input: false },
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          async after(user, ctx) {
+            if (user.emailVerified) await env.welcome?.(user.id, ctx?.headers ?? ctx?.request?.headers);
+          },
+        },
+      },
+      session: {
+        create: {
+          async before(session, ctx) {
+            return { data: { ...session, site: sessionSite(ctx) } };
+          },
+        },
+      },
+    },
     // Better Auth skips the origin check under a test runner; keep the production behaviour there too.
     advanced: { disableOriginCheck: false },
-    emailAndPassword: {
-      enabled: true,
-      requireEmailVerification: true,
-      revokeSessionsOnPasswordReset: true,
-      async sendResetPassword({ user, url }) {
-        await env.sendEmail({
-          to: user.email,
-          subject: "Reset your Mockintosh Computer Club password",
-          text: [
-            `Hi ${user.name},`,
-            "",
-            "Someone asked to reset the password for your Mockintosh Computer Club membership. To choose a new one, open this link within an hour:",
-            "",
-            url,
-            "",
-            "If it wasn't you, ignore this email; your password stays as it is.",
-          ].join("\n"),
-        });
-      },
-    },
-    emailVerification: {
-      sendOnSignUp: true,
-      // The Macintosh signs itself in once the link is opened, wherever that is.
-      autoSignInAfterVerification: false,
-      async afterEmailVerification(user, request) {
-        await env.welcome?.(user.id, request);
-      },
-      async sendVerificationEmail({ user, url }) {
-        await env.sendEmail({
-          to: user.email,
-          subject: "Welcome to the Mockintosh Computer Club",
-          text: [
-            `Hi ${user.name},`,
-            "",
-            "To finish joining the Mockintosh Computer Club, confirm your email address by opening this link within an hour:",
-            "",
-            url,
-            "",
-            "Then return to your Mockintosh: it signs you in by itself.",
-            "",
-            "If you didn't join, ignore this email.",
-          ].join("\n"),
-        });
-      },
-    },
   } satisfies BetterAuthOptions;
 }
 
@@ -167,36 +219,84 @@ export function clubAuth(): ClubAuth | null {
     sendEmail: emailSender(),
     hosts: process.env.VERCEL ? deploymentHosts() : [],
     localURL: process.env.BETTER_AUTH_URL,
-    macOrigins: [
-      ...OWN_MAC_ORIGINS,
-      ...(process.env.VERCEL ? [] : LOCAL_MAC_ORIGINS),
-      ...(process.env.MAC_ORIGINS ?? "").split(",").map((origin) => origin.trim()).filter(Boolean),
-    ],
+    macOrigins: macOriginPatterns(),
+    providers: configuredProviders(),
     welcome: welcomeNewMember,
   });
   return auth;
 }
 
-/** Welcome credits, counted per address in the guard's store. Never stops verification. */
-async function welcomeNewMember(memberId: string, request?: Request): Promise<void> {
+/** This deployment's sites whose Macs show the form: ours, `MAC_ORIGINS`, and any local port off Vercel. */
+export function macOriginPatterns(): string[] {
+  return [
+    ...OWN_MAC_ORIGINS,
+    ...(process.env.VERCEL ? [] : LOCAL_MAC_ORIGINS),
+    ...(process.env.MAC_ORIGINS ?? "").split(",").map((origin) => origin.trim()).filter(Boolean),
+  ];
+}
+
+/** True when `origin` is one of `patterns`, where `*` stands for part of a host name or a port. */
+export function originMatches(origin: string | null, patterns: readonly string[]): boolean {
+  if (!origin) return false;
+  return patterns.some((pattern) => {
+    const source = pattern.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\/]/g, "\\$&")).join("[a-z0-9.-]*");
+    return new RegExp(`^${source}$`, "i").test(origin);
+  });
+}
+
+/** GitHub and Google, each when its OAuth app's id and secret are set. */
+function configuredProviders(): Partial<Record<Provider, ProviderCredentials>> {
+  const providers: Partial<Record<Provider, ProviderCredentials>> = {};
+  for (const provider of ["github", "google"] as const) {
+    const prefix = provider.toUpperCase();
+    const clientId = process.env[`${prefix}_CLIENT_ID`]?.trim();
+    const clientSecret = process.env[`${prefix}_CLIENT_SECRET`]?.trim();
+    if (clientId && clientSecret) providers[provider] = { clientId, clientSecret };
+  }
+  return providers;
+}
+
+/** The providers this deployment offers, for its pages and `GET /api/config`. */
+export function offeredProviders(): Provider[] {
+  return Object.keys(configuredProviders()) as Provider[];
+}
+
+/** Welcome credits, counted per address in the guard's store. Never stops joining. */
+async function welcomeNewMember(memberId: string, headers?: Headers): Promise<void> {
   try {
     const credits = clubCredits();
     const counters = guardEnvFromProcess().store;
     if (!credits || !counters) throw new Error("No database or limit store");
-    await welcomeMember(credits, counters, memberId, request ? clientAddress(request) : "unknown");
+    const address = headers ? clientAddress(new Request("http://club.invalid/", { headers })) : "unknown";
+    await welcomeMember(credits, counters, memberId, address);
   } catch (error) {
     console.error(`No welcome credits for ${memberId}:`, error);
   }
 }
 
-/** The signed-in member a request's session cookie names, if any. */
+/** The signed-in member a request's session names (bearer token or, on the Club's pages, cookie). */
 export interface Member {
   id: string;
   email: string;
+  name: string;
+  /** The session: one connected Macintosh, or a browser on the Club's pages. */
+  session: {
+    id: string;
+    site: string | null;
+    /** Credits it may spend per day; `null` = no cap. */
+    dailyCap: number | null;
+  };
 }
 
 export async function memberFromRequest(authInstance: ClubAuth | null, req: Request): Promise<Member | null> {
   if (!authInstance) return null;
-  const session = await authInstance.api.getSession({ headers: req.headers });
-  return session ? { id: session.user.id, email: session.user.email } : null;
+  const found = await authInstance.api.getSession({ headers: req.headers });
+  if (!found) return null;
+  const session = found.session as typeof found.session & { site?: string | null; dailyCap?: number | null };
+  return {
+    id: found.user.id,
+    email: found.user.email,
+    name: found.user.name,
+    session: { id: session.id, site: session.site ?? null, dailyCap: session.dailyCap ?? null },
+  };
 }

@@ -59,6 +59,23 @@ describe("guardRequest", () => {
     if (!result.ok) expect(await result.response.json()).toMatchObject({ code: "out_of_credits" });
   });
 
+  it("refuses a session over its daily cap, and passes one under it", async () => {
+    const env = (left: number | null): GuardEnv => ({
+      ...hostedEnv(),
+      async member(req) {
+        const id = SESSIONS[req.headers.get("cookie") ?? ""];
+        return id ? { id, sessionId: `${id}:mac` } : null;
+      },
+      capLeft: async (caller) => (caller.sessionId === "user-ada:mac" ? left : null),
+    });
+    const over = await guardRequest(post({ cookie: "session=ada" }), LIMITS, env(0));
+    expect(!over.ok && over.response.status).toBe(402);
+    if (!over.ok) expect(await over.response.json()).toMatchObject({ code: "over_daily_cap" });
+    const under = await guardRequest(post({ cookie: "session=ada" }), LIMITS, env(5));
+    expect(under).toMatchObject({ ok: true, caller: { kind: "member", id: "user-ada", sessionId: "user-ada:mac" } });
+    expect((await guardRequest(post({ cookie: "session=ada" }), LIMITS, env(null))).ok).toBe(true);
+  });
+
   it("lets a member run only a few requests at once, and frees each slot when it's done", async () => {
     const env = { ...hostedEnv(), store: createMemoryCounters() };
     const roomy = { ...LIMITS, perClient: { max: 100, windowSeconds: 60 }, global: { max: 100, windowSeconds: 60 } };

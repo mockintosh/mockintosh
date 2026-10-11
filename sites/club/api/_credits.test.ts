@@ -70,6 +70,20 @@ describe("credits", () => {
     expect((await credits.recent(id)).map((entry) => entry.kind)).toEqual(["usage", "grant"]);
   });
 
+  it("adds up what each session spent since a time", async () => {
+    const id = await member();
+    await credits.grant(id, 1000, "grant", `welcome:${id}`);
+    const before = Date.now() - 1000;
+    await credits.charge(id, usage(5000), "usage:mac-a1", "mac-a");
+    await credits.charge(id, usage(5000), "usage:mac-a2", "mac-a");
+    await credits.charge(id, usage(5000), "usage:mac-b1", "mac-b");
+    await credits.charge(id, usage(5000), "usage:none");
+    expect(await credits.spentBy("mac-a", before)).toBe(20);
+    expect(await credits.spentBy("mac-b", before)).toBe(10);
+    expect(await credits.spentBy("mac-a", Date.now() + 60_000)).toBe(0);
+    expect(await credits.spentBy("mac-c", before)).toBe(0);
+  });
+
   it("refuses to grant nothing", async () => {
     await expect(credits.grant(await member(), 0, "grant", "nothing")).rejects.toThrow();
   });

@@ -8,6 +8,11 @@ import { PostgresDialect, type Dialect, type PostgresPool } from "kysely";
 
 let dialect: Dialect | undefined;
 
+/** Use `local` instead of `DATABASE_URL`: `npm run dev:club`'s own database. */
+export function useLocalDatabase(local: Dialect): void {
+  dialect = local;
+}
+
 /** The database as a Kysely dialect, or `null` when `DATABASE_URL` is unset. */
 export function databaseDialect(): Dialect | null {
   if (dialect) return dialect;
