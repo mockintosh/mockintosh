@@ -1,15 +1,19 @@
 /**
- * Calendar, after the Mac's own: a week of days down the hours, events you
- * draw by dragging, move and stretch by dragging, and name in place. Views
- * are listed in `calendar/views.ts`; Week is the first one built.
+ * Calendar, after the Mac's own: a day or a week down the hours, a month of
+ * weeks, or the whole year, with events you draw by dragging, move and
+ * stretch by dragging, and name in place. The views are listed in
+ * `calendar/views.ts`, with their components attached here.
  */
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { defineApp, useApp } from "@mockintosh/sdk";
-import { atMinute, formatFloating, minuteOfDay, sameDay, startOfDay, type Weekday } from "./calendar/dates";
+import { atMinute, formatFloating, minuteOfDay, startOfDay, type Weekday } from "./calendar/dates";
 import { EVENTS_FILE, type CalendarEvent, newEventId, parseEvents, sampleEvents, serializeEvents } from "./calendar/events";
 import { TOOLBAR_H, Toolbar } from "./calendar/Toolbar";
+import { DayView } from "./calendar/DayView";
+import { MonthView } from "./calendar/MonthView";
 import { WeekView } from "./calendar/WeekView";
+import { YearView } from "./calendar/YearView";
 import {
   VIEW_DEFINITIONS,
   type CalendarActions,
@@ -24,11 +28,14 @@ import { sprites } from "./calendar/icons";
 const SETTINGS_FILE = "settings.json";
 const DEFAULT_SETTINGS: CalendarSettings = { weekStart: 1, hour24: true };
 
-/** The views with the components built so far. */
-const VIEWS: readonly CalendarView[] = VIEW_DEFINITIONS.map((view) => ({
-  ...view,
-  Component: ({ week: WeekView } as Partial<Record<ViewKind, (props: ViewProps) => JSX.Element>>)[view.kind],
-}));
+const COMPONENTS: Record<ViewKind, (props: ViewProps) => JSX.Element> = {
+  day: DayView,
+  week: WeekView,
+  month: MonthView,
+  year: YearView,
+};
+
+const VIEWS: readonly CalendarView[] = VIEW_DEFINITIONS.map((view) => ({ ...view, Component: COMPONENTS[view.kind] }));
 
 const viewOf = (kind: ViewKind) => VIEWS.find((view) => view.kind === kind)!;
 
@@ -111,6 +118,11 @@ function Calendar(_props: Record<string, unknown>): JSX.Element {
       if (id) setSelected(id);
       setEditing(id);
     },
+    focus: (day) => setDate(startOfDay(day)),
+    show: (kind, day) => {
+      setDate(startOfDay(day));
+      setView(kind);
+    },
   };
 
   const step = (direction: -1 | 1) => setDate(viewOf(view()).step(date(), direction));
@@ -119,9 +131,11 @@ function Calendar(_props: Record<string, unknown>): JSX.Element {
   /** A new hour-long event: at the next hour today when today is in view, else at nine. */
   function newEvent(): void {
     const today = new Date();
-    const shown = weekOf(date(), settings());
-    const inView = sameDay(weekOf(today, settings()), shown);
+    const [from, to] = viewOf(view()).range(date(), settings());
+    const inView = today >= from && today < to;
     const day = inView ? today : date();
+    // The year has nowhere to name an event in place: open the day it goes on.
+    if (view() === "year") actions.show("day", day);
     const start = inView ? Math.min(23, Math.floor(minuteOfDay(today) / 60) + 1) * 60 : 9 * 60;
     actions.create({
       id: newEventId(),
@@ -160,7 +174,6 @@ function Calendar(_props: Record<string, unknown>): JSX.Element {
               label: v.label,
               shortcut: v.shortcut,
               checked: v.kind === state.view,
-              disabled: !v.Component,
               onClick: () => setView(v.kind),
             })),
             { type: "separator" as const },
@@ -221,7 +234,7 @@ function Calendar(_props: Record<string, unknown>): JSX.Element {
           // One element per view, so switching mounts the new view fresh.
           <For each={[view()]}>
             {(kind) => {
-              const View = viewOf(kind).Component!;
+              const View = viewOf(kind).Component;
               return (
                 <View
                   date={date()}
@@ -252,7 +265,7 @@ export default defineApp({
   about: {
     version: "1.0",
     description:
-      "Keeps your events by the week. Drag in a day to add an event, drag it to move it or its bottom edge to change its length, and double-click it to rename it.",
+      "Keeps your events by the day, week, month or year. Drag in a day to add an event, drag it to move it or its bottom edge to change its length, and double-click it to rename it.",
   },
   defaultSize: { width: 480, height: 300 },
   resizable: true,

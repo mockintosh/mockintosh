@@ -104,7 +104,6 @@ export function Toolbar(props: {
         segments={props.views.map((view) => ({
           label: view.label,
           selected: view.kind === props.view,
-          disabled: !view.Component,
           onClick: () => props.onView(view.kind),
         }))}
       />

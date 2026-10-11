@@ -17,6 +17,8 @@ export const MONTH_NAMES = [
 
 export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
+export const WEEKDAY_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
 /** Local midnight of `date`'s day. */
 export function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -99,4 +101,29 @@ export function formatHour(hour: number, hour24: boolean): string {
 /** `October 2026`. */
 export function formatMonthYear(date: Date): string {
   return `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** `October 11, 2026`. */
+export function formatLongDate(date: Date): string {
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+export function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+export function daysInMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+/** The whole weeks that hold `date`'s month: the first one's first day, and how many there are. */
+export function monthWeeks(date: Date, weekStart: Weekday): { first: Date; count: number } {
+  const first = startOfWeek(startOfMonth(date), weekStart);
+  const lead = dayDifference(first, startOfMonth(date));
+  return { first, count: Math.ceil((lead + daysInMonth(date)) / 7) };
+}
+
+/** A key for `date`'s day, the same for any time on it. */
+export function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 }

@@ -290,7 +290,7 @@
   },
   "about": {
    "version": "1.0",
-   "description": "Keeps your events by the week. Drag in a day to add an event, drag it to move it or its bottom edge to change its length, and double-click it to rename it."
+   "description": "Keeps your events by the day, week, month or year. Drag in a day to add an event, drag it to move it or its bottom edge to change its length, and double-click it to rename it."
   },
   "sprites": {
    "calendar/icon": {

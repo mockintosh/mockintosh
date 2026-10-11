@@ -1,11 +1,11 @@
 /**
  * The calendar's views — Day, Week, Month and Year — and what each needs to
- * be shown: its title, how far Previous and Next go, and the component that
- * draws it. A view without a component is listed but can't be chosen yet.
+ * be shown: its title, the days it covers, and how far Previous and Next go.
+ * `Calendar.tsx` attaches the component that draws each.
  */
 import type { JSX } from "@mockintosh/ui";
 import type { CalendarEvent } from "./events";
-import { addDays, formatMonthYear, startOfWeek, type Weekday } from "./dates";
+import { addDays, formatLongDate, formatMonthYear, monthWeeks, startOfDay, startOfWeek, type Weekday } from "./dates";
 
 export type ViewKind = "day" | "week" | "month" | "year";
 
@@ -25,6 +25,10 @@ export interface CalendarActions {
   remove(id: string): void;
   /** Edit an event's title in place, or stop editing. */
   edit(id: string | null): void;
+  /** Make `date` the day the calendar is about, in the view it's in. */
+  focus(date: Date): void;
+  /** Go to `kind`'s view of the period holding `date`. */
+  show(kind: ViewKind, date: Date): void;
 }
 
 export interface ViewProps {
@@ -50,10 +54,11 @@ export interface CalendarView {
   shortcut: string;
   /** The title over the view for the period holding `date`. */
   title(date: Date, settings: CalendarSettings): string;
+  /** The days the view shows for `date`: from the first, up to but not including the second. */
+  range(date: Date, settings: CalendarSettings): [Date, Date];
   /** `date` moved one period earlier (-1) or later (1). */
   step(date: Date, direction: -1 | 1): Date;
-  /** Draws the view; absent while the view isn't built yet. */
-  Component?: (props: ViewProps) => JSX.Element;
+  Component: (props: ViewProps) => JSX.Element;
 }
 
 /** The first day of the week holding `date`. */
@@ -75,7 +80,8 @@ export const VIEW_DEFINITIONS: readonly Omit<CalendarView, "Component">[] = [
     kind: "day",
     label: "Day",
     shortcut: "1",
-    title: (date) => formatMonthYear(date),
+    title: (date) => formatLongDate(date),
+    range: (date) => [startOfDay(date), addDays(startOfDay(date), 1)],
     step: (date, direction) => addDays(date, direction),
   },
   {
@@ -84,6 +90,7 @@ export const VIEW_DEFINITIONS: readonly Omit<CalendarView, "Component">[] = [
     shortcut: "2",
     // The month the week mostly falls in, as Calendar titles it.
     title: (date, settings) => formatMonthYear(addDays(weekOf(date, settings), 3)),
+    range: (date, settings) => [weekOf(date, settings), addDays(weekOf(date, settings), 7)],
     step: (date, direction) => addDays(date, 7 * direction),
   },
   {
@@ -91,6 +98,10 @@ export const VIEW_DEFINITIONS: readonly Omit<CalendarView, "Component">[] = [
     label: "Month",
     shortcut: "3",
     title: (date) => formatMonthYear(date),
+    range: (date, settings) => {
+      const { first, count } = monthWeeks(date, settings.weekStart);
+      return [first, addDays(first, count * 7)];
+    },
     step: (date, direction) => addMonths(date, direction),
   },
   {
@@ -98,6 +109,7 @@ export const VIEW_DEFINITIONS: readonly Omit<CalendarView, "Component">[] = [
     label: "Year",
     shortcut: "4",
     title: (date) => String(date.getFullYear()),
+    range: (date) => [new Date(date.getFullYear(), 0, 1), new Date(date.getFullYear() + 1, 0, 1)],
     step: (date, direction) => addMonths(date, 12 * direction),
   },
 ];

@@ -8,10 +8,11 @@
  */
 import { For, Show, createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { TextInput, fontLineHeight, measureText } from "@mockintosh/ui";
+import { measureText } from "@mockintosh/ui";
 import { WindowHeader, useApp } from "@mockintosh/sdk";
 import {
   MINUTES_PER_DAY,
+  WEEKDAY_LONG,
   WEEKDAY_SHORT,
   addDays,
   atMinute,
@@ -29,9 +30,9 @@ import {
   eventStart,
   layoutAllDay,
   layoutDay,
-  moveEvent,
   newEventId,
 } from "./events";
+import { BODY_H, DayNumber, NEW_TITLE, TitleEditor, WEEKEND, fit, moveBy } from "./shared";
 import type { ViewProps } from "./views";
 
 const HOUR_H = 26;
@@ -45,31 +46,14 @@ const SNAP = 15;
 const RESIZE_EDGE = 4;
 /** The hour the grid opens scrolled to. */
 const FIRST_HOUR = 7;
-const NEW_TITLE = "New Event";
+/** A day this wide is headed with its weekday's whole name. */
+const LONG_NAME_W = 100;
 /** Narrower than this, a title stays on one line rather than breaking inside its words. */
 const WRAP_W = 48;
 
-const BODY_H = fontLineHeight("body");
 const GRID_H = 24 * HOUR_H + 1;
 
-/** Weekends are shaded with this pattern, a dot in every 4×4. */
-const WEEKEND = new Uint8Array([0x88, 0, 0x22, 0, 0x88, 0, 0x22, 0]);
-
 const minuteY = (minutes: number) => Math.round((minutes * HOUR_H) / 60);
-
-/** `text` cut with an ellipsis to fit `width` pixels, measured as drawn (`bold` is wider). */
-function fit(text: string, width: number, bold = false): string {
-  const style = { bold };
-  if (measureText(text, "body", style) <= width) return text;
-  let lo = 0;
-  let hi = text.length;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    if (measureText(`${text.slice(0, mid)}…`, "body", style) <= width) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo === 0 ? "" : `${text.slice(0, lo).trimEnd()}…`;
-}
 
 /** An event being dragged, as it would be if the mouse were let go now. */
 interface Drag {
@@ -106,13 +90,6 @@ export function TimeGrid(props: ViewProps & { days: readonly Date[] }): JSX.Elem
 
   // --- Dragging ---------------------------------------------------------------
 
-  function moveBy(event: CalendarEvent, days: number, minutes: number): CalendarEvent {
-    const start = eventStart(event);
-    const moved = addDays(start, days);
-    moved.setMinutes(moved.getMinutes() + minutes);
-    return moveEvent(event, moved);
-  }
-
   /** Where a drag that started at (x0, y0) on screen is now, in whole days and snapped minutes. */
   const travel = (x0: number, y0: number, x: number, y: number) => ({
     days: Math.round((x - x0) / averageW()),
@@ -143,18 +120,11 @@ export function TimeGrid(props: ViewProps & { days: readonly Date[] }): JSX.Elem
         justifyContent="center"
         alignItems="center"
         gap={3}
+        // In the week, a day's heading opens that day.
+        onClick={count() > 1 ? () => props.actions.show("day", day()) : undefined}
       >
-        <text font="body" nowrap>{WEEKDAY_SHORT[day().getDay()]!}</text>
-        <box
-          paddingLeft={2}
-          paddingRight={2}
-          borderRadius={3}
-          background={today() ? 1 : 0}
-        >
-          <text font="body" bold={today()} color={today() ? 0 : 1} nowrap>
-            {String(day().getDate())}
-          </text>
-        </box>
+        <text font="body" nowrap>{(columnW(p.index) >= LONG_NAME_W ? WEEKDAY_LONG : WEEKDAY_SHORT)[day().getDay()]!}</text>
+        <DayNumber label={String(day().getDate())} today={today()} />
       </box>
     );
   }
@@ -304,7 +274,7 @@ export function TimeGrid(props: ViewProps & { days: readonly Date[] }): JSX.Elem
               </box>
             }
           >
-            <TitleEditor event={p.event} width={Math.max(8, p.width - 6)} />
+            <TitleEditor event={p.event} width={Math.max(8, p.width - 6)} actions={props.actions} />
           </Show>
           <Show when={showsTime() && !editing()}>
             <text font="body" color={ink()} nowrap>{fit(p.time!, textW())}</text>
@@ -347,39 +317,6 @@ export function TimeGrid(props: ViewProps & { days: readonly Date[] }): JSX.Elem
           <text font="body" color={0} nowrap>{fit(p.time!, p.width - 6)}</text>
         </Show>
       </box>
-    );
-  }
-
-  function TitleEditor(p: { event: CalendarEvent; width: number }): JSX.Element {
-    const [draft, setDraft] = createSignal(p.event.title);
-    let done = false;
-    const commit = () => {
-      if (done) return;
-      done = true;
-      const title = draft().trim() || NEW_TITLE;
-      if (title !== p.event.title) props.actions.update({ ...p.event, title });
-      props.actions.edit(null);
-    };
-    return (
-      <TextInput
-        name="event-title"
-        value={draft()}
-        onChange={setDraft}
-        onSubmit={commit}
-        onBlur={commit}
-        onCancel={() => {
-          done = true;
-          props.actions.edit(null);
-        }}
-        borderless
-        padding={0}
-        verticalAlign="top"
-        font="body"
-        width={p.width}
-        height={BODY_H}
-        autoFocus
-        selectAllOnFocus
-      />
     );
   }
 

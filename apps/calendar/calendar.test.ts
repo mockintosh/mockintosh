@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addDays, dayDifference, daysFrom, formatFloating, formatHour, formatTime, parseFloating, startOfWeek } from "./dates";
-import { type CalendarEvent, layoutAllDay, layoutDay, moveEvent, parseEvents, serializeEvents } from "./events";
+import { addDays, dayDifference, dayKey, daysFrom, formatFloating, formatHour, formatTime, monthWeeks, parseFloating, startOfWeek } from "./dates";
+import { type CalendarEvent, busyDays, layoutAllDay, layoutDay, moveEvent, parseEvents, serializeEvents } from "./events";
 import { VIEW_DEFINITIONS } from "./views";
 
 const timed = (id: string, start: string, end: string): CalendarEvent => ({ id, title: id, start, end });
@@ -105,5 +105,35 @@ describe("views", () => {
     expect(formatFloating(view("week").step(new Date(2026, 9, 11), 1))).toBe("2026-10-18T00:00");
     expect(formatFloating(view("month").step(new Date(2026, 0, 31), 1))).toBe("2026-02-28T00:00");
     expect(formatFloating(view("day").step(new Date(2026, 9, 1), -1))).toBe("2026-09-30T00:00");
+  });
+
+  it("covers each view's days", () => {
+    const range = (kind: string, date: Date) => view(kind).range(date, settings).map(formatFloating);
+    expect(range("day", new Date(2026, 9, 11, 15))).toEqual(["2026-10-11T00:00", "2026-10-12T00:00"]);
+    expect(range("week", new Date(2026, 9, 11))).toEqual(["2026-10-05T00:00", "2026-10-12T00:00"]);
+    expect(range("month", new Date(2026, 9, 11))).toEqual(["2026-09-28T00:00", "2026-11-02T00:00"]);
+    expect(range("year", new Date(2026, 9, 11))).toEqual(["2026-01-01T00:00", "2027-01-01T00:00"]);
+  });
+});
+
+describe("months and years", () => {
+  it("finds the whole weeks that hold a month", () => {
+    expect(monthWeeks(new Date(2026, 9, 20), 1)).toMatchObject({ count: 5 });
+    expect(formatFloating(monthWeeks(new Date(2026, 9, 20), 1).first)).toBe("2026-09-28T00:00");
+    // February 2026 starts on a Sunday: five weeks from Monday, exactly four from Sunday.
+    expect(monthWeeks(new Date(2026, 1, 1), 1).count).toBe(5);
+    expect(monthWeeks(new Date(2026, 1, 1), 0).count).toBe(4);
+    expect(monthWeeks(new Date(2026, 7, 1), 1).count).toBe(6);
+  });
+
+  it("marks the days events fall on", () => {
+    const busy = busyDays([
+      timed("late", "2026-10-12T23:00", "2026-10-13T01:00"),
+      timed("ends at midnight", "2026-10-15T22:00", "2026-10-16T00:00"),
+      { ...timed("trip", "2026-10-20", "2026-10-22"), allDay: true },
+    ]);
+    const key = (d: number) => dayKey(new Date(2026, 9, d));
+    expect([12, 13, 15, 20, 21].every((d) => busy.has(key(d)))).toBe(true);
+    expect([14, 16, 22].some((d) => busy.has(key(d)))).toBe(false);
   });
 });

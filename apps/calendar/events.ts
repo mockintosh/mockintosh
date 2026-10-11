@@ -7,6 +7,7 @@ import {
   addDays,
   atMinute,
   dayDifference,
+  dayKey,
   formatFloating,
   parseFloating,
   startOfDay,
@@ -193,6 +194,23 @@ export function layoutAllDay(events: readonly CalendarEvent[], days: readonly Da
     bar.lane = lane;
   }
   return bars;
+}
+
+// --- Days with something on -------------------------------------------------
+
+/** The days (by `dayKey`) that some event falls on. An event touches its end's day only if it runs into it. */
+export function busyDays(events: readonly CalendarEvent[]): Set<string> {
+  const busy = new Set<string>();
+  for (const event of events) {
+    const start = startOfDay(eventStart(event));
+    const end = eventEnd(event);
+    // A year and a bit is as far as any view looks; longer events are marked that far.
+    for (let day = start, n = 0; n < 400; day = addDays(day, 1), n++) {
+      if (n > 0 && day.getTime() >= end.getTime()) break;
+      busy.add(dayKey(day));
+    }
+  }
+  return busy;
 }
 
 // --- A first launch's calendar ------------------------------------------------
