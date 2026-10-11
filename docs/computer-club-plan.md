@@ -1,6 +1,6 @@
 # Mockintosh Computer Club: accounts and AI credits
 
-Plan, 9 October 2026; revised 11 October 2026 to make the Club a separate service. Phases 1 (accounts), 2 (credits) and 3 (the separate service) are built. The Club runs at `club.mockintosh.com` (Vercel project `mockintosh-club`, root `sites/club`, connected to the repo), from this branch; mockintosh.com uses it once this branch's OS is deployed there. Everything from phase 4 on is a proposal. The Club's project has the Neon database `mockintosh-club` (us-east-1, next to the functions in `iad1`) as `DATABASE_URL`, the Upstash Redis store for its counters, `BETTER_AUTH_SECRET`, and `RESEND_API_KEY` for `mail.mockintosh.com`; the AI Gateway answers to its own OIDC token. Polar is not set up yet. Companion to the [server infrastructure plan](server-infrastructure-plan.md).
+Plan, 9 October 2026; revised 11 October 2026 to make the Club a separate service. Phases 1 (accounts), 2 (credits), 3 (the separate service) and 4 (signing in on the Club) are built; GitHub and Google sign-in wait for their OAuth apps. The Club runs at `club.mockintosh.com` (Vercel project `mockintosh-club`, root `sites/club`, connected to the repo), from this branch; mockintosh.com uses it once this branch's OS is deployed there. Everything from phase 4 on is a proposal. The Club's project has the Neon database `mockintosh-club` (us-east-1, next to the functions in `iad1`) as `DATABASE_URL`, the Upstash Redis store for its counters, `BETTER_AUTH_SECRET`, and `RESEND_API_KEY` for `mail.mockintosh.com`; the AI Gateway answers to its own OIDC token. Polar is not set up yet. Companion to the [server infrastructure plan](server-infrastructure-plan.md).
 
 ## Context
 
@@ -25,23 +25,30 @@ Mockintosh is open source, and most people running their own copy don't want a d
 - **Copies built from this repo use our Club by default** (`CLUB_URL` defaults to `https://club.mockintosh.com`), so the Assistant works out of the box and their users pay us for the AI. Setting `CLUB_URL` to nothing gives `key` mode.
 - **Apple sign-in comes later**, next to GitHub and Google, through the same popup; there is a paid Apple developer account for it.
 
-## What's built (phases 1 to 3)
+## What's built (phases 1 to 4)
 
 - **The Club service** (`sites/club`, its own workspace with its own dependencies):
-  - **Accounts:** `api/_auth.ts` (Better Auth: email and password, verification email before the first sign-in, password resets, 30-day sessions as bearer tokens), `api/auth/[...all].ts`, `api/verified.ts` and `api/reset-password.ts` (the pages email links open), `api/_email.ts` (Resend), `api/_db.ts` (Neon pool through Kysely).
-  - **Credits:** `api/_credits.ts` (balance, ledger, idempotent grants and charges, welcome credits), `api/_pricing.ts` (cost from the gateway's response, 2×), `api/credits.ts` (balance and latest changes).
+  - **Accounts:** `api/_auth.ts` (Better Auth: no passwords; a six-digit code emailed to the member, which also makes a new member; GitHub and Google once `GITHUB_CLIENT_ID`/`_SECRET` and `GOOGLE_CLIENT_ID`/`_SECRET` are set; device codes for connecting a Mac; 30-day sessions, as bearer tokens for Macs and as a cookie on the Club's pages; each session records its `site` and an optional `dailyCap`), `api/auth/[...all].ts` (which names a connecting Mac after the site in its `Origin`), `api/config.ts` (`form` or `connect` for the asking origin, and the providers), `api/_email.ts` (Resend), `api/_db.ts` (Neon pool through Kysely).
+  - **The Club's pages:** `/` (`api/account.ts`: sign in or join, credits and the latest changes, the connected Macs with a daily limit and Disconnect, Sign Out) and `/connect` (`api/connect.ts`: sign in, then "foo.example's Mockintosh wants to use your Computer Club credits", the code to compare, Connect or Don't Connect), sharing `api/_pages.ts` (plain HTML forms that post back to the page, same-origin only) and `api/_sessions.ts`.
+  - **Credits:** `api/_credits.ts` (balance, ledger, idempotent grants and charges, each charge recording the session that spent it, welcome credits when a member is created with a verified email), `api/_pricing.ts` (cost from the gateway's response, 2×), `api/credits.ts` (balance and latest changes).
+  - **Daily caps:** the guard refuses a session that spent its cap in the last 24 hours (`402`, `over_daily_cap`), from the ledger's `session_id`.
   - **The AI:** `api/chat.ts` and `api/generate-image.ts` run the OS's own answering code (the root `api/chat.ts` and `api/generate-image.ts`) behind the shared guard (`api/_guard.ts`, with the Club's hooks in `api/_club.ts`), and charge after each answer.
   - **CORS:** `api/_cors.ts` answers any site, without cookies; preflights are cached a day.
   - **Schema:** `db/migrate.ts` (Better Auth's tables, then `db/migrations/*.sql`), run by `npm run db:migrate`.
-  - **Local:** `npm run dev:club` on port 3002 (`scripts/dev.ts`, sharing `scripts/functionServer.ts` with the OS's `dev:api`); `vercel.json` and `public/` for its Vercel project.
+  - **Local:** `npm run dev:club` on port 3002 (`scripts/dev.ts`, sharing `scripts/functionServer.ts` with the OS's `dev:api`), on a PGlite database in `sites/club/.dev-db` when `DATABASE_URL` is unset; `vercel.json` (rewrites `/` and `/connect` to their functions) and `public/` for its Vercel project.
 - **The OS:** `api/config.ts` names the Club (`src/shared/hostConfig.ts`); the root `api/chat.ts` and `api/generate-image.ts` take only the scripts' token for now (phase 5 adds `key` and `open`).
 - **On the Mac:**
   - The web platform asks `/api/config` at boot (`fetchHostConfig`) and has a Club only when it names one.
   - `src/platform/web/club.ts` talks to the Club's URL with the bearer token, kept in the page's `localStorage`, which app processes (workers) can't reach.
-  - The Apple menu's "Join Mockintosh Computer Club…" / "Computer Club…", and the Club window (`apps/finder/ComputerClub.tsx`: join, sign in, forgot password, wait for the emailed link, member card with credits and the latest changes, sign out), backed by `os.club` (`src/os/club.ts`).
+  - The Apple menu's "Join Mockintosh Computer Club…" / "Computer Club…", and the Club window (`apps/finder/ComputerClub.tsx`), backed by `os.club` (`src/os/club.ts`). On Mockintosh's own sites it asks for an email and the emailed code; elsewhere "Connect…" shows a code, the Club's page as a QR code for a phone, and a link for this computer's browser, and polls until the member allows it. Signed in: the member card with credits and the latest changes, which follow each app request, and Sign Out.
   - `useApp().club` with capability `club`: `status`, `open`, and `fetch`, which sends a request to the Club with the session, so apps never see it.
   - The Assistant calls the Club through `club.fetch`, and shows its balance and the Join… / Computer Club… alerts.
-- **Differences from the design below, for now:** the token lives in `localStorage` rather than a system file; the Assistant's prompt is still built by the Club from its copy of the OS (the Mac doesn't send its own yet); and the email sign-in form works only on Mockintosh's own sites (`OWN_MAC_ORIGINS` in `api/_auth.ts`, plus `MAC_ORIGINS`), since other copies are meant to connect through the Club's pages (phase 4).
+- **Differences from the design below, for now:**
+  - The token lives in `localStorage` rather than a system file.
+  - The Assistant's prompt is still built by the Club from its copy of the OS (the Mac doesn't send its own yet).
+  - A daily cap is set on the account page after connecting, not on the connect page.
+  - GitHub and Google show on the Club's pages, and as "GitHub or Google…" in the Club window (through the connect page), only once their OAuth apps exist: GitHub's callback is `https://club.mockintosh.com/api/auth/callback/github`, Google's `…/callback/google`.
+  - The connect page's site name comes from the request's `Origin`. A copy's server can send any `Origin`, so it is a label, not proof; the code shown in both places is what ties the page to the Mac.
 
 ## Target architecture: the Club as a separate service
 
@@ -125,18 +132,18 @@ A checkout drawn entirely on the canvas isn't possible: confirming a paid Polar 
 
 ## Data model (applied with `npm run db:migrate`)
 
-- **Better Auth's tables:** `user`, `session`, `account`, `verification`, plus `deviceCode` (phase 4). A session doubles as a connected Mac: its token is the Mac's bearer token, and the site it connected from is stored with it.
-- **`credit_balance(user_id → user, balance)`** and **`credit_ledger(user_id, delta, kind, ref UNIQUE, model, input_tokens, output_tokens, cost_microusd, created_at)`** (built). `ref` is the idempotency key: `welcome:<user>`, `usage:<generation id>`, a Polar order id.
+- **Better Auth's tables:** `user`, `session` (plus `site` and `dailyCap`), `account`, `verification`, `deviceCode`. A session doubles as a connected Mac: its token is the Mac's bearer token, and the site it connected from is stored with it.
+- **`credit_balance(user_id → user, balance)`** and **`credit_ledger(user_id, delta, kind, ref UNIQUE, model, input_tokens, output_tokens, cost_microusd, session_id, created_at)`** (built). `ref` is the idempotency key: `welcome:<user>`, `usage:<generation id>`, a Polar order id.
 - **`pay_link(code PK, user_id → user, checkout_id, checkout_url, credits, expires_at)`** (phase 6): the short links in the QR codes.
-- **A spending cap per token** (phase 4): a column on the session (`daily_cap`), checked by the guard against that day's `usage` rows.
+- **A spending cap per token** (built): `session.dailyCap`, checked by the guard against the session's `usage` rows of the last 24 hours.
 - **Units:** 1 credit = $0.001 of retail value.
 
 ## Phases (each one shippable)
 
-1. **Accounts** (built). Better Auth with email and password, the Club window, the Apple menu item, session auth in the guard.
+1. **Accounts** (built). Better Auth with email and password (replaced by emailed codes in phase 4), the Club window, the Apple menu item, session auth in the guard.
 2. **Credits** (built). The ledger, pricing, charging in chat and image, welcome credits, 402 handling, balance and latest changes in the Club window and the Assistant. **Don't open to the public before this.**
 3. **The Club as a separate service** (built, runs locally). Move the Club into `sites/club`; bearer tokens and CORS instead of the cookie; `useApp().club.fetch` and the Assistant calling the Club; the OS's `/api/config`. The Mac's existing forms keep working against the Club, so the move can be tested on its own. The Club's Vercel project is live at `club.mockintosh.com`. Two things deploying taught: Vercel calls a default-exported function as Node's `(req, res)`, so every Node function exports `default { fetch }`; and outside Next.js a `[...all]` file matches one path segment, so the Club's `vercel.json` rewrites `/api/auth/*` to it.
-4. **Signing in on the Club.** Email codes in the Mac's form on the Club's own sites (the origin allowlist and `GET /config`); "Connect to the Computer Club…" with the popup or QR code, the connect page and its consent line; GitHub and Google; the account page with connected Macs and Disconnect; per-token spending caps.
+4. **Signing in on the Club** (built). Email codes in the Mac's form on the Club's own sites (the origin allowlist and `GET /api/config`); "Connect…" with the QR code or this computer's browser, the connect page and its consent line; GitHub and Google (waiting for their OAuth apps); the account page with connected Macs, Disconnect and per-Mac daily limits. Needs `npm run db:migrate` against the Club's database before it deploys.
 5. **Copies without a Club.** `key` mode with "Set AI Gateway Key…" in the Assistant, `open` mode, no Club interface when unconfigured, and a "Running your own Mockintosh" section in the README.
 6. **Buying credits.** Polar products and checkout sessions, the pack choice in the Club window, the payment sheet with its QR code and short `pay` links, the `order.paid` / `order.refunded` webhooks, and "Manage Purchases…".
 7. **Docs and cleanup.** `ARCHITECTURE.md`, `FUTURE.md` (paid apps' licences can belong to a member and use the same checkout), `todo.md`.
