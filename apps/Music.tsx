@@ -62,14 +62,17 @@ const SEARCH_DELAY_MS = 350;
 /** How long the position slider waits for the drag to rest before seeking. */
 const SEEK_DELAY_MS = 150;
 
-function Music(_props: Record<string, unknown>): JSX.Element {
+/** What `onOpen` hands the window: the developer token, fetched before it opens. */
+interface MusicProps extends Record<string, unknown> {
+  developerToken?: string;
+}
+
+function Music(props: MusicProps): JSX.Element {
   const app = useApp();
   const win = app.window;
   const { storage } = app;
   const musicKit = app.musicKit!; // present: the app requires "music-kit"
   const [userToken, setUserToken] = createSignal<string | null>(null, { ownedWrite: true });
-  const [ready, setReady] = createSignal(false);
-  const [configError, setConfigError] = createSignal("");
   const [route, setRoute] = createSignal<Route>({ view: "browse" });
   /** Pages behind the current one, for Back: artist → album, say. */
   const [history, setHistory] = createSignal<Route[]>([]);
@@ -120,7 +123,7 @@ function Music(_props: Record<string, unknown>): JSX.Element {
   const session: AppleMusicSession = {
     fetch: app.fetch!, // present: the app requires "network"
     origin: app.env.origin,
-    developerToken: null,
+    developerToken: props.developerToken ?? null,
     musicUserToken: null,
     images: app.images,
     onSignedOut: () => void signOut("Apple Music signed you out. Sign in again."),
@@ -180,18 +183,6 @@ function Music(_props: Record<string, unknown>): JSX.Element {
     select(signedIn ? { view: "home" } : { view: "browse" });
   });
 
-  // The developer token first: without one there is nothing to sign in to.
-  const developerToken = createMemo(async () => {
-    try {
-      const token = await fetchDeveloperToken(session);
-      session.developerToken = token;
-      return token;
-    } catch (e) {
-      setConfigError(e instanceof Error ? e.message : "Apple Music is not configured");
-      return null;
-    }
-  });
-
   const storedToken = createMemo(async () => {
     const raw = await storage.read(TOKEN_KEY);
     if (raw === null) return null;
@@ -211,12 +202,6 @@ function Music(_props: Record<string, unknown>): JSX.Element {
         setUserToken(token);
       }
       setTokenChecked(true);
-    },
-  );
-  createEffect(
-    () => developerToken(),
-    (token) => {
-      if (token) setReady(true);
     },
   );
 
@@ -271,9 +256,9 @@ function Music(_props: Record<string, unknown>): JSX.Element {
 
   let connectedAs: string | null | undefined;
   createEffect(
-    () => [ready(), tokenChecked(), userToken()] as const,
-    ([isReady, checked, token]) => {
-      if (!isReady || !checked || connectedAs === token) return;
+    () => [tokenChecked(), userToken()] as const,
+    ([checked, token]) => {
+      if (!checked || connectedAs === token) return;
       const signingOut = connectedAs !== undefined && token === null;
       connectedAs = token;
       // Signing out already told MusicKit (unauthorize); it carries on with previews.
@@ -401,7 +386,7 @@ function Music(_props: Record<string, unknown>): JSX.Element {
 
   // Keyed on both tokens: a fetch before the developer token arrives has nothing to sign with.
   const playlists = useLoaded(
-    () => (ready() && userToken() ? "playlists" : ""),
+    () => (userToken() ? "playlists" : ""),
     (key) => (key ? cached(key, () => fetchPlaylists(session)) : Promise.resolve([] as Collection[])),
   );
 
@@ -773,19 +758,13 @@ function Music(_props: Record<string, unknown>): JSX.Element {
 
   return (
     <>
-      <Show when={configError()}>
-        <box width={win.width()} height={win.height()} padding={8} flexDirection="column" gap={4} background={0}>
-          <text font="body">Apple Music isn't set up on this server.</text>
-          <text font="body">{configError()}</text>
-        </box>
-      </Show>
-      <Show when={ready() && nowPlayingOpen()}>
+      <Show when={nowPlayingOpen()}>
         {/* It fits the window, so it reports the window's height: nothing to scroll. */}
         <box onLayout={({ height }) => win.setContentSize(win.width(), height)}>
           <NowPlayingScreen width={win.width()} height={win.height()} loader={artwork} player={player} onClose={closeNowPlaying} />
         </box>
       </Show>
-      <Show when={ready() && !nowPlayingOpen()}>
+      <Show when={!nowPlayingOpen()}>
         {/*
           The page scrolls with the window's own scroll bar, which runs the
           window's full height. The sidebar and the now-playing bar are drawn
@@ -853,4 +832,19 @@ export default defineApp({
   minSize: { width: 380, height: 220 },
   scrollable: true,
   Component: Music,
+  onOpen(app, props) {
+    // Without a developer token there is nothing to play or sign in to: say
+    // so in an alert instead of opening a window. The OS ends a launch with
+    // no window once onOpen returns, so hold it until the token is in.
+    const release = app.keepAlive?.() ?? (() => {});
+    fetchDeveloperToken({ fetch: app.fetch!, origin: app.env.origin })
+      .then(
+        (developerToken) => app.openWindow({ props: { ...props, developerToken } }),
+        (e: unknown) =>
+          void app.os.showDialog({
+            message: `Apple Music isn't set up on this server. ${e instanceof Error ? e.message : ""}`.trim(),
+          }),
+      )
+      .finally(release);
+  },
 });
