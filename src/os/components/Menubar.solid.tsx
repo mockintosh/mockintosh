@@ -174,7 +174,8 @@ export function Menubar(props: MenubarProps): JSX.Element {
         };
       });
   });
-  const extraOpen = (appId: string) => getWindows().some((w) => w.appId === appId);
+  /** The menubar app whose icon the button went down on: lit until the button comes up, as a title is. */
+  const [pressedExtra, setPressedExtra] = createSignal<string | null>(null, { ownedWrite: true });
 
   const openIdx   = () => getOpenMenuIndex();
   const openMenu  = () => {
@@ -330,18 +331,20 @@ export function Menubar(props: MenubarProps): JSX.Element {
         }}
         </For>
 
-      {/* Menubar apps — each one's icon, lit while it has a window open. */}
+      {/* Menubar apps — each one's icon, lit while the button is down on it. */}
       <For each={extras()}>
         {(extra) => (
           <IconTitle
             left={extra.left}
             icon={extra.icon}
-            lit={extraOpen(extra.id)}
+            lit={pressedExtra() === extra.id}
             semantic={{ name: extra.title, role: "button" }}
             onMouseDown={() => {
               closeMenu();
+              setPressedExtra(extra.id);
               os.toggleMenubarApp(extra.id);
             }}
+            onMouseUp={() => setPressedExtra(null)}
           />
         )}
       </For>

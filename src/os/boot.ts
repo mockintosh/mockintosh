@@ -50,8 +50,10 @@ import {
   hideApps as hideAppsInState,
   isAppHidden,
   isAccessoryKey,
+  getActiveWindow,
   getContextMenu,
   closeContextMenu,
+  type OSWindow,
 } from "./state";
 import { releaseContextMenu } from "./components/Menubar.solid";
 import type { OSServices } from "./context";
@@ -760,6 +762,19 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     return (e.button ?? 0) === 0 && !!e.modifiers?.ctrl && !e.modifiers.meta;
   }
 
+  /**
+   * A menubar app's panel had the keyboard and a press landed somewhere else
+   * (the desktop, a window, the menubar): put the panel away, as on the Mac.
+   * Run after the press is dispatched, so a press on the app's own icon only
+   * toggles it.
+   */
+  function dismissAccessory(before: OSWindow | undefined, x: number, y: number): void {
+    if (!before?.accessory || !getWindows().some((w) => w.id === before.id)) return;
+    const r = windowOuterRect(before);
+    if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) return;
+    osServices.closeWindow(before.id);
+  }
+
   function onPointer(e: PlatformPointerEvent): void {
     if (stopped) throw new ServiceError("disconnect", "Boot has ended");
     if (screenshotCapture.selecting()) {
@@ -798,11 +813,13 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       case "down": {
         cursorX = e.x;
         cursorY = e.y;
+        const keyWindow = getActiveWindow();
         if (isContextClick(e)) {
           doubleClick.reset();
           // A second secondary click only puts away the menu the first one opened.
           if (getContextMenu()) closeContextMenu();
           else if (ui.dispatchPointer("contextmenu", e.x, e.y, { modifiers: e.modifiers })) contextPress = { x: e.x, y: e.y };
+          dismissAccessory(keyWindow, e.x, e.y);
           trackCursor(e.x, e.y);
           scheduleRepaint();
           return;
@@ -811,6 +828,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         if (doubleClick.down(e.x, e.y, scheduler.now())) {
           ui.dispatchPointer("dblclick", e.x, e.y);
         }
+        dismissAccessory(keyWindow, e.x, e.y);
         trackCursor(e.x, e.y);
         scheduleRepaint();
         return;
