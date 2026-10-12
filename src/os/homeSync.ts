@@ -20,6 +20,7 @@ import {
   type SyncNode,
 } from "@mockintosh/protocol";
 import type { FetchRequest, FetchResponse } from "@mockintosh/sdk";
+import { decodeBase64, encodeBase64 } from "@mockintosh/ui";
 
 /** What the engine keeps between runs, on this Mac only. */
 export interface SyncState {
@@ -70,19 +71,6 @@ export class DiskSyncError extends Error {
   constructor(readonly status: number, message: string) {
     super(message);
   }
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary);
-}
-
-function fromBase64(text: string): Uint8Array {
-  const binary = atob(text);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
 }
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
@@ -173,7 +161,7 @@ export function startHomeSync(o: HomeSyncOptions): HomeSync {
 
   async function contentsOf(n: SyncNode): Promise<Uint8Array | undefined> {
     if (n.kind !== "file") return undefined;
-    if (n.content !== undefined) return fromBase64(n.content);
+    if (n.content !== undefined) return decodeBase64(n.content);
     if (!n.sha256) return new Uint8Array();
     const resp = await call(`/api/disk/blob?sha=${n.sha256}`);
     return new Uint8Array(await resp.arrayBuffer());
@@ -247,7 +235,7 @@ export function startHomeSync(o: HomeSyncOptions): HomeSync {
     }
     const bytes = (await o.fs.readBytes(node.id)) ?? new Uint8Array();
     if (bytes.byteLength <= DISK_INLINE_MAX) {
-      change.content = toBase64(bytes);
+      change.content = encodeBase64(bytes);
       return change;
     }
     const sha = await sha256Hex(bytes);

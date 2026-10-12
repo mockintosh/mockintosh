@@ -175,6 +175,16 @@ function later(work: () => void): void {
 }
 
 /** Where this Mac keeps its disk sync state: a file in Mockintosh HD's Preferences, never on the synced disk. */
+type Listen = (type: string, listener: () => void) => void;
+
+/** The page around the OS, when there is one: its site, and when it's shown, hidden or focused. */
+const host = globalThis as {
+  location?: { host?: string };
+  document?: { addEventListener?: Listen; removeEventListener?: Listen };
+  addEventListener?: Listen;
+  removeEventListener?: Listen;
+};
+
 const SYNC_FOLDER = "Computer Club";
 const SYNC_FILE = "Disk Sync";
 
@@ -229,16 +239,16 @@ export function startHomeDisks(
         member: member.id,
         request: (path, init) => club.call(path, init),
         store: homeSyncStore(os.fs, member.id),
-        site: globalThis.location?.host || "this Mac",
+        site: host.location?.host || "this Mac",
         onNotice: (message) => void os.showDialog({ message, buttons: ["OK"], variant: "note" }),
       });
       syncSoon();
     };
     // Coming back to the page, or leaving it: catch up, and send what's waiting.
-    const doc = options.sync === false ? undefined : globalThis.document;
+    const doc = options.sync === false ? undefined : host.document;
     const onVisibility = () => syncSoon();
     doc?.addEventListener?.("visibilitychange", onVisibility);
-    if (doc) globalThis.addEventListener?.("focus", onVisibility);
+    if (doc) host.addEventListener?.("focus", onVisibility);
     createEffect(
       () => {
         const member = club.member();
@@ -272,7 +282,7 @@ export function startHomeDisks(
     return () => {
       stopSync();
       doc?.removeEventListener?.("visibilitychange", onVisibility);
-      if (doc) globalThis.removeEventListener?.("focus", onVisibility);
+      if (doc) host.removeEventListener?.("focus", onVisibility);
       dispose();
     };
   });

@@ -40,6 +40,10 @@ declare class AbortController {
   abort(): void;
 }
 
+declare const crypto: {
+  readonly subtle: { digest(algorithm: "SHA-256", data: Uint8Array<ArrayBuffer>): Promise<ArrayBuffer> };
+};
+
 declare module "*.json" {
   const value: unknown;
   export default value;
