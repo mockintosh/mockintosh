@@ -12,7 +12,7 @@ const EXPOSE_HEADERS = "set-auth-token";
 function corsHeaders(req: Request): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": req.headers.get("origin") ?? "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
     "Access-Control-Allow-Headers": ALLOW_HEADERS,
     "Access-Control-Expose-Headers": EXPOSE_HEADERS,
     "Access-Control-Max-Age": "86400",

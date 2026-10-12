@@ -37,6 +37,8 @@ export interface SystemClub {
   signOut(): Promise<void>;
   /** A request to the Club for an app, with this computer's session (`useApp().club.fetch`). */
   fetch(path: string, init?: FetchRequest): Promise<FetchResponse>;
+  /** A request of the OS's own (the home disk's sync), with the session; credits aren't asked for after it. */
+  call(path: string, init?: FetchRequest): Promise<FetchResponse>;
 }
 
 export function createSystemClub(accounts: ClubAccounts): SystemClub {
@@ -113,6 +115,7 @@ export function createSystemClub(accounts: ClubAccounts): SystemClub {
       setMember(null);
       setCredits(null);
     },
+    call: (path, init) => accounts.fetch(path, init),
     async fetch(path, init) {
       const resp = await accounts.fetch(path, init);
       // An app's request may have spent credits, or found the session over:

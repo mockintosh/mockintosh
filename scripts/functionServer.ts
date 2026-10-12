@@ -44,18 +44,19 @@ export function loadEnvFiles(paths: readonly string[]): boolean {
   return loaded;
 }
 
-async function readBody(req: IncomingMessage): Promise<string> {
+/** The request body as bytes: a disk upload is binary. */
+async function readBody(req: IncomingMessage): Promise<Uint8Array> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
-  return Buffer.concat(chunks).toString();
+  return new Uint8Array(Buffer.concat(chunks));
 }
 
-function toWebRequest(req: IncomingMessage, body: string, port: number): Request {
+function toWebRequest(req: IncomingMessage, body: Uint8Array, port: number): Request {
   const url = new URL(req.url ?? "/", `http://localhost:${port}`);
   return new Request(url.toString(), {
     method: req.method,
     headers: req.headers as Record<string, string>,
-    body: req.method !== "GET" && req.method !== "HEAD" ? body : undefined,
+    body: req.method !== "GET" && req.method !== "HEAD" ? (body as Uint8Array<ArrayBuffer>) : undefined,
   });
 }
 

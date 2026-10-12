@@ -1,6 +1,6 @@
 # Your disk in the Computer Club: synced storage
 
-Plan, 12 October 2026. Phase 1 (your disk, locally) is built; see [What's built](#whats-built-phase-1). Companion to the [Computer Club plan](computer-club-plan.md), which covers accounts, credits and connecting Macs.
+Plan, 12 October 2026. Phases 1 (your disk, locally) and 2 (sync) are built; see [What's built](#whats-built-phase-1) and [Sync as built](#sync-as-built-phase-2). Companion to the [Computer Club plan](computer-club-plan.md), which covers accounts, credits and connecting Macs.
 
 ## Context
 
@@ -31,6 +31,18 @@ The question was whether to save everything or to sync a chosen part, iCloud-sty
 - **Tests:** `src/os/fs.test.ts` (home disks), `src/os/home.test.ts`, `apps/finder/iconGrid.test.ts`, `src/platform/web/process/fsMirror.test.ts`.
 
 Phase 2 syncs the home disk's subtree out of the shared catalog; giving it a storage folder of its own can wait until there is a reason.
+
+## Sync as built (phase 2)
+
+- **The protocol** (`packages/protocol/src/diskSync.ts`): `GET /api/disk/changes?since=N` (rows changed after N, a page of 500 at a time), `POST /api/disk/push` (changes, each with the revision it was based on), and `GET`/`PUT /api/disk/blob?sha=` (larger contents by SHA-256). All take the member's bearer token and answer any site, like the Club's other routes.
+- **Ids every Mac shares.** The disk is `<member>.home` and its folders `<member>.desktop`, `.trash`, `.documents`, `.pictures`; everything else keeps the id it was made with. A disk from phase 1, with random ids, is renumbered once when it mounts (`FileSystem.renumberDirectory`). The volume node itself doesn't sync: it is the top folders' parent.
+- **The Club** (`sites/club/api/_disk.ts`, `db/migrations/0003_disk.sql`): `disk_node`, one row per file and folder with the revision the Mac gave it and a change number from one sequence (`disk_seq`); `disk_blob`, larger contents per member by hash; `disk_format`, the newest catalog format that has written the disk. A push is one transaction: a change applies only if based on the stored revision, else it comes back refused with the Club's version; a removal becomes a tombstone; a node needs its folder; the quota (100 MB) counts live rows; a Mac whose format is older than the disk's gets 409 `newer_disk_format`.
+- **On the Mac** (`src/os/homeSync.ts`, started by `src/os/home.ts` when the disk mounts, stopped when it ejects): it keeps, per node, the revision it last agreed with the Club on (`base`), in "Disk Sync" in Mockintosh HD's Preferences (`Computer Club` folder). A sync pulls, then pushes, up to three rounds while pushes come back refused:
+  - **Pull:** a node whose revision isn't the agreed one is news; it's put in place exactly as the Club has it (`FileSystem.applyRemote`). A file changed here as well is first kept beside it as "Name (site)"; a node of the same name gets out of the way the same way. A tombstone removes the node, keeping a changed file as a copy.
+  - **Push:** every node whose revision isn't the agreed one goes up, folders before their contents; every agreed node that's gone goes up as a removal. Files up to 16 KB travel inline; larger ones are uploaded by hash first. Files over 4 MB, and anything past the quota, stay on this Mac, and the member hears about it once.
+  - **When:** on mounting, 20 seconds after the last change, every minute, and on focus or when the page is shown or hidden. A newer Mockintosh having written the disk stops pushes for the session, with one notice.
+- **Not yet as designed:** larger contents live in Postgres (`disk_blob`), not Vercel Blob, until a Blob store is set up; the per-file limit is 4 MB (a function's request body), not 25; contents come down with every change rather than when a file is opened; the Trash isn't emptied after 30 days; there's no upload progress in the Club window.
+- **Tests:** `sites/club/api/_disk.test.ts` (the Club's rules), `sites/club/api/_diskSync.test.ts` (two Macs through one Club: carrying files and edits, both versions kept, removals, moves and renames, larger files, same names, a first sync, the format gate), and the derived ids in `src/os/home.test.ts`. Checked in the browser with two origins signed in as one member: a folder made on either appeared on the other.
 
 ## What is on a disk today
 
@@ -125,9 +137,10 @@ Storage is nearly free because 1-bit work is small. What costs money is write an
 
 ## Data model (the Club's database)
 
-- **`disk_node(id, user_id, parent_id, name, kind, type, size, revision, modified_at, attributes jsonb, content bytea null, blob_sha256 null, local_only bool, deleted_at)`**: one row per file or folder on a member's disk. `content` holds small files; `blob_sha256` names large ones. Deleted rows stay as tombstones for a while so other Macs learn about the deletion.
-- **`disk_blob(sha256 PK, size, user_id, created_at)`**: which large contents exist, for quotas and cleanup.
-- **`disk_cursor`**: a per-member change counter, so "what changed since N" is one indexed query.
+- **`disk_node(user_id, id, parent_id, name, kind, type, size, revision, created_at, modified_at, role, attributes jsonb, content bytea, sha256, deleted, seq)`** (built): one row per file or folder on a member's disk. `content` holds small files; `sha256` names larger ones. Deleted rows stay as tombstones so other Macs learn about the removal.
+- **`disk_blob(user_id, sha256, size, content, created_at)`** (built): larger contents, once per member. To move to Vercel Blob, keeping this table as the index.
+- **`disk_seq`** (built): one sequence numbering every change, so "what changed since N" is one indexed query on `(user_id, seq)`.
+- **`disk_format(user_id, format)`** (built): the newest catalog format that wrote the disk.
 - **Quota** is the sum of `size` over a member's live rows.
 
 ## Code
@@ -143,7 +156,7 @@ Storage is nearly free because 1-bit work is small. What costs money is write an
 ## Phases
 
 1. **Your disk, locally** (built). Mount a second, local-only disk for the signed-in member: per-disk roles in the Finder, the merged Desktop and Trash, "my desktop" drops, new files defaulting to it, the guest-to-member move and its prompts. No network yet; this proves the interface on its own. Signing out already ejects the disk and keeps its contents on the Mac; phase 4 adds removing them.
-2. **Sync.** The Club's tables and endpoints, the push and pull engine, small files in rows and large ones in Blob, batching, conflict copies, the read-only gate for older versions, quota.
+2. **Sync** (built; see [Sync as built](#sync-as-built-phase-2)). The Club's tables and endpoints, the push and pull engine, small files in rows and large ones by hash, batching, conflict copies, the read-only gate for older versions, quota. Moving large contents to Vercel Blob, upload progress, and the Trash's 30 days are left.
 3. **Settings that follow you.** App settings on your disk by default, the "this Mac only" option, App Store installs reappearing on other Macs.
 4. **Signing out and shared computers.** Unmount, keep or clear the cached copy, guest files at the next sign-in.
 5. **Docs.** `ARCHITECTURE.md`, the SDK guide (where an app's files and settings go), the Club plan.
@@ -154,6 +167,7 @@ Storage is nearly free because 1-bit work is small. What costs money is write an
 - **Encryption.** End-to-end encryption (keys only on your Macs) would keep files from the Club too, but makes restoring after losing every device hard and rules out server features later. In v1, files are private to the member and encrypted at rest by the providers.
 - **Losing local data before it syncs.** Browsers can clear OPFS. Asking for persistent storage (`navigator.storage.persist()`) when you sign in, and uploading promptly, narrows the window.
 - **Blobs missing from OPFS.** While measuring for this plan, one disk in the desktop app's browser pane had a complete catalog but no file contents. It's being investigated separately; it must be understood before sync relies on the local copy.
+- **Icon positions going back and forth.** A Mac whose own icons sit where a synced icon was saves a new place for it (the desktop's make-way rule), and that place syncs. Two Macs with different desktops could keep moving the same icon; seen once in testing (an extra revision). If it recurs, keep positions per Mac, or stop saving made-way positions on the home disk.
 - **Moving many files.** A guest with hundreds of pictures makes the first upload long; the move is local and instant, and the upload is resumable and shows progress.
 
 ## Verification

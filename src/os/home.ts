@@ -8,10 +8,12 @@
  */
 import { createEffect, createRoot } from "solid-js";
 import { MIME, ROOT_ID, fitName, fitNameWithSuffix, type FileSystem, type FSDirectory, type FSNode, type NodeRole } from "@mockintosh/fs";
+import { homeFolderId, homeVolumeId } from "@mockintosh/protocol";
 import type { ClubMember } from "../platform/types";
 import type { SystemClub } from "./club";
 import type { OSServices } from "./context";
 import { getWindows } from "./state";
+import { startHomeSync, type HomeSync, type SyncState, type SyncStore } from "./homeSync";
 
 /** The folders every home disk has, by role. */
 const HOME_FOLDERS: ReadonlyArray<{ role: Exclude<NodeRole, "root" | "volume">; name: string }> = [
@@ -41,14 +43,21 @@ export function homeDiskName(member: ClubMember): string {
 export function mountHomeDisk(fs: FileSystem, member: ClubMember): { volume: FSDirectory; created: boolean } {
   const created = !fs.homeVolume(member.id);
   const name = homeDiskName(member);
-  const volume = fs.mountHome(member.id, name);
+  // The disk and its folders have the ids every Mac derives, so their contents sync into the same places.
+  const volumeId = homeVolumeId(member.id);
+  const mounted = fs.mountHome(member.id, name, volumeId);
+  if (mounted.id !== volumeId) fs.renumberDirectory(mounted.id, volumeId);
+  const volume = fs.directory(volumeId)!;
   if (volume.name !== name && !fs.child(ROOT_ID, name)) fs.rename(volume.id, name);
   fs.batch(() => {
     for (const { role, name } of HOME_FOLDERS) {
-      if (!fs.locate(role, volume.id)) fs.mkdir(volume.id, fs.availableName(volume.id, name), { role });
+      const id = homeFolderId(member.id, role);
+      const existing = fs.locate(role, volumeId);
+      if (!existing) fs.mkdir(volumeId, fs.availableName(volumeId, name), { role, id });
+      else if (existing.id !== id) fs.renumberDirectory(existing.id, id);
     }
   });
-  return { volume: fs.directory(volume.id)!, created };
+  return { volume: fs.directory(volumeId)!, created };
 }
 
 /**
@@ -151,11 +160,6 @@ function closeVanishedFolders(os: Pick<OSServices, "fs" | "closeWindow">): void 
 }
 
 /**
- * Follow the Club's member: mount their disk when they're signed in, eject
- * it when they sign out (not when the Club is merely unreachable). Returns
- * the stop function.
- */
-/**
  * Run `work` after the current reactive update: file-system changes made
  * while effects apply aren't readable until it finishes, and mounting reads
  * back the folders it makes.
@@ -170,9 +174,71 @@ function later(work: () => void): void {
   });
 }
 
-export function startHomeDisks(os: Pick<OSServices, "fs" | "showDialog" | "closeWindow">, club: SystemClub): () => void {
+/** Where this Mac keeps its disk sync state: a file in Mockintosh HD's Preferences, never on the synced disk. */
+const SYNC_FOLDER = "Computer Club";
+const SYNC_FILE = "Disk Sync";
+
+/** This Mac's sync state for `member`'s disk, beside every other member's in one file. */
+export function homeSyncStore(fs: FileSystem, member: string): SyncStore {
+  const file = () => {
+    const prefs = fs.locate("preferences", fs.locate("volume")?.id);
+    const folder = prefs && fs.child(prefs.id, SYNC_FOLDER);
+    const found = folder?.kind === "directory" ? fs.child(folder.id, SYNC_FILE) : undefined;
+    return { prefs, folder, found };
+  };
+  const all = async (): Promise<Record<string, SyncState>> => {
+    const { found } = file();
+    return (found && (await fs.readJSON<Record<string, SyncState>>(found.id))) || {};
+  };
+  return {
+    async load() {
+      return (await all())[member] ?? null;
+    },
+    async save(state) {
+      const { prefs, folder } = file();
+      if (!prefs) return;
+      const dir = folder?.kind === "directory" ? folder : fs.mkdir(prefs.id, SYNC_FOLDER);
+      await fs.writeJSON(dir.id, SYNC_FILE, { ...(await all()), [member]: state });
+    },
+  };
+}
+
+/**
+ * Follow the Club's member: mount their disk when they're signed in, eject
+ * it when they sign out (not when the Club is merely unreachable), and keep
+ * it in step with the Club while it's mounted. Returns the stop function.
+ */
+export function startHomeDisks(
+  os: Pick<OSServices, "fs" | "showDialog" | "closeWindow">,
+  club: SystemClub,
+  options: { sync?: boolean } = {},
+): () => void {
   return createRoot((dispose) => {
     let mounted: string | null = null;
+    let sync: HomeSync | null = null;
+    const stopSync = () => {
+      sync?.stop();
+      sync = null;
+    };
+    const syncSoon = () => void sync?.syncNow().catch((error: unknown) => console.warn("Home disk sync:", error));
+    const startSync = (member: ClubMember) => {
+      stopSync();
+      if (options.sync === false) return;
+      sync = startHomeSync({
+        fs: os.fs,
+        member: member.id,
+        request: (path, init) => club.call(path, init),
+        store: homeSyncStore(os.fs, member.id),
+        site: globalThis.location?.host || "this Mac",
+        onNotice: (message) => void os.showDialog({ message, buttons: ["OK"], variant: "note" }),
+      });
+      syncSoon();
+    };
+    // Coming back to the page, or leaving it: catch up, and send what's waiting.
+    const doc = options.sync === false ? undefined : globalThis.document;
+    const onVisibility = () => syncSoon();
+    doc?.addEventListener?.("visibilitychange", onVisibility);
+    if (doc) globalThis.addEventListener?.("focus", onVisibility);
     createEffect(
       () => {
         const member = club.member();
@@ -185,6 +251,7 @@ export function startHomeDisks(os: Pick<OSServices, "fs" | "showDialog" | "close
         if (member === null) {
           // Also a disk left mounted by the last session, when its member signed out elsewhere.
           mounted = null;
+          stopSync();
           later(() => {
             ejectHomeDisks(os.fs);
             closeVanishedFolders(os);
@@ -197,10 +264,16 @@ export function startHomeDisks(os: Pick<OSServices, "fs" | "showDialog" | "close
           ejectHomeDisks(os.fs, member.id);
           closeVanishedFolders(os);
           const { volume, created } = mountHomeDisk(os.fs, member);
+          startSync(member);
           void offerGuestItems(os, member, volume, created).catch((error) => console.error("Home disk:", error));
         });
       },
     );
-    return dispose;
+    return () => {
+      stopSync();
+      doc?.removeEventListener?.("visibilitychange", onVisibility);
+      if (doc) globalThis.removeEventListener?.("focus", onVisibility);
+      dispose();
+    };
   });
 }

@@ -34,6 +34,9 @@ const { default: creditsHandler } = await import("../api/credits.js");
 const { default: configHandler } = await import("../api/config.js");
 const { default: accountHandler } = await import("../api/account.js");
 const { default: connectHandler } = await import("../api/connect.js");
+const { default: diskChangesHandler } = await import("../api/disk/changes.js");
+const { default: diskPushHandler } = await import("../api/disk/push.js");
+const { default: diskBlobHandler } = await import("../api/disk/blob.js");
 
 serveFunctions({
   port: PORT,
@@ -45,6 +48,9 @@ serveFunctions({
       "/api/config": configHandler,
       "/": accountHandler,
       "/connect": connectHandler,
+      "/api/disk/changes": diskChangesHandler,
+      "/api/disk/push": diskPushHandler,
+      "/api/disk/blob": diskBlobHandler,
     },
     prefix: [["/api/auth/", authHandler]],
   },

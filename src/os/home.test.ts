@@ -41,6 +41,21 @@ describe("home disks", () => {
     expect(mountHomeDisk(fs, ADA).created).toBe(false);
   });
 
+  it("gives the disk and its folders the ids every Mac derives, and renumbers an older disk", async () => {
+    const fs = await bootedFS();
+    // A disk from before the ids: made with random ones.
+    const old = fs.mountHome(ADA.id, "Ada");
+    const desk = fs.mkdir(old.id, "Desktop Folder", { role: "desktop" });
+    const note = await fs.writeFile(desk.id, "Note", "kept");
+    const { volume } = mountHomeDisk(fs, ADA);
+    expect(volume.id).toBe("member-1.home");
+    expect(fs.locate("desktop", volume.id)!.id).toBe("member-1.desktop");
+    expect(fs.locate("pictures", volume.id)!.id).toBe("member-1.pictures");
+    expect(fs.node(note.id)!.parentId).toBe("member-1.desktop");
+    expect(await fs.readText(note.id)).toBe("kept");
+    expect(fs.locate("desktop")!.id).toBe("member-1.desktop");
+  });
+
   it("names the disk after the username, and follows a new one", async () => {
     const fs = await bootedFS();
     const { volume } = mountHomeDisk(fs, ADA);
@@ -100,7 +115,7 @@ describe("home disks", () => {
     const [member, setMember] = createSignal<ClubMember | null | undefined>(undefined, { ownedWrite: true });
     const [offline, setOffline] = createSignal(false, { ownedWrite: true });
     const club = { member, offline } as unknown as SystemClub;
-    const stop = startHomeDisks({ fs, showDialog: dialogAnswering(null), closeWindow: vi.fn() }, club);
+    const stop = startHomeDisks({ fs, showDialog: dialogAnswering(null), closeWindow: vi.fn() }, club, { sync: false });
     const names = () => fs.volumes().map((v) => v.name);
     const settle = async () => {
       flush();

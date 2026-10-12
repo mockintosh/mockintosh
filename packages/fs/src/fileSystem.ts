@@ -654,10 +654,11 @@ export class FileSystem {
   }
 
   /**
-   * Mount `member`'s home disk, creating it as `name` the first time. Its
-   * folders are the caller's to create (`locate` finds them by role).
+   * Mount `member`'s home disk, creating it as `name` (with `id`, when
+   * given) the first time. Its folders are the caller's to create (`locate`
+   * finds them by role).
    */
-  mountHome(member: string, name: string): FSDirectory {
+  mountHome(member: string, name: string, id?: NodeId): FSDirectory {
     const existing = this.homeVolume(member);
     if (existing) {
       if (!existing.ejected) return existing;
@@ -670,7 +671,7 @@ export class FileSystem {
     const taken = new Set((this.state.childIds[ROOT_ID] ?? []).map((id) => this.state.nodes[id]?.name));
     let candidate = fitName(name.trim() || "Home");
     for (let n = 2; taken.has(candidate); n++) candidate = fitNameWithSuffix(name.trim() || "Home", ` ${n}`);
-    const volume = this.mkdir(ROOT_ID, candidate, { role: "volume" });
+    const volume = this.mkdir(ROOT_ID, candidate, { role: "volume", id });
     this.commit((s) => { (s.nodes[volume.id] as FSDirectory).home = member; });
     return (this.state.nodes[volume.id] as FSDirectory | undefined) ?? { ...volume, home: member };
   }
@@ -681,6 +682,68 @@ export class FileSystem {
     if (volume?.kind !== "directory" || volume.parentId !== ROOT_ID) throw new FSError("not-found", `No such volume: ${volumeId}`);
     if (volume.ejected) return;
     this.commit((s) => { (s.nodes[volumeId] as FSDirectory).ejected = true; });
+  }
+
+  // =========================================================================
+  // Sync
+  // =========================================================================
+
+  /**
+   * Put `node` in the catalog exactly as another computer has it: its id,
+   * name, folder, revision and times, its attributes replaced, and for a
+   * file `content` as its body. Used by a synced disk to take in what the
+   * Club sends; ordinary changes go through the methods above, which keep
+   * revisions and names in order. Its folder must exist.
+   */
+  async applyRemote(node: FSNode, attributes: NodeAttributes | undefined, content?: Uint8Array): Promise<void> {
+    const parent = node.parentId === null ? undefined : this.state.nodes[node.parentId];
+    if (!parent || parent.kind !== "directory") throw new FSError("not-found", `No such directory: ${node.parentId}`);
+    const existing = this.state.nodes[node.id];
+    if (existing && existing.kind !== node.kind) throw new FSError("conflict", `${node.id} changed between file and folder`);
+    if (node.kind === "file" && content) await this.backend.writeBlob(node.id, content);
+    this.commit((s) => {
+      const before = s.nodes[node.id];
+      if (before && before.parentId !== node.parentId && before.parentId !== null) {
+        s.childIds[before.parentId] = (s.childIds[before.parentId] ?? []).filter((c) => c !== node.id);
+      }
+      if (!before || before.parentId !== node.parentId) (s.childIds[node.parentId!] ??= []).push(node.id);
+      if (node.kind === "directory") s.childIds[node.id] ??= [];
+      s.nodes[node.id] = { ...node };
+      if (attributes && Object.keys(attributes).length) s.attributes[node.id] = { ...attributes };
+      else delete s.attributes[node.id];
+      for (const id of this.collectSubtreeIn(s, node.id)) {
+        unindexRole(s, id);
+        indexRole(s, id);
+      }
+    });
+  }
+
+  /**
+   * Give a folder a new id: its contents, attributes and role go with it.
+   * For a home disk made before its folders had the ids every Mac derives.
+   */
+  renumberDirectory(oldId: NodeId, newId: NodeId): void {
+    const dir = this.state.nodes[oldId];
+    if (dir?.kind !== "directory" || dir.parentId === null) throw new FSError("not-found", `No such folder: ${oldId}`);
+    if (oldId === newId) return;
+    if (this.state.nodes[newId]) throw new FSError("exists", `Node ${newId} already exists`);
+    this.commit((s) => {
+      const node = { ...s.nodes[oldId], id: newId } as FSDirectory;
+      delete s.nodes[oldId];
+      s.nodes[newId] = node;
+      const siblings = s.childIds[node.parentId!] ?? [];
+      s.childIds[node.parentId!] = siblings.map((c) => (c === oldId ? newId : c));
+      s.childIds[newId] = s.childIds[oldId] ?? [];
+      delete s.childIds[oldId];
+      for (const child of s.childIds[newId]) if (s.nodes[child]) s.nodes[child].parentId = newId;
+      if (s.attributes[oldId]) {
+        s.attributes[newId] = s.attributes[oldId];
+        delete s.attributes[oldId];
+      }
+      // Roles are keyed by volume, which may be this folder: index them all again.
+      for (const key of Object.keys(s.roles)) delete s.roles[key];
+      for (const id of Object.keys(s.nodes)) indexRole(s, id);
+    });
   }
 
   // =========================================================================
@@ -830,6 +893,18 @@ export class FileSystem {
   private assertWritable(id: NodeId): void {
     const volume = this.volumeOf(id);
     if (volume?.locked) throw new FSError("locked", `"${volume.name}" is locked, so nothing on it can be changed.`);
+  }
+
+  /** `id` and everything under it, in a store being changed. */
+  private collectSubtreeIn(s: CatalogState, id: NodeId): NodeId[] {
+    const out: NodeId[] = [];
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      out.push(cur);
+      for (const c of s.childIds[cur] ?? []) stack.push(c);
+    }
+    return out;
   }
 
   private collectSubtree(id: NodeId): NodeId[] {
