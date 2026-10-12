@@ -14,6 +14,7 @@ export {
   type KnownMime,
 } from "./types";
 export { FileSystem, type FileSystemOptions, type MkdirOptions } from "./fileSystem";
+export type { VolumeImage, VolumeImageEntry, VolumeImageFile, VolumeImageFolder } from "./volumeImage";
 export { FSError, isFSError, type FSErrorCode } from "./errors";
 export { InMemoryBackend, type FSBackend } from "./backend";
 export { inferMimeType, isTextType, isImageType, isFontType, extensionOf, IMAGE_TYPES, FONT_TYPES } from "./mime";

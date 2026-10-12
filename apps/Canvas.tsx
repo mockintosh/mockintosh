@@ -501,12 +501,6 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
     updateElement(el.id, () => ({ ...el, x: el.x + by.dx, y: el.y + by.dy }));
   }
 
-  function desktopCanvases() {
-    const desktop = app.fs.locate("desktop");
-    if (!desktop) return [];
-    return app.fs.children(desktop.id).filter((n) => n.kind === "file" && n.type === MIME.canvas);
-  }
-
   async function confirmDiscard(): Promise<boolean> {
     if (!dirty()) return true;
     const choice = await app.os.showDialog({
@@ -611,36 +605,8 @@ function CanvasApp(props: Record<string, unknown>): JSX.Element {
 
   async function openDocument(): Promise<void> {
     if (!(await confirmDiscard())) return;
-    const files = desktopCanvases();
-    if (files.length === 0) {
-      await app.os.showDialog({ message: "No Canvas documents on the desktop.", variant: "note" });
-      return;
-    }
-    if (files.length <= 6) {
-      const choice = await app.os.showDialog({
-        message: "Open which canvas?",
-        buttons: [...files.map((f) => f.name), "Cancel"],
-        variant: "note",
-      });
-      if (!choice || choice === "Cancel") return;
-      const file = files.find((f) => f.name === choice);
-      if (file) await loadFile(file.id, file.name);
-      return;
-    }
-    const typed = await app.os.showDialog({
-      message: "Name of a Canvas document on the desktop:",
-      buttons: ["Cancel", "Open"],
-      showInput: true,
-      variant: "note",
-    });
-    const name = typed?.trim();
-    if (!name) return;
-    const file = files.find((f) => f.name === name);
-    if (!file) {
-      await app.os.showDialog({ message: `"${name}" isn't on the desktop.`, variant: "note" });
-      return;
-    }
-    await loadFile(file.id, file.name);
+    const file = await app.os.showOpenDialog({ types: [MIME.canvas], near: fileId() });
+    if (file) await loadFile(file.id, file.name);
   }
 
   function setPageSize(id: PageSizeId): void {

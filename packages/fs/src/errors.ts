@@ -6,7 +6,9 @@ export type FSErrorCode =
   | "invalid-move"
   | "not-a-directory"
   | "not-a-file"
-  | "immutable";
+  | "immutable"
+  /** The node is on a locked disk. */
+  | "locked";
 
 export class FSError extends Error {
   readonly code: FSErrorCode;

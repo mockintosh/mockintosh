@@ -33,14 +33,6 @@ export function wrapped(text: string, width: number, font: string): string[] {
   return lines;
 }
 
-/** `text` cut to fit `width` in `font`, ending in an ellipsis when it had to be cut. */
-export function fitted(text: string, width: number, font: string): string {
-  if (measureText(text, font) <= width) return text;
-  let cut = text;
-  while (cut.length > 0 && measureText(`${cut}…`, font) > width) cut = cut.slice(0, -1);
-  return cut ? `${cut.trimEnd()}…` : "";
-}
-
 /** One of the app's sprites (`icons.ts`), by name. */
 export function Icon(props: { name: string }): JSX.Element {
   const app = useApp();

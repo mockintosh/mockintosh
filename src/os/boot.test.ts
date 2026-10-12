@@ -310,10 +310,10 @@ describe("bootOS on the headless platform", () => {
     // Stop-hand ink in the icon cell (inside the frame + 16px pad).
     expect(inkCoverage(frame, x + inset + 16, y + inset + 16, 32, 32)).toBeGreaterThan(0.25);
     // Default-ring OK sits on the bottom-left (20px face + 4px ring + 16px pad).
-    // The face starts on the pad, inside the outer hairline the content box
-    // starts under, and the ring overhangs it 4px to the left.
+    // The content box starts inside the whole frame, across as well as down,
+    // so the face starts on the pad and the ring overhangs it 4px to the left.
     const btnTop = y + inset + 112 - 16 - 28;
-    const faceLeft = x + 1 + 16;
+    const faceLeft = x + inset + 16;
     const btnLeft = faceLeft - 4;
     expect(inkCoverage(frame, btnLeft + 10, btnTop, 40, 3)).toBe(1);
     expect(inkCoverage(frame, btnLeft, btnTop + 10, 3, 8)).toBe(1);

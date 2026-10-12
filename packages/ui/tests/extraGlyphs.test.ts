@@ -97,12 +97,10 @@ describe("extra glyphs in the built-in fonts", () => {
   });
 
   it("measures ⌘R wider than R in the menu font by the glyph's advance", () => {
-    const font = requireFont("menu");
-    const cmdWidth = getGlyphWidth(font, getGlyphIndexForChar(font, COMMAND_KEY));
     expect(measureText(`${COMMAND_KEY}R`, "menu")).toBeGreaterThan(measureText("R", "menu"));
-    expect(measureText(`${COMMAND_KEY}R`, "menu")).toBe(
-      measureText("R", "menu") + cmdWidth + font.spacing
-    );
+    // Chicago's ⌘ is 9/1/11 in Apple's font: one pixel in, the image, one pixel after.
+    expect(measureText(COMMAND_KEY, "menu")).toBe(11);
+    expect(measureText(`${COMMAND_KEY}R`, "menu")).toBe(measureText("R", "menu") + 11);
   });
 
   it("renders symbols distinctly from the '?' fallback", () => {

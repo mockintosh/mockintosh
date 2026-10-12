@@ -58,10 +58,19 @@ export interface FSFile extends FSNodeBase {
   type: string;
   /** Body size in bytes. */
   size: number;
+  /**
+   * Where a mounted disk's file can also be streamed from (a movie a player
+   * opens by address rather than reading whole). `readBytes` works either way.
+   */
+  url?: string;
 }
 
 export interface FSDirectory extends FSNodeBase {
   kind: "directory";
+  /** On a volume: a locked disk, so nothing on it can be changed (a mounted `VolumeImage`). */
+  locked?: boolean;
+  /** On a volume: the user can eject it (`FileSystem.unmount`). */
+  ejectable?: boolean;
 }
 
 export type FSNode = FSFile | FSDirectory;
@@ -85,6 +94,8 @@ export interface WriteFileOptions {
   type?: string;
   /** Attributes to merge into the node's attribute bag on write. */
   attributes?: NodeAttributes;
+  /** Where the body can also be streamed from (`FSFile.url`), e.g. a copy of a mounted disk's movie. */
+  url?: string;
 }
 
 /** MIME types the OS itself defines. */
@@ -98,6 +109,8 @@ export const MIME = {
   sprite: "image/x-mockintosh-sprite",
   /** JSON Canvas document — retained shapes and text, not a bitmap. */
   canvas: "application/x-mockintosh-canvas",
+  /** JSON `{ reel }` — a motion picture, naming one of the reels Showreel can play. */
+  motion: "application/x-mockintosh-motion",
   /** JSON `{ appId }` — a Finder icon that launches an app. */
   appShortcut: "application/x-mockintosh-app-shortcut",
   /** JSON app manifest for an installed third-party app. */

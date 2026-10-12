@@ -81,24 +81,6 @@ function toMenubar(program: PaintProgram, menus: PaintMenu[]): MenubarDefinition
   }));
 }
 
-/** The PNTG files `SFGetFile` would list: on the desktop, in Pictures, and beside the open document. */
-function paintFiles(app: AppContext, near: PaintFileRef | null): PaintFileRef[] {
-  const dirs = new Set<string>();
-  const desktop = app.fs.locate("desktop");
-  if (desktop) dirs.add(desktop.id);
-  const pictures = app.fs.locate("pictures");
-  if (pictures) dirs.add(pictures.id);
-  const parent = near ? app.fs.node(near.id)?.parentId : null;
-  if (parent) dirs.add(parent);
-  const files: PaintFileRef[] = [];
-  for (const dir of dirs) {
-    for (const node of app.fs.children(dir)) {
-      if (node.kind === "file" && node.type === MIME.paint) files.push({ id: node.id, name: node.name });
-    }
-  }
-  return files;
-}
-
 function pageImage(page: BitMap): { width: number; height: number; data: Uint8Array } {
   const data = new Uint8Array(DOC_WIDTH * DOC_HEIGHT);
   for (let v = 0; v < DOC_HEIGHT; v++) {
@@ -177,27 +159,8 @@ function startSession(app: AppContext, screenWidth: number, screenHeight: number
     clipboardText: async () => (clipboard ? clipboard.readText() : null),
     heldModifiers: () => eventModifiers(heldModifiers()),
     async getFile() {
-      const files = paintFiles(app, program.paint.docFile);
-      if (files.length === 0) {
-        await app.os.showDialog({ message: "There are no MacPaint documents on the desktop.", variant: "note" });
-        return null;
-      }
-      if (files.length <= 6) {
-        const label = await app.os.showDialog({
-          message: "MacPaint documents on disk",
-          buttons: [...files.map((f) => f.name), "Cancel"],
-          variant: "note",
-        });
-        return files.find((f) => f.name === label) ?? null;
-      }
-      const typed = await app.os.showDialog({
-        message: `MacPaint documents on disk: ${files.map((f) => f.name).join(", ")}`,
-        buttons: ["Cancel", "Open"],
-        showInput: true,
-        variant: "note",
-      });
-      const name = typed?.trim();
-      return name ? (files.find((f) => f.name === name) ?? null) : null;
+      const file = await app.os.showOpenDialog({ types: [MIME.paint], near: program.paint.docFile?.id });
+      return file ? { id: file.id, name: file.name } : null;
     },
     async putFile(message, defaultName) {
       const typed = await app.os.showDialog({

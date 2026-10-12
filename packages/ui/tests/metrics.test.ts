@@ -24,8 +24,8 @@ describe("faceMetrics", () => {
     expect(m.cellHeight).toBe(13);
     expect(m.ascent).toBe(12);
     expect(m.descent).toBe(3);
-    expect(m.leading).toBe(0);
-    expect(m.lineHeight).toBe(15);
+    expect(m.leading).toBe(1);
+    expect(m.lineHeight).toBe(16);
     expect(m.capTop).toBe(1);
     expect(m.capHeight).toBe(9);
     expect(m.capAscent).toBe(10);
@@ -82,7 +82,7 @@ describe("CDEF baseline", () => {
   });
 
   it("uses the FontInfo line box for single-line middle", () => {
-    expect(alignmentHeight(requireFont("menu"), 1, 13, "middle")).toBe(15);
+    expect(alignmentHeight(requireFont("menu"), 1, 13, "middle")).toBe(16);
   });
 
   it("keeps the cell block for top, bottom, and wrapped middle", () => {

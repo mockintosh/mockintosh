@@ -360,6 +360,18 @@ const ICON_TRASH_FULL_16X16 = defineSprite(
   16,
   "AAqAAAAgIAAKqqqACVVVgAqqqoACVVYACWVlgAmWWYAllllgJZZZYCWWWWAllllgCZZZgAllZYACVVYAAKqoAA=="
 );
+/** System 7.5.3: System Floppy Disk -3998 · ICN# */
+const ICON_FLOPPY_DISK = defineSprite(
+  32,
+  32,
+  "KqqqqqqqqgCVVlVVVVZVgJVWVVVqVlVglVZVVZWWVViVVlVVlZZVVpVWVVWVllVWlVZVVZWWVVaVVlVVlZZVVpVWVVVqVlVWlVZVVVVWVVaVVaqqqqlVVpVVVVVVVVVWlVVVVVVVVVaVVVVVVVVVVpVqqqqqqqlWlZVVVVVVVlaVlVVVVVVWVpWVVVVVVVZWlZVVVVVVVlaVlVVVVVVWVpWVVVVVVVZWlZVVVVVVVlaVlVVVVVVWVpWVVVVVVVZWlZVVVVVVVlaVlVVVVVVWVpWVVVVVVVZWlZVVVVVVVlaVlVVVVVVWVpWVVVVVVVZWlZVVVVVVVlYqqqqqqqqqqA=="
+);
+/** System 7.5.3: System Floppy Disk -3998 · ics# */
+const ICON_FLOPPY_DISK_16X16 = defineSprite(
+  16,
+  16,
+  "aqqqoJZVVZiWVWmWllVVlpWqqlaVVVVWlqqqlplVVWaZVVVmmVVVZplVVWaZVVVmmVVVZplVVWaZVVVmqqqqqg=="
+);
 export const iconSprites: Record<string, Sprite> = {
   "icon/1bitcamera": ICON_1BITCAMERA,
   "icon/MacFlim": ICON_MACFLIM,
@@ -404,4 +416,6 @@ export const iconSprites: Record<string, Sprite> = {
   "foundry/icon": ICON_FOUNDRY_ICON,
   "icon/trash-full": ICON_TRASH_FULL,
   "icon/trash-full-16x16": ICON_TRASH_FULL_16X16,
+  "icon/floppy-disk": ICON_FLOPPY_DISK,
+  "icon/floppy-disk-16x16": ICON_FLOPPY_DISK_16X16,
 };

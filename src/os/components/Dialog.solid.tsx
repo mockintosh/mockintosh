@@ -4,7 +4,7 @@ import { DialogButton, Spacer, TextInput, createSignal, layoutText, resolveFont 
 import type { DialogVariant } from "@mockintosh/sdk";
 import { useWindow } from "../windowContext";
 import { alertIcon } from "../iconCatalog/catalog";
-import { windowFrame } from "../windowGeometry";
+import { windowFrame, windowSizeForContent } from "../windowGeometry";
 
 export interface DialogProps {
   message: string;
@@ -26,16 +26,16 @@ const RING_OVERHANG = 4;
 /** A 20px button face plus the default ring's overhang. */
 const BUTTON_ROW = 20 + 2 * RING_OVERHANG;
 const INPUT_ROW = 36;
+/** The alert window's outer width. */
 const WIDTH = 376;
 
 /** Window size that fits the message wrapped beside the icon, plus input and buttons. */
 export function dialogSize(options: { message: string; showInput?: boolean }): { width: number; height: number } {
-  // The alert frame comes out of the window's width, not its height.
   const contentWidth = WIDTH - 2 * windowFrame({ kind: "alert" });
   const textWidth = contentWidth - PADDING * 2 - ICON_SIZE - GAP;
   const textHeight = layoutText(resolveFont("menu"), options.message, textWidth).height;
   const height = PADDING + Math.max(ICON_SIZE, textHeight) + BUTTON_GAP + BUTTON_ROW + PADDING;
-  return { width: WIDTH, height: height + (options.showInput ? INPUT_ROW : 0) };
+  return windowSizeForContent({ kind: "alert" }, { width: contentWidth, height: height + (options.showInput ? INPUT_ROW : 0) });
 }
 
 export function DialogApp(props: DialogProps): JSX.Element {

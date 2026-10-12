@@ -71,7 +71,7 @@
  },
  "video": {
   "id": "video",
-  "title": "1984.mp4",
+  "title": "Movie Player",
   "icon": "icon/MacFlim",
   "defaultSize": {
    "width": 340,
@@ -86,6 +86,13 @@
   "minSize": {
    "width": 220,
    "height": 140
+  },
+  "fileTypes": [
+   "video/mp4"
+  ],
+  "about": {
+   "version": "2.0",
+   "description": "Plays movies in one bit, dithered as they play."
   }
  },
  "photobooth": {
@@ -330,9 +337,12 @@
    "width": 224,
    "height": 150
   },
+  "fileTypes": [
+   "application/x-mockintosh-motion"
+  ],
   "about": {
    "version": "4.0",
-   "description": "Four reels in one bit, each with its own score. One Bit: type, shape, depth, particles and the edit, to a 120 BPM groove. The Keeper: an engraved silent short, drawn on twos, with a waltz and a projector. Hello, Mockintosh: the machine introduces itself in its own pixels and sounds. A Lot Like 1984: the 1984 ad itself, re-cut and dithered, with Mockintosh taking over Big Brother's screens."
+   "description": "Plays motion files: reels in one bit, each with its own score. It knows four. One Bit: type, shape, depth, particles and the edit, to a 120 BPM groove. The Keeper: an engraved silent short, drawn on twos, with a waltz and a projector. Hello, Mockintosh: the machine introduces itself in its own pixels and sounds. A Lot Like 1984: the 1984 ad itself, re-cut and dithered, with Mockintosh taking over Big Brother's screens."
   },
   "sprites": {
    "showreel/icon": {
@@ -344,6 +354,16 @@
     "width": 16,
     "height": 16,
     "data": "AAACqAACqWgCqWqAJaoAACgAAAAqqqqoKWpamCWpalgqqqqoJVVVWCVapVglaWlYJWlpWCVapVglVVVYKqqqqA=="
+   },
+   "showreel/document": {
+    "width": 32,
+    "height": 32,
+    "data": "AqqqqqqgAAACVVVVVWgAAAJVVVVVZgAAAlVVVVVlgAACVVVVVWVgAAJVVVVVZVgAAlVVVVVqqgACVVVVVVVWAAJVVVVVVVYAAlVVVValVgACVVVWqWVWAAJVVqlqlVYAAlapapVVVgACWWqVVVVWAAJaVVVVVVYAAlqqqqqpVgACWlqWpalWAAJZalqWmVYAAlqqqqqpVgACWVVVVVlWAAJZVWpVWVYAAllVqpVZVgACWVaVpVlWAAJZVpWlWVYAAllWlaVZVgACWVWqlVlWAAJZVWpVWVYAAllVVVVZVgACWqqqqqlWAAJVVVVVVVYAAlVVVVVVVgACqqqqqqqqAA=="
+   },
+   "showreel/document-16x16": {
+    "width": 16,
+    "height": 16,
+    "data": "CqqgAAlVaAAJVWYACVVlgAlVaqAJVVVgCVVqYAlammAJqaVgCaqqYAmmmmAJqqpgCZaWYAmWlmAJqqpgCqqqoA=="
    },
    "showreel/bomb": {
     "width": 32,

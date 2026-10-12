@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { BULLET, Button, Progress, Slider, TextInput, fontLineHeight, measureText, useUIServices } from "@mockintosh/ui";
+import { BULLET, Button, Progress, Slider, TextInput, fontLineHeight, measureText, truncateText, useUIServices } from "@mockintosh/ui";
 import { useApp, defineApp } from "@mockintosh/sdk";
 import {
   SPOTIFY_ACCOUNTS_HOST,
@@ -59,20 +59,6 @@ interface SdkPlayer {
   setVolume(v: number): Promise<void>;
   activateElement?(): Promise<void>;
   addListener(event: string, cb: (payload: never) => void): void;
-}
-
-/** `text`, cut with an ellipsis to fit `width` pixels in `font`. */
-function fit(text: string, width: number, font = "body"): string {
-  if (width <= 0) return "";
-  if (measureText(text, font) <= width) return text;
-  let lo = 0;
-  let hi = text.length;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (measureText(`${text.slice(0, mid)}…`, font) <= width) lo = mid;
-    else hi = mid - 1;
-  }
-  return `${text.slice(0, lo).trimEnd()}…`;
 }
 
 function artistNames(track: SpotifyTrack): string {
@@ -148,7 +134,7 @@ function SetupScreen(props: SetupScreenProps): JSX.Element {
         <text font="body">Add this Redirect URI, and tick Web API and Web Playback SDK:</text>
         <box flexDirection="row" gap={6} alignItems="center">
           <box borderColor={1} borderWidth={1} paddingLeft={4} paddingRight={4} height={20} justifyContent="center">
-            <text font="body" nowrap>{fit(props.redirectUri, textW() - 100)}</text>
+            <text font="body" nowrap>{truncateText(props.redirectUri, textW() - 100)}</text>
           </box>
           <Show when={props.copy}>
             <Button
@@ -566,7 +552,7 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
                             onDoubleClick={() => void play(pl.uri)}
                           >
                             <text font="body" color={on() ? 0 : 1} nowrap>
-                              {fit(pl.name, SIDEBAR_W - PAD * 2)}
+                              {truncateText(pl.name, SIDEBAR_W - PAD * 2)}
                             </text>
                           </box>
                         );
@@ -594,9 +580,9 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
                   <box height={PLAYLIST_HEADER_H} flexDirection="row" alignItems="center" gap={PAD + 2} paddingLeft={PAD + 2} paddingRight={PAD}>
                     <Cover art={cover()} size={COVER} />
                     <box flexDirection="column" gap={2} flexGrow={1}>
-                      <text font="menu" nowrap>{fit(pl().name, paneW() - COVER - 90, "menu")}</text>
+                      <text font="menu" nowrap>{truncateText(pl().name, paneW() - COVER - 90, "menu")}</text>
                       <text font="body" nowrap>
-                        {fit(
+                        {truncateText(
                           [pl().owner && `by ${pl().owner}`, songCount(pl())]
                             .filter(Boolean)
                             .join(` ${BULLET} `),
@@ -650,13 +636,13 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
                                   </box>
                                   <box width={nameColW()}>
                                     <text font="body" color={on() ? 0 : 1} bold={playing()} nowrap>
-                                      {fit(track.name, nameColW())}
+                                      {truncateText(track.name, nameColW())}
                                     </text>
                                   </box>
                                   <box width={PAD} />
                                   <box width={artistColW()}>
                                     <text font="body" color={on() ? 0 : 1} nowrap>
-                                      {fit(artistNames(track), artistColW())}
+                                      {truncateText(artistNames(track), artistColW())}
                                     </text>
                                   </box>
                                   <box width={TIME_W}>
@@ -692,10 +678,10 @@ function SpotifyPlayer(_props: Record<string, unknown>): JSX.Element {
           <Cover art={art()} size={ART} />
           <box flexDirection="column" gap={2} width={Math.max(60, win.width() - ART - 330)}>
             <text font="menu" nowrap>
-              {fit(player()?.track?.name ?? (ready() ? "Not playing" : status() || "Connecting…"), Math.max(60, win.width() - ART - 330), "menu")}
+              {truncateText(player()?.track?.name ?? (ready() ? "Not playing" : status() || "Connecting…"), Math.max(60, win.width() - ART - 330), "menu")}
             </text>
             <text font="body" nowrap>
-              {fit(
+              {truncateText(
                 player()?.track ? artistNames(player()!.track!) : player() ? "" : ready() ? status() || "Double-click a song to play it." : "",
                 Math.max(60, win.width() - ART - 330),
               )}

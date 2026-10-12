@@ -49,6 +49,23 @@ export function measureText(
 }
 
 /**
+ * `TruncString(…, smTruncEnd)`: `text` cut at the end to fit `width` pixels
+ * in `fontName`, ending in "…" when it had to be cut, or "" when not even one
+ * character and the ellipsis fit.
+ */
+export function truncateText(text: string, width: number, fontName: string = "body", style: FontStyle = {}, size?: number): string {
+  if (measureText(text, fontName, style, size) <= width) return text;
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (measureText(`${text.slice(0, mid).trimEnd()}…`, fontName, style, size) <= width) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo === 0 ? "" : `${text.slice(0, lo).trimEnd()}…`;
+}
+
+/**
  * Line height of a named font, in pixels — FontInfo
  * `ascent + descent + leading`. Same advance `layoutText` uses.
  */

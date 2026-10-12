@@ -7,6 +7,7 @@ import {
 } from "./outlineStrike";
 import { DEFAULT_SCALER_OPTIONS, OutlineFace } from "./truetype/scaler";
 import { applyExtraGlyphs } from "./extraGlyphs";
+import { applyNfntMetrics } from "./nfnt";
 import {
   BAKED_STYLE_ALIASES,
   BUILTIN_STRIKES,
@@ -118,6 +119,11 @@ function rememberInfo(family: string, size: number, info: RegisteredFontInfo | u
   infoMap().set(fontInfoKey(family, size), info);
 }
 
+let nfntByKey: Map<string, NonNullable<FontStrikeSpec["nfnt"]>> | undefined;
+function nfntMap(): Map<string, NonNullable<FontStrikeSpec["nfnt"]>> {
+  return (nfntByKey ??= new Map());
+}
+
 let overhangsByKey: Map<string, Readonly<Record<number, readonly [number, number]>>> | undefined;
 function overhangMap(): Map<string, Readonly<Record<number, readonly [number, number]>>> {
   return (overhangsByKey ??= new Map());
@@ -136,7 +142,14 @@ function loadStrike(family: string, size: number, data: string): DeckerFont {
       font.originX[Number(ordinal)] = originX;
     }
   }
-  return applyExtraGlyphs(font);
+  const full = applyExtraGlyphs(font);
+  // After the extra glyphs, so ⌘ and the arrows are placed by the font's rule too.
+  const nfnt = nfntMap().get(fontInfoKey(family, size));
+  if (nfnt) {
+    const mismatched = applyNfntMetrics(full, nfnt.metrics, nfnt.offset);
+    if (mismatched.length) console.warn(`${family} ${size}: glyphs ${mismatched.join(", ")} don't match the NFNT image widths`);
+  }
+  return full;
 }
 
 function putStrike(family: string, size: number, font: DeckerFont): void {
@@ -288,6 +301,7 @@ export function initBuiltinFonts(): void {
     const key = strikeKey(strike.family, strike.style ?? 0);
     rememberInfo(key, strike.size, strike.info);
     if (strike.overhangs) overhangMap().set(fontInfoKey(key, strike.size), strike.overhangs);
+    if (strike.nfnt) nfntMap().set(fontInfoKey(key, strike.size), strike.nfnt);
   }
   for (const [name, alias] of Object.entries(BAKED_STYLE_ALIASES)) {
     pendingBakedMap().set(name, alias);

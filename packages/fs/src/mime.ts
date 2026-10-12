@@ -9,6 +9,7 @@ const BY_EXTENSION: Readonly<Record<string, string>> = {
   json: MIME.json,
   deck: MIME.deck,
   canvas: MIME.canvas,
+  motion: MIME.motion,
   png: "image/png",
   pbm: "image/x-portable-bitmap",
   pntg: MIME.paint,
@@ -67,6 +68,7 @@ export function isTextType(type: string): boolean {
     type === MIME.json ||
     type === MIME.deck ||
     type === MIME.canvas ||
+    type === MIME.motion ||
     type === MIME.sprite ||
     type === MIME.appShortcut ||
     type === MIME.app ||

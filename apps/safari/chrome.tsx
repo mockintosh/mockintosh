@@ -1,4 +1,4 @@
-import { For, Show, createSignal, measureText, type Sprite } from "@mockintosh/sdk";
+import { For, Show, createSignal, truncateText, type Sprite } from "@mockintosh/sdk";
 import { TextInput, createPress, type JSX } from "@mockintosh/ui";
 import { closeIcon, dimmed, lockIcon } from "./icons";
 
@@ -146,14 +146,6 @@ export interface TabBarProps {
   onClose: (id: number) => void;
 }
 
-/** `text` cut to fit `width`, ending in an ellipsis when it had to be cut. */
-function fitted(text: string, width: number): string {
-  if (measureText(text, TAB_FONT) <= width) return text;
-  let cut = text;
-  while (cut.length > 0 && measureText(`${cut}…`, TAB_FONT) > width) cut = cut.slice(0, -1);
-  return cut ? `${cut.trimEnd()}…` : "";
-}
-
 function TabCell(props: {
   tab: TabLabel;
   active: boolean;
@@ -183,7 +175,7 @@ function TabCell(props: {
         alignItems="center"
         overflow="hidden"
       >
-        <text font={TAB_FONT} color={dark() ? 0 : 1} nowrap>{fitted(props.tab.label, props.width - 8)}</text>
+        <text font={TAB_FONT} color={dark() ? 0 : 1} nowrap>{truncateText(props.tab.label, props.width - 8, TAB_FONT)}</text>
       </box>
       <Show when={hovered()}>
         <box

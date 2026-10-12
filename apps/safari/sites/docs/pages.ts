@@ -81,7 +81,11 @@ Everything you make is kept on **Mockintosh HD**, a disk stored in your browser.
 
 ## Opening and moving documents
 
-Each document has a type, and each application says which types it reads. Double-clicking a document opens it in the application for its type; an application's File menu can open others. Drag documents between folder windows to move them.
+Each document has a type, and each application says which types it reads. Double-clicking a document opens it in the application for its type; an application's File menu can open others. Drag documents between folder windows to move them; dragged onto another disk, they are copied.
+
+## The Tour disk
+
+**Mockintosh Tour** sits below the hard disk with the demos that come with the system: Showreel's reels and the 1984 film. It is locked, so nothing on it changes; drag what you want to keep onto Mockintosh HD to copy it. To eject it, select it and choose **Eject Disk** from the Special menu, or drag it to the Trash. **Special › Insert Tour Disk** puts it back.
 
 ## Bringing files in
 
@@ -103,8 +107,8 @@ Some applications are always there. The rest are listed in the **App Store**, wh
 - **Preview**: Shows pictures and sprites.
 - **File**: Shows text, Markdown and JSON files.
 - **Photo Booth**: Takes dithered photos with your camera.
-- **1984.mp4**: The film, in one bit.
-- **Showreel**: Four short films in one bit, each with its own score.
+- **Movie Player**: Plays movies in one bit, like 1984.mp4 on the Mockintosh Tour disk.
+- **Showreel**: Plays motion files, short films in one bit with their own scores. Four come on the Mockintosh Tour disk.
 - **Icon Gallery**: Every icon in the system.
 
 ## In the App Store

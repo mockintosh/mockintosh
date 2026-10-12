@@ -11,8 +11,9 @@ export interface DialogButtonProps extends Pick<ButtonProps, "name" | "label" | 
 }
 
 /**
- * A push button as the Dialog Manager draws it: flat, no shadow, and the
- * default ring painted outside the item so every face in a row lines up.
+ * A push button as the Dialog Manager draws it: flat, no shadow, the
+ * default ring painted outside the item so every face in a row lines up,
+ * and dimmed by graying its title.
  */
 export function DialogButton(props: DialogButtonProps): JSX.Element {
   return (
@@ -30,6 +31,7 @@ export function DialogButton(props: DialogButtonProps): JSX.Element {
       shadow={false}
       ring={props.default}
       ringOverhang
+      dimTitle
     />
   );
 }
