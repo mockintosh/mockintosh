@@ -4,9 +4,14 @@ import type { ClubAccounts, ClubConfig, ClubConnection, ClubCredits, ClubMember 
 interface AuthUser {
   id?: string;
   name?: string;
+  username?: string | null;
+  displayUsername?: string | null;
   email?: string;
   createdAt?: string;
 }
+
+/** The Club's username rule (`sites/club/api/_auth.ts`). */
+const USERNAME_RULE = 'A username is 3 to 24 letters, digits, "_" or ".".';
 
 /** What Better Auth's error bodies say, by `code`, in the Club window's words. */
 const MESSAGES: Record<string, string> = {
@@ -14,6 +19,11 @@ const MESSAGES: Record<string, string> = {
   INVALID_OTP: "That code didn't work. Check it, or send a new one.",
   OTP_EXPIRED: "That code has expired. Send a new one.",
   TOO_MANY_ATTEMPTS: "Too many tries with that code. Send a new one.",
+  USERNAME_REQUIRED: "New members choose a username. Type one, then send a new code.",
+  USERNAME_IS_ALREADY_TAKEN: "That username is taken. Choose another, or leave it empty if you're already a member.",
+  USERNAME_TOO_SHORT: USERNAME_RULE,
+  USERNAME_TOO_LONG: USERNAME_RULE,
+  INVALID_USERNAME: USERNAME_RULE,
 };
 
 /** What a device token answers while the member hasn't approved yet. */
@@ -23,7 +33,14 @@ const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
 function member(user: AuthUser | undefined): ClubMember | null {
   if (!user?.email || !user.id) return null;
   const since = Date.parse(user.createdAt ?? "");
-  return { id: user.id, name: user.name || user.email, email: user.email, since: Number.isFinite(since) ? since : Date.now() };
+  const username = user.displayUsername || user.username || null;
+  return {
+    id: user.id,
+    name: user.name || username || user.email,
+    username,
+    email: user.email,
+    since: Number.isFinite(since) ? since : Date.now(),
+  };
 }
 
 /**
@@ -107,14 +124,21 @@ export function createWebClubAccounts(fetch: FetchFunction, club: string): ClubA
       return { signIn: data.signIn, providers };
     },
 
-    async sendCode(email) {
+    async sendCode(email, username) {
+      // A refused sign-up uses up its code, so a new member's username is checked first.
+      if (username) {
+        const { status, data } = await call("/is-username-available", { username });
+        if (status !== 200) throw failure(status, data);
+        if (data?.available === false) throw failure(400, { code: "USERNAME_IS_ALREADY_TAKEN" });
+      }
       const { status, data } = await call("/email-otp/send-verification-otp", { email, type: "sign-in" });
       if (status !== 200) throw failure(status, data);
     },
 
-    async signInWithCode(email, code, name) {
+    async signInWithCode(email, code, username) {
       const otp = code.replace(/\D/g, "");
-      const { status, data, resp } = await call("/sign-in/email-otp", { email, otp, ...(name && { name }) });
+      const joining = username ? { username, displayUsername: username, name: username } : {};
+      const { status, data, resp } = await call("/sign-in/email-otp", { email, otp, ...joining });
       const signedIn = status === 200 ? member(data?.user) : null;
       const issued = resp.headers.get("set-auth-token") ?? (typeof data?.token === "string" ? data.token : null);
       if (!signedIn || !issued) throw failure(status, data);

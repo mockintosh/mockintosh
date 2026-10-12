@@ -8,7 +8,7 @@ import { bootstrapFileSystem, STARTUP_VOLUME_NAME } from "./fsBootstrap";
 import { guestItems, mountHomeDisk, moveGuestItems, offerGuestItems, startHomeDisks } from "./home";
 
 const NOW = 1_800_000_000_000;
-const ADA: ClubMember = { id: "member-1", name: "Ada", email: "ada@example.com", since: NOW - 60_000 };
+const ADA: ClubMember = { id: "member-1", name: "Ada Lovelace", username: "Ada", email: "ada@example.com", since: NOW - 60_000 };
 
 async function bootedFS() {
   const fs = await FileSystem.open({ backend: new InMemoryBackend(), persistDelayMs: 0 });
@@ -39,6 +39,14 @@ describe("home disks", () => {
     expect(fs.volumeOf(fs.locate("desktop")!.id)!.id).toBe(volume.id);
     expect(fs.volumeOf(fs.locate("preferences")!.id)!.name).toBe(STARTUP_VOLUME_NAME);
     expect(mountHomeDisk(fs, ADA).created).toBe(false);
+  });
+
+  it("names the disk after the username, and follows a new one", async () => {
+    const fs = await bootedFS();
+    const { volume } = mountHomeDisk(fs, ADA);
+    expect(volume.name).toBe("Ada");
+    expect(mountHomeDisk(fs, { ...ADA, username: "countess" }).volume.id).toBe(volume.id);
+    expect(fs.directory(volume.id)!.name).toBe("countess");
   });
 
   it("counts the guest's files but not the Mac's app shortcuts", async () => {

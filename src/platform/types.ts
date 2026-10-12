@@ -158,6 +158,8 @@ export interface ClubMember {
   /** The Club's id for the member: stable across renames, and their home disk's owner. */
   id: string;
   name: string;
+  /** Chosen when joining ("Ada"), and their home disk's name; `null` for one who joined with GitHub or Google and hasn't chosen yet. */
+  username: string | null;
   email: string;
   /** When they joined, in milliseconds since the epoch. */
   since: number;
@@ -206,10 +208,14 @@ export interface ClubAccounts {
   session(): Promise<ClubMember | null>;
   /** How this computer may sign in. */
   config(): Promise<ClubConfig>;
-  /** Emails a six-digit sign-in code (`form` only). The Club makes a membership for a new address. */
-  sendCode(email: string): Promise<void>;
-  /** Signs in with an emailed code; `name` names a new member. Throws when the code is wrong. */
-  signInWithCode(email: string, code: string, name?: string): Promise<ClubMember>;
+  /**
+   * Emails a six-digit sign-in code (`form` only). The Club makes a
+   * membership for a new address, which needs `username`: checked here,
+   * before a code is spent on it.
+   */
+  sendCode(email: string, username?: string): Promise<void>;
+  /** Signs in with an emailed code; a new member gives the `username` they chose. Throws when the code is wrong. */
+  signInWithCode(email: string, code: string, username?: string): Promise<ClubMember>;
   /** Starts connecting this computer on the Club's page. */
   connect(): Promise<ClubConnection>;
   signOut(): Promise<void>;

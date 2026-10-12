@@ -6,7 +6,21 @@
 import { html } from "../../../api/_page.js";
 import { clubAuth } from "./_auth.js";
 import { clubCredits, type LedgerEntry } from "./_credits.js";
-import { clubPage, formFields, seeOther, signInAction, signInForm, signOut, signedIn } from "./_pages.js";
+import { USERNAME_MAX, USERNAME_MIN } from "./_auth.js";
+import {
+  USERNAME_RULE,
+  assertUsernameFree,
+  authHeaders,
+  clubPage,
+  formFields,
+  ok,
+  problemOf,
+  seeOther,
+  signInAction,
+  signInForm,
+  signOut,
+  signedIn,
+} from "./_pages.js";
 import { clubSessions, type ConnectedSession } from "./_sessions.js";
 
 const PATH = "/";
@@ -64,7 +78,31 @@ function macRow(session: ConnectedSession): string {
   );
 }
 
-async function memberPage(user: { id: string; name: string; email: string; createdAt: Date }, currentSession: string): Promise<Response> {
+interface PageUser {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+  username?: string | null;
+  displayUsername?: string | null;
+}
+
+/** For a member without a username (one who joined with GitHub or Google): choosing one. */
+function chooseUsername(problem?: string): string {
+  return (
+    html`<div class="card"><h2>Choose a username</h2>` +
+    (problem ? html`<p><strong>${problem}</strong></p>` : "") +
+    html`<form method="post" action="${PATH}">
+<input type="hidden" name="action" value="username">
+<label for="username">Username</label>
+<input id="username" name="username" autocomplete="username" minlength="${USERNAME_MIN}" maxlength="${USERNAME_MAX}" pattern="[A-Za-z0-9_.]+" required>
+<p class="small">${USERNAME_RULE} Your disk on every Mockintosh is named after it.</p>
+<button type="submit">Choose</button>
+</form></div>`
+  );
+}
+
+async function memberPage(user: PageUser, currentSession: string, problem?: string): Promise<Response> {
   const credits = clubCredits();
   const sessions = clubSessions();
   if (!credits || !sessions) return clubPage(html`<p>The Computer Club isn't open on this server yet.</p>`, 503);
@@ -73,11 +111,12 @@ async function memberPage(user: { id: string; name: string; email: string; creat
   return clubPage(
     html`<h1>Mockintosh Computer Club</h1>
 <div class="card">
-<div class="row"><span>Member</span><span>${user.name || user.email}</span></div>
+<div class="row"><span>Member</span><span>${user.displayUsername || user.username || user.name || user.email}</span></div>
 <div class="row"><span>Email</span><span>${user.email}</span></div>
 <div class="row"><span>Since</span><span>${formatDate(new Date(user.createdAt).getTime())}</span></div>
 <div class="row"><span>Credits</span><strong>${formatCredits(balance)}</strong></div>
 </div>` +
+      (user.username ? "" : chooseUsername(problem)) +
       (recent.length
         ? html`<div class="card"><h2>Latest</h2>` +
           recent
@@ -111,6 +150,18 @@ async function handler(req: Request): Promise<Response> {
     const session = await signedIn(auth, req);
     const sessions = clubSessions();
     if (!session || !sessions) return seeOther(PATH);
+    if (fields.get("action") === "username") {
+      const username = (fields.get("username") ?? "").trim();
+      try {
+        await assertUsernameFree(auth, username);
+        await ok(
+          await auth.api.updateUser({ body: { username, displayUsername: username }, headers: authHeaders(req), asResponse: true }),
+        );
+      } catch (error) {
+        return memberPage(session.user as PageUser, session.session.id, problemOf(error));
+      }
+      return seeOther(PATH);
+    }
     const target = fields.get("session") ?? "";
     if (fields.get("action") === "disconnect" && target !== session.session.id) await sessions.disconnect(session.user.id, target);
     if (fields.get("action") === "cap") {
@@ -123,7 +174,7 @@ async function handler(req: Request): Promise<Response> {
   if (req.method !== "GET") return clubPage(html`<p>Method not allowed.</p>`, 405);
   const session = await signedIn(auth, req);
   if (!session) return signedOutPage();
-  return memberPage(session.user, session.session.id);
+  return memberPage(session.user as PageUser, session.session.id);
 }
 
 /** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */

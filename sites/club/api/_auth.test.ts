@@ -63,10 +63,10 @@ function codeFor(to: string): string {
   return code;
 }
 
-/** Signs `email` in from `origin` with an emailed code. */
-async function signInWithCode(email: string, origin = ORIGIN, name?: string): Promise<Response> {
+/** Signs `email` in from `origin` with an emailed code; a new member gives `username`. */
+async function signInWithCode(email: string, origin = ORIGIN, username?: string): Promise<Response> {
   expect((await post("/email-otp/send-verification-otp", { email, type: "sign-in" }, { Origin: origin })).status).toBe(200);
-  return post("/sign-in/email-otp", { email, otp: codeFor(email), ...(name && { name }) }, { Origin: origin });
+  return post("/sign-in/email-otp", { email, otp: codeFor(email), ...(username && { username, displayUsername: username, name: username }) }, { Origin: origin });
 }
 
 function chatRequest(authorization: string): Request {
@@ -79,7 +79,7 @@ describe("Computer Club accounts", () => {
     expect(signIn.status).toBe(200);
     expect(welcomed).toHaveLength(1);
     const member = await memberFromRequest(auth, chatRequest(bearerHeader(signIn)));
-    expect(member).toMatchObject({ email: "ada@example.com", name: "Ada", session: { site: "localhost:5199", dailyCap: null } });
+    expect(member).toMatchObject({ email: "ada@example.com", name: "Ada", username: "Ada", session: { site: "localhost:5199", dailyCap: null } });
 
     const again = await signInWithCode("ada@example.com");
     expect(again.status).toBe(200);
@@ -89,6 +89,21 @@ describe("Computer Club accounts", () => {
     expect(signOut.status).toBe(200);
     expect(await memberFromRequest(auth, chatRequest(bearerHeader(signIn)))).toBeNull();
     expect(await memberFromRequest(auth, chatRequest(bearerHeader(again)))).not.toBeNull();
+  });
+
+  it("needs a username to join, and each one once", async () => {
+    const without = await signInWithCode("bea@example.com");
+    expect(without.status).toBe(400);
+    expect(await without.json()).toMatchObject({ code: "USERNAME_REQUIRED" });
+    // Taken whatever its case: "ada" is Ada's.
+    const taken = await signInWithCode("bea@example.com", ORIGIN, "ADA");
+    expect(taken.status).toBe(400);
+    expect(await taken.json()).toMatchObject({ code: "USERNAME_IS_ALREADY_TAKEN" });
+    const odd = await signInWithCode("bea@example.com", ORIGIN, "bea/../x");
+    expect(odd.status).toBe(400);
+    expect((await signInWithCode("bea@example.com", ORIGIN, "Bea")).status).toBe(200);
+    expect((await post("/is-username-available", { username: "bea" })).status).toBe(200);
+    expect(await (await post("/is-username-available", { username: "bea" })).json()).toEqual({ available: false });
   });
 
   it("refuses a wrong code", async () => {

@@ -10,7 +10,7 @@ The question was whether to save everything or to sync a chosen part, iCloud-sty
 
 ## Decisions
 
-- **Your home is a disk of its own, AppleShare style.** While you're signed in, a second disk named after you ("Gustav") appears under Mockintosh HD. It holds your Desktop Folder, Documents, Pictures, Projects, Preferences, Fonts and Trash.
+- **Your home is a disk of its own, AppleShare style.** While you're signed in, a second disk named after your username ("Gustav") appears under Mockintosh HD. Usernames are chosen when joining and unique, so two members' disks never share a name; a changed username renames the disk the next time it mounts. It holds your Desktop Folder, Documents, Pictures, Projects, Preferences, Fonts and Trash.
 - **Everything on your disk syncs; nothing on Mockintosh HD does.** There are no per-file sync settings: the disk is the boundary, and the Finder shows it.
 - **The desktop and Trash are views over every disk**, as in System 7: each disk keeps its own invisible `Desktop Folder` and `Trash`, and the Finder shows them together.
 - **While you're signed in, the desktop means *your* desktop.** Anything dropped on the desktop, and any new desktop file (a screenshot), goes to your disk, even from a window on Mockintosh HD. This departs from System 7, where a file kept to its own disk, because otherwise people would lose files they assumed were syncing.

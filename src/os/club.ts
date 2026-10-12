@@ -28,9 +28,10 @@ export interface SystemClub {
   refresh(): Promise<{ member: ClubMember | null; credits: ClubCredits | null }>;
   /** How this computer signs in; asked once. */
   config(): Promise<ClubConfig>;
-  sendCode(email: string): Promise<void>;
-  /** Signs in with an emailed code; `name` names a new member. */
-  signInWithCode(email: string, code: string, name?: string): Promise<ClubMember>;
+  /** Emails a sign-in code; a new member's `username` is checked first. */
+  sendCode(email: string, username?: string): Promise<void>;
+  /** Signs in with an emailed code; a new member gives their `username`. */
+  signInWithCode(email: string, code: string, username?: string): Promise<ClubMember>;
   /** Starts connecting on the Club's page; a `connected` poll signs this computer in. */
   connect(): Promise<ClubConnection>;
   signOut(): Promise<void>;
@@ -89,9 +90,9 @@ export function createSystemClub(accounts: ClubAccounts): SystemClub {
       });
       return config;
     },
-    sendCode: (email) => accounts.sendCode(email),
-    async signInWithCode(email, code, name) {
-      const signedIn = await accounts.signInWithCode(email, code, name);
+    sendCode: (email, username) => accounts.sendCode(email, username),
+    async signInWithCode(email, code, username) {
+      const signedIn = await accounts.signInWithCode(email, code, username);
       setMember(signedIn);
       await refreshCredits(true);
       return signedIn;

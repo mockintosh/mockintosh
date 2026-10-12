@@ -176,7 +176,7 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
   function EmailSignIn(props: { club: SystemClub; providers: ClubConfig["providers"]; onConnect: () => void }): JSX.Element {
     const [panel, setPanel] = createSignal<"email" | "code">("email", { ownedWrite: true });
     const [email, setEmail] = createSignal("", { ownedWrite: true });
-    const [name, setName] = createSignal("", { ownedWrite: true });
+    const [username, setUsername] = createSignal("", { ownedWrite: true });
     const [code, setCode] = createSignal("", { ownedWrite: true });
     const { busy, run } = useBusy();
 
@@ -184,7 +184,7 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
       void run(async () => {
         const address = email().trim();
         if (!address) throw new Error("Type your email address.");
-        await props.club.sendCode(address);
+        await props.club.sendCode(address, username().trim() || undefined);
         setCode("");
         setPanel("code");
       });
@@ -193,7 +193,7 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
     function signIn(): void {
       void run(async () => {
         if (!code().trim()) throw new Error("Type the code from the email.");
-        await props.club.signInWithCode(email().trim(), code(), name().trim() || undefined);
+        await props.club.signInWithCode(email().trim(), code(), username().trim() || undefined);
       });
     }
 
@@ -201,10 +201,10 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
       <>
         <Show when={panel() === "email"}>
           <text font="body" width={textWidth()}>
-            Members can use the Assistant. Type your email and the Club sends you a code. New here? Add your name: joining is free and comes with credits to start.
+            Members can use the Assistant. Type your email and the Club sends you a code. New here? Choose a username too, which names your own disk: joining is free and comes with credits to start.
           </text>
           <Field label="Email" name="club-email" value={email()} onChange={setEmail} onSubmit={send} disabled={busy()} />
-          <Field label="Name" name="club-name" value={name()} onChange={setName} onSubmit={send} disabled={busy()} />
+          <Field label="Username" name="club-username" value={username()} onChange={setUsername} onSubmit={send} disabled={busy()} />
           <Buttons>
             <Show when={props.providers.length > 0}>
               <Button
@@ -349,7 +349,7 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
           {`Welcome to the ${CLUB_NAME}. Your credits pay for the Assistant's replies and pictures.`}
         </text>
         <Divider />
-        <Row label="Member" name="club-member" value={props.member.name} />
+        <Row label="Member" name="club-member" value={props.member.username ?? props.member.name} />
         <Row label="Email" name="club-member-email" value={props.member.email} />
         <Row label="Since" name="club-member-since" value={formatDate(props.member.since)} />
         <Row

@@ -6,7 +6,7 @@
  * own origin.
  */
 import { html, page } from "../../../api/_page.js";
-import { offeredProviders, type ClubAuth, type Provider } from "./_auth.js";
+import { USERNAME_MAX, USERNAME_MIN, offeredProviders, type ClubAuth, type Provider } from "./_auth.js";
 
 export const TITLE = "Mockintosh Computer Club";
 
@@ -49,6 +49,19 @@ export async function formFields(req: Request): Promise<URLSearchParams | null> 
   return new URLSearchParams(await req.text());
 }
 
+/** What a username may be, as the forms say it. */
+export const USERNAME_RULE = `A username is ${USERNAME_MIN} to ${USERNAME_MAX} letters, digits, "_" or ".".`;
+
+/**
+ * Checks a new member's username before a code is sent for it: a code is
+ * used up by a refused sign-up. Throws an `AuthFailure` the form can show.
+ */
+export async function assertUsernameFree(auth: ClubAuth, username: string): Promise<void> {
+  const resp = await ok(await auth.api.isUsernameAvailable({ body: { username }, asResponse: true }));
+  const { available } = (await resp.json()) as { available?: boolean };
+  if (!available) throw new AuthFailure(400, { code: "USERNAME_IS_ALREADY_TAKEN" });
+}
+
 /** A refused Better Auth call: its status and JSON body. */
 export class AuthFailure extends Error {
   constructor(
@@ -65,6 +78,9 @@ export function problemOf(error: unknown): string {
     const { body } = error;
     if (body.code === "INVALID_OTP" || body.code === "OTP_EXPIRED") return "That code didn't work. Check it, or send a new one.";
     if (body.code === "TOO_MANY_ATTEMPTS") return "Too many tries with that code. Send a new one.";
+    if (body.code === "USERNAME_REQUIRED") return "New members choose a username. Type one, then send a new code.";
+    if (body.code === "USERNAME_IS_ALREADY_TAKEN") return "That username is taken. Choose another.";
+    if (body.code === "USERNAME_TOO_SHORT" || body.code === "USERNAME_TOO_LONG" || body.code === "INVALID_USERNAME") return USERNAME_RULE;
     if (error.status === 429) return "Too many tries. Wait a minute, then try again.";
     return error.message;
   }
@@ -115,25 +131,30 @@ export async function signInAction(
 ): Promise<Response | null> {
   const action = fields.get("action");
   const email = (fields.get("email") ?? "").trim();
-  const name = (fields.get("name") ?? "").trim();
+  const username = (fields.get("username") ?? "").trim();
   if (action === "send-code") {
     try {
       if (!email) throw new AuthFailure(400, { message: "Type your email address." });
+      if (username) await assertUsernameFree(auth, username);
       await ok(await auth.api.sendVerificationOTP({ body: { email, type: "sign-in" }, headers: authHeaders(req), asResponse: true }));
-      return clubPage(signInForm({ action: back, step: "code", email, name }));
+      return clubPage(signInForm({ action: back, step: "code", email, username }));
     } catch (error) {
-      return clubPage(signInForm({ action: back, step: "email", email, name, problem: problemOf(error) }), 400);
+      return clubPage(signInForm({ action: back, step: "email", email, username, problem: problemOf(error) }), 400);
     }
   }
   if (action === "sign-in") {
     try {
       const otp = (fields.get("otp") ?? "").replace(/\D/g, "");
       const resp = await ok(
-        await auth.api.signInEmailOTP({ body: { email, otp, ...(name && { name }) }, headers: authHeaders(req), asResponse: true }),
+        await auth.api.signInEmailOTP({
+          body: { email, otp, ...(username && { username, displayUsername: username, name: username }) },
+          headers: authHeaders(req),
+          asResponse: true,
+        }),
       );
       return seeOther(back, cookiesOf(resp));
     } catch (error) {
-      return clubPage(signInForm({ action: back, step: "code", email, name, problem: problemOf(error) }), 400);
+      return clubPage(signInForm({ action: back, step: "code", email, username, problem: problemOf(error) }), 400);
     }
   }
   if (action === "provider") {
@@ -164,14 +185,14 @@ export async function signOut(auth: ClubAuth, req: Request, back: string): Promi
 }
 
 /**
- * Signing in, in two steps: an email address (and a name, for someone
+ * Signing in, in two steps: an email address (and a username, for someone
  * new), then the six-digit code the Club emails. Or a provider.
  */
 export function signInForm(options: {
   action: string;
   step: "email" | "code";
   email?: string;
-  name?: string;
+  username?: string;
   problem?: string;
 }): string {
   const problem = options.problem ? html`<p><strong>${options.problem}</strong></p>` : "";
@@ -182,7 +203,7 @@ export function signInForm(options: {
 <form method="post" action="${options.action}">
 <input type="hidden" name="action" value="sign-in">
 <input type="hidden" name="email" value="${options.email ?? ""}">
-<input type="hidden" name="name" value="${options.name ?? ""}">
+<input type="hidden" name="username" value="${options.username ?? ""}">
 <label for="otp">Code</label>
 <input id="otp" name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="7" required autofocus>
 <button type="submit">Sign In</button>
@@ -190,7 +211,7 @@ export function signInForm(options: {
 <form method="post" action="${options.action}" class="inline">
 <input type="hidden" name="action" value="send-code">
 <input type="hidden" name="email" value="${options.email ?? ""}">
-<input type="hidden" name="name" value="${options.name ?? ""}">
+<input type="hidden" name="username" value="${options.username ?? ""}">
 <p class="small">No email? <button type="submit">Send Another Code</button></p>
 </form>`
     );
@@ -202,8 +223,9 @@ export function signInForm(options: {
 <input type="hidden" name="action" value="send-code">
 <label for="email">Email</label>
 <input id="email" name="email" type="email" autocomplete="email" value="${options.email ?? ""}" required autofocus>
-<label for="name">Your name <span class="small">(if you're new)</span></label>
-<input id="name" name="name" autocomplete="name" maxlength="80" value="${options.name ?? ""}">
+<label for="username">Username <span class="small">(if you're new)</span></label>
+<input id="username" name="username" autocomplete="username" minlength="${USERNAME_MIN}" maxlength="${USERNAME_MAX}" pattern="[A-Za-z0-9_.]+" value="${options.username ?? ""}">
+<p class="small">${USERNAME_RULE} Your disk on every Mockintosh is named after it.</p>
 <button type="submit">Send Me a Code</button>
 </form>` +
     (providers.length

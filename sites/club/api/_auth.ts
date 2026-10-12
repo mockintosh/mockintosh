@@ -11,7 +11,8 @@
  * spending cap (`dailyCap`). See docs/computer-club-plan.md.
  */
 import { betterAuth, type BetterAuthOptions } from "better-auth";
-import { bearer, deviceAuthorization, emailOTP } from "better-auth/plugins";
+import { APIError } from "better-auth/api";
+import { bearer, deviceAuthorization, emailOTP, username } from "better-auth/plugins";
 import type { Dialect } from "kysely";
 import { databaseDialect } from "./_db.js";
 import { emailSender, type SendEmail } from "./_email.js";
@@ -39,6 +40,15 @@ const CODE_SECONDS = 10 * 60;
 const CONNECT_EXPIRES = "15m";
 /** How often a Macintosh asks whether its connect code was approved. */
 const CONNECT_INTERVAL = "5s";
+
+/**
+ * Usernames: chosen when joining, unique, kept as typed for display
+ * (`displayUsername`) and lower-cased for lookups. Letters, digits, `_` and
+ * `.`, so one always makes a Mac disk name (at most 31 characters): a
+ * member's home disk is named after it.
+ */
+export const USERNAME_MIN = 3;
+export const USERNAME_MAX = 24;
 
 /** The sign-in providers the Club offers on its pages, when they are configured. */
 export type Provider = "github" | "google";
@@ -122,6 +132,7 @@ export function clubAuthOptions(env: ClubAuthEnv) {
     trustedOrigins: [...env.macOrigins],
     plugins: [
       bearer(),
+      username({ minUsernameLength: USERNAME_MIN, maxUsernameLength: USERNAME_MAX }),
       emailOTP({
         expiresIn: CODE_SECONDS,
         allowedAttempts: 5,
@@ -153,6 +164,12 @@ export function clubAuthOptions(env: ClubAuthEnv) {
     databaseHooks: {
       user: {
         create: {
+          // Joining with an emailed code needs a username; the username plugin checks and normalizes it.
+          async before(user, ctx) {
+            if (ctx?.path === "/sign-in/email-otp" && !(user as { username?: unknown }).username) {
+              throw new APIError("BAD_REQUEST", { code: "USERNAME_REQUIRED", message: "Choose a username to join." });
+            }
+          },
           async after(user, ctx) {
             if (user.emailVerified) await env.welcome?.(user.id, ctx?.headers ?? ctx?.request?.headers);
           },
@@ -279,6 +296,8 @@ export interface Member {
   id: string;
   email: string;
   name: string;
+  /** As the member typed it ("Ada"); `null` for a member who joined before usernames, or with GitHub or Google. */
+  username: string | null;
   /** The session: one connected Macintosh, or a browser on the Club's pages. */
   session: {
     id: string;
@@ -293,10 +312,12 @@ export async function memberFromRequest(authInstance: ClubAuth | null, req: Requ
   const found = await authInstance.api.getSession({ headers: req.headers });
   if (!found) return null;
   const session = found.session as typeof found.session & { site?: string | null; dailyCap?: number | null };
+  const user = found.user as typeof found.user & { username?: string | null; displayUsername?: string | null };
   return {
-    id: found.user.id,
-    email: found.user.email,
-    name: found.user.name,
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    username: user.displayUsername || user.username || null,
     session: { id: session.id, site: session.site ?? null, dailyCap: session.dailyCap ?? null },
   };
 }

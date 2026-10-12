@@ -7,7 +7,7 @@
  * guest left on Mockintosh HD can move to it. See docs/club-storage-plan.md.
  */
 import { createEffect, createRoot } from "solid-js";
-import { MIME, fitNameWithSuffix, type FileSystem, type FSDirectory, type FSNode, type NodeRole } from "@mockintosh/fs";
+import { MIME, ROOT_ID, fitName, fitNameWithSuffix, type FileSystem, type FSDirectory, type FSNode, type NodeRole } from "@mockintosh/fs";
 import type { ClubMember } from "../platform/types";
 import type { SystemClub } from "./club";
 import type { OSServices } from "./context";
@@ -29,10 +29,20 @@ const NEW_ACCOUNT_MS = 60 * 60 * 1000;
 const MOVE = "Move";
 const KEEP = "Don't Move";
 
-/** Mount `member`'s disk with its folders. `created` when this Mac had never seen it. */
+/** What a member's disk is called: their username. */
+export function homeDiskName(member: ClubMember): string {
+  return fitName(member.username || member.name || member.email.split("@")[0] || "Home");
+}
+
+/**
+ * Mount `member`'s disk with its folders, renamed if their username changed.
+ * `created` when this Mac had never seen it.
+ */
 export function mountHomeDisk(fs: FileSystem, member: ClubMember): { volume: FSDirectory; created: boolean } {
   const created = !fs.homeVolume(member.id);
-  const volume = fs.mountHome(member.id, member.name || member.email);
+  const name = homeDiskName(member);
+  const volume = fs.mountHome(member.id, name);
+  if (volume.name !== name && !fs.child(ROOT_ID, name)) fs.rename(volume.id, name);
   fs.batch(() => {
     for (const { role, name } of HOME_FOLDERS) {
       if (!fs.locate(role, volume.id)) fs.mkdir(volume.id, fs.availableName(volume.id, name), { role });
