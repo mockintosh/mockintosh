@@ -1,6 +1,14 @@
 import { For, createSignal } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { Overlay } from "./Overlay";
+import { PopUpFace } from "./PopUpFace";
+import { truncateText } from "../fonts/bridge";
+
+/** The face's height, frame included. */
+const HEIGHT = 16;
+/** The label's left inside the frame; room kept on the right for the triangle. */
+const LABEL_X = 3;
+const LABEL_RIGHT = 22;
 import { useRadius } from "../theme";
 
 export interface SelectOption {
@@ -18,7 +26,7 @@ export interface SelectProps {
   width?: number;
 }
 
-/** System 7 pop-up menu. Exclusive. The kit name is Select; the face is a pop-up. */
+/** System 7 pop-up menu. Exclusive. The kit name is Select; the face is `PopUpFace`. */
 export function Select(props: SelectProps): JSX.Element {
   const [open, setOpen] = createSignal(false);
   const width = () => props.width ?? 140;
@@ -64,17 +72,6 @@ export function Select(props: SelectProps): JSX.Element {
             value: props.value,
             enabled: !props.disabled,
           }}
-          width={width()}
-          height={16}
-          flexDirection="row"
-          alignItems="center"
-          paddingLeft={4}
-          paddingRight={4}
-          gap={4}
-          borderColor={1}
-          borderWidth={1}
-          borderRadius={radius()}
-          background={props.disabled ? "checker" : 0}
           tabIndex={props.disabled ? undefined : 0}
           cursor={props.disabled ? "default" : "pointer"}
           onClick={toggle}
@@ -86,14 +83,22 @@ export function Select(props: SelectProps): JSX.Element {
             if (key === " " || key === "Enter" || key === "ArrowDown") toggle();
           }}
         >
-          <box flexGrow={1}>
-            <text font="body" color={1} stipple={props.disabled} nowrap>
-              {label()}
+          <PopUpFace width={width()} height={HEIGHT} open={open()}>
+            <text
+              position="absolute"
+              left={LABEL_X}
+              top={0}
+              width={width() - LABEL_X - LABEL_RIGHT}
+              height={HEIGHT - 2}
+              font="body"
+              verticalAlign="middle"
+              color={open() ? 0 : 1}
+              stipple={props.disabled}
+              nowrap
+            >
+              {truncateText(label(), width() - LABEL_X - LABEL_RIGHT, "body")}
             </text>
-          </box>
-          <text font="body" color={1} stipple={props.disabled} nowrap>
-            v
-          </text>
+          </PopUpFace>
         </box>
       }
     >

@@ -152,8 +152,66 @@ const CLAPPERBOARD_16: Sprite = fromGrid(16, 16, [
   ".##############.",
 ]);
 
+/** A motion file: a page with the clapperboard on it. */
+const DOCUMENT: Sprite = fromGrid(32, 32, [
+  "...###################..........",
+  "...#ooooooooooooooooo##.........",
+  "...#ooooooooooooooooo#o#........",
+  "...#ooooooooooooooooo#oo#.......",
+  "...#ooooooooooooooooo#ooo#......",
+  "...#ooooooooooooooooo#oooo#.....",
+  "...#ooooooooooooooooo#######....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#ooooooooooooooo###ooooo#....",
+  "...#ooooooooooo####oo#ooooo#....",
+  "...#ooooooo####oo####oooooo#....",
+  "...#ooo####oo####oooooooooo#....",
+  "...#oo#oo####oooooooooooooo#....",
+  "...#oo##ooooooooooooooooooo#....",
+  "...#oo#################oooo#....",
+  "...#oo##oo###oo###oo###oooo#....",
+  "...#oo#oo###oo###oo##o#oooo#....",
+  "...#oo#################oooo#....",
+  "...#oo#ooooooooooooooo#oooo#....",
+  "...#oo#oooooo###oooooo#oooo#....",
+  "...#oo#ooooo#####ooooo#oooo#....",
+  "...#oo#oooo##ooo##oooo#oooo#....",
+  "...#oo#oooo##ooo##oooo#oooo#....",
+  "...#oo#oooo##ooo##oooo#oooo#....",
+  "...#oo#ooooo#####ooooo#oooo#....",
+  "...#oo#oooooo###oooooo#oooo#....",
+  "...#oo#ooooooooooooooo#oooo#....",
+  "...#oo#################oooo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#ooooooooooooooooooooooo#....",
+  "...#########################....",
+]);
+
+/** The motion file for 16×16 views: the page with a smaller clapperboard. */
+const DOCUMENT_16: Sprite = fromGrid(16, 16, [
+  "..########......",
+  "..#oooooo##.....",
+  "..#oooooo#o#....",
+  "..#oooooo#oo#...",
+  "..#oooooo#####..",
+  "..#oooooooooo#..",
+  "..#oooooo###o#..",
+  "..#ooo###o##o#..",
+  "..#o###o##ooo#..",
+  "..#o########o#..",
+  "..#o##o##o##o#..",
+  "..#o########o#..",
+  "..#o#oo##oo#o#..",
+  "..#o#oo##oo#o#..",
+  "..#o########o#..",
+  "..############..",
+]);
+
 export const sprites: Record<string, Sprite> = {
   "showreel/icon": clapperboard(),
   "showreel/icon-16x16": CLAPPERBOARD_16,
+  "showreel/document": DOCUMENT,
+  "showreel/document-16x16": DOCUMENT_16,
   "showreel/bomb": bomb(),
 };

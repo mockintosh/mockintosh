@@ -1,5 +1,7 @@
 import { BUILTIN_FONT_BODY, BUILTIN_FONT_MENU, BUILTIN_FONT_MONO } from "./data";
 import { BUILTIN_FONT_BODY_BOLD } from "./faces/bodyBold";
+import { CHICAGO_12_NFNT } from "./faces/chicago12Metrics";
+import type { NfntMetrics } from "./nfnt";
 import { BUILTIN_FONT_GENEVA_12 } from "./faces/geneva12";
 import { BUILTIN_FONT_GENEVA_12_BOLD } from "./faces/genevaTwelveBold";
 import { BUILTIN_FONT_LISA } from "./faces/lisa";
@@ -34,6 +36,12 @@ export interface FontStrikeSpec {
    * advance (`%%FNT1` stores one width per glyph, used as the cell).
    */
   overhangs?: Readonly<Record<number, readonly [number, number]>>;
+  /**
+   * The Mac font's offset/width table (`applyNfntMetrics`): where each listed
+   * glyph's image starts right of the pen and how far the pen moves; other
+   * glyphs sit `offset` in with as much after.
+   */
+  nfnt?: { metrics: NfntMetrics; offset: number };
 }
 
 /** Role names keep existing `<text font="body">` call sites. */
@@ -154,11 +162,12 @@ const REDACTION_STRIKES: readonly FontStrikeSpec[] = REDACTION_SIZES.flatMap((si
 /**
  * Decker's Chicago 12 draws 1px between glyphs; the Mac's draws 2 (an `i`
  * advances 4, an `H` 8). Header byte 2 is the spacing: 16, 13, 1 → 16, 13, 2.
+ * `CHICAGO_12_NFNT` then places each glyph as Apple's font does.
  */
 const CHICAGO_12 = BUILTIN_FONT_MENU.replace(/^%%FNT1EA0B/, "%%FNT1EA0C");
 
 const VENDORED_STRIKES: readonly FontStrikeSpec[] = [
-  { family: "chicago", size: 12, data: CHICAGO_12, info: { ascent: 12, descent: 3, leading: 0 } },
+  { family: "chicago", size: 12, data: CHICAGO_12, info: { ascent: 12, descent: 3, leading: 1 }, nfnt: { metrics: CHICAGO_12_NFNT, offset: 1 } },
   { family: "geneva", size: 9, data: BUILTIN_FONT_BODY, info: { ascent: 10, descent: 2, leading: 0 } },
   { family: "geneva", size: 12, data: BUILTIN_FONT_GENEVA_12, info: { ascent: 12, descent: 3, leading: 1 } },
   { family: "monaco", size: 9, data: BUILTIN_FONT_MONO, info: { ascent: 9, descent: 2, leading: 0 } },

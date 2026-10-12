@@ -605,7 +605,7 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
           <Show when={ai.shortcut}>
             <box position="absolute" left={rowW - 40} top={0} width={36} height={ITEM_H} justifyContent="center">
               <text font={MENU_FONT} nowrap align="right" verticalAlign="middle"
-                color={isHighlighted() && !ai.disabled ? 0 : 1}>
+                color={isHighlighted() && !ai.disabled ? 0 : 1} stipple={ai.disabled}>
                 {`${COMMAND_KEY}${ai.shortcut}`}
               </text>
             </box>

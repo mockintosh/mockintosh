@@ -8,7 +8,7 @@
 
 import { createContext, useContext, type Accessor } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import type { FileSystem } from "@mockintosh/fs";
+import type { FileSystem, FSFile } from "@mockintosh/fs";
 import type { GrafPort } from "@mockintosh/quickdraw";
 import type { Sprite } from "@mockintosh/ui";
 import type { MenubarDefinition } from "./menus";
@@ -242,6 +242,20 @@ export interface DialogOptions {
   variant?: DialogVariant;
 }
 
+/** What the Open dialog (`os.showOpenDialog`) lists, and where it starts. */
+export interface OpenDialogOptions {
+  /**
+   * MIME types the list shows besides folders, like `SFGetFile`'s type
+   * list. Omitted, it shows every document (not apps or app shortcuts).
+   */
+  types?: readonly string[];
+  /**
+   * A folder to start in, or a file to start beside — the open document,
+   * say. Omitted, the dialog starts where the last one was left.
+   */
+  near?: string;
+}
+
 /**
  * Per-app key/value storage. Keys are file names inside the app's own folder
  * (`System Folder/Preferences/<appId>/`), so the user can see and delete an
@@ -277,6 +291,7 @@ export type AppFileSystem = Pick<
   | "locate"
   | "volumes"
   | "volumeOf"
+  | "isLocked"
   | "readBytes"
   | "readText"
   | "readJSON"
@@ -421,7 +436,11 @@ export type WindowKind = "document" | "dialog" | "utility" | "plain" | "alert" |
 export interface WindowSpec<P extends Record<string, unknown> = Record<string, unknown>> {
   kind?: WindowKind;
   title?: string;
-  /** Content size in pixels. Ignored for `fullscreen`, which is the screen. */
+  /**
+   * The window's size in pixels: `height` is the content's, `width` the
+   * whole window's, its frame (and scroll-bar band, when it scrolls)
+   * included. Ignored for `fullscreen`, which is the screen.
+   */
   size?: { width: number; height: number };
   /** Screen position of the window's top-left corner; staggered by the OS when omitted. */
   position?: { x: number; y: number };
@@ -490,6 +509,12 @@ export interface AppContext {
      * the text typed — `null` when that dialog's "Cancel" is pressed.
      */
     showDialog(options: DialogOptions): Promise<string | null>;
+    /**
+     * The system's Open dialog: a list of folders and documents to browse,
+     * with Open and Cancel. Resolves with the file the user opened, or
+     * `null` on Cancel.
+     */
+    showOpenDialog(options?: OpenDialogOptions): Promise<FSFile | null>;
     /**
      * Do something that keeps the Macintosh busy, under the watch cursor:
      * the watch reaches the screen first, then `work` runs — it may block
@@ -654,7 +679,7 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
    * processes). Declare `"main"` only for something a process can't serve.
    */
   runtime?: "worker" | "main";
-  /** Content size of the main window. */
+  /** Size of the main window, measured as `WindowSpec.size` is. */
   defaultSize: { width: number; height: number };
   /** Kind of the main window (default `document`). */
   windowKind?: WindowKind;
@@ -803,6 +828,7 @@ export function useApp(): AppServices {
 
 export {
   measureText,
+  truncateText,
   spacedFontName,
   fontLineHeight,
   drawString,

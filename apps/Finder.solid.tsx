@@ -59,6 +59,8 @@ import {
 } from "./finder/iconGrid";
 import { INFO_BAR_H, SB_INNER, windowContentRect, windowTotalHeight } from "../src/os/windowGeometry";
 import { folderHeaderLayout } from "./finder/folderHeader";
+import { copyIcons, dropCopies } from "./finder/copy";
+import { TOUR_DISK_ID } from "../src/os/tourDisk";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -624,13 +626,26 @@ function updateDragPosition(gx: number, gy: number): void {
   });
 }
 
+/**
+ * Drop icons into a folder: those from the same, writable disk move; the rest
+ * (from another disk, or a locked one) are copied, as dragging between disks
+ * does on the Mac.
+ */
+async function dropIcons(fs: FileSystem, targetDirId: string, placements: IconPlacement[]): Promise<void> {
+  const copies = placements.filter((p) => dropCopies(fs, p.nodeId, targetDirId));
+  const moves = placements.filter((p) => !copies.includes(p));
+  if (moves.length) placeIcons(fs, targetDirId, moves);
+  if (copies.length) await copyIcons(fs, targetDirId, copies);
+}
+
 /** Called from an icon's onDragEnd: resolves the drop target for an icon drag. */
 export function handleGlobalMouseUp(
   x: number,
   y: number,
   menubarH: number,
   fs: FileSystem,
-  showDialog: OSServices["showDialog"]
+  showDialog: OSServices["showDialog"],
+  ejectDisk: OSServices["ejectDisk"],
 ): void {
   const drag = finderDrag();
   const targetIconId = dropTargetId();
@@ -649,13 +664,20 @@ export function handleGlobalMouseUp(
     })),
   ];
 
-  // Released over a folder icon: move inside and let the icons auto-arrange.
+  // A removable disk dragged to the Trash is ejected, as on the Mac.
+  const dragged = [drag.nodeId, ...drag.companions.map((c) => c.nodeId)];
+  if (targetIconId && targetIconId === getTrashId(fs) && dragged.some((id) => fs.directory(id)?.ejectable)) {
+    for (const id of dragged) if (fs.directory(id)?.ejectable) ejectDisk(id);
+    return;
+  }
+
+  // Released over a folder icon: move (or copy) inside and let the icons auto-arrange.
   if (targetIconId && targetIconId !== drag.sourceDirectoryId) {
     const placements: IconPlacement[] = [
       { nodeId: drag.nodeId, position: undefined },
       ...drag.companions.map((c) => ({ nodeId: c.nodeId, position: undefined })),
     ];
-    void runFinderMutation(showDialog, () => placeIcons(fs, targetIconId, placements));
+    void runFinderMutation(showDialog, () => dropIcons(fs, targetIconId, placements));
     return;
   }
 
@@ -672,7 +694,7 @@ export function handleGlobalMouseUp(
     if (inside) {
       const dropX = drag.ghostX - content.x + win.scrollX;
       const dropY = drag.ghostY - content.y + win.scrollY;
-      void runFinderMutation(showDialog, () => placeIcons(fs, dirId, placementsAt(dropX, dropY)));
+      void runFinderMutation(showDialog, () => dropIcons(fs, dirId, placementsAt(dropX, dropY)));
       return;
     }
   }
@@ -682,7 +704,9 @@ export function handleGlobalMouseUp(
   const isVolume = drag.sourceDirectoryId === ROOT_ID;
   const targetDir = isVolume ? ROOT_ID : getDesktopFolderId(fs) ?? drag.sourceDirectoryId;
   void runFinderMutation(showDialog, () =>
-    placeIcons(fs, targetDir, placementsAt(drag.ghostX, drag.ghostY - menubarH))
+    isVolume
+      ? placeIcons(fs, targetDir, placementsAt(drag.ghostX, drag.ghostY - menubarH))
+      : dropIcons(fs, targetDir, placementsAt(drag.ghostX, drag.ghostY - menubarH))
   );
 }
 
@@ -990,10 +1014,15 @@ export function FinderFolderContent(props: { directoryId: string }): JSX.Element
     const volume = id ? os.fs.volumeOf(id) : undefined;
     return volume ? os.fs.usedBytes(volume.id) : 0;
   });
+  /** A locked disk (the Tour disk) is full as far as the user is concerned: nothing can be added. */
+  const diskLocked = createMemo(() => {
+    const id = dirId();
+    return !!id && os.fs.isLocked(id);
+  });
   const headerFigures = createMemo((): [string, string, string] => [
     itemCount(),
     `${formatK(diskUsed())} in disk`,
-    `${formatK(Math.max(0, DISK_CAPACITY - diskUsed()))} available`,
+    `${formatK(diskLocked() ? 0 : Math.max(0, DISK_CAPACITY - diskUsed()))} available`,
   ]);
   const header = createMemo(() => {
     const [count, disk, free] = headerFigures().map((text) => measureText(text, FONT));
@@ -1271,7 +1300,7 @@ function IconCell(props: IconCellProps): JSX.Element {
       }}
       onDrag={(_lx, _ly, gx, gy) => handleDrag(gx, gy)}
       onDragEnd={(_lx, _ly, gx, gy) => {
-        handleGlobalMouseUp(gx, gy, os.menubarHeight, os.fs, os.showDialog);
+        handleGlobalMouseUp(gx, gy, os.menubarHeight, os.fs, os.showDialog, os.ejectDisk);
       }}
       onScroll={props.onScroll}
       onMouseEnter={() => {
@@ -1455,6 +1484,9 @@ export function buildFinderMenus(
   const trashEmpty = !trashId || fs.childCount(trashId) === 0;
   // New folders go in the active folder window, or on the desktop.
   const newFolderParent = activeDirId ?? getDesktopFolderId(fs);
+  // Eject Disk ejects the selected item's disk, else the front window's (System 7).
+  const diskOf = (id: string | undefined) => (id ? fs.volumeOf(id) : undefined);
+  const ejectTarget = [diskOf(selected?.id), diskOf(activeDirId)].find((disk) => disk?.ejectable);
 
   return [
     {
@@ -1519,7 +1551,17 @@ export function buildFinderMenus(
           },
         },
         { type: "separator" },
-        { label: "Eject Disk",  disabled: true },
+        {
+          label: "Eject Disk",
+          shortcut: "E",
+          disabled: !selection?.os || !ejectTarget,
+          onClick: () => {
+            if (ejectTarget && selection?.os) selection.os.ejectDisk(ejectTarget.id);
+          },
+        },
+        ...(fs.node(TOUR_DISK_ID) || !selection?.os
+          ? []
+          : [{ label: "Insert Tour Disk", onClick: () => selection.os.insertTourDisk() }]),
         {
           label: "Erase Disk…",
           disabled: !selection?.os,

@@ -19,13 +19,20 @@ interface DesktopShortcut {
  */
 const DESKTOP_SHORTCUTS: readonly DesktopShortcut[] = [
   { name: "Photo Booth",  appId: "photobooth",   icon: "icon/photobooth-smr-32" },
-  { name: "1984.mp4",     appId: "video",        icon: "icon/MacFlim" },
   { name: "Safari",       appId: "safari",       icon: "icon/safari" },
   { name: "Maps",         appId: "maps",         icon: "maps/icon" },
   { name: "App Store",    appId: "appstore",     icon: "icon/appstore-smr-32x32" },
   { name: "Icon Gallery", appId: "icon_gallery", icon: "icon-gallery/icon" },
-  { name: "Showreel",     appId: "showreel",     icon: "showreel/icon" },
   { name: "Terminal",     appId: "terminal",     icon: "terminal/icon" },
+];
+
+/**
+ * Demo shortcuts older desktops were given. The demos are on the Tour disk
+ * now (`tourDisk.ts`), so these are taken away.
+ */
+const RETIRED_SHORTCUTS: readonly { name: string; appId: string }[] = [
+  { name: "Showreel", appId: "showreel" },
+  { name: "1984.mp4", appId: "video" },
 ];
 
 /** Create the startup volume and its standard folders on a fresh disk; repair them otherwise. */
@@ -49,7 +56,7 @@ export async function bootstrapFileSystem(fs: FileSystem): Promise<void> {
       await writeDesktopShortcut(fs, desktop.id, s);
     }
   } else {
-    await ensureDesktopShortcut(fs, desktop, "showreel");
+    for (const retired of RETIRED_SHORTCUTS) await removeShortcut(fs, desktop.id, retired);
     await ensureDesktopShortcut(fs, desktop, "maps");
     await ensureDesktopShortcut(fs, desktop, "terminal");
   }
@@ -76,6 +83,14 @@ async function writeDesktopShortcut(
     type: MIME.appShortcut,
     attributes: { icon: s.icon },
   });
+}
+
+/** Remove a shortcut the system put on the desktop, if it is still that shortcut. */
+async function removeShortcut(fs: FileSystem, desktopId: string, spec: { name: string; appId: string }): Promise<void> {
+  const node = fs.child(desktopId, spec.name);
+  if (node?.kind !== "file" || node.type !== MIME.appShortcut) return;
+  if ((await fs.readJSON<{ appId?: string }>(node.id))?.appId !== spec.appId) return;
+  await fs.remove(node.id);
 }
 
 /** Find a role folder on the parent's volume, or create it under `parent`. */

@@ -5,7 +5,7 @@
 
 import { createContext, useContext } from "solid-js";
 import type { SpriteRegistry } from "./sprites/registry";
-import type { FileSystem } from "@mockintosh/fs";
+import type { FileSystem, FSFile } from "@mockintosh/fs";
 import type { AnimRect } from "./zoomAnimation";
 import type { AppInstaller } from "./installedApps";
 import type {
@@ -16,6 +16,7 @@ import type {
   CameraService,
   GpuService,
   DialogOptions,
+  OpenDialogOptions,
   DownloadService,
   FetchFunction,
   FontRasterService,
@@ -96,6 +97,8 @@ export interface OSServices {
   openFSNode: (nodeId: string, fromRect?: IconScreenRect) => void;
   closeWindow: (id: string) => void;
   showDialog: (options: DialogOptions) => Promise<string | null>;
+  /** The Open dialog (`AppContext.os.showOpenDialog`). */
+  showOpenDialog: (options?: OpenDialogOptions) => Promise<FSFile | null>;
   /** Run `work` under the watch cursor, once the watch is on screen (`AppContext.os.busy`). */
   busy: <T>(work: () => T | Promise<T>) => Promise<T>;
   /**
@@ -141,6 +144,10 @@ export interface OSServices {
    * shortcuts restored). Reloads the machine when the platform can.
    */
   eraseDisk: () => Promise<void>;
+  /** Eject a removable disk: close its windows and take it off the desktop. */
+  ejectDisk: (volumeId: string) => void;
+  /** Put the Tour disk back after it was ejected. */
+  insertTourDisk: () => void;
 }
 
 export const OSContext = createContext<OSServices | null>(null);

@@ -107,8 +107,8 @@ const WINDOW_DEFINITIONS: Record<OSWindowKind, WindowDefinition> = {
     toolPalette: true,
   },
   plain: PLAIN,
-  // dBoxProc: 1px outer, 2px white, 2px inner band; square; system-modal.
-  alert: { ...PLAIN, frameGap: 2, innerFrame: 2, modal: true, layer: 5 },
+  // dBoxProc: 1px outer, 2px white, 2px inner band; square; no shadow; system-modal.
+  alert: { ...PLAIN, frameGap: 2, innerFrame: 2, shadow: false, modal: true, layer: 5 },
   desk: { ...PLAIN, frame: 0, shadow: false, backdrop: true },
   fullscreen: {
     titleBar: false,

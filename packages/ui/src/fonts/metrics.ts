@@ -27,12 +27,13 @@ export interface FontInfo {
 }
 
 /**
- * System 6 `'FONT'` / `'NFNT'` headers for the shipped faces.
- * Chicago 12 is pixel-checked against `public/ok-button-map.txt`
- * (20px face → baseline 14 → caps on rows 5–13).
+ * System 6 `'FONT'` / `'NFNT'` headers for the shipped faces. Chicago 12 is
+ * System 6.0.8's FONT 12 (System 7's NFNT 5478 is the same): 12/3/1, a
+ * 16px line. Pixel-checked against `public/ok-button-map.txt` (20px face →
+ * baseline 14 → caps on rows 5–13).
  */
 const SYSTEM_FONT_INFO: Readonly<Record<string, FontInfo>> = {
-  menu: { ascent: 12, descent: 3, leading: 0 }, // Chicago 12
+  menu: { ascent: 12, descent: 3, leading: 1 }, // Chicago 12
   body: { ascent: 10, descent: 2, leading: 0 }, // Geneva 9
   bodyBold: { ascent: 10, descent: 2, leading: 0 }, // Geneva 9 Bold (FM smear)
   geneva12: { ascent: 12, descent: 3, leading: 1 }, // FONT 396
@@ -87,12 +88,12 @@ export function alignmentHeight(
 }
 
 /**
- * CDEF baseline in a box: center the FontInfo line, then add ascent.
- * `baseline = top + (h − (ascent+descent+leading)) / 2 + ascent`
+ * CDEF 0's baseline in a box (System 6.0.8 / 7.0.1, the same code):
+ * `v = bottom − ((h − (ascent+descent+leading)) asr 1) − leading − descent`.
+ * The line is centred with the odd pixel above it.
  */
 export function cdefBaseline(top: number, height: number, m: FontFaceMetrics): number {
-  const vOffset = Math.floor((height - m.lineHeight) / 2);
-  return top + vOffset + m.ascent;
+  return top + height - ((height - m.lineHeight) >> 1) - m.leading - m.descent;
 }
 
 /** Decker cell top so caps sit on {@link cdefBaseline}. */

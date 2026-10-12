@@ -1,8 +1,9 @@
 import { Show, createEffect, createMemo, createSignal, onCleanup, onSettled } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { Button, Slider, defineApp, useApp, type VideoExcerpt } from "@mockintosh/sdk";
+import { Button, MIME, Slider, defineApp, useApp, type AppContext, type FileDocumentProps, type VideoExcerpt } from "@mockintosh/sdk";
 import { createFrame, type Frame } from "./showreel/painter";
 import { REELS } from "./showreel/catalog";
+import { motionReel } from "./showreel/motion";
 import { chapterAt, timecode, type ReelAssets, type ReelDefinition } from "./showreel/reels";
 import { ReelSound, type ReelSoundState } from "./showreel/sound/reelSound";
 import { sprites } from "./showreel/icons";
@@ -16,57 +17,58 @@ const FOOTAGE_LEAD = 2;
 /** …and how much faster than playback decoding must be running for that. */
 const FOOTAGE_OUTRUN = 1.25;
 
-function Showreel(_props: Record<string, unknown>): JSX.Element {
+/** A motion file, opened: the file, and the reel it names. Empty when the app itself is opened. */
+type ShowreelProps = Partial<FileDocumentProps> & { reel?: string } & Record<string, unknown>;
+
+function Showreel(props: ShowreelProps): JSX.Element {
   const app = useApp();
   const win = app.window;
+  const reel = REELS.find((r) => r.id === props.reel) ?? REELS[0]!;
 
   const [time, setTime] = createSignal(0);
   const [playing, setPlaying] = createSignal(false);
   const [looping, setLooping] = createSignal(true);
-  const [reel, setReel] = createSignal<ReelDefinition>(REELS[0]!);
   const [muted, setMuted] = createSignal(false);
   const [soundState, setSoundState] = createSignal<ReelSoundState>("opening");
-  /** Footage by reel id, possibly still filling in. Changes once per reel, so players rebuild once. */
-  const [excerpts, setExcerpts] = createSignal<ReadonlyMap<string, VideoExcerpt>>(new Map());
-  /** How far the current reel's footage has loaded, or null when it isn't loading. */
+  /** The reel's footage, possibly still filling in. Set once, so the player rebuilds once. */
+  const [footage, setFootage] = createSignal<VideoExcerpt | undefined>(undefined);
+  /** How far the reel's footage has loaded, or null when it isn't loading. */
   const [loading, setLoading] = createSignal<number | null>(null);
   // Plain mirrors of the above for handlers, which mustn't read signals they just wrote.
-  const loaded = new Map<string, VideoExcerpt>();
-  const loads = new Set<string>();
+  let loaded: VideoExcerpt | undefined;
+  let loadingFootage = false;
   const abort = new AbortController();
-  let current: ReelDefinition = reel();
   let playWhenLoaded = false;
 
-  function assetsFor(r: ReelDefinition, footage = loaded.get(r.id)): ReelAssets {
-    return { sprite: (name) => app.getSprite(name), footage };
+  function assetsFor(excerpt = loaded): ReelAssets {
+    return { sprite: (name) => app.getSprite(name), footage: excerpt };
   }
 
-  function awaitingFootage(r: ReelDefinition): boolean {
-    return !!r.footage && !loaded.has(r.id) && loads.has(r.id);
+  function awaitingFootage(): boolean {
+    return !!reel.footage && !loaded && loadingFootage;
   }
 
   /**
-   * Start decoding a reel's footage, once; where video can't be decoded the
-   * reel plays without it. Decoding fills the excerpt in reel order, so once
-   * it's ahead and outrunning playback the reel starts while it finishes.
+   * Start decoding the reel's footage; where video can't be decoded the reel
+   * plays without it. Decoding fills the excerpt in reel order, so once it's
+   * ahead and outrunning playback the reel starts while it finishes.
    */
   function loadFootage(r: ReelDefinition): void {
     const request = r.footage;
     const excerpt = app.video?.excerpt;
-    if (!request || !excerpt || loaded.has(r.id) || loads.has(r.id)) return;
-    loads.add(r.id);
+    if (!request || !excerpt) return;
+    loadingFootage = true;
     setLoading(0);
     const { url, ...rest } = request;
     const seconds = request.ranges.reduce((sum, range) => sum + range.to - range.from, 0);
     const started = app.scheduler.now();
     let partial: VideoExcerpt | null = null;
-    const admit = (footage: VideoExcerpt) => {
-      if (loaded.has(r.id)) return;
-      loaded.set(r.id, footage);
-      setExcerpts(new Map(loaded));
-      if (current !== r) return;
+    const admit = (decoded: VideoExcerpt) => {
+      if (loaded) return;
+      loaded = decoded;
+      setFootage(decoded);
       setLoading(null);
-      sound.setReel(r, assetsFor(r, footage));
+      sound.setReel(r, assetsFor(decoded));
       if (playWhenLoaded) play();
     };
     excerpt(url, {
@@ -74,7 +76,7 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
       signal: abort.signal,
       onPartial: (footage) => (partial = footage),
       onProgress: (fraction) => {
-        if (current === r && !loaded.has(r.id)) setLoading(fraction);
+        if (!loaded) setLoading(fraction);
         const decoded = fraction * seconds;
         const elapsed = (app.scheduler.now() - started) / 1000;
         if (partial && decoded >= FOOTAGE_LEAD && decoded > elapsed * FOOTAGE_OUTRUN) admit(partial);
@@ -84,12 +86,12 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
       .catch((err: unknown) => {
         if (abort.signal.aborted) return;
         console.error("Showreel: couldn't decode footage", err);
-        loads.delete(r.id);
-        if (current === r) setLoading(null);
+        loadingFootage = false;
+        setLoading(null);
       });
   }
 
-  const sound = new ReelSound(reel(), assetsFor(reel()), (state) => {
+  const sound = new ReelSound(reel, assetsFor(), (state) => {
     setSoundState(state);
     // The picture ran on its own clock until now; start the sound where it is.
     if (state === "running") sound.cue(time(), playing());
@@ -99,14 +101,14 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
   const statusText = () => {
     const progress = loading();
     if (progress !== null) return `Loading ${Math.round(progress * 100)}%`;
-    return soundState() === "suspended" ? "Click for sound" : chapterAt(reel(), time()).title;
+    return soundState() === "suspended" ? "Click for sound" : chapterAt(reel, time()).title;
   };
   const view = () => ({
     width: win.width(),
     height: isFullScreen() ? win.height() : Math.max(1, win.height() - BAR_H - 1),
   });
 
-  const player = createMemo(() => reel().createPlayer({ sprite: (name) => app.getSprite(name), footage: excerpts().get(reel().id) }));
+  const player = createMemo(() => reel.createPlayer(assetsFor(footage())));
   let frame: Frame | null = null;
   let paints = 0;
   const revision = createMemo(() => {
@@ -123,7 +125,7 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
   function tick(now: number): void {
     const step = lastTick === null ? 0 : Math.min(MAX_STEP, (now - lastTick) / 1000);
     lastTick = now;
-    const { duration, fps } = reel();
+    const { duration, fps } = reel;
     const heard = sound.heard();
     const next = heard ? heard.time : time() + step;
     if ((heard ? heard.ended : next >= duration) && !looping()) {
@@ -136,13 +138,13 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
   }
 
   function play(): void {
-    if (awaitingFootage(current)) {
+    if (awaitingFootage()) {
       playWhenLoaded = true;
       return;
     }
     playWhenLoaded = false;
     if (cancelFrame) return;
-    const from = !looping() && time() >= reel().duration - 1.5 / reel().fps ? 0 : time();
+    const from = !looping() && time() >= reel.duration - 1.5 / reel.fps ? 0 : time();
     setTime(from);
     lastTick = null;
     setPlaying(true);
@@ -178,38 +180,20 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
   /** Jump by whole reel frames, pausing so the frame can be studied. */
   function stepFrames(frames: number): void {
     stop();
-    const { duration, fps } = reel();
+    const { duration, fps } = reel;
     const next = Math.round(time() * fps) + frames;
     const total = Math.round(duration * fps);
     seek((((next % total) + total) % total) / fps);
   }
 
   function seekChapter(offset: number): void {
-    const { chapters } = reel();
-    const current = chapters.indexOf(chapterAt(reel(), time()));
+    const { chapters } = reel;
+    const current = chapters.indexOf(chapterAt(reel, time()));
     // "Previous" from well inside a chapter goes back to its start first.
     const within = time() - chapters[current]!.start > 0.5;
     const target = offset < 0 && within ? current : current + offset;
     const chapter = chapters[(target + chapters.length) % chapters.length]!;
     seek(chapter.start);
-  }
-
-  /** Cut to another reel from its first frame, keeping the transport state. */
-  function selectReel(next: ReelDefinition): void {
-    if (next === current) return;
-    const resume = playing() || playWhenLoaded;
-    current = next;
-    setReel(next);
-    setLoading(null);
-    sound.setReel(next, assetsFor(next));
-    loadFootage(next);
-    if (awaitingFootage(next)) {
-      stop(0);
-      setTime(0);
-      playWhenLoaded = resume;
-      return;
-    }
-    seek(0);
   }
 
   function toggleLoop(): void {
@@ -225,6 +209,7 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
   }
 
   onSettled(() => {
+    loadFootage(reel);
     play();
     void sound.open(app.audio);
   });
@@ -235,16 +220,10 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
     sound.close();
   });
 
-  createEffect(
-    () => reel().title,
-    (title) => win.setTitle(title),
-  );
-
   // The menus show the chapter, not the time: rebuilding them every frame would shut an open menu.
-  const chapter = createMemo(() => chapterAt(reel(), time()).number);
+  const chapter = createMemo(() => chapterAt(reel, time()).number);
   createEffect(
     () => ({
-      reel: reel(),
       playing: playing(),
       looping: looping(),
       muted: muted(),
@@ -253,11 +232,15 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
       chapter: chapter(),
     }),
     (state) => {
-      const { chapters } = state.reel;
+      const { chapters } = reel;
       app.setMenus([
         {
           label: "File",
-          items: [{ label: "Quit", shortcut: "Q", onClick: () => app.quit() }],
+          items: [
+            { label: "Open…", shortcut: "O", onClick: () => void chooseReel(app, props.fileId) },
+            { type: "separator" },
+            { label: "Quit", shortcut: "Q", onClick: () => app.quit() },
+          ],
         },
         {
           label: "View",
@@ -266,17 +249,6 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
               label: state.full ? "Exit Full Screen" : "Full Screen",
               shortcut: "F",
               onClick: () => win.setFullScreen(!isFullScreen()),
-            },
-          ],
-        },
-        {
-          label: "Reel",
-          items: [
-            {
-              type: "radiogroup",
-              value: state.reel.id,
-              onValueChange: (value) => selectReel(REELS.find((r) => r.id === value)!),
-              items: REELS.map((r) => ({ label: r.title, value: r.id })),
             },
           ],
         },
@@ -341,8 +313,8 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
             name="scrub"
             value={time()}
             min={0}
-            max={reel().duration - 1 / reel().fps}
-            step={1 / reel().fps}
+            max={reel.duration - 1 / reel.fps}
+            step={1 / reel.fps}
             showValue={false}
             width={Math.max(40, win.width() - TIMECODE_W - 70)}
             onChange={(value) => {
@@ -351,7 +323,7 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
             }}
           />
           <text font="menu" spacing={1} nowrap>
-            {`${timecode(time(), reel().fps)} ${statusText()}`}
+            {`${timecode(time(), reel.fps)} ${statusText()}`}
           </text>
         </box>
       </Show>
@@ -359,7 +331,23 @@ function Showreel(_props: Record<string, unknown>): JSX.Element {
   );
 }
 
-export default defineApp({
+/** Open the reel a motion file names, in a window of its own; say so when it names none Showreel has. */
+async function openReel(app: AppContext, { fileId, title }: FileDocumentProps): Promise<void> {
+  const reel = motionReel(await app.fs.readJSON(fileId));
+  if (!reel || !REELS.some((r) => r.id === reel)) {
+    await app.os.showDialog({ message: `"${title}" isn't a reel Showreel can play.`, variant: "caution" });
+    return;
+  }
+  app.openWindow<ShowreelProps>({ title, props: { fileId, title, reel } });
+}
+
+/** File › Open…: pick a motion file, starting beside `near`, and play it in a window of its own. */
+async function chooseReel(app: AppContext, near?: string): Promise<void> {
+  const file = await app.os.showOpenDialog({ types: [MIME.motion], near });
+  if (file) app.os.openApp("showreel", { fileId: file.id, title: file.name });
+}
+
+export default defineApp<ShowreelProps>({
   id: "showreel",
   title: "Showreel",
   icon: "showreel/icon",
@@ -368,11 +356,18 @@ export default defineApp({
   about: {
     version: "4.0",
     description:
-      "Four reels in one bit, each with its own score. One Bit: type, shape, depth, particles and the edit, to a 120 BPM groove. The Keeper: an engraved silent short, drawn on twos, with a waltz and a projector. Hello, Mockintosh: the machine introduces itself in its own pixels and sounds. A Lot Like 1984: the 1984 ad itself, re-cut and dithered, with Mockintosh taking over Big Brother's screens.",
+      "Plays motion files: reels in one bit, each with its own score. It knows four. One Bit: type, shape, depth, particles and the edit, to a 120 BPM groove. The Keeper: an engraved silent short, drawn on twos, with a waltz and a projector. Hello, Mockintosh: the machine introduces itself in its own pixels and sounds. A Lot Like 1984: the 1984 ad itself, re-cut and dithered, with Mockintosh taking over Big Brother's screens.",
   },
   defaultSize: { width: 400, height: 248 },
   minSize: { width: 224, height: 150 },
   scrollable: false,
   resizable: true,
+  fileTypes: [MIME.motion],
   Component: Showreel,
+  onOpen(app, props) {
+    const release = app.keepAlive?.();
+    const { fileId, title } = props;
+    const opening = fileId ? openReel(app, { fileId, title: title ?? "Untitled" }) : chooseReel(app);
+    void opening.finally(() => release?.());
+  },
 });

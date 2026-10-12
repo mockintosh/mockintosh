@@ -8,6 +8,7 @@ import {
   defineApp,
   heldModifiers,
   measureText,
+  truncateText,
   onCleanup,
   onSettled,
   showPrintDialog,
@@ -33,7 +34,7 @@ import { SearchError, searchPlaces, type Place } from "./maps/search";
 import { TileSource } from "./maps/tiles";
 import { GpuBuildings } from "./maps/gpuBuildings";
 import { BADGE_HALF, BADGE_SIZE, drawCentred, drawCompass, drawMarks, drawMarksInto, resultLetter, type Mark } from "./maps/marks";
-import { FIELD_H, Icon, MARGIN, fitted } from "./maps/ui";
+import { FIELD_H, Icon, MARGIN } from "./maps/ui";
 import {
   BUILDINGS_ZOOM,
   MAX_ZOOM,
@@ -1431,10 +1432,10 @@ function Maps(_props: Record<string, unknown>): JSX.Element {
                   <ResultBadge index={index()} inverted={hovered() === index()} />
                   <box flexDirection="column" justifyContent="center">
                     <text font="menu" spacing={1} color={hovered() === index() ? 0 : 1}>
-                      {fitted(found.name, resultTextWidth(), spacedFontName("menu", 1))}
+                      {truncateText(found.name, resultTextWidth(), spacedFontName("menu", 1))}
                     </text>
                     <text font="body" color={hovered() === index() ? 0 : 1}>
-                      {fitted(found.distance === undefined ? found.detail : `${distanceAway(found.distance)} · ${found.detail}`, resultTextWidth(), "body")}
+                      {truncateText(found.distance === undefined ? found.detail : `${distanceAway(found.distance)} · ${found.detail}`, resultTextWidth(), "body")}
                     </text>
                   </box>
                 </box>

@@ -38,8 +38,8 @@ describe("bootstrapFileSystem", () => {
     expect(fs.volumes()).toEqual([]);
     await bootstrapFileSystem(fs);
 
-    const names = fs.children(fs.locate("desktop")!.id).map((n) => n.name);
-    const firstBoot = ["Photo Booth", "1984.mp4", "Safari", "Maps", "App Store", "Icon Gallery", "Showreel", "Terminal"];
+    const names = fs.children(fs.locate("desktop")!.id).map((n) => n.name).sort((a, b) => a.localeCompare(b));
+    const firstBoot = ["Photo Booth", "Safari", "Maps", "App Store", "Icon Gallery", "Terminal"];
     expect(names).toEqual([...firstBoot].sort((a, b) => a.localeCompare(b)));
     expect(names).not.toContain("Canvas");
     expect(names).not.toContain("MacPaint");
@@ -58,7 +58,7 @@ describe("bootstrapFileSystem", () => {
     expect(fs.locate("preferences")).toBeDefined();
   });
 
-  it("adds Showreel, Maps and Terminal shortcuts to an existing desktop that lacks them", async () => {
+  it("adds Maps and Terminal shortcuts to an existing desktop that lacks them", async () => {
     const fs = await FileSystem.open({ backend: new InMemoryBackend(), persistDelayMs: 0 });
     const hd = fs.mkdir(ROOT_ID, STARTUP_VOLUME_NAME, { role: "volume" });
     fs.mkdir(hd.id, "Desktop Folder", { role: "desktop" });
@@ -67,9 +67,6 @@ describe("bootstrapFileSystem", () => {
     const system = fs.mkdir(hd.id, "System Folder", { role: "system" });
     fs.mkdir(system.id, "Preferences", { role: "preferences" });
     await bootstrapFileSystem(fs);
-    const showreel = fs.child(fs.locate("desktop")!.id, "Showreel");
-    expect(showreel).toMatchObject({ kind: "file", type: MIME.appShortcut });
-    expect(fs.attributes(showreel!.id).icon).toBe("showreel/icon");
     const maps = fs.child(fs.locate("desktop")!.id, "Maps");
     expect(maps).toMatchObject({ kind: "file", type: MIME.appShortcut });
     expect(fs.attributes(maps!.id).icon).toBe("maps/icon");
@@ -78,6 +75,21 @@ describe("bootstrapFileSystem", () => {
     expect(fs.attributes(terminal!.id).icon).toBe("terminal/icon");
     expect(fs.child(fs.locate("desktop")!.id, "Dither")).toBeUndefined();
     expect(fs.child(fs.locate("desktop")!.id, "Canvas")).toBeUndefined();
+  });
+
+  it("takes away the demo shortcuts older desktops were given, and nothing else", async () => {
+    const fs = await bootedFS();
+    const desktop = fs.locate("desktop")!;
+    await fs.writeJSON(desktop.id, "Showreel", { appId: "showreel" }, { type: MIME.appShortcut });
+    await fs.writeJSON(desktop.id, "1984.mp4", { appId: "video" }, { type: MIME.appShortcut });
+    // The user's own file of that name stays.
+    await fs.remove(fs.child(desktop.id, "Safari")!.id);
+    await fs.writeFile(desktop.id, "Safari", "notes", { type: MIME.text });
+
+    await bootstrapFileSystem(fs);
+    expect(fs.child(desktop.id, "Showreel")).toBeUndefined();
+    expect(fs.child(desktop.id, "1984.mp4")).toBeUndefined();
+    expect(fs.child(desktop.id, "Safari")?.kind).toBe("file");
   });
 });
 

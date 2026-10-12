@@ -45,7 +45,7 @@ import {
   type WindowKind,
   type WindowSpec,
 } from "@mockintosh/sdk";
-import type { FSNode } from "@mockintosh/fs";
+import type { FSFile, FSNode } from "@mockintosh/fs";
 import { wireMenus, type MenuActions } from "../../../os/process/menus";
 import { publishSharedFrame, sharedFrameBytes } from "../../../os/process/sharedFrame";
 import type { AppSource, HostToProcess, ProcessStart, ProcessToHost, WindowState, WireWindowSpec } from "../../../os/process/protocol";
@@ -336,6 +336,7 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         openersFor: (type) => openersAmong(openers, type),
         closeWindow: (id) => (windows.has(id) || opening.has(id) ? notify("window.close", id) : notify("os.closeWindow", id)),
         showDialog: (options) => call("os.showDialog", [options]) as Promise<string | null>,
+        showOpenDialog: (options) => call("os.showOpenDialog", [options]) as Promise<FSFile | null>,
         // This thread is the app's own; blocking it blocks nobody else.
         busy: async (work) => work(),
       },

@@ -46,6 +46,11 @@ export interface ButtonProps {
    * does, so a default button's face lines up with its neighbours.
    */
   ringOverhang?: boolean;
+  /**
+   * Dim a disabled button as the Control Manager does: the face stays
+   * solid and only the title is grayed. Otherwise the face is checkered.
+   */
+  dimTitle?: boolean;
   /** Named cursor. Buttons leave the host default (arrow) unless set. */
   cursor?: CursorName;
   width?: LayoutStyle["width"];
@@ -70,11 +75,12 @@ export function Button(props: ButtonProps): JSX.Element {
   const inset = () => depress() && press.pressed() && !shadow();
   const radius = useRadius("md");
 
+  const checkered = () => props.disabled && !props.dimTitle;
   const background = (): Ink | PatternName =>
-    press.pressed() ? 1 : props.disabled ? "checker" : 0;
+    press.pressed() ? 1 : checkered() ? "checker" : 0;
 
   const borderStyle = (): "solid" | "dotted" =>
-    props.disabled ? "dotted" : "solid";
+    checkered() ? "dotted" : "solid";
 
   // The outer box only takes the container's alignment. Where the container
   // stretches it may be stretched; the button inside keeps its own size and
@@ -119,7 +125,7 @@ export function Button(props: ButtonProps): JSX.Element {
             <Show when={props.icon}>
               {(icon) => <image src={icon()} width={icon().width} height={icon().height} mode={press.pressed() ? "inverted" : "normal"} />}
             </Show>
-            <text font={props.font ?? "body"} size={props.size} bold={props.bold} italic={props.italic} color={press.pressed() ? 0 : 1} align="center" verticalAlign="middle" nowrap>
+            <text font={props.font ?? "body"} size={props.size} bold={props.bold} italic={props.italic} color={press.pressed() ? 0 : 1} stipple={props.disabled && props.dimTitle} align="center" verticalAlign="middle" nowrap>
               {props.label}
             </text>
           </box>

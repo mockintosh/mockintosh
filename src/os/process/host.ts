@@ -493,6 +493,7 @@ export class AppProcess {
         return ctx.signIn.authorize(args[0] as string);
       case "os":
         if (name === "showDialog") return ctx.os.showDialog(args[0] as never);
+        if (name === "showOpenDialog") return ctx.os.showOpenDialog(args[0] as never);
         if (name === "openApp") return ctx.os.openApp(args[0] as string, args[1] as Record<string, unknown>);
         if (name === "closeWindow") return ctx.os.closeWindow(args[0] as string);
         break;

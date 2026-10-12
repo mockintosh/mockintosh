@@ -133,6 +133,21 @@ export function windowInnerWidth(win: Pick<OSWindow, "kind" | "width">): number 
   return win.width - 2 * windowOuterFrame(win);
 }
 
+/**
+ * The `WindowSpec.size` that gives a window a content area of `content`.
+ * A window's stored width is its outer width — frame, and the scroll-bar
+ * band when it has one, included — while its height is the content's alone.
+ * (An alert's content then sits inside its whole dBoxProc frame.)
+ */
+export function windowSizeForContent(
+  win: Pick<OSWindow, "kind"> & { scrollable?: boolean; resizable?: boolean },
+  content: { width: number; height: number },
+): { width: number; height: number } {
+  const growBand = !win.scrollable && !!win.resizable && windowDefinition(win.kind).growBox;
+  const reserved = win.scrollable || growBand ? SB_INNER : 0;
+  return { width: content.width + 2 * windowFrame(win) + reserved, height: content.height };
+}
+
 /** Width available to the window's content component. */
 export function windowContentWidth(win: OSWindow): number {
   const reserved = win.scrollable || hasGrowBand(win) ? SB_INNER : 0;

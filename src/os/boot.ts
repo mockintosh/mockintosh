@@ -18,7 +18,7 @@ import { registerFileOperations } from "./kernel/files";
 import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd, type Rect } from "@mockintosh/quickdraw";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
 import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
-import { FileSystem } from "@mockintosh/fs";
+import { FileSystem, type FSFile } from "@mockintosh/fs";
 import type { AppContext } from "@mockintosh/sdk";
 import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEvent } from "../platform/types";
 import { importHostFile, isImportableHostFile, resolveImportTarget } from "./hostImport";
@@ -28,6 +28,7 @@ import { cursorForName, cursors } from "./cursors";
 import { animateZoomRect, type AnimRect, type ZoomPair } from "./zoomAnimation";
 import { buildFolderWindow, windowOuterRect } from "../../apps/Finder.solid";
 import { bootstrapFileSystem } from "./fsBootstrap";
+import { TOUR_DISK_ID, mountTourDisk, noteTourDiskEjected } from "./tourDisk";
 import { createFontFolder } from "./fontFolder";
 import { resolveOpenAction } from "./openers";
 import { claimMenubarEdge, stepMenubarReveal } from "./menubarReveal";
@@ -64,6 +65,8 @@ import { openAppAboutBox, ABOUT_SIZE } from "./components/AppAboutBox.solid";
 import bundledDeclarations from "../../apps/declarations.generated.json";
 import { buildAppWindow } from "./appWindow";
 import { DialogApp, dialogSize } from "./components/Dialog.solid";
+import { OPEN_DIALOG_SIZE, OpenDialog } from "./components/OpenDialog.solid";
+import { DESKTOP, placeExists, placeOf, type SFPlace } from "./standardFile";
 import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
 import type { SystemSignIn } from "./signIn";
 import { createAppInstaller, migrateBundledDesktopShortcuts } from "./installedApps";
@@ -196,6 +199,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   bootTrace("fs");
   const fs = await FileSystem.open({ backend: platform.storage });
   await bootstrapFileSystem(fs);
+  /** The tour disk's film, read whole only when something asks for its bytes. */
+  const fetchBytes = async (url: string): Promise<Uint8Array> => {
+    if (!platform.fetch) throw new Error("This Macintosh can't read the Tour disk's movie.");
+    const response = await platform.fetch(url);
+    if (!response.ok) throw new Error(`Couldn't read ${url} (${response.status})`);
+    return new Uint8Array(await response.arrayBuffer());
+  };
+  mountTourDisk(fs, fetchBytes);
   const kernel = new Kernel();
   registerFileOperations(kernel, fs, platform.source);
   const desktopSettings = await createDesktopSettings(fs);
@@ -242,6 +253,8 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
   }
 
   // --- OS services (passed to Solid components via context) ---
+  /** Where the last Open dialog was left. */
+  let lastOpenPlace: SFPlace = DESKTOP;
   const osServices: OSServices = {
     kernel,
     instances,
@@ -377,6 +390,23 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         });
       });
     },
+    showOpenDialog(options = {}) {
+      // Like Standard File's CurDirStore: the next dialog opens where this one was left.
+      const start = options.near ? placeOf(fs, options.near) : placeExists(fs, lastOpenPlace) ? lastOpenPlace : DESKTOP;
+      return new Promise((resolve) => {
+        osServices.openWindow("__open__", {
+          props: {
+            types: options.types,
+            start,
+            resolve: (file: FSFile | null, place: SFPlace) => {
+              lastOpenPlace = place;
+              resolve(file);
+            },
+          },
+          size: OPEN_DIALOG_SIZE,
+        });
+      });
+    },
     openFolderWindow(title, directoryId, fromRect?) {
       const win = buildFolderWindow(fs, {
         title,
@@ -486,7 +516,21 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         return;
       }
       await bootstrapFileSystem(fs);
+      mountTourDisk(fs, fetchBytes);
       closeAllWindows();
+    },
+    ejectDisk(volumeId) {
+      const volume = fs.directory(volumeId);
+      if (!volume?.ejectable) return;
+      for (const win of getWindows()) {
+        const dirId = win.props?.directoryId;
+        if (typeof dirId === "string" && fs.volumeOf(dirId)?.id === volumeId) osServices.closeWindow(win.id);
+      }
+      fs.unmount(volumeId);
+      if (volumeId === TOUR_DISK_ID) noteTourDiskEjected(fs);
+    },
+    insertTourDisk() {
+      mountTourDisk(fs, fetchBytes, { insert: true });
     },
   };
 
@@ -511,6 +555,18 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     resizable: false,
     singleInstance: false,
     Component: DialogApp as any,
+  });
+
+  registerApp({
+    id: "__open__",
+    title: "",
+    icon: "icon/computer",
+    defaultSize: OPEN_DIALOG_SIZE,
+    windowKind: "alert",
+    scrollable: false,
+    resizable: false,
+    singleInstance: false,
+    Component: OpenDialog as any,
   });
 
   registerApp({

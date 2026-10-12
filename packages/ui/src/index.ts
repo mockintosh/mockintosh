@@ -147,7 +147,7 @@ export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar, glyphAdvance, glyph
 export type { DeckerFont } from "./fonts/font";
 export { resolveFont, fontStyleFromProps, fontFromProps, textFace } from "./fonts/style";
 export type { FontStyle } from "./fonts/style";
-export { measureText, fontLineHeight, drawString } from "./fonts/bridge";
+export { measureText, truncateText, fontLineHeight, drawString } from "./fonts/bridge";
 export { layoutText, lineLeft, lineTop, caretPoint, indexAtPoint } from "./fonts/textLayout";
 export type { TextBlock, TextLine } from "./fonts/textLayout";
 export { layoutRuns, runAtPoint } from "./fonts/runLayout";
@@ -264,6 +264,8 @@ export {
   Radio,
   RadioGroup,
   Select,
+  PopUpFace,
+  POPUP_TRIANGLE,
   Slider,
   Spinner,
   Switch,
@@ -328,6 +330,7 @@ export type {
   RadioOption,
   SelectProps,
   SelectOption,
+  PopUpFaceProps,
   SliderProps,
   SpinnerProps,
   SwitchProps,
