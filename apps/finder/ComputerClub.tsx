@@ -1,32 +1,44 @@
 /**
  * Mockintosh Computer Club — join, sign in and out. Members can use the
- * Assistant. On Mockintosh's own sites the window asks for an email and
+ * Assistant. Signed out, the window is a 1984-style magazine spread: the
+ * Club's picture, "Introducing the Computer Club." in New York, and the
+ * way in beside it. On Mockintosh's own sites the window asks for an email and
  * the code the Club sends; anywhere else it connects on the Club's page,
  * with a code to check and a QR code for a phone. A Finder-hosted window
  * like the Chooser, opened from the Apple menu ("Join Mockintosh Computer
  * Club…" until this computer is signed in, then "Computer Club…").
  * Accounts are `os.club` (src/os/club.ts); see docs/computer-club-plan.md.
  */
-import { For, Show, createSignal, onCleanup } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { Button, TextInput, useApp } from "@mockintosh/sdk";
 import { useOS, type OSServices } from "../../src/os/context";
 import { CLUB_NAME, type SystemClub } from "../../src/os/club";
 import type { ClubConfig, ClubConnection, ClubCredits, ClubMember } from "../../src/platform/types";
 import { QRCode } from "../../src/os/components/QRCode.solid";
-import { FINDER_APP_ID } from "../../src/os/state";
+import { FINDER_APP_ID, getWindows, updateOSWindow } from "../../src/os/state";
+import { CLUB_AD_PICTURE } from "./clubAdPicture";
 import { openSystemWindow } from "../../src/os/systemWindows";
 import { Divider, PAD, Row } from "./printerUi";
 
 export const JOIN_CLUB_LABEL = `Join ${CLUB_NAME}…`;
 export const CLUB_MENU_LABEL = "Computer Club…";
 
+/** The member card's window. */
 const SIZE = { width: 300, height: 300 };
+/** Between the picture and the words beside it. */
+const AD_GAP = 12;
+/** The column beside the picture: the headline, then the way in. */
+const AD_COLUMN_W = 234;
+/** The signed-out window: the picture and its column, as a spread. */
+const AD_SIZE = { width: PAD * 2 + CLUB_AD_PICTURE.width + AD_GAP + AD_COLUMN_W, height: PAD * 2 + CLUB_AD_PICTURE.height };
 const FIELD_LABEL_W = 60;
-/** The connect panel's QR code box: 3px modules for the Club's link. */
-const CONNECT_QR_BOX = 120;
+/** The connect panel's QR code box: 2px modules for the Club's link (a version 5 code), within the spread's column. */
+const CONNECT_QR_BOX = 100;
 
 const LATEST_DATE_W = 44;
+/** Latest changes the card lists; the Club's account page has more. */
+const LATEST_SHOWN = 5;
 
 const formatDate = (ms: number) =>
   new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -50,11 +62,41 @@ function entryLabel(entry: ClubCredits["recent"][number]): string {
   }
 }
 
+/** The window's size for the member, or for the spread while nobody is signed in. */
+function windowSize(os: OSServices): { width: number; height: number } {
+  return os.club?.member() ? SIZE : AD_SIZE;
+}
+
 export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
   const os = useOS();
   const win = app.window;
-  const textWidth = () => win.width() - PAD * 2;
+  /** Signed out (or not known yet): the spread. */
+  const spread = () => !!os.club && !os.club.member();
+  /** Connecting on the Club's page: the spread drops its subhead to make room for the code. */
+  const [connecting, setConnecting] = createSignal(false, { ownedWrite: true });
+  const textWidth = () => (spread() ? AD_COLUMN_W : win.width() - PAD * 2);
+
+  // Signed in: a connection under way is over.
+  createEffect(
+    () => !!os.club?.member(),
+    (signedIn) => {
+      if (signedIn) setConnecting(false);
+    },
+  );
+
+  // Grow into the spread on signing out, back to the card on signing in; stay on screen.
+  createEffect(
+    () => windowSize(os),
+    (size) => {
+      const current = getWindows().find((w) => w.id === win.id);
+      if (!current) return;
+      // Leave room for the frame and its shadow at the screen's right edge.
+      const x = Math.max(0, Math.min(current.x, os.resolution.width - size.width - 4));
+      if (current.width === size.width && current.height === size.height && current.x === x) return;
+      updateOSWindow(win.id, { width: size.width, height: size.height, x });
+    },
+  );
 
   return (
     <box
@@ -72,9 +114,20 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
         {(club) => (
           <Show
             when={club().member() !== undefined}
-            fallback={<text font="body">Checking your membership…</text>}
+            fallback={
+              <Spread>
+                <text font="body" width={textWidth()}>Checking your membership…</text>
+              </Spread>
+            }
           >
-            <Show when={club().member()} fallback={<SignedOut club={club()} />}>
+            <Show
+              when={club().member()}
+              fallback={
+                <Spread>
+                  <SignedOut club={club()} />
+                </Spread>
+              }
+            >
               {(member) => <MemberCard club={club()} member={member()} />}
             </Show>
           </Show>
@@ -127,6 +180,34 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
     );
   }
 
+  /**
+   * The magazine spread: the picture, and beside it the headline in New
+   * York, the subhead, and `children` (the way in).
+   */
+  function Spread(props: { children: JSX.Element }): JSX.Element {
+    return (
+      <box flexDirection="row" gap={AD_GAP} alignItems="flex-start">
+        <image
+          semantic={{ name: "club-picture", role: "image", value: "A compact Macintosh saying Mockintosh, with its keyboard and mouse" }}
+          width={CLUB_AD_PICTURE.width}
+          height={CLUB_AD_PICTURE.height}
+          src={CLUB_AD_PICTURE}
+        />
+        <box width={AD_COLUMN_W} flexDirection="column" gap={8}>
+          <box flexDirection="column">
+            <text font="newYork" size={24} width={AD_COLUMN_W} semantic={{ name: "club-headline", role: "heading" }}>
+              Introducing the Computer Club.
+            </text>
+            <Show when={!connecting()}>
+              <text font="newYork" size={12} width={AD_COLUMN_W}>Members only. Everyone welcome.</text>
+            </Show>
+          </box>
+          {props.children}
+        </box>
+      </box>
+    );
+  }
+
   function Buttons(props: { children: JSX.Element }): JSX.Element {
     return (
       <box flexDirection="row" gap={6} alignItems="center">
@@ -140,7 +221,6 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
   function SignedOut(props: { club: SystemClub }): JSX.Element {
     const [config, setConfig] = createSignal<ClubConfig | null>(null, { ownedWrite: true });
     const [unreachable, setUnreachable] = createSignal(false, { ownedWrite: true });
-    const [connecting, setConnecting] = createSignal(false, { ownedWrite: true });
     props.club.config().then(setConfig, () => setUnreachable(true));
 
     return (
@@ -159,7 +239,7 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
             ) : (
               <>
                 <text font="body" width={textWidth()}>
-                  {`Members can use the Assistant. Connect this Mockintosh to your membership on the ${CLUB_NAME}'s website; you can join there too. Joining is free and comes with credits to start.`}
+                  {`Members use the Assistant. Connect this Mockintosh on the ${CLUB_NAME}'s website, where you can join too: it's free, with credits to start.`}
                 </text>
                 <Buttons>
                   <Button name="club-connect" label="Connect…" ring onClick={() => setConnecting(true)} />
@@ -201,7 +281,7 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
       <>
         <Show when={panel() === "email"}>
           <text font="body" width={textWidth()}>
-            Members can use the Assistant. Type your email and the Club sends you a code. New here? Choose a username too, which names your own disk: joining is free and comes with credits to start.
+            Members use the Assistant. Type your email and the Club sends you a code. New here? Choose a username too: it names your own disk. Joining is free, with credits to start.
           </text>
           <Field label="Email" name="club-email" value={email()} onChange={setEmail} onSubmit={send} disabled={busy()} />
           <Field label="Username" name="club-username" value={username()} onChange={setUsername} onSubmit={send} disabled={busy()} />
@@ -301,17 +381,14 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
         >
           {(connection) => (
             <>
-              <text font="body" width={textWidth()}>
-                {`Sign in or join on the ${CLUB_NAME}'s page, and check that it shows this code:`}
-              </text>
-              <box flexDirection="row" justifyContent="center">
-                <text font="menu" semantic={{ name: "club-connect-code", role: "status" }}>{connection().code}</text>
-              </box>
+              <text font="body" width={textWidth()}>{`Sign in or join on the ${CLUB_NAME}'s page.`}</text>
               <box flexDirection="row" gap={8} alignItems="center">
                 <box width={CONNECT_QR_BOX} height={CONNECT_QR_BOX} alignItems="center" justifyContent="center" borderColor={1} borderWidth={1}>
                   <QRCode link={connection().url} box={CONNECT_QR_BOX} name="club-connect-qr" onClick={() => open(connection().url)} />
                 </box>
-                <box flexDirection="column" gap={6} width={sideWidth()}>
+                <box flexDirection="column" gap={4} width={sideWidth()}>
+                  <text font="body" wrap width={sideWidth()}>Check that it shows this code:</text>
+                  <text font="menu" semantic={{ name: "club-connect-code", role: "status" }}>{connection().code}</text>
                   <text font="body" wrap width={sideWidth()}>Scan it with your phone's camera,</text>
                   <Show when={os.browser}>
                     <text
@@ -360,7 +437,7 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
         <Show when={props.club.credits()?.recent.length}>
           <Divider />
           <text font="body" nowrap>Latest</text>
-          <For each={props.club.credits()!.recent}>
+          <For each={props.club.credits()!.recent.slice(0, LATEST_SHOWN)}>
             {(entry) => (
               <box flexDirection="row" gap={4}>
                 <box width={LATEST_DATE_W}>
@@ -388,8 +465,9 @@ export function openComputerClub(os: OSServices): string {
   return openSystemWindow(os, FINDER_APP_ID, {
     title: "Computer Club",
     kind: "document",
-    size: SIZE,
-    scrollable: true,
+    size: windowSize(os),
+    // A panel, not a document: the spread and the card each fit their window.
+    scrollable: false,
     Component: ComputerClub,
   });
 }

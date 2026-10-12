@@ -749,8 +749,10 @@ export function handleGlobalMouseUp(
     const staying = new Map<string, IconPlacement[]>();
     const arriving: IconPlacement[] = [];
     for (const p of placements) {
-      const parent = fs.node(p.nodeId)?.parentId ?? null;
-      if (parent && isDesktopFolder(fs, parent)) staying.set(parent, [...(staying.get(parent) ?? []), p]);
+      const node = fs.node(p.nodeId);
+      const parent = node?.parentId ?? null;
+      // Already on the desktop, or a role folder (the Trash) shown there: only its place changes.
+      if (parent && (isDesktopFolder(fs, parent) || node?.role)) staying.set(parent, [...(staying.get(parent) ?? []), p]);
       else arriving.push(p);
     }
     fs.batch(() => {

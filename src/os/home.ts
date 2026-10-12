@@ -75,7 +75,8 @@ export function guestItems(fs: FileSystem, since = 0): FSNode[] {
   }
   const pictures = fs.locate("pictures", startup.id);
   if (pictures) items.push(...fs.children(pictures.id));
-  return items.filter((n) => Math.max(n.createdAt, n.modifiedAt) > since);
+  // A role folder (a Trash dragged into the Desktop Folder) is the Mac's too.
+  return items.filter((n) => !n.role && Math.max(n.createdAt, n.modifiedAt) > since);
 }
 
 /**

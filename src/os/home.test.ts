@@ -49,9 +49,10 @@ describe("home disks", () => {
     expect(fs.directory(volume.id)!.name).toBe("countess");
   });
 
-  it("counts the guest's files but not the Mac's app shortcuts", async () => {
+  it("counts the guest's files but not the Mac's app shortcuts, or a Trash dragged onto the desktop", async () => {
     const fs = await bootedFS();
     const { note, picture } = await withGuestFiles(fs);
+    fs.move(fs.locate("trash")!.id, fs.locate("desktop")!.id);
     expect(guestItems(fs).map((n) => n.id).sort()).toEqual([note.id, picture.id].sort());
   });
 
