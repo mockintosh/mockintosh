@@ -44,7 +44,11 @@ describe("bundled apps' menu shortcuts", () => {
       vi.useFakeTimers();
       const platform = createHeadlessPlatform({ width: 512, height: 342, audioSampleRate: 44100, microphoneSampleRate: 44100 });
       const services: Partial<Platform> = {
-        fetch: () => new Promise<Response>(() => {}),
+        // Music opens its window only once it has a developer token; everything else waits forever.
+        fetch: (input) =>
+          String(input).endsWith("/api/apple-music/token")
+            ? Promise.resolve(Response.json({ developerToken: "test" }))
+            : new Promise<Response>(() => {}),
         images: inert(), video: inert(), camera: inert(), browser: inert(), signInRelay: inert(),
         musicKit: inert({ state: MUSIC_KIT_IDLE, onChange: () => () => {}, onError: () => () => {} }),
       };
@@ -53,9 +57,12 @@ describe("bundled apps' menu shortcuts", () => {
       vi.advanceTimersByTime(1000); // the splash
       registerApp((await APP_MODULES[id]!()).default);
       os.services.openApp(id);
-      platform.tick();
-      await os.render();
-      expect(getActiveAppId()).toBe(id);
+      // Some apps open their window only after an `await` in `onOpen`.
+      await vi.waitFor(async () => {
+        platform.tick();
+        await os!.render();
+        expect(getActiveAppId()).toBe(id);
+      });
       expect(menubarProblems(getMenubarMenus(), id)).toEqual([]);
     });
   }
