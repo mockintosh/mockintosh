@@ -105,7 +105,7 @@ export function isStoredUserToken(v: unknown): v is { musicUserToken: string } {
 }
 
 /** The developer token from this deployment, or an error naming what's missing. */
-export async function fetchDeveloperToken(session: AppleMusicSession): Promise<string> {
+export async function fetchDeveloperToken(session: Pick<AppleMusicSession, "fetch" | "origin">): Promise<string> {
   const resp = await session.fetch(`${session.origin}/api/apple-music/token`);
   const data = (await resp.json().catch(() => ({}))) as { developerToken?: string; error?: string };
   if (!data.developerToken) throw new Error(data.error ?? `Apple Music token unavailable (${resp.status})`);
