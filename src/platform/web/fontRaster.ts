@@ -1,6 +1,6 @@
 import type { FontRasterMode, FontRasterOptions, FontRasterService } from "@mockintosh/sdk";
 import type { FontStrikeDraft, FontStrikeGlyph } from "@mockintosh/ui";
-import { defaultRasterCharset, deckerOrdinalForCharCode, peekSfntFamily } from "@mockintosh/ui";
+import { macRomanCharset, slotForCodePoint, peekSfntFamily } from "@mockintosh/ui";
 import { SCALER_MODES, clampStrikeSize, rasterizeWithScaler, sanitizeFamily } from "../fontRaster/raster";
 
 function coverageFromImage(data: ImageData): Uint8Array {
@@ -29,15 +29,15 @@ async function rasterizeHinted(bytes: Uint8Array, options: FontRasterOptions): P
     const ascent = Math.max(1, Math.ceil(metrics.fontBoundingBoxAscent || metrics.actualBoundingBoxAscent || ppem * 0.8));
     const descent = Math.max(0, Math.ceil(metrics.fontBoundingBoxDescent || metrics.actualBoundingBoxDescent || ppem * 0.2));
     const srcH = ascent + descent;
-    const chars = options.chars ?? defaultRasterCharset();
+    const chars = options.chars ?? macRomanCharset();
     const glyphs: FontStrikeGlyph[] = [];
     let maxWidth = 1;
 
     for (const ch of chars) {
       const cp = ch.codePointAt(0);
       if (cp === undefined) continue;
-      const ordinal = deckerOrdinalForCharCode(cp);
-      if (ordinal === 255) continue;
+      const ordinal = slotForCodePoint(cp);
+      if (ordinal < 0) continue;
       const m = pctx.measureText(ch);
       const advance = Math.max(1, Math.round(m.width));
       const left = Math.ceil(m.actualBoundingBoxLeft || 0);

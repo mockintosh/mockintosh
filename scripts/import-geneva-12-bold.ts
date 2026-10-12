@@ -9,17 +9,17 @@ import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { smearDeckerFontBold } from "../packages/ui/src/fonts/boldSmear";
-import { decodeDeckerFont, encodeDeckerFont } from "../packages/ui/src/fonts/codec";
+import { decodeFont, encodeFont } from "../packages/ui/src/fonts/codec";
 import { BUILTIN_FONT_GENEVA_12 } from "../packages/ui/src/fonts/faces/geneva12";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outPath = resolve(root, "packages/ui/src/fonts/faces/genevaTwelveBold.ts");
 
 const bold = smearDeckerFontBold(
-  decodeDeckerFont(BUILTIN_FONT_GENEVA_12, "geneva12"),
+  decodeFont(BUILTIN_FONT_GENEVA_12, "geneva12"),
   "geneva12Bold",
 );
-const record = encodeDeckerFont(bold);
+const record = encodeFont(bold);
 const escaped = record.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 writeFileSync(

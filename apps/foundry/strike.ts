@@ -1,6 +1,6 @@
 import {
   MAX_NAME_LENGTH,
-  deckerOrdinalForCharCode,
+  slotForCodePoint,
   type FontStrikeDraft,
   type FontStrikeGlyph,
 } from "@mockintosh/sdk";
@@ -44,7 +44,7 @@ export function blitDraftLines(
   const widths = lines.map((line) => {
     let w = 0;
     for (const ch of line) {
-      const g = byOrd.get(deckerOrdinalForCharCode(ch.charCodeAt(0)));
+      const g = byOrd.get(slotForCodePoint(ch.charCodeAt(0)));
       w += (g?.width ?? 0) + draft.spacing;
     }
     return w;
@@ -56,7 +56,7 @@ export function blitDraftLines(
   for (let i = 0; i < lines.length; i++) {
     let x = 0;
     for (const ch of lines[i]!) {
-      const g = byOrd.get(deckerOrdinalForCharCode(ch.charCodeAt(0)));
+      const g = byOrd.get(slotForCodePoint(ch.charCodeAt(0)));
       if (!g) continue;
       for (let gy = 0; gy < draft.glyphHeight; gy++) {
         for (let gx = 0; gx < g.width; gx++) {

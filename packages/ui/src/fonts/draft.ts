@@ -45,7 +45,6 @@ export function deckerFontFromDraft(draft: FontStrikeDraft): DeckerFont {
     glyphStride,
     glyphWidths,
     glyphData,
-    sourceFormat: "FNT1",
   };
 }
 

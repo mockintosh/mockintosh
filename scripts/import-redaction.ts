@@ -21,7 +21,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deckerOrdinalForCharCode, defaultRasterCharset } from "../packages/ui/src/fonts/drom";
+import { slotForCodePoint, macRomanCharset } from "../packages/ui/src/fonts/charmap";
 import { parseSfnt, type SfntFont } from "../packages/ui/src/fonts/truetype/sfnt";
 
 const ZIP_URL = "https://www.redaction.us/static/redaction.zip";
@@ -122,9 +122,9 @@ function convert(bytes: Uint8Array, grid: number): Strike {
   const font = parseSfnt(bytes);
   if (font.unitsPerEm !== 1000) throw new Error(`Redaction ${grid}: unitsPerEm ${font.unitsPerEm}`);
   const glyphs: Glyph[] = [];
-  for (const ch of defaultRasterCharset()) {
+  for (const ch of macRomanCharset()) {
     const codePoint = ch.codePointAt(0)!;
-    const glyph = rasterize(font, grid, codePoint, deckerOrdinalForCharCode(codePoint));
+    const glyph = rasterize(font, grid, codePoint, slotForCodePoint(codePoint));
     if (glyph) glyphs.push(glyph);
   }
   // Line box from the font's ascender / descender, grown to any ink that leaves it.

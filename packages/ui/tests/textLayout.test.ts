@@ -27,7 +27,6 @@ function monoFont(): DeckerFont {
     glyphStride: 10,
     glyphWidths,
     glyphData: new Uint8Array(256 * 10),
-    sourceFormat: "FNT0",
   };
 }
 

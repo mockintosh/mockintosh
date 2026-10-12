@@ -17,8 +17,8 @@ import {
 import { charAdvance, getGlyphPixel, getGlyphWidth, textAdvance } from "../../src/fonts/font";
 import { drawString, installFontBridge, measureText } from "../../src/fonts/bridge";
 import { fontFamilyId, hostSwapFont, uiTextRuns } from "../../src/fonts/strike";
-import { encodeDeckerFont } from "../../src/fonts/codec";
-import { deckerOrdinalForCharCode } from "../../src/fonts/drom";
+import { encodeFont } from "../../src/fonts/codec";
+import { slotForCodePoint } from "../../src/fonts/charmap";
 import { OutlineFace } from "../../src/fonts/truetype/scaler";
 import { deckerFontFromDraft } from "../../src/fonts/draft";
 import { resolveFont } from "../../src/fonts/style";
@@ -73,7 +73,7 @@ describe("outline families in the Font Manager", () => {
       spacing: 1,
       glyphs: [{ ordinal: 72, width: 4, pixels: new Uint8Array(40).fill(1) }],
     };
-    registerFont("testsans", encodeDeckerFont(deckerFontFromDraft(draft)), 12);
+    registerFont("testsans", encodeFont(deckerFontFromDraft(draft)), 12);
     const bitmap = requireFont("testsans", 12);
     expect(bitmap).not.toBe(scaled);
     expect(bitmap.outline).toBeUndefined();
@@ -90,16 +90,19 @@ describe("outline families in the Font Manager", () => {
     expect(runs[1]!.x).toBe(charAdvance(font, "A") - 2);
   });
 
-  it("draws characters beyond Decker's 256 from page strikes", () => {
+  it("draws characters beyond page 0's 256 from page strikes", () => {
     install("testsans");
     const font = requireFont("testsans", 16);
-    expect(charAdvance(font, "Ω")).toBeGreaterThan(0);
+    // Ω is Mac OS Roman 0xBD: page 0.
+    expect(inkCount(font, 0xbd)).toBeGreaterThan(0);
+    expect(charAdvance(font, "\u01FA")).toBeGreaterThan(0);
     expect(textAdvance(font, "\u{1F600}")).toBeGreaterThan(0);
-    const runs = uiTextRuns(font, "HΩ\u{1F600}");
-    expect(runs.map((r) => r.faceKey)).toEqual(["testsans", "testsans\u0001p4", "testsans\u0001p503"]);
-    expect(runs[1]!.bytes).toEqual([0xa9]);
-    const page = getFont("testsans\u0001p4", 16)!;
-    expect(inkCount(page, 0xa9)).toBeGreaterThan(0);
+    const runs = uiTextRuns(font, "HΩ\u01FA\u{1F600}");
+    expect(runs.map((r) => r.faceKey)).toEqual(["testsans", "testsans\u0001p2", "testsans\u0001p503"]);
+    expect(runs[0]!.bytes).toEqual([0x48, 0xbd]);
+    expect(runs[1]!.bytes).toEqual([0xfa]);
+    const page = getFont("testsans\u0001p2", 16)!;
+    expect(inkCount(page, 0xfa)).toBeGreaterThan(0);
   });
 
   it("matches real Bold faces before synthesizing", () => {
@@ -124,7 +127,7 @@ describe("outline families in the Font Manager", () => {
       spacing: 0,
       glyphs: [{ ordinal: 72, width: 3, pixels: new Uint8Array(30).fill(1) }],
     };
-    const strike = registerStyledStrike("testsans", 12, encodeDeckerFont(deckerFontFromDraft(draft)), 1);
+    const strike = registerStyledStrike("testsans", 12, encodeFont(deckerFontFromDraft(draft)), 1);
     expect(getRealFace("testsans", 1, 12)?.font).toBe(strike);
   });
 });
@@ -211,7 +214,7 @@ describe("QuickDraw through the scaler", () => {
     install("testsans");
     const font = requireFont("testsans", 20);
     expect(font.inkAbove).toBeUndefined();
-    const aring = deckerOrdinalForCharCode(0xc5);
+    const aring = slotForCodePoint(0xc5);
     for (let x = 0; x < getGlyphWidth(font, aring); x++) expect(getGlyphPixel(font, aring, x, -1)).toBe(false);
 
     // Ǻ lives on page strike 2 and rises above any line box.

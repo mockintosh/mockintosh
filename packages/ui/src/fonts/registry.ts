@@ -1,12 +1,12 @@
 import type { DeckerFont } from "./font";
-import { decodeDeckerFont } from "./codec";
+import { decodeFont } from "./codec";
 import {
   createOutlineStrike,
   parsePageFaceKey,
   type FamilyScalerSettings,
 } from "./outlineStrike";
 import { DEFAULT_SCALER_OPTIONS, OutlineFace } from "./truetype/scaler";
-import { applyExtraGlyphs } from "./extraGlyphs";
+import { applyExtraGlyphs, ensureMissingGlyph } from "./extraGlyphs";
 import {
   BAKED_STYLE_ALIASES,
   BUILTIN_STRIKES,
@@ -89,7 +89,10 @@ function withSpacing(font: DeckerFont, spacing: number): DeckerFont {
   let bySpacing = spacedCache.get(font);
   if (!bySpacing) spacedCache.set(font, (bySpacing = new Map()));
   let spaced = bySpacing.get(spacing);
-  if (!spaced) bySpacing.set(spacing, (spaced = { ...font, spacing }));
+  if (!spaced) {
+    const pages = font.pages && new Map([...font.pages].map(([n, page]) => [n, withSpacing(page, spacing)]));
+    bySpacing.set(spacing, (spaced = { ...font, spacing, ...(pages ? { pages } : {}) }));
+  }
   return spaced;
 }
 
@@ -124,19 +127,17 @@ function overhangMap(): Map<string, Readonly<Record<number, readonly [number, nu
 }
 
 function loadStrike(family: string, size: number, data: string): DeckerFont {
-  const font = decodeDeckerFont(data, family);
-  font.size = size;
+  // Overhangs: the cell is the glyph's ink; these glyphs advance less than it (f, j, y).
   const overhangs = overhangMap().get(fontInfoKey(family, size));
-  if (overhangs) {
-    // The cell is the glyph's ink; these glyphs advance less than it (f, j, y).
-    font.advances = font.glyphWidths.slice();
-    font.originX = new Uint8Array(256);
-    for (const [ordinal, [advance, originX]] of Object.entries(overhangs)) {
-      font.advances[Number(ordinal)] = advance;
-      font.originX[Number(ordinal)] = originX;
-    }
-  }
-  return applyExtraGlyphs(font);
+  const font = decodeFont(data, family, { size, overhangs });
+  return finishFace(font, infoMap().get(fontInfoKey(family, size))?.descent);
+}
+
+/** Mockintosh's symbols, and a missing-character box for a face without one. */
+function finishFace(font: DeckerFont, descent: number | undefined): DeckerFont {
+  applyExtraGlyphs(font);
+  ensureMissingGlyph(font, descent ?? font.fontInfo?.descent ?? Math.max(1, Math.round(font.glyphHeight / 5)));
+  return font;
 }
 
 function putStrike(family: string, size: number, font: DeckerFont): void {
@@ -261,9 +262,9 @@ export function resolveFaceRef(name: string = "body", size?: number): { family: 
   return { family, size: nearestSize(sizes, requested) };
 }
 
-/** Decode a Decker font record and patch in Mockintosh's extra symbol glyphs for that name. */
+/** Decode a font record and patch in Mockintosh's extra symbol glyphs for that name. */
 function loadFont(name: string, data: string): DeckerFont {
-  return applyExtraGlyphs(decodeDeckerFont(data, name));
+  return finishFace(decodeFont(data, name), infoMap().get(name)?.descent);
 }
 
 function sizesOf<T>(map: Map<string, Map<number, T>>, family: string): Map<number, T> {
@@ -298,7 +299,7 @@ export function initBuiltinFonts(): void {
 }
 
 /**
- * Register a custom font from a %%FNT0 / %%FNT1 data block string.
+ * Register a custom font from a font record (`%%MFN1`, or Decker's `%%FNT0` / `%%FNT1`).
  * Custom fonts can override built-in names. Extra symbol glyphs (see `extraGlyphs.ts`)
  * are applied when a drawing exists for `name`, so overriding `menu` keeps ⌘ / ✓ / • working.
  */
@@ -324,7 +325,12 @@ export function getFont(name: string = "body", size?: number): DeckerFont | null
   const paged = parsePageFaceKey(name);
   if (paged.page > 0) {
     const ref = resolveFaceRef(paged.family, size);
-    return outlineStrike(ref.family, 0, ref.size, paged.page);
+    if (outlineFamilyMap().has(ref.family)) {
+      const face = getFont(paged.family, size);
+      if (!face || face.outline) return outlineStrike(ref.family, 0, ref.size, paged.page);
+      return face.pages?.get(paged.page) ?? null;
+    }
+    return getFont(paged.family, size)?.pages?.get(paged.page) ?? null;
   }
   const ref = resolveFaceRef(name, size);
   if (bakedMap().has(ref.family) || pendingBakedMap().has(ref.family)) {

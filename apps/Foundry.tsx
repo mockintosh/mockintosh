@@ -13,11 +13,11 @@ import {
   MAX_BAKE_SIZE,
   MIN_BAKE_SIZE,
   clampBakeSize,
-  decodeDeckerFont,
+  decodeFont,
   decodeSuitcase,
   deckerFontFromDraft,
   draftFromDeckerFont,
-  encodeDeckerFont,
+  encodeFont,
   encodeSuitcase,
   familyKey,
   isFontType,
@@ -182,7 +182,7 @@ function Foundry(props: FoundryProps): JSX.Element {
           const first = opened.strikes[0];
           setSourceBytes(null);
           setSize(first.size);
-          applyDraft(draftFromDeckerFont(decodeDeckerFont(first.data, opened.family), opened.family, first.size));
+          applyDraft(draftFromDeckerFont(decodeFont(first.data, opened.family), opened.family, first.size));
         }
         setDirty(false);
         setError("");
@@ -198,7 +198,7 @@ function Foundry(props: FoundryProps): JSX.Element {
         return;
       }
       try {
-        const font = decodeDeckerFont(text, family());
+        const font = decodeFont(text, family());
         const next = draftFromDeckerFont(font, sanitizeOpenName(file.name), font.size ?? font.glyphHeight);
         setSourceBytes(null);
         setSize(next.size);
@@ -285,7 +285,7 @@ function Foundry(props: FoundryProps): JSX.Element {
   async function installStrike(): Promise<void> {
     const d = currentDraft();
     if (!d) return;
-    const packed = encodeDeckerFont(deckerFontFromDraft(d));
+    const packed = encodeFont(deckerFontFromDraft(d));
     app.fonts.register(d.family, packed, d.size);
     await app.os.showDialog({
       message: `Installed “${d.family}” ${d.size} for this session.`,
@@ -301,7 +301,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     if (!s) return null;
     s = { ...s, family: family() || s.family };
     if (d && (dirty() || s.outlines.length === 0)) {
-      s = withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeDeckerFont(deckerFontFromDraft(d)));
+      s = withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeFont(deckerFontFromDraft(d)));
     }
     return s;
   }
@@ -310,7 +310,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     const d = currentDraft();
     const s = currentSuitcase();
     if (!d || !s) return;
-    setSuitcase(withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeDeckerFont(deckerFontFromDraft(d))));
+    setSuitcase(withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeFont(deckerFontFromDraft(d))));
     setDirty(false);
   }
 
@@ -382,7 +382,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     const d = currentDraft();
     const desktop = app.fs.locate("desktop");
     if (!d || !desktop) return;
-    const packed = encodeDeckerFont(deckerFontFromDraft(d));
+    const packed = encodeFont(deckerFontFromDraft(d));
     const name = uniqueChildName(app.fs, desktop.id, fitNameWithSuffix(d.family, `-${d.size}.fnt`));
     await app.fs.writeFile(desktop.id, name, packed, { type: MIME.deckerFont });
     setDirty(false);

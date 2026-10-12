@@ -3,12 +3,13 @@
  * a FOND with its `'NFNT'` strikes and `'sfnt'` outlines.
  *
  * On disk a suitcase is JSON (`.suit`): hand-tuned bitmap strikes as
- * `%%FNT1` records, outlines as base64 TrueType / OpenType bytes, both
+ * font records (`codec.ts`), outlines as base64 TrueType / OpenType bytes, both
  * tagged with their style (1 bold, 2 italic), plus the family's scaler
  * switches. Installing registers everything with the Font Manager.
  */
 
 import { decodeBase64, encodeBase64 } from "../base64";
+import { isFontRecord } from "./codec";
 import type { FamilyScalerSettings } from "./outlineStrike";
 import { familyKey, registerFont, registerOutlineFace, registerStyledStrike } from "./registry";
 import { OutlineFace } from "./truetype/scaler";
@@ -23,7 +24,7 @@ export interface SuitcaseStrike {
   size: number;
   /** 0 plain, 1 bold, 2 italic, 3 bold italic. */
   style: number;
-  /** `%%FNT1` record. */
+  /** Font record (`%%MFN1`, or a Decker `%%FNT1`). */
   data: string;
 }
 
@@ -73,7 +74,7 @@ export function decodeSuitcase(text: string): FontSuitcase {
     throw new Error("This isn't a font suitcase.");
   }
   const strikes = (json.strikes ?? []).filter(
-    (s) => typeof s?.data === "string" && s.data.startsWith("%%FNT") && Number.isFinite(s.size),
+    (s) => typeof s?.data === "string" && isFontRecord(s.data) && Number.isFinite(s.size),
   );
   const outlines = (json.outlines ?? [])
     .filter((o) => typeof o?.data === "string")

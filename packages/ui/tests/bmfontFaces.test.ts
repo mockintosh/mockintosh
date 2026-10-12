@@ -8,15 +8,15 @@ import {
   onFontsChanged,
   requireFont,
 } from "../src/fonts/registry";
-import { charAdvance, ordinalForCharCode, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, glyphAdvance, glyphOriginX } from "../src/fonts/font";
+import { charAdvance, getGlyphPixel, getGlyphWidth, glyphAdvance, glyphOriginX, locateGlyph } from "../src/fonts/font";
 import { faceMetrics } from "../src/fonts/metrics";
 
 initBuiltinFonts();
 
 function ink(name: string, size: number, ch: string): number {
-  const font = requireFont(name, size);
-  const ord = getGlyphIndexForChar(font, ch);
-  expect(ord, `${name} ${size} has its own ${ch}`).toBe(ordinalForCharCode(ch.charCodeAt(0)));
+  const hit = locateGlyph(requireFont(name, size), ch.codePointAt(0)!);
+  expect(hit, `${name} ${size} has its own ${ch}`).toBeDefined();
+  const { font, ordinal: ord } = hit!;
   let n = 0;
   for (let y = 0; y < font.glyphHeight; y++)
     for (let x = 0; x < getGlyphWidth(font, ord); x++) if (getGlyphPixel(font, ord, x, y)) n++;

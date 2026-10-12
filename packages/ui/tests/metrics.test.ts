@@ -14,7 +14,6 @@ function emptyFont(glyphHeight: number): DeckerFont {
     glyphStride: glyphHeight,
     glyphWidths: new Uint8Array(256),
     glyphData: new Uint8Array(256 * glyphHeight),
-    sourceFormat: "FNT0",
   };
 }
 

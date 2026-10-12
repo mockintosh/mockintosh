@@ -41,7 +41,6 @@ export function smearDeckerFontBold(font: DeckerFont, name: string): DeckerFont 
     glyphWidths,
     glyphData,
     ...carryAdvances(font, glyphWidths),
-    sourceFormat: "FNT1",
     outlinePad: font.outlinePad,
     shadowPad: font.shadowPad,
   };

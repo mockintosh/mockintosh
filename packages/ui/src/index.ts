@@ -140,10 +140,10 @@ export {
   SUITCASE_ITALIC,
 } from "./fonts/suitcase";
 export type { FontSuitcase, SuitcaseStrike, SuitcaseOutline } from "./fonts/suitcase";
-export { encodeDeckerFont, decodeDeckerFont } from "./fonts/codec";
+export { encodeFont, decodeFont } from "./fonts/codec";
 export { deckerFontFromDraft, draftFromDeckerFont } from "./fonts/draft";
 export type { FontStrikeDraft, FontStrikeGlyph } from "./fonts/draft";
-export { DROM_CHARS, deckerOrdinalForCharCode, defaultRasterCharset } from "./fonts/drom";
+export { MISSING_SLOT, charForSlot, codePointForSlot, macRomanCharset, slotForCodePoint } from "./fonts/charmap";
 export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar, glyphAdvance, glyphOriginX } from "./fonts/font";
 export type { DeckerFont } from "./fonts/font";
 export { resolveFont, fontStyleFromProps, fontFromProps, textFace } from "./fonts/style";

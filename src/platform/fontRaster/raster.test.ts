@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeDeckerFont, encodeDeckerFont, listFontFamilies, registerFont } from "@mockintosh/sdk";
+import { decodeFont, encodeFont, listFontFamilies, registerFont } from "@mockintosh/sdk";
 import { OutlineFace, deckerFontFromDraft, draftFromDeckerFont } from "@mockintosh/ui";
 import { createOutlineFontRasterService } from "./service";
 import { rasterizeWithScaler } from "./raster";
@@ -18,7 +18,7 @@ describe("tiny TrueType fixture", () => {
 });
 
 describe("baking strikes", () => {
-  it("produces a strike whose A has ink and packs as %%FNT1", () => {
+  it("produces a strike whose A has ink and packs as %%MFN1", () => {
     const draft = rasterizeWithScaler(buildTinyTtf(), { size: 36, mode: "auto", threshold: 96, spacing: 1, chars: " A" });
     expect(draft.family).toBe("tiny");
     expect(draft.size).toBe(36);
@@ -29,9 +29,9 @@ describe("baking strikes", () => {
     expect(letterA.width).toBeGreaterThan(0);
     expect(letterA.pixels.some((p) => p === 1)).toBe(true);
 
-    const packed = encodeDeckerFont(deckerFontFromDraft(draft));
-    expect(packed.startsWith("%%FNT1")).toBe(true);
-    const again = draftFromDeckerFont(decodeDeckerFont(packed, draft.family), draft.family, draft.size).glyphs.find(
+    const packed = encodeFont(deckerFontFromDraft(draft));
+    expect(packed.startsWith("%%MFN1")).toBe(true);
+    const again = draftFromDeckerFont(decodeFont(packed, draft.family), draft.family, draft.size).glyphs.find(
       (g) => g.ordinal === 65,
     )!;
     expect(again.width).toBe(letterA.width);
@@ -40,7 +40,7 @@ describe("baking strikes", () => {
 
   it("registers the packed strike on the SDK font list", () => {
     const draft = rasterizeWithScaler(buildTinyTtf(), { size: 24, mode: "auto", threshold: 96, spacing: 0, chars: "A" });
-    registerFont(draft.family, encodeDeckerFont(deckerFontFromDraft(draft)), draft.size);
+    registerFont(draft.family, encodeFont(deckerFontFromDraft(draft)), draft.size);
     expect(listFontFamilies().find((f) => f.name === draft.family)?.sizes).toContain(24);
   });
 

@@ -10,14 +10,14 @@ import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { smearDeckerFontBold } from "../packages/ui/src/fonts/boldSmear";
-import { decodeDeckerFont, encodeDeckerFont } from "../packages/ui/src/fonts/codec";
+import { decodeFont, encodeFont } from "../packages/ui/src/fonts/codec";
 import { BUILTIN_FONT_BODY } from "../packages/ui/src/fonts/data";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outPath = resolve(root, "packages/ui/src/fonts/faces/bodyBold.ts");
 
-const bold = smearDeckerFontBold(decodeDeckerFont(BUILTIN_FONT_BODY, "body"), "bodyBold");
-const record = encodeDeckerFont(bold);
+const bold = smearDeckerFontBold(decodeFont(BUILTIN_FONT_BODY, "body"), "bodyBold");
+const record = encodeFont(bold);
 const escaped = record.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 writeFileSync(

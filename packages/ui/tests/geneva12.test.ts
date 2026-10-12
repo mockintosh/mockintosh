@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { smearDeckerFontBold } from "../src/fonts/boldSmear";
-import { decodeDeckerFont } from "../src/fonts/codec";
+import { decodeFont } from "../src/fonts/codec";
 import { getGlyphPixel, getGlyphWidth, hasGlyph } from "../src/fonts/font";
 import { initBuiltinFonts, listFontSizes, requireFont } from "../src/fonts/registry";
 import { measureText } from "../src/fonts/bridge";
@@ -86,7 +86,7 @@ describe("geneva12Bold (FONT 396 Font Manager smear)", () => {
 
   it("matches a fresh smear of the vendored geneva12 face", () => {
     const expected = smearDeckerFontBold(
-      decodeDeckerFont(BUILTIN_FONT_GENEVA_12, "geneva12"),
+      decodeFont(BUILTIN_FONT_GENEVA_12, "geneva12"),
       "geneva12Bold",
     );
     const actual = requireFont("geneva12Bold");

@@ -109,11 +109,17 @@ export function resolveFont(name: string = "body", style: FontStyle = {}, size?:
   const cached = byStyle.get(bits);
   if (cached) return cached;
 
-  let next = base;
-  if (style.bold) next = smearDeckerFontBold(next, base.name);
-  if (style.italic) next = widenDeckerAdvance(next, 1, base.name);
-  if (style.outline || style.shadow) next = outlineDeckerFont(next, base.name);
-  if (style.shadow) next = padDeckerShadow(next, base.name);
+  const restyle = (strike: DeckerFont): DeckerFont => {
+    let next = strike;
+    if (style.bold) next = smearDeckerFontBold(next, base.name);
+    if (style.italic) next = widenDeckerAdvance(next, 1, base.name);
+    if (style.outline || style.shadow) next = outlineDeckerFont(next, base.name);
+    if (style.shadow) next = padDeckerShadow(next, base.name);
+    return next;
+  };
+  const next = restyle(base);
+  // A bitmap face's other pages take the same style, so measuring matches drawing.
+  if (base.pages) next.pages = new Map([...base.pages].map(([page, strike]) => [page, restyle(strike)]));
   byStyle.set(bits, next);
   return next;
 }
@@ -154,7 +160,6 @@ export function widenDeckerAdvance(font: DeckerFont, extra: number, name: string
     glyphWidths,
     glyphData,
     ...carryAdvances(font, glyphWidths),
-    sourceFormat: "FNT1",
     outlinePad: font.outlinePad,
     shadowPad: font.shadowPad,
   };

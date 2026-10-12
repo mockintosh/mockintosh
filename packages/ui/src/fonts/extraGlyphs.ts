@@ -1,20 +1,14 @@
 /**
- * Mockintosh-specific symbol glyphs that the vendored Decker fonts lack.
+ * Symbol glyphs Mockintosh draws into fonts that lack them: ⌘ and ✓ where
+ * Apple's own strike has none, ⇧ and ⌥ which System 7 fonts never had.
  *
- * The fonts in `data.ts` are regenerated from Decker and must never be hand-edited, so
- * extra glyphs are described here as readable pixel art and patched into each decoded
- * font at registration time (see `registry.ts`).
- *
- * Ordinals: Decker uses 10, 32–126 and 127 + index into `DROM_CHARS` (currently up to
- * 240); 255 means "missing". Mockintosh symbols live in the free range above Decker's,
- * starting at `EXTRA_ORDINAL_BASE`, so vendored fonts stay compatible.
+ * The generated faces must never be hand-edited, so the drawings live here
+ * as readable pixel art and are patched into each decoded font at
+ * registration time (see `registry.ts`), each at its character's slot
+ * (`charmap.ts`). A glyph the font already draws is left alone.
  */
+import { MISSING_SLOT, slotForCodePoint } from "./charmap";
 import type { DeckerFont } from "./font";
-
-/** First ordinal reserved for Mockintosh symbols (must stay above Decker's `DROM_CHARS`). */
-export const EXTRA_ORDINAL_BASE = 241;
-/** Ordinal 255 is Decker's "missing glyph" marker and must never be assigned. */
-const MAX_ASSIGNABLE_ORDINAL = 254;
 
 /**
  * A glyph as pixel art: one string per row, `#` = ink, anything else = paper.
@@ -42,10 +36,7 @@ export const BULLET = "\u2022";
 export const SHIFT_KEY = "\u21E7";
 export const OPTION_KEY = "\u2325";
 
-/**
- * The single source of truth for Mockintosh symbols. Order matters: the ordinal is
- * `EXTRA_ORDINAL_BASE + index`, so only append to this list.
- */
+/** The single source of truth for Mockintosh symbols. */
 export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
   {
     char: COMMAND_KEY,
@@ -318,26 +309,15 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
   },
 ];
 
-if (EXTRA_ORDINAL_BASE + EXTRA_GLYPHS.length - 1 > MAX_ASSIGNABLE_ORDINAL) {
-  throw new Error("Too many extra glyphs: ordinals would reach Decker's missing-glyph marker");
-}
-
-const extraOrdinalByCodeUnit = new Map<number, number>();
-EXTRA_GLYPHS.forEach((def, index) => {
-  if (def.char.length !== 1) {
-    throw new Error(`Extra glyph "${def.name}" must be a single UTF-16 code unit`);
+for (const def of EXTRA_GLYPHS) {
+  if (def.char.length !== 1 || slotForCodePoint(def.char.charCodeAt(0)) < 0) {
+    throw new Error(`Extra glyph "${def.name}" needs a page-0 slot in charmap.ts`);
   }
-  extraOrdinalByCodeUnit.set(def.char.charCodeAt(0), EXTRA_ORDINAL_BASE + index);
-});
-
-/** The symbol at a Mockintosh ordinal, or `undefined` outside the extra range. */
-export function extraCharForOrdinal(ordinal: number): string | undefined {
-  return EXTRA_GLYPHS[ordinal - EXTRA_ORDINAL_BASE]?.char;
 }
 
-/** Ordinal for a Mockintosh symbol, or `undefined` if the code unit isn't one. */
-export function extraOrdinalForCharCode(codeUnit: number): number | undefined {
-  return extraOrdinalByCodeUnit.get(codeUnit);
+/** Page-0 slot of a Mockintosh symbol. */
+export function extraGlyphSlot(def: ExtraGlyphDefinition): number {
+  return slotForCodePoint(def.char.charCodeAt(0));
 }
 
 /** Whether a drawing fits inside the font's glyph cell without widening `maxWidth`. */
@@ -371,7 +351,7 @@ export function writePixelGlyph(font: DeckerFont, ordinal: number, glyph: PixelG
     if (row.length !== width) {
       throw new Error(`Glyph ${ordinal} for font "${font.name}": row ${r} has ragged width`);
     }
-    const rowOffset = base + (glyph.top + r) * byteWidth;
+    const rowOffset = base + (glyph.top + r + (font.inkAbove ?? 0)) * byteWidth;
     for (let x = 0; x < width; x++) {
       if (row[x] === "#") {
         font.glyphData[rowOffset + (x >> 3)] |= 1 << (7 - (x & 7));
@@ -379,14 +359,17 @@ export function writePixelGlyph(font: DeckerFont, ordinal: number, glyph: PixelG
     }
   });
   font.glyphWidths[ordinal] = width;
+  if (font.advances) font.advances[ordinal] = width;
+  if (font.originX) font.originX[ordinal] = 0;
 }
 
 /**
- * Patch every extra glyph that has a drawing for `font.name` into the font.
- * Symbols without a drawing for this font — or whose drawing doesn't fit the cell, which can
- * happen when a custom font is registered under a built-in name with a smaller cell — are
- * left empty, so `font.ts` falls back to `?`. `extraGlyphs.test.ts` asserts every built-in
- * font actually receives every symbol.
+ * Patch every extra glyph that has a drawing for `font.name` into the font,
+ * where the font doesn't already draw that character. Symbols without a
+ * drawing — or whose drawing doesn't fit the cell, which can happen when a
+ * custom font is registered under a built-in name with a smaller cell —
+ * are left empty, so `font.ts` falls back to the missing-character box.
+ * `extraGlyphs.test.ts` asserts every built-in font draws every symbol.
  */
 const EXTRA_FACE_ALIASES: Readonly<Record<string, string>> = {
   "geneva/9": "body",
@@ -408,11 +391,37 @@ function extraGlyphLookupKeys(font: DeckerFont): string[] {
 
 export function applyExtraGlyphs(font: DeckerFont): DeckerFont {
   const keys = extraGlyphLookupKeys(font);
-  EXTRA_GLYPHS.forEach((def, index) => {
+  for (const def of EXTRA_GLYPHS) {
+    const slot = extraGlyphSlot(def);
+    if (font.glyphWidths[slot]) continue;
     const glyph = keys.map((key) => def.perFont[key]).find((drawing) => drawing != null);
-    if (glyph && pixelGlyphFitsFont(font, glyph)) {
-      writePixelGlyph(font, EXTRA_ORDINAL_BASE + index, glyph);
+    if (glyph && pixelGlyphFitsFont(font, glyph)) writePixelGlyph(font, slot, glyph);
+  }
+  return font;
+}
+
+/**
+ * Give a face a missing-character box when it has none, sized like Apple's
+ * (Geneva 9's is 5×7 on the baseline): what QuickDraw draws for a
+ * character the font lacks. `descent` places the baseline in the cell.
+ */
+export function ensureMissingGlyph(font: DeckerFont, descent: number): DeckerFont {
+  if (font.glyphWidths[MISSING_SLOT]) return font;
+  const baseline = font.glyphHeight - Math.max(0, Math.min(descent, font.glyphHeight - 1));
+  const height = Math.max(3, Math.min(baseline, Math.round(baseline * 0.7)));
+  const inkWidth = Math.max(3, Math.round(height * 0.7));
+  const width = Math.min(font.maxWidth, inkWidth + (font.spacing > 0 ? 0 : 1));
+  if (width < 3) return font;
+  const rows: string[] = [];
+  for (let r = 0; r < height; r++) {
+    const edge = r === 0 || r === height - 1;
+    let row = "";
+    for (let x = 0; x < width; x++) {
+      const ink = x < inkWidth && (edge ? true : x === 0 || x === inkWidth - 1);
+      row += ink ? "#" : ".";
     }
-  });
+    rows.push(row);
+  }
+  writePixelGlyph(font, MISSING_SLOT, { top: baseline - height, rows });
   return font;
 }

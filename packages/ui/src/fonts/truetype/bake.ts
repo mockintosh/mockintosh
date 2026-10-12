@@ -1,19 +1,19 @@
 /**
  * Bake a whole strike from an outline, the way ATM pre-rendered bitmaps:
- * every Decker ordinal the font can draw, packed as a `FontStrikeDraft`
+ * every page-0 slot the font can draw, packed as a `FontStrikeDraft`
  * that Foundry edits and saves as `%%FNT1`.
  */
 
-import { defaultRasterCharset, deckerOrdinalForCharCode } from "../drom";
+import { macRomanCharset, slotForCodePoint } from "../charmap";
 import type { FontStrikeDraft, FontStrikeGlyph } from "../draft";
 import { familyKey } from "../registry";
 import { DEFAULT_SCALER_OPTIONS, OutlineFace, type ScalerOptions } from "./scaler";
 
 export interface BakeOptions extends Partial<ScalerOptions> {
   size: number;
-  /** Extra columns after every glyph (Decker `spacing`). */
+  /** Extra columns after every glyph (`spacing`). */
   spacing?: number;
-  /** Characters to bake; defaults to ASCII plus Decker's extras. */
+  /** Characters to bake; defaults to Mac OS Roman. */
   chars?: string;
 }
 
@@ -30,11 +30,11 @@ export function bakeOutlineStrike(source: Uint8Array | OutlineFace, options: Bak
   const size = clampBakeSize(options.size);
   const metrics = face.metrics(size);
   const wanted: { cp: number; ordinal: number; gid: number }[] = [];
-  for (const ch of options.chars ?? defaultRasterCharset()) {
+  for (const ch of options.chars ?? macRomanCharset()) {
     const cp = ch.codePointAt(0);
     if (cp === undefined || cp > 0xffff) continue;
-    const ordinal = deckerOrdinalForCharCode(cp);
-    if (ordinal === 255) continue;
+    const ordinal = slotForCodePoint(cp);
+    if (ordinal < 0) continue;
     const gid = face.font.glyphId(cp);
     if (gid || cp === 32) wanted.push({ cp, ordinal, gid });
   }

@@ -64,7 +64,6 @@ export function outlineDeckerFont(font: DeckerFont, name: string): DeckerFont {
     glyphWidths,
     glyphData,
     ...carryAdvances(font, glyphWidths),
-    sourceFormat: "FNT1",
     outlinePad: pad,
     shadowPad: font.shadowPad,
   };
@@ -108,7 +107,6 @@ export function padDeckerShadow(font: DeckerFont, name: string): DeckerFont {
     glyphWidths,
     glyphData,
     ...carryAdvances(font, glyphWidths),
-    sourceFormat: "FNT1",
     outlinePad: font.outlinePad,
     shadowPad: (font.shadowPad ?? 0) + pad,
   };

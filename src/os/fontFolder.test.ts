@@ -3,7 +3,7 @@ import { FileSystem, InMemoryBackend, MIME, ROOT_ID } from "@mockintosh/fs";
 import {
   decodeSuitcase,
   deckerFontFromDraft,
-  encodeDeckerFont,
+  encodeFont,
   encodeSuitcase,
   getFont,
   listFontFamilies,
@@ -20,7 +20,7 @@ async function bootedFS() {
 }
 
 function strike(size: number): string {
-  return encodeDeckerFont(
+  return encodeFont(
     deckerFontFromDraft({
       family: "x",
       size,

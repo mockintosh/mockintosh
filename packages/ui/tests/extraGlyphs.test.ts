@@ -1,5 +1,5 @@
 /**
- * Extra symbol glyphs (⌘ ✓ •) patched into the vendored Decker fonts at registration time.
+ * Extra symbol glyphs (⌘ ✓ •) patched into fonts that lack them at registration time.
  */
 
 import { describe, it, expect } from "vitest";
@@ -8,12 +8,11 @@ import {
   CHECK_MARK,
   COMMAND_KEY,
   EXTRA_GLYPHS,
-  EXTRA_ORDINAL_BASE,
   applyExtraGlyphs,
-  extraOrdinalForCharCode,
+  extraGlyphSlot,
   writePixelGlyph,
 } from "../src/fonts/extraGlyphs";
-import { deckerOrdinalForCharCode } from "../src/fonts/drom";
+import { MISSING_SLOT, slotForCodePoint } from "../src/fonts/charmap";
 import {
   getGlyphIndexForChar,
   getGlyphPixel,
@@ -47,38 +46,27 @@ function syntheticFont(name: string, maxWidth: number, glyphHeight: number): Dec
     glyphStride,
     glyphWidths: new Uint8Array(256),
     glyphData: new Uint8Array(256 * glyphStride),
-    sourceFormat: "FNT1",
   };
 }
 
-describe("extra glyph ordinal mapping", () => {
-  it("assigns each symbol a non-fallback ordinal above Decker's range and below 255", () => {
-    for (const ch of SYMBOLS) {
-      const cu = ch.charCodeAt(0);
-      expect(deckerOrdinalForCharCode(cu)).toBe(255);
-      const ord = ordinalForCharCode(cu);
-      expect(ord).not.toBe(255);
-      expect(ord).toBeGreaterThanOrEqual(EXTRA_ORDINAL_BASE);
-      expect(ord).toBeLessThanOrEqual(254);
-      expect(extraOrdinalForCharCode(cu)).toBe(ord);
-    }
+describe("page-0 slots", () => {
+  it("puts the menu symbols where Chicago keeps them and • at Mac OS Roman 0xA5", () => {
+    expect(slotForCodePoint(COMMAND_KEY.charCodeAt(0))).toBe(0x11);
+    expect(slotForCodePoint(CHECK_MARK.charCodeAt(0))).toBe(0x12);
+    expect(slotForCodePoint(BULLET.charCodeAt(0))).toBe(0xa5);
+    for (const def of EXTRA_GLYPHS) expect(extraGlyphSlot(def)).toBe(slotForCodePoint(def.char.charCodeAt(0)));
   });
 
-  it("does not collide with Decker's DROM_CHARS ordinals", () => {
-    // Highest Decker ordinal: 127 + index of the last DROM char (currently '°').
-    const highestDecker = deckerOrdinalForCharCode("\u00b0".charCodeAt(0));
-    expect(highestDecker).not.toBe(255);
-    expect(EXTRA_ORDINAL_BASE).toBeGreaterThan(highestDecker);
+  it("gives every symbol a distinct slot, none of them the missing glyph's", () => {
+    const slots = EXTRA_GLYPHS.map(extraGlyphSlot);
+    expect(new Set(slots).size).toBe(EXTRA_GLYPHS.length);
+    expect(slots).not.toContain(MISSING_SLOT);
   });
 
-  it("gives every symbol a distinct ordinal", () => {
-    const ords = EXTRA_GLYPHS.map((g) => extraOrdinalForCharCode(g.char.charCodeAt(0)));
-    expect(new Set(ords).size).toBe(EXTRA_GLYPHS.length);
-  });
-
-  it("leaves Decker's ASCII and extended mapping untouched", () => {
+  it("maps ASCII to itself and Mac OS Roman's upper half to its bytes", () => {
     expect(ordinalForCharCode("A".charCodeAt(0))).toBe(65);
-    expect(ordinalForCharCode("\u2026".charCodeAt(0))).toBe(127);
+    expect(ordinalForCharCode("\u2122".charCodeAt(0))).toBe(0xaa);
+    expect(ordinalForCharCode("\u2026".charCodeAt(0))).toBe(0xc9);
     expect(ordinalForCharCode("\u2603".charCodeAt(0))).toBe(255);
   });
 });
@@ -144,13 +132,20 @@ describe("writePixelGlyph / applyExtraGlyphs", () => {
     expect(() => writePixelGlyph(font, 200, { top: 0, rows: ["##", "#"] })).toThrow();
   });
 
-  it("skips symbols with no drawing for the font name, leaving them to the '?' fallback", () => {
+  it("skips symbols with no drawing for the font name, leaving them to the missing glyph", () => {
     const font = syntheticFont("custom", 8, 10);
     font.glyphWidths["?".charCodeAt(0)] = 3;
     applyExtraGlyphs(font);
-    for (const ch of SYMBOLS) {
-      expect(getGlyphIndexForChar(font, ch)).toBe("?".charCodeAt(0));
-    }
+    for (const ch of [COMMAND_KEY, CHECK_MARK]) expect(getGlyphIndexForChar(font, ch)).toBe("?".charCodeAt(0));
+    font.glyphWidths[MISSING_SLOT] = 4;
+    for (const ch of [COMMAND_KEY, CHECK_MARK]) expect(getGlyphIndexForChar(font, ch)).toBe(MISSING_SLOT);
+  });
+
+  it("leaves a glyph the font already draws alone", () => {
+    const font = syntheticFont("menu", 16, 13);
+    writePixelGlyph(font, 0x11, { top: 0, rows: ["#"] });
+    applyExtraGlyphs(font);
+    expect(getGlyphWidth(font, 0x11)).toBe(1);
   });
 
   it("applies drawings to a custom font registered under a built-in name when they fit", () => {
