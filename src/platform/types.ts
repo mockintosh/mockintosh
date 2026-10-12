@@ -155,6 +155,8 @@ export interface SignInRelay {
 
 /** A Mockintosh Computer Club member, as this computer is signed in. */
 export interface ClubMember {
+  /** The Club's id for the member: stable across renames, and their home disk's owner. */
+  id: string;
   name: string;
   email: string;
   /** When they joined, in milliseconds since the epoch. */

@@ -527,6 +527,8 @@ const take = decodeWav((await app.storage.readBytes("take.wav"))!);
 
 `useApp().fs` is the user's file system — the same one the Finder shows. Catalog reads are reactive (call them inside `createMemo` or the `compute` half of `createEffect` and they re-run when that folder changes); bodies are read with `readText`/`readBytes`/`readJSON`.
 
+While someone is signed in to the Computer Club, their own disk (named after them) is mounted next to Mockintosh HD, and `fs.locate("desktop")`, `"pictures"` and `"documents"` find its folders first. So saving to the role you located puts the file on their disk without your app knowing about disks. To read everything on the desktop, list each mounted disk's Desktop Folder: `fs.volumes().map((v) => fs.locate("desktop", v.id))`. A disk ejected when they sign out, and everything on it, reads as absent: an id you kept for something on it stops resolving until they sign in again.
+
 ```tsx
 import { useApp, MIME, createMemo, For } from "@mockintosh/sdk";
 

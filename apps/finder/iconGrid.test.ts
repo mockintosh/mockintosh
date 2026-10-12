@@ -61,6 +61,19 @@ describe("desktop grid", () => {
     expect(arrangeIcons(icons, grid).placed.get("new")).toEqual({ x: 440, y: 264 });
   });
 
+  it("moves an icon whose place another disk's icon took, and leaves one disk's icons stacked", () => {
+    const icons: GridIcon[] = [
+      { id: "guest", position: { x: 440, y: 72 }, group: "hd" },
+      { id: "stacked", position: { x: 440, y: 72 }, group: "hd" },
+      { id: "returning", position: { x: 440, y: 72 }, group: "home" },
+    ];
+    const { positions, placed } = arrangeIcons(icons, grid);
+    expect(positions.get("guest")).toEqual({ x: 440, y: 72 });
+    expect(positions.get("stacked")).toEqual({ x: 440, y: 72 });
+    expect(placed).toEqual(new Map([["returning", positions.get("returning")!]]));
+    expect(positions.get("returning")).not.toEqual({ x: 440, y: 72 });
+  });
+
   it("draws an icon left off a smaller screen on screen, without forgetting where it was saved", () => {
     const { positions, placed } = arrangeIcons([{ id: "far", position: { x: 900, y: 500 } }], grid);
     expect(positions.get("far")).toEqual({ x: 440, y: 264 });

@@ -51,4 +51,25 @@ describe("the process's file system mirror", () => {
     expect(notify).toHaveBeenCalledWith("fs.rename", "docs", "Papers");
     expect(notify).toHaveBeenCalledWith("fs.move", "docs", "desk");
   });
+
+  it("finds a role on the member's home disk first, and keeps the startup disk as the volume", () => {
+    const notify = vi.fn();
+    const mirror = createFsMirror(async () => null, notify);
+    mirror.update({
+      rootId: "root",
+      nodes: [
+        dir("root", null, ""),
+        dir("home", "root", "Ada", { role: "volume", home: "member-1" } as Partial<FSNode>),
+        dir("homeDesk", "home", "Desktop Folder", { role: "desktop" }),
+        dir("hd", "root", "Mockintosh HD", { role: "volume" }),
+        dir("desk", "hd", "Desktop Folder", { role: "desktop" }),
+        dir("prefs", "hd", "Preferences", { role: "preferences" }),
+      ],
+    });
+    flush();
+    expect(mirror.fs.volumes().map((v) => v.id)).toEqual(["hd", "home"]);
+    expect(mirror.fs.locate("volume")?.id).toBe("hd");
+    expect(mirror.fs.locate("desktop")?.id).toBe("homeDesk");
+    expect(mirror.fs.locate("preferences")?.id).toBe("prefs");
+  });
 });

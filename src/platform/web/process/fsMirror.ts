@@ -9,7 +9,7 @@
  */
 import { createSignal } from "solid-js";
 import type { AppFileSystem } from "@mockintosh/sdk";
-import { FSError, ROOT_ID, assertNewNameFits, type FSDirectory, type FSFile, type FSNode, type MkdirOptions, type NodeRole } from "@mockintosh/fs";
+import { FSError, ROOT_ID, assertNewNameFits, mountedVolumes, roleSearchOrder, type FSDirectory, type FSFile, type FSNode, type MkdirOptions, type NodeRole } from "@mockintosh/fs";
 import type { FsSnapshot } from "../../../os/process/protocol";
 
 type Call = (method: string, args: unknown[]) => Promise<unknown>;
@@ -75,11 +75,9 @@ export function createFsMirror(call: Call, notify: Notify): FsMirror {
     });
   };
   const child = (dirId: string, name: string): FSNode | undefined => children(dirId).find((n) => n.name === name);
-  /** The user's disks first (the startup volume leads), then mounted locked ones, as `FileSystem.volumes`. */
-  const volumes = (): FSDirectory[] => {
-    const all = children(index().rootId).filter((n): n is FSDirectory => n.kind === "directory");
-    return [...all.filter((v) => !v.locked), ...all.filter((v) => v.locked)];
-  };
+  // The host leaves ejected volumes out of its snapshot; the order is the host's too.
+  const volumes = (): FSDirectory[] =>
+    mountedVolumes(children(index().rootId).filter((n): n is FSDirectory => n.kind === "directory"));
   const volumeOf = (id: string): FSDirectory | undefined => {
     const idx = index();
     let current = idx.nodes.get(id);
@@ -154,7 +152,7 @@ export function createFsMirror(call: Call, notify: Notify): FsMirror {
     locate(role: NodeRole, volumeId?: string): FSDirectory | undefined {
       if (role === "root") return directory(index().rootId);
       if (role === "volume") return volumeId ? directory(volumeId) : volumes()[0];
-      const scope = volumeId ? [volumeId] : volumes().map((v) => v.id);
+      const scope = volumeId ? [volumeId] : roleSearchOrder(volumes()).map((v) => v.id);
       for (const vid of scope) {
         for (const n of index().nodes.values()) {
           if (n.kind === "directory" && n.role === role && volumeOf(n.id)?.id === vid) return n;

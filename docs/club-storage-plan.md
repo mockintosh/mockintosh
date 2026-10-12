@@ -1,6 +1,6 @@
 # Your disk in the Computer Club: synced storage
 
-Plan, 12 October 2026. Nothing here is built yet. Companion to the [Computer Club plan](computer-club-plan.md), which covers accounts, credits and connecting Macs.
+Plan, 12 October 2026. Phase 1 (your disk, locally) is built; see [What's built](#whats-built-phase-1). Companion to the [Computer Club plan](computer-club-plan.md), which covers accounts, credits and connecting Macs.
 
 ## Context
 
@@ -16,7 +16,21 @@ The question was whether to save everything or to sync a chosen part, iCloud-sty
 - **While you're signed in, the desktop means *your* desktop.** Anything dropped on the desktop, and any new desktop file (a screenshot), goes to your disk, even from a window on Mockintosh HD. This departs from System 7, where a file kept to its own disk, because otherwise people would lose files they assumed were syncing.
 - **New files default to your disk:** Save dialogs, Photo Booth, MacPaint, screenshots.
 - **Signed out, nothing changes from today.** A guest, or a Mockintosh with no Club, has one disk, Mockintosh HD.
-- **Joining moves the guest's things to your disk**, with Move selected; signing in to an existing account on a Mac with guest files asks first, with Keep selected (see [From guest to member](#from-guest-to-member)).
+- **Joining moves the guest's things to your disk**, with Move selected; signing in to an existing account on a Mac with guest files asks first, with Don't Move selected (see [From guest to member](#from-guest-to-member)).
+
+## What's built (phase 1)
+
+- **Home disks in the file system** (`packages/fs`). A volume node can carry `home` (the member's Club id) and `ejected`. Your disk lives in the same catalog and OPFS storage as Mockintosh HD; there is no second backend yet.
+  - `volumes()` lists mounted disks, startup disk first; `locate(role)` searches a mounted home disk first, so Desktop Folder, Pictures and Documents resolve to it, and roles it lacks (System Folder, Preferences, Applications, Fonts) to Mockintosh HD. `locate("volume")` stays the startup disk. The order lives in `packages/fs/src/volumes.ts`, shared with app processes' mirror (`src/platform/web/process/fsMirror.ts`).
+  - An ejected disk and everything on it read as absent (`node`, `children`, writes), with a fast path when nothing is ejected; app processes' snapshots leave it out.
+  - `mountHome(member, name)` creates or remounts the disk; `eject(id)` ejects it.
+- **The member's disk** (`src/os/home.ts`, started from `src/os/boot.ts`). It follows `os.club.member`: mounted with its Desktop Folder, Trash, Documents and Pictures on sign-in; ejected on sign-out, and Finder windows on it close. While the Club is unreachable (`os.club.offline`) the disk stays as it was. Members now have an `id` (`ClubMember.id`), which names the disk's owner.
+- **The guest's files.** On mounting, desktop items other than app shortcuts and everything in Pictures on Mockintosh HD are offered once: a new account (made in the last hour, disk new to this Mac) gets **Move** as the default, an existing one **Don't Move**. Moving is one catalog change, since both disks share the Mac's storage: no copying and nothing to resume. Desktop positions travel with the files; a clash gets " (this Mac)". Later sign-ins ask only about files made since (`guestCheckedAt` on the disk).
+- **The Finder.** The desktop shows each disk's icon and Desktop Folder; an icon moved on the desktop stays on its own disk, and anything else dropped there goes to your disk. One Trash icon (Mockintosh HD's) shows every disk's Trash: its window lists them together, trashing sends each item to its own disk's Trash, the full icon and Empty Trash cover them all. A home disk gives up its desktop place when it ejects, and an icon whose saved place another disk's icon took while it was away moves to the nearest free place (`GridIcon.group`).
+- **Apps.** New files from screenshots, Photo Booth, MacPaint, imports and the rest go to your disk through `locate`. Photo Booth and TP7 use a remembered library only if it's on that disk. App Store installs and their shortcuts stay on Mockintosh HD (phase 3 moves them).
+- **Tests:** `src/os/fs.test.ts` (home disks), `src/os/home.test.ts`, `apps/finder/iconGrid.test.ts`, `src/platform/web/process/fsMirror.test.ts`.
+
+Phase 2 syncs the home disk's subtree out of the shared catalog; giving it a storage folder of its own can wait until there is a reason.
 
 ## What is on a disk today
 
@@ -64,15 +78,14 @@ A heavy member (200 pictures, 30 paintings, three projects with ten builds each)
 
 **Joining on this Mac.** The new disk is empty and the guest's things are almost certainly the new member's. The Club window offers, with Move selected:
 
-> Move your desktop, documents and pictures to Gustav? They'll be on every Mac you sign in to. [Keep on This Mac] [Move]
+> Move the 3 items you made before joining to your disk "Gustav"? They're on the desktop and in Pictures on Mockintosh HD. [Don't Move] [Move]
 
-1. **Copy, then remove.** Each item is copied to your disk's local copy, then removed from Mockintosh HD once the copy is saved. It's the same file at the same position, so nothing on the screen moves.
-2. **Upload in the background.** The Club window shows progress ("Uploading 12 of 40"); moving doesn't wait for the network.
-3. **What moves:** desktop items the guest made, Documents, Pictures, Projects (source, not build output), added fonts, app settings that follow you, and App Store install manifests. **What stays:** the built-in shortcuts and settings tied to this Mac.
-4. **Safe to interrupt.** The list of what's left to move is saved in Mockintosh HD's Preferences, so closing the tab mid-move resumes at the next boot. An item is never in neither place.
-5. **Over the quota:** whatever doesn't fit stays on Mockintosh HD, and the window lists it.
+1. **One move.** Both disks share the Mac's storage, so moving is a single catalog change: the same files at the same desktop positions, nothing on the screen jumps, and nothing to resume.
+2. **Upload in the background** (phase 2). The Club window shows progress ("Uploading 12 of 40"); moving doesn't wait for the network.
+3. **What moves:** desktop items the guest made and everything in Pictures. Phase 3 adds app settings that follow you and App Store installs. **What stays:** the Mac's app shortcuts and settings tied to this Mac.
+4. **Over the quota** (phase 2): whatever doesn't fit stays on Mockintosh HD, and the window lists it.
 
-**Signing in to an existing account on a Mac with guest files.** The guest files might be the member's from before signing in, or someone else's on a shared computer. The window asks, with Keep selected, and says how many items. Moving them:
+**Signing in to an existing account on a Mac with guest files.** The guest files might be the member's from before signing in, or someone else's on a shared computer. The window asks, with Don't Move selected, and says how many items. Moving them:
 - **Name clashes** get a suffix: "Untitled Painting (this Mac)".
 - **App settings** keep the account's version, the one in use elsewhere.
 
@@ -119,7 +132,7 @@ Storage is nearly free because 1-bit work is small. What costs money is write an
 
 ## Code
 
-- **`packages/fs`:** each disk gets its own backend. Mockintosh HD keeps OPFS; your disk's backend is a local OPFS copy (`mockintosh-fs/home-<member>/`) plus a sync engine that pushes and pulls rows. The catalog already has per-disk roles.
+- **`packages/fs`:** home disks share the catalog and storage with Mockintosh HD (phase 1). The sync engine (phase 2) pushes and pulls the rows of the home disk's subtree.
 - **The Finder** (`apps/Finder.solid.tsx`) shows the union of Desktop Folders and Trash folders, and routes desktop drops to your disk while signed in.
 - **`src/os/appStorage.ts`:** settings on your disk by default, with a "this Mac only" option.
 - **`src/os/fsBootstrap.ts`:** creating and repairing your disk's folders when it mounts.
@@ -129,7 +142,7 @@ Storage is nearly free because 1-bit work is small. What costs money is write an
 
 ## Phases
 
-1. **Your disk, locally.** Mount a second, local-only disk for the signed-in member: per-disk roles in the Finder, the merged Desktop and Trash, "my desktop" drops, new files defaulting to it, the guest-to-member move and its prompts. No network yet; this proves the interface on its own.
+1. **Your disk, locally** (built). Mount a second, local-only disk for the signed-in member: per-disk roles in the Finder, the merged Desktop and Trash, "my desktop" drops, new files defaulting to it, the guest-to-member move and its prompts. No network yet; this proves the interface on its own. Signing out already ejects the disk and keeps its contents on the Mac; phase 4 adds removing them.
 2. **Sync.** The Club's tables and endpoints, the push and pull engine, small files in rows and large ones in Blob, batching, conflict copies, the read-only gate for older versions, quota.
 3. **Settings that follow you.** App settings on your disk by default, the "this Mac only" option, App Store installs reappearing on other Macs.
 4. **Signing out and shared computers.** Unmount, keep or clear the cached copy, guest files at the next sign-in.
@@ -145,5 +158,5 @@ Storage is nearly free because 1-bit work is small. What costs money is write an
 
 ## Verification
 
-- **Unit tests:** the merged desktop and Trash across disks; "my desktop" drops from Mockintosh HD; the guest-to-member move resuming after an interruption; conflict copies from two Macs editing one file; tombstones; the read-only gate; quota refusals; dedupe of identical contents.
+- **Unit tests:** the merged desktop and Trash across disks; "my desktop" drops from Mockintosh HD; the guest-to-member move and its defaults; conflict copies from two Macs editing one file; tombstones; the read-only gate; quota refusals; dedupe of identical contents.
 - **End to end, locally,** with two browsers (two ports) against the local Club: join in one with guest files and move them; sign in to the other and see the same desktop; edit a file in both and get a conflict copy; sign out and in; clear one browser's site data and get everything back.

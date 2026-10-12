@@ -132,6 +132,8 @@ interface FinderIcon {
   isVolume?: boolean;
   position?: { x: number; y: number };
   zOrder: number;
+  /** On the desktop: the disk the icon comes from (see `GridIcon.group`). */
+  group?: string;
 }
 
 interface PositionedIcon {
@@ -417,12 +419,47 @@ function buildOutlineForItem(sprite: SpriteRef, title: string, cellW: number): G
 // FileSystem helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * The Trash icon's folder: the startup disk's, so the icon stays put when a
+ * home disk mounts. What the Trash holds is every mounted disk's Trash
+ * (`trashFolders`).
+ */
 function getTrashId(fs: FileSystem): string | undefined {
-  return fs.locate("trash")?.id;
+  return fs.locate("trash", fs.locate("volume")?.id)?.id;
 }
 
+/** Every mounted disk's Trash: the Trash window lists them together and Empty Trash empties them all. */
+function trashFolders(fs: FileSystem): string[] {
+  return fs.volumes().flatMap((v) => fs.locate("trash", v.id)?.id ?? []);
+}
+
+function isTrash(fs: FileSystem, id: string): boolean {
+  return fs.directory(id)?.role === "trash";
+}
+
+/** Whether `id` is a Desktop Folder of a mounted disk: an icon in it is already on the desktop. */
+function isDesktopFolder(fs: FileSystem, id: string | null): boolean {
+  return !!id && fs.directory(id)?.role === "desktop";
+}
+
+/**
+ * Where something put on the desktop goes: the home disk's Desktop Folder
+ * while a member is signed in ("my desktop"), else the startup disk's.
+ */
 function getDesktopFolderId(fs: FileSystem): string | undefined {
   return fs.locate("desktop")?.id;
+}
+
+/** Trash icons, each into its own disk's Trash, as on a Mac with several disks. */
+function placeInTrash(fs: FileSystem, placements: IconPlacement[]): void {
+  const fallback = getTrashId(fs);
+  const byTrash = new Map<string, IconPlacement[]>();
+  for (const p of placements) {
+    const volume = fs.volumeOf(p.nodeId);
+    const trash = (volume && fs.locate("trash", volume.id)?.id) ?? fallback;
+    if (trash) byTrash.set(trash, [...(byTrash.get(trash) ?? []), { ...p, position: undefined }]);
+  }
+  for (const [trash, list] of byTrash) placeIcons(fs, trash, list);
 }
 
 /**
@@ -505,33 +542,29 @@ function toFinderIcon(fs: FileSystem, node: FSNode, isVolume = false): FinderIco
  * doesn't list them.
  */
 function buildFolderIcons(fs: FileSystem, directoryId: string): FinderIcon[] {
-  return fs.children(directoryId)
+  const contents = isTrash(fs, directoryId) ? trashFolders(fs).flatMap((id) => fs.children(id)) : fs.children(directoryId);
+  return contents
     .filter((n) => n.kind !== "directory" || (n.role !== "trash" && n.role !== "desktop"))
     .map((n) => toFinderIcon(fs, n));
 }
 
+/**
+ * The desktop: each disk's icon and its Desktop Folder's contents, the
+ * startup disk (and the Trash) first, so a home disk's icons are the ones
+ * that make way when their places were taken while it was ejected.
+ */
 function buildDesktopIcons(fs: FileSystem): FinderIcon[] {
   const icons: FinderIcon[] = [];
-  const volumes = fs.volumes();
+  const trash = getTrashId(fs);
+  const trashNode = trash ? fs.directory(trash) : undefined;
 
-  for (const vol of volumes) icons.push(toFinderIcon(fs, vol, true));
-
-  for (const vol of volumes) {
+  for (const vol of fs.volumes()) {
+    const group = vol.id;
+    icons.push({ ...toFinderIcon(fs, vol, true), group });
     const desktop = fs.locate("desktop", vol.id);
-    if (!desktop) continue;
-    for (const node of fs.children(desktop.id)) icons.push(toFinderIcon(fs, node));
-  }
-
-  // Trash (if not already included)
-  const trashId = getTrashId(fs);
-  if (trashId && !icons.some((ic) => ic.nodeId === trashId)) {
-    for (const vol of volumes) {
-      const trash = fs.locate("trash", vol.id);
-      if (trash) {
-        icons.push(toFinderIcon(fs, trash));
-        break;
-      }
-    }
+    if (desktop) for (const node of fs.children(desktop.id)) icons.push({ ...toFinderIcon(fs, node), group });
+    // One Trash icon for every disk's Trash, on the startup disk.
+    if (trashNode && fs.volumeOf(trashNode.id)?.id === vol.id) icons.push({ ...toFinderIcon(fs, trashNode), group });
   }
 
   return icons;
@@ -550,7 +583,7 @@ function createIconLayout<G extends IconGrid>(
 ): { positions: Accessor<Map<string, IconPosition>>; cleanUp: () => void } {
   const layout = createMemo(() => {
     const list = icons();
-    const bare = list.map((icon): GridIcon => ({ id: icon.nodeId, position: icon.position }));
+    const bare = list.map((icon): GridIcon => ({ id: icon.nodeId, position: icon.position, group: icon.group }));
     const g = grid(bare);
     const gridIcons = list.map((icon, i): GridIcon => (icon.position ? bare[i] : { ...bare[i], home: home(icon, g) }));
     return { grid: g, ...arrangeIcons(gridIcons, g) };
@@ -679,7 +712,9 @@ export function handleGlobalMouseUp(
       { nodeId: drag.nodeId, position: undefined },
       ...drag.companions.map((c) => ({ nodeId: c.nodeId, position: undefined })),
     ];
-    void runFinderMutation(showDialog, () => dropIcons(fs, targetIconId, placements));
+    void runFinderMutation(showDialog, () =>
+      isTrash(fs, targetIconId) ? placeInTrash(fs, placements) : dropIcons(fs, targetIconId, placements),
+    );
     return;
   }
 
@@ -696,20 +731,33 @@ export function handleGlobalMouseUp(
     if (inside) {
       const dropX = drag.ghostX - content.x + win.scrollX;
       const dropY = drag.ghostY - content.y + win.scrollY;
-      void runFinderMutation(showDialog, () => dropIcons(fs, dirId, placementsAt(dropX, dropY)));
+      void runFinderMutation(showDialog, () =>
+        isTrash(fs, dirId) ? placeInTrash(fs, placementsAt(dropX, dropY)) : dropIcons(fs, dirId, placementsAt(dropX, dropY)),
+      );
       return;
     }
   }
 
-  // Default: drop onto the desktop. Volumes stay at the root; everything else
-  // lands in the Desktop Folder.
+  // Default: drop onto the desktop. Volumes stay at the root; an icon already
+  // on the desktop stays in its own disk's Desktop Folder; anything else lands
+  // in the Desktop Folder of the member's disk, or the startup disk's.
   const isVolume = drag.sourceDirectoryId === ROOT_ID;
-  const targetDir = isVolume ? ROOT_ID : getDesktopFolderId(fs) ?? drag.sourceDirectoryId;
-  void runFinderMutation(showDialog, () =>
-    isVolume
-      ? placeIcons(fs, targetDir, placementsAt(drag.ghostX, drag.ghostY - menubarH))
-      : dropIcons(fs, targetDir, placementsAt(drag.ghostX, drag.ghostY - menubarH))
-  );
+  const placements = placementsAt(drag.ghostX, drag.ghostY - menubarH);
+  void runFinderMutation(showDialog, async () => {
+    if (isVolume) return placeIcons(fs, ROOT_ID, placements);
+    const desktop = getDesktopFolderId(fs) ?? drag.sourceDirectoryId;
+    const staying = new Map<string, IconPlacement[]>();
+    const arriving: IconPlacement[] = [];
+    for (const p of placements) {
+      const parent = fs.node(p.nodeId)?.parentId ?? null;
+      if (parent && isDesktopFolder(fs, parent)) staying.set(parent, [...(staying.get(parent) ?? []), p]);
+      else arriving.push(p);
+    }
+    fs.batch(() => {
+      for (const [folder, list] of staying) placeIcons(fs, folder, list);
+    });
+    if (arriving.length) await dropIcons(fs, desktop, arriving);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1504,8 +1552,8 @@ export function buildFinderMenus(
   const projectApp = selected && fs.attributes(selected.id).projectApp;
   const projectId = selected?.kind === "directory" && fs.child(selected.id, "mockintosh.json") ? selected.id
     : typeof projectApp === "string" ? selection?.os.projects?.projectIdForApp(projectApp) : undefined;
-  const trashId = getTrashId(fs);
-  const trashEmpty = !trashId || fs.childCount(trashId) === 0;
+  const trashes = trashFolders(fs);
+  const trashEmpty = trashes.every((id) => fs.childCount(id) === 0);
   // New folders go in the active folder window, or on the desktop.
   const newFolderParent = activeDirId ?? getDesktopFolderId(fs);
   // Eject Disk ejects the selected item's disk, else the front window's (System 7).
@@ -1570,8 +1618,7 @@ export function buildFinderMenus(
           label: "Empty Trash",
           disabled: trashEmpty,
           onClick: async () => {
-            if (!trashId) return;
-            for (const child of fs.children(trashId)) await fs.remove(child.id);
+            for (const trash of trashes) for (const child of fs.children(trash)) await fs.remove(child.id);
           },
         },
         { type: "separator" },

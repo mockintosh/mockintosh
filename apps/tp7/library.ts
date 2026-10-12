@@ -35,7 +35,7 @@ export interface LoadedMemo {
   markers: number[];
 }
 
-/** The disk the Desktop is on: where the library lives. */
+/** The disk the Desktop is on (a member's home disk while mounted): where the library lives. */
 function startupVolume(fs: AppFileSystem): FSDirectory | undefined {
   const desktop = fs.locate("desktop");
   return desktop ? fs.volumeOf(desktop.id) : undefined;
@@ -44,11 +44,12 @@ function startupVolume(fs: AppFileSystem): FSDirectory | undefined {
 /** The library folder if it already exists. Does not create one. */
 export async function findLibrary(fs: AppFileSystem, storage: AppStorage): Promise<FSDirectory | null> {
   const saved = await storage.read(LIBRARY_ID_KEY);
+  const volume = startupVolume(fs);
   if (saved) {
     const remembered = fs.directory(saved);
-    if (remembered && !isInTrash(fs, remembered.id)) return remembered;
+    // A library on another disk (Mockintosh HD, while a member's disk is mounted) stays there; new memos go to this one's.
+    if (remembered && !isInTrash(fs, remembered.id) && fs.volumeOf(remembered.id)?.id === volume?.id) return remembered;
   }
-  const volume = startupVolume(fs);
   const named = volume ? fs.child(volume.id, LIBRARY_NAME) : undefined;
   if (named?.kind !== "directory") return null;
   await storage.write(LIBRARY_ID_KEY, named.id);
@@ -68,7 +69,7 @@ export async function ensureLibrary(fs: AppFileSystem, storage: AppStorage): Pro
 }
 
 function isInTrash(fs: AppFileSystem, id: string): boolean {
-  const trash = fs.locate("trash");
+  const trash = fs.locate("trash", fs.volumeOf(id)?.id);
   if (!trash) return false;
   for (let node = fs.node(id); node; node = node.parentId ? fs.node(node.parentId) : undefined) {
     if (node.id === trash.id) return true;

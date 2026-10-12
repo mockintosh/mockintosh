@@ -3,7 +3,7 @@ import type { FetchResponse } from "@mockintosh/sdk";
 import type { ClubAccounts, ClubMember } from "../platform/types";
 import { createSystemClub } from "./club";
 
-const MEMBER: ClubMember = { name: "Ada", email: "ada@example.com", since: 0 };
+const MEMBER: ClubMember = { id: "member-1", name: "Ada", email: "ada@example.com", since: 0 };
 
 function response(status: number): FetchResponse {
   return new Response("{}", { status }) as unknown as FetchResponse;

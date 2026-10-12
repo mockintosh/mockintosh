@@ -303,7 +303,8 @@ function Tp7(props: Record<string, unknown>): JSX.Element {
     setMarkers([]);
     syncTransport();
     try {
-      const trash = fs.locate("trash");
+      // Its own disk's Trash, as the Finder would.
+      const trash = fs.locate("trash", fs.volumeOf(id)?.id);
       if (trash) {
         const name = uniqueChildName(fs, trash.id, file.name);
         if (name !== file.name) fs.rename(id, name);

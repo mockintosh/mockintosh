@@ -288,7 +288,9 @@ export interface AppStorage {
 /**
  * The shared file system as seen by apps: reactive catalog reads (call them
  * inside memos/effects), content access, and mutations. Well-known folders
- * are found by role (`fs.locate("desktop")`), never by name.
+ * are found by role (`fs.locate("desktop")`), never by name; while a
+ * Computer Club member is signed in, their own disk's Desktop Folder,
+ * Pictures and Documents are found first.
  */
 export type AppFileSystem = Pick<
   FileSystem,

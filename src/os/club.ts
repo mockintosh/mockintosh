@@ -16,6 +16,11 @@ export interface SystemClub {
   /** Their credits and latest changes; `null` when signed out or not yet known. */
   credits: Accessor<ClubCredits | null>;
   /**
+   * The last attempt to reach the Club failed: `member` is what was known
+   * before (or `null` at boot), not a sign that the member signed out.
+   */
+  offline: Accessor<boolean>;
+  /**
    * Ask the server again (the session may have ended elsewhere), credits
    * included. Resolves with what it found: read that, not the signals,
    * which may not show it until Solid flushes.
@@ -36,6 +41,7 @@ export interface SystemClub {
 export function createSystemClub(accounts: ClubAccounts): SystemClub {
   const [member, setMember] = createSignal<ClubMember | null | undefined>(undefined, { ownedWrite: true });
   const [credits, setCredits] = createSignal<ClubCredits | null>(null, { ownedWrite: true });
+  const [offline, setOffline] = createSignal(false, { ownedWrite: true });
 
   /**
    * Credits for `signedIn`, the member as this call knows them: a signal
@@ -57,7 +63,9 @@ export function createSystemClub(accounts: ClubAccounts): SystemClub {
     try {
       current = await accounts.session();
       setMember(current);
+      setOffline(false);
     } catch {
+      setOffline(true);
       // Unreachable server: keep what we knew, or treat a first answer as signed out.
       current = member() ?? null;
       if (member() === undefined) setMember(null);
@@ -72,6 +80,7 @@ export function createSystemClub(accounts: ClubAccounts): SystemClub {
   return {
     member,
     credits,
+    offline,
     refresh,
     config() {
       config ??= accounts.config().catch((error: unknown) => {

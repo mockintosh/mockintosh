@@ -2,6 +2,7 @@ import type { FetchFunction, FetchResponse } from "@mockintosh/sdk";
 import type { ClubAccounts, ClubConfig, ClubConnection, ClubCredits, ClubMember } from "../types";
 
 interface AuthUser {
+  id?: string;
   name?: string;
   email?: string;
   createdAt?: string;
@@ -20,9 +21,9 @@ const STILL_WAITING = new Set(["authorization_pending", "slow_down"]);
 const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
 
 function member(user: AuthUser | undefined): ClubMember | null {
-  if (!user?.email) return null;
+  if (!user?.email || !user.id) return null;
   const since = Date.parse(user.createdAt ?? "");
-  return { name: user.name || user.email, email: user.email, since: Number.isFinite(since) ? since : Date.now() };
+  return { id: user.id, name: user.name || user.email, email: user.email, since: Number.isFinite(since) ? since : Date.now() };
 }
 
 /**

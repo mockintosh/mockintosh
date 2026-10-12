@@ -41,12 +41,19 @@ export interface GridIcon {
   position?: IconPosition;
   /** Slot to take when first placed, if it is free. */
   home?: IconPosition;
+  /**
+   * Where the icon comes from (on the desktop, its disk). A saved position
+   * covered by an earlier icon from another group moves to the nearest free
+   * slot: a disk that mounts again finds its icons' places taken by what was
+   * made while it was away. Icons of one group may still overlap.
+   */
+  group?: string;
 }
 
 export interface Arrangement {
   /** Where each icon draws. */
   positions: Map<string, IconPosition>;
-  /** Icons that had no saved position and were just given a slot; the view saves these. */
+  /** Icons that had no saved position, or had to make way, and were just given a slot; the view saves these. */
   placed: Map<string, IconPosition>;
 }
 
@@ -108,31 +115,44 @@ export function arrangeIcons(icons: readonly GridIcon[], grid: IconGrid): Arrang
   const positions = new Map<string, IconPosition>();
   const placed = new Map<string, IconPosition>();
   const taken: IconPosition[] = [];
-  const take = (id: string, at: IconPosition) => {
+  const takenGroups: Array<string | undefined> = [];
+  const take = (id: string, at: IconPosition, group?: string) => {
     positions.set(id, at);
     taken.push(at);
+    takenGroups.push(group);
   };
   const isFree = (slot: IconPosition) => !taken.some((p) => overlaps(p, slot, grid.footprint));
+  const coveredByAnotherGroup = (icon: GridIcon) =>
+    icon.group !== undefined &&
+    taken.some((p, i) => takenGroups[i] !== undefined && takenGroups[i] !== icon.group && overlaps(p, icon.position!, grid.footprint));
 
   const unplaced: GridIcon[] = [];
   const offscreen: GridIcon[] = [];
+  const displaced: GridIcon[] = [];
   for (const icon of icons) {
     if (!icon.position) unplaced.push(icon);
     else if (grid.bounds && !isVisible(icon.position, grid.footprint, grid.bounds)) offscreen.push(icon);
-    else take(icon.id, icon.position);
+    else if (coveredByAnotherGroup(icon)) displaced.push(icon);
+    else take(icon.id, icon.position, icon.group);
+  }
+
+  for (const icon of displaced) {
+    const near = nearestFirst(icon.position!, grid.slots).find(isFree) ?? leastCovered(grid, taken);
+    take(icon.id, near, icon.group);
+    placed.set(icon.id, near);
   }
 
   // Icons with a home slot claim it before others fill in around them.
   const byHome = [...unplaced.filter((i) => i.home), ...unplaced.filter((i) => !i.home)];
   for (const icon of byHome) {
     const slot = icon.home && isFree(icon.home) ? icon.home : grid.slots.find(isFree) ?? leastCovered(grid, taken);
-    take(icon.id, slot);
+    take(icon.id, slot, icon.group);
     placed.set(icon.id, slot);
   }
 
   for (const icon of offscreen) {
     const near = nearestFirst(icon.position!, grid.slots).find(isFree) ?? leastCovered(grid, taken);
-    take(icon.id, near);
+    take(icon.id, near, icon.group);
   }
 
   return { positions, placed };

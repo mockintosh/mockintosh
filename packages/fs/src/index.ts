@@ -20,3 +20,4 @@ export { InMemoryBackend, type FSBackend } from "./backend";
 export { inferMimeType, isTextType, isImageType, isFontType, extensionOf, IMAGE_TYPES, FONT_TYPES } from "./mime";
 export { uniqueChildName, fitName, fitNameWithSuffix, nameFits, assertNewNameFits, MAX_NAME_LENGTH } from "./names";
 export { CURRENT_CATALOG_VERSION, parseCatalog, type CatalogDocument } from "./catalogDocument";
+export { mountedVolumes, roleSearchOrder } from "./volumes";
