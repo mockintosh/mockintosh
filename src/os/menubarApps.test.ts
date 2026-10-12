@@ -105,19 +105,56 @@ describe("menubar apps", () => {
     }
   });
 
-  it("lights its slot while the panel is open, as the application menu's lights while it is down", async () => {
+  /** Whether the slot is drawn inverted: the margins beside the icon are solid black. */
+  function lit(slot: Bounds): boolean {
+    const frame = platform.lastFrame()!;
+    return frame[(slot.y + 2) * WIDTH + slot.x + 1] === 1 && frame[(slot.y + slot.height - 2) * WIDTH + slot.x + slot.width - 2] === 1;
+  }
+
+  it("lights its slot only while the button is down on it, as a menu title does", async () => {
     const { spotlight } = await titles();
-    platform.click(spotlight.x + 5, spotlight.y + 5);
+    platform.pointer({ type: "down", x: spotlight.x + 5, y: spotlight.y + 5, button: 0 });
     platform.tick();
     expect(panel()).toBeDefined();
-    const frame = platform.lastFrame()!;
-    // Inverted: the margins beside the icon are solid black.
-    expect(frame[(spotlight.y + 2) * WIDTH + spotlight.x + 1]).toBe(1);
-    expect(frame[(spotlight.y + spotlight.height - 2) * WIDTH + spotlight.x + spotlight.width - 2]).toBe(1);
+    expect(lit(spotlight)).toBe(true);
+
+    platform.pointer({ type: "up", x: spotlight.x + 5, y: spotlight.y + 5, button: 0 });
+    platform.tick();
+    expect(panel(), "the panel stays up").toBeDefined();
+    expect(lit(spotlight)).toBe(false);
 
     platform.click(spotlight.x + 5, spotlight.y + 5);
     platform.tick();
     expect(panel()).toBeUndefined();
+    expect(lit(spotlight)).toBe(false);
+  });
+
+  it("leaves its slot unlit when the hotkey brings the panel up", async () => {
+    const { spotlight } = await titles();
+    hotkey();
+    expect(panel()).toBeDefined();
+    expect(lit(spotlight)).toBe(false);
+  });
+
+  it("goes away on a click outside it: on the desktop, in a window, or in the menubar", async () => {
+    os.services.openFolderWindow("Desktop Folder", os.services.fs.locate("desktop")!.id);
+    platform.tick();
+    const folder = getWindows().find((w) => w.id === getActiveWindowId())!;
+    const { app } = await titles();
+    const outside = [
+      { where: "the desktop", x: 4, y: HEIGHT - 4 },
+      { where: "a window", x: folder.x + 20, y: folder.y + 40 },
+      { where: "the menubar", x: app.x - 120, y: app.y + 5 },
+    ];
+    for (const { where, x, y } of outside) {
+      hotkey();
+      await vi.advanceTimersByTimeAsync(50);
+      platform.tick();
+      expect(panel(), where).toBeDefined();
+      platform.click(x, y);
+      platform.tick();
+      expect(panel(), where).toBeUndefined();
+    }
   });
 
   it("toggles from anywhere with its hotkey, keeping the menubar and the keyboard's way back", () => {

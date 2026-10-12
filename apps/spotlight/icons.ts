@@ -36,33 +36,8 @@ const ICON = fromGrid(32, 32, [
   "................................",
 ]);
 
-/**
- * The same glass for the application menu and the menubar, without the glint:
- * the lens is QuickDraw's own 10×10 oval (`FrameOval`, inside filled by
- * `PaintOval`), and the handle a 3px staircase down the lens's diagonal, so
- * the icon mirrors across that diagonal.
- */
-const ICON_16 = fromGrid(16, 16, [
-  "................",
-  "....####........",
-  "..##oooo##......",
-  "..#oooooo#......",
-  ".#oooooooo#.....",
-  ".#oooooooo#.....",
-  ".#oooooooo#.....",
-  ".#oooooooo#.....",
-  "..#oooooo#......",
-  "..##oooo###.....",
-  "....####.###....",
-  "..........###...",
-  "...........###..",
-  "............###.",
-  ".............##.",
-  "................",
-]);
-
-/** The search field's glyph: a light outline glass before the text. */
-const SEARCH_FIELD = fromGrid(13, 13, [
+/** The light outline glass: the search field's glyph, and the menubar's icon. */
+const GLASS = [
   "...#####.....",
   ".##.....##...",
   ".#.......#...",
@@ -76,6 +51,17 @@ const SEARCH_FIELD = fromGrid(13, 13, [
   "...#####.###.",
   "..........###",
   "...........##",
+];
+
+/** The search field's glyph, before the text. */
+const SEARCH_FIELD = fromGrid(13, 13, GLASS);
+
+/** The same pixels on a 16×16 canvas, for the menubar and the application menu: a pixel in from the top left. */
+const ICON_16 = fromGrid(16, 16, [
+  "................",
+  ...GLASS.map((row) => `.${row}..`),
+  "................",
+  "................",
 ]);
 
 export const sprites: Record<string, Sprite> = {
