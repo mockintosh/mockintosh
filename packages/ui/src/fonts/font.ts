@@ -59,10 +59,9 @@ export interface OutlineGlyphSource {
 
 const QUESTION_MARK = 63;
 
-/** Page-0 slot for a UTF-16 code unit (`charmap.ts`); 255 when it has none. */
+/** Page-0 slot for a UTF-16 code unit (`charmap.ts`); -1 when it has none. */
 export function ordinalForCharCode(codeUnit: number): number {
-  const slot = slotForCodePoint(codeUnit);
-  return slot < 0 ? 255 : slot;
+  return slotForCodePoint(codeUnit);
 }
 
 /**
@@ -85,10 +84,10 @@ export function getGlyphIndexForChar(font: DeckerFont, ch: string): number {
   if (!ch) return -1;
   const code = ch.charCodeAt(0);
   const ord = ordinalForCharCode(code);
-  if (ord !== 255 && hasGlyph(font, ord)) return ord;
+  if (ord >= 0 && hasGlyph(font, ord)) return ord;
   const lookalike = LOOKALIKES.get(code);
-  const lookalikeOrd = lookalike === undefined ? 255 : ordinalForCharCode(lookalike.charCodeAt(0));
-  if (lookalikeOrd !== 255 && hasGlyph(font, lookalikeOrd)) return lookalikeOrd;
+  const lookalikeOrd = lookalike === undefined ? -1 : ordinalForCharCode(lookalike.charCodeAt(0));
+  if (lookalikeOrd >= 0 && hasGlyph(font, lookalikeOrd)) return lookalikeOrd;
   return missingGlyphIndex(font);
 }
 

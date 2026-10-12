@@ -8,7 +8,7 @@ export interface FontStrikeGlyph {
   pixels: Uint8Array;
 }
 
-/** Working strike before `%%FNT1` packing. */
+/** Working strike before `%%MFN1` packing. */
 export interface FontStrikeDraft {
   family: string;
   size: number;

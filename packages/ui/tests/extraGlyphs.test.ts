@@ -17,6 +17,7 @@ import {
   getGlyphIndexForChar,
   getGlyphPixel,
   getGlyphWidth,
+  glyphAdvance,
   ordinalForCharCode,
   type DeckerFont,
 } from "../src/fonts/font";
@@ -67,7 +68,8 @@ describe("page-0 slots", () => {
     expect(ordinalForCharCode("A".charCodeAt(0))).toBe(65);
     expect(ordinalForCharCode("\u2122".charCodeAt(0))).toBe(0xaa);
     expect(ordinalForCharCode("\u2026".charCodeAt(0))).toBe(0xc9);
-    expect(ordinalForCharCode("\u2603".charCodeAt(0))).toBe(255);
+    expect(ordinalForCharCode("\u2603".charCodeAt(0))).toBe(-1);
+    expect(ordinalForCharCode("\u02c7".charCodeAt(0))).toBe(0xff);
   });
 });
 
@@ -86,10 +88,10 @@ describe("extra glyphs in the built-in fonts", () => {
 
   it("measures ⌘R wider than R in the menu font by the glyph's advance", () => {
     const font = requireFont("menu");
-    const cmdWidth = getGlyphWidth(font, getGlyphIndexForChar(font, COMMAND_KEY));
+    const cmdAdvance = glyphAdvance(font, getGlyphIndexForChar(font, COMMAND_KEY));
     expect(measureText(`${COMMAND_KEY}R`, "menu")).toBeGreaterThan(measureText("R", "menu"));
     expect(measureText(`${COMMAND_KEY}R`, "menu")).toBe(
-      measureText("R", "menu") + cmdWidth + font.spacing
+      measureText("R", "menu") + cmdAdvance + font.spacing
     );
   });
 
@@ -160,12 +162,31 @@ describe("writePixelGlyph / applyExtraGlyphs", () => {
 });
 
 describe("typographic look-alikes", () => {
-  it("draws curly quotes, dashes and odd spaces as their ASCII look-alikes rather than '?'", () => {
+  it("draws Apple's own curly quotes and dashes in the system fonts", () => {
     for (const name of BUILTIN_FONTS) {
       const font = requireFont(name);
-      expect(Array.from("it’s “fine” — really", (ch) => getGlyphIndexForChar(font, ch))).toEqual(
-        Array.from(`it's "fine" - really`, (ch) => getGlyphIndexForChar(font, ch)),
-      );
+      for (const ch of "‘’“”–—") {
+        const idx = getGlyphIndexForChar(font, ch);
+        expect(idx).toBe(slotForCodePoint(ch.charCodeAt(0)));
+        expect(glyphHasInk(font, idx)).toBe(true);
+      }
+    }
+  });
+
+  it("falls back to ASCII look-alikes where a font lacks the glyph", () => {
+    const font = syntheticFont("lookalikes", 6, 10);
+    for (const ch of `'"-`) {
+      const slot = slotForCodePoint(ch.charCodeAt(0));
+      font.glyphWidths[slot] = 4;
+    }
+    expect(Array.from("’“—", (ch) => getGlyphIndexForChar(font, ch))).toEqual(
+      Array.from(`'"-`, (ch) => getGlyphIndexForChar(font, ch)),
+    );
+  });
+
+  it("draws odd spaces and the middle dot like their plain forms", () => {
+    for (const name of BUILTIN_FONTS) {
+      const font = requireFont(name);
       expect(measureText("a\u00a0b", name).width).toBe(measureText("a b", name).width);
       expect(getGlyphIndexForChar(font, "·")).toBe(getGlyphIndexForChar(font, BULLET));
     }

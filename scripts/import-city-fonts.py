@@ -9,8 +9,8 @@ Sources (not committed):
 
   LOSTFONTS suitcase — Toronto (removed from System 6).
 
-Chicago 12, Geneva 9, Geneva 12, and Monaco 9 are already in the repo
-(Decker / FONT 396) and are not rewritten.
+Chicago, Geneva, Monaco and New York come from System 7.5.3 instead
+(`scripts/import-system-fonts.py`) and are not written here.
 
 Usage:
   python3 scripts/import-city-fonts.py
@@ -54,13 +54,8 @@ CITY_FAMILIES = {
     "los angeles": "losAngeles",
 }
 
-# Already vendored; keep those files as the source of truth.
-SKIP = {
-    ("chicago", 12),
-    ("geneva", 9),
-    ("geneva", 12),
-    ("monaco", 9),
-}
+# Imported from System 7.5.3 by import-system-fonts.py.
+SYSTEM_753_FAMILIES = {"chicago", "geneva", "monaco", "newYork"}
 
 APPLEDOUBLE_MAGIC = b"\x00\x05\x16\x07"
 APPLEDOUBLE_RSRC = 2
@@ -454,7 +449,7 @@ def main() -> None:
             raise SystemExit(f"missing {label}: {path}")
         for family, size, font in collect_from(path):
             key = (family, size)
-            if key in SKIP or key in collected:
+            if key[0] in SYSTEM_753_FAMILIES or key in collected:
                 continue
             collected[key] = (font, label)
 

@@ -1,6 +1,7 @@
 /**
  * Reads `reference/Decker/js/lil.js` FONTS block and writes
- * `packages/ui/src/fonts/data.ts` with embedded %%FNT strings.
+ * `scripts/decker-fonts.ts` with embedded %%FNT strings: Decker's drawings,
+ * which `import-system-fonts.py` reads for the letters Apple's strikes lack.
  *
  * Usage: node scripts/extract-decker-fonts.mjs
  */
@@ -75,6 +76,6 @@ export const BUILTIN_FONT_MENU = "${tsEscapeDoubleQuoted(menu)}";
 export const BUILTIN_FONT_MONO = "${tsEscapeDoubleQuoted(mono)}";
 `;
 
-const outPath = path.join(root, "packages/ui/src/fonts/data.ts");
+const outPath = path.join(root, "scripts/decker-fonts.ts");
 fs.writeFileSync(outPath, out, "utf8");
 console.log(`Wrote ${outPath} (${out.length} bytes)`);

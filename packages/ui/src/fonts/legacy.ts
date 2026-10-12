@@ -9,7 +9,6 @@
  */
 
 import { decodeBase64 } from "../base64";
-import { placeCodePoint } from "./charmap";
 
 /** Decker's `drom_chars`: ordinal 127 + index. */
 const LEGACY_CHARS =
@@ -87,9 +86,4 @@ export function decodeLegacyRecord(
     }
   }
   return { maxWidth, glyphHeight, spacing, glyphs };
-}
-
-/** Where each glyph of a decoded record lands now. */
-export function placeLegacyGlyphs(record: LegacyRecord): { page: number; slot: number; glyph: LegacyGlyph }[] {
-  return record.glyphs.map((glyph) => ({ ...placeCodePoint(glyph.codePoint), glyph }));
 }

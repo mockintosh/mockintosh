@@ -5,7 +5,7 @@ import { getGlyphPixel, getGlyphWidth, hasGlyph } from "../src/fonts/font";
 import { initBuiltinFonts, listFontSizes, requireFont } from "../src/fonts/registry";
 import { measureText } from "../src/fonts/bridge";
 import { faceMetrics } from "../src/fonts/metrics";
-import { BUILTIN_FONT_GENEVA_12 } from "../src/fonts/faces/geneva12";
+import { SYSTEM_FONT_GENEVA_12 } from "../src/fonts/faces/system/geneva_12";
 
 initBuiltinFonts();
 
@@ -84,9 +84,9 @@ describe("geneva12Bold (FONT 396 Font Manager smear)", () => {
     expect(m.lineHeight).toBe(16);
   });
 
-  it("matches a fresh smear of the vendored geneva12 face", () => {
+  it("matches a fresh smear of System 7.5.3 Geneva 12", () => {
     const expected = smearDeckerFontBold(
-      decodeFont(BUILTIN_FONT_GENEVA_12, "geneva12"),
+      decodeFont(SYSTEM_FONT_GENEVA_12, "geneva"),
       "geneva12Bold",
     );
     const actual = requireFont("geneva12Bold");

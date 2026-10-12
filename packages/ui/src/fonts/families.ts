@@ -1,12 +1,11 @@
-import { BUILTIN_FONT_BODY, BUILTIN_FONT_MENU, BUILTIN_FONT_MONO } from "./data";
 import { BUILTIN_FONT_BODY_BOLD } from "./faces/bodyBold";
-import { BUILTIN_FONT_GENEVA_12 } from "./faces/geneva12";
 import { BUILTIN_FONT_GENEVA_12_BOLD } from "./faces/genevaTwelveBold";
 import { BUILTIN_FONT_LISA } from "./faces/lisa";
 import { BUILTIN_FONT_PIXEL } from "./faces/pixel";
 import * as R from "./faces/redaction";
 import { BUILTIN_FONT_JISKAN_16, BUILTIN_FONT_JISKAN_16_INFO } from "./faces/jiskan";
 import { CITY_GENERATED } from "./faces/city/generated";
+import { SYSTEM_STRIKES } from "./faces/system/generated";
 
 export interface FontFamilyInfo {
   name: string;
@@ -26,12 +25,12 @@ export interface FontStrikeSpec {
   size: number;
   /** Styled face this strike draws (1 bold, 2 italic); plain when absent. */
   style?: 1 | 2;
-  /** `%%FNT1` block, or a loader for a large strike fetched on first use. */
+  /** Font record (`%%MFN1`, or a Decker `%%FNT1`), or a loader for a large strike fetched on first use. */
   data: string | (() => Promise<string>);
   info?: { ascent: number; descent: number; leading: number };
   /**
    * Ordinal → [advance, originX] for glyphs whose ink overhangs their
-   * advance (`%%FNT1` stores one width per glyph, used as the cell).
+   * advance, for Decker `%%FNT1` records (one width per glyph, used as the cell).
    */
   overhangs?: Readonly<Record<number, readonly [number, number]>>;
 }
@@ -151,24 +150,15 @@ const REDACTION_STRIKES: readonly FontStrikeSpec[] = REDACTION_SIZES.flatMap((si
   },
 ]);
 
-/**
- * Decker's Chicago 12 draws 1px between glyphs; the Mac's draws 2 (an `i`
- * advances 4, an `H` 8). Header byte 2 is the spacing: 16, 13, 1 → 16, 13, 2.
- */
-const CHICAGO_12 = BUILTIN_FONT_MENU.replace(/^%%FNT1EA0B/, "%%FNT1EA0C");
-
 const VENDORED_STRIKES: readonly FontStrikeSpec[] = [
-  { family: "chicago", size: 12, data: CHICAGO_12, info: { ascent: 12, descent: 3, leading: 0 } },
-  { family: "geneva", size: 9, data: BUILTIN_FONT_BODY, info: { ascent: 10, descent: 2, leading: 0 } },
-  { family: "geneva", size: 12, data: BUILTIN_FONT_GENEVA_12, info: { ascent: 12, descent: 3, leading: 1 } },
-  { family: "monaco", size: 9, data: BUILTIN_FONT_MONO, info: { ascent: 9, descent: 2, leading: 0 } },
   { family: "lisa", size: 12, data: BUILTIN_FONT_LISA, info: { ascent: 10, descent: 2, leading: 0 } },
   { family: "pixel", size: 24, data: BUILTIN_FONT_PIXEL },
   ...REDACTION_STRIKES,
   { family: "jiskan", size: 16, data: BUILTIN_FONT_JISKAN_16, info: BUILTIN_FONT_JISKAN_16_INFO },
 ];
 
-export const BUILTIN_STRIKES: readonly FontStrikeSpec[] = [...VENDORED_STRIKES, ...CITY_GENERATED];
+/** Chicago, Geneva, Monaco and New York from System 7.5.3; the other city fonts from System 6.0.8. */
+export const BUILTIN_STRIKES: readonly FontStrikeSpec[] = [...SYSTEM_STRIKES, ...VENDORED_STRIKES, ...CITY_GENERATED];
 
 export const LISTED_FONT_NAMES: readonly string[] = [
   "body",

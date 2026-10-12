@@ -2,22 +2,9 @@
 
 import { BUILTIN_FONT_ATHENS_18 } from "./athens_18";
 import { BUILTIN_FONT_CAIRO_18 } from "./cairo_18";
-import { BUILTIN_FONT_GENEVA_10 } from "./geneva_10";
-import { BUILTIN_FONT_GENEVA_14 } from "./geneva_14";
-import { BUILTIN_FONT_GENEVA_18 } from "./geneva_18";
-import { BUILTIN_FONT_GENEVA_20 } from "./geneva_20";
-import { BUILTIN_FONT_GENEVA_24 } from "./geneva_24";
 import { BUILTIN_FONT_LONDON_18 } from "./london_18";
 import { BUILTIN_FONT_LOSANGELES_12 } from "./losAngeles_12";
 import { BUILTIN_FONT_LOSANGELES_24 } from "./losAngeles_24";
-import { BUILTIN_FONT_MONACO_12 } from "./monaco_12";
-import { BUILTIN_FONT_NEWYORK_9 } from "./newYork_9";
-import { BUILTIN_FONT_NEWYORK_10 } from "./newYork_10";
-import { BUILTIN_FONT_NEWYORK_12 } from "./newYork_12";
-import { BUILTIN_FONT_NEWYORK_14 } from "./newYork_14";
-import { BUILTIN_FONT_NEWYORK_18 } from "./newYork_18";
-import { BUILTIN_FONT_NEWYORK_20 } from "./newYork_20";
-import { BUILTIN_FONT_NEWYORK_24 } from "./newYork_24";
 import { BUILTIN_FONT_SANFRANCISCO_18 } from "./sanFrancisco_18";
 import { BUILTIN_FONT_TORONTO_9 } from "./toronto_9";
 import { BUILTIN_FONT_TORONTO_12 } from "./toronto_12";
@@ -36,22 +23,9 @@ export interface CityStrike {
 export const CITY_GENERATED: readonly CityStrike[] = [
   { family: "athens", size: 18, data: BUILTIN_FONT_ATHENS_18, info: { ascent: 18, descent: 4, leading: 1 } },
   { family: "cairo", size: 18, data: BUILTIN_FONT_CAIRO_18, info: { ascent: 20, descent: 4, leading: 2 } },
-  { family: "geneva", size: 10, data: BUILTIN_FONT_GENEVA_10, info: { ascent: 10, descent: 2, leading: 1 } },
-  { family: "geneva", size: 14, data: BUILTIN_FONT_GENEVA_14, info: { ascent: 14, descent: 4, leading: 1 } },
-  { family: "geneva", size: 18, data: BUILTIN_FONT_GENEVA_18, info: { ascent: 18, descent: 4, leading: 1 } },
-  { family: "geneva", size: 20, data: BUILTIN_FONT_GENEVA_20, info: { ascent: 20, descent: 4, leading: 0 } },
-  { family: "geneva", size: 24, data: BUILTIN_FONT_GENEVA_24, info: { ascent: 22, descent: 6, leading: 1 } },
   { family: "london", size: 18, data: BUILTIN_FONT_LONDON_18, info: { ascent: 17, descent: 3, leading: 3 } },
   { family: "losAngeles", size: 12, data: BUILTIN_FONT_LOSANGELES_12, info: { ascent: 11, descent: 3, leading: 2 } },
   { family: "losAngeles", size: 24, data: BUILTIN_FONT_LOSANGELES_24, info: { ascent: 22, descent: 6, leading: 1 } },
-  { family: "monaco", size: 12, data: BUILTIN_FONT_MONACO_12, info: { ascent: 12, descent: 3, leading: 1 } },
-  { family: "newYork", size: 9, data: BUILTIN_FONT_NEWYORK_9, info: { ascent: 10, descent: 2, leading: 0 } },
-  { family: "newYork", size: 10, data: BUILTIN_FONT_NEWYORK_10, info: { ascent: 10, descent: 2, leading: 0 } },
-  { family: "newYork", size: 12, data: BUILTIN_FONT_NEWYORK_12, info: { ascent: 12, descent: 3, leading: 1 } },
-  { family: "newYork", size: 14, data: BUILTIN_FONT_NEWYORK_14, info: { ascent: 14, descent: 3, leading: 2 } },
-  { family: "newYork", size: 18, data: BUILTIN_FONT_NEWYORK_18, info: { ascent: 17, descent: 4, leading: 2 } },
-  { family: "newYork", size: 20, data: BUILTIN_FONT_NEWYORK_20, info: { ascent: 18, descent: 4, leading: 2 } },
-  { family: "newYork", size: 24, data: BUILTIN_FONT_NEWYORK_24, info: { ascent: 21, descent: 5, leading: 3 } },
   { family: "sanFrancisco", size: 18, data: BUILTIN_FONT_SANFRANCISCO_18, info: { ascent: 16, descent: 4, leading: 3 } },
   { family: "toronto", size: 9, data: BUILTIN_FONT_TORONTO_9, info: { ascent: 10, descent: 2, leading: 0 } },
   { family: "toronto", size: 12, data: BUILTIN_FONT_TORONTO_12, info: { ascent: 12, descent: 3, leading: 1 } },

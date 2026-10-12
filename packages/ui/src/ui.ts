@@ -112,7 +112,7 @@ export interface UIInstance {
   resize(screen: BitMap): void;
 
   /**
-   * Register a custom font from a %%FNT0 / %%FNT1 data block string.
+   * Register a custom font from a font record (%%MFN1, or Decker's %%FNT0 / %%FNT1).
    * Custom fonts can override built-in names (body, menu, mono, pixel).
    */
   registerFont(name: string, data: string): void;

@@ -1,7 +1,7 @@
 /**
  * Bake a whole strike from an outline, the way ATM pre-rendered bitmaps:
  * every page-0 slot the font can draw, packed as a `FontStrikeDraft`
- * that Foundry edits and saves as `%%FNT1`.
+ * that Foundry edits and saves as `%%MFN1`.
  */
 
 import { macRomanCharset, slotForCodePoint } from "../charmap";
@@ -38,7 +38,7 @@ export function bakeOutlineStrike(source: Uint8Array | OutlineFace, options: Bak
     const gid = face.font.glyphId(cp);
     if (gid || cp === 32) wanted.push({ cp, ordinal, gid });
   }
-  // A `%%FNT1` strike has no rows outside its cell, so PreserveGlyph grows the cell instead.
+  // A draft has no rows outside its cell, so PreserveGlyph grows the cell instead.
   const room = scaler.preserveGlyph ? face.inkRoom(wanted.map((w) => w.gid), metrics) : { above: 0, below: 0 };
   const glyphs: FontStrikeGlyph[] = [];
   let maxWidth = 1;

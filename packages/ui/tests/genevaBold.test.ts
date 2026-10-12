@@ -5,7 +5,7 @@ import { getGlyphPixel, getGlyphWidth } from "../src/fonts/font";
 import { initBuiltinFonts, listFonts, requireFont } from "../src/fonts/registry";
 import { measureText } from "../src/fonts/bridge";
 import { faceMetrics } from "../src/fonts/metrics";
-import { BUILTIN_FONT_BODY } from "../src/fonts/data";
+import { SYSTEM_FONT_GENEVA_9 } from "../src/fonts/faces/system/geneva_9";
 
 initBuiltinFonts();
 
@@ -43,8 +43,8 @@ describe("bodyBold (Geneva 9 Font Manager smear)", () => {
     expect(m.lineHeight).toBe(12);
   });
 
-  it("matches a fresh smear of the vendored body face", () => {
-    const expected = smearDeckerFontBold(decodeFont(BUILTIN_FONT_BODY, "body"), "bodyBold");
+  it("matches a fresh smear of System 7.5.3 Geneva 9", () => {
+    const expected = smearDeckerFontBold(decodeFont(SYSTEM_FONT_GENEVA_9, "geneva"), "bodyBold");
     const actual = requireFont("bodyBold");
     expect(actual.maxWidth).toBe(expected.maxWidth);
     expect(getGlyphWidth(actual, "W".charCodeAt(0))).toBe(getGlyphWidth(expected, "W".charCodeAt(0)));

@@ -1,5 +1,6 @@
 /**
- * Bake Font Manager bold of Decker Geneva 9 (`body`) into a %%FNT1 face.
+ * Bake Font Manager bold of System 7.5.3 Geneva 9 (`body`) and Geneva 12
+ * (`geneva12`) as their own faces, `bodyBold` and `geneva12Bold`.
  *
  * Apple's System FONDs only list plain Geneva 9/12. Bold on the original Mac
  * is this 1px smear — not a separate designed strike.
@@ -11,28 +12,34 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { smearDeckerFontBold } from "../packages/ui/src/fonts/boldSmear";
 import { decodeFont, encodeFont } from "../packages/ui/src/fonts/codec";
-import { BUILTIN_FONT_BODY } from "../packages/ui/src/fonts/data";
+import type { DeckerFont } from "../packages/ui/src/fonts/font";
+import { SYSTEM_FONT_GENEVA_9 } from "../packages/ui/src/fonts/faces/system/geneva_9";
+import { SYSTEM_FONT_GENEVA_12 } from "../packages/ui/src/fonts/faces/system/geneva_12";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outPath = resolve(root, "packages/ui/src/fonts/faces/bodyBold.ts");
 
-const bold = smearDeckerFontBold(decodeFont(BUILTIN_FONT_BODY, "body"), "bodyBold");
-const record = encodeFont(bold);
-const escaped = record.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+/** Smear a face and every page strike it carries. */
+function smearFace(face: DeckerFont, name: string): DeckerFont {
+  const bold = smearDeckerFontBold(face, name);
+  if (face.pages) bold.pages = new Map([...face.pages].map(([page, strike]) => [page, smearDeckerFontBold(strike, name)]));
+  return bold;
+}
 
-writeFileSync(
-  outPath,
-  `// Generated from Decker Geneva 9 + Font Manager bold smear. Do not hand-edit.
+function bake(source: string, size: number, name: string, constName: string, file: string, from: string): void {
+  const bold = smearFace(decodeFont(source, "geneva", { size }), name);
+  const record = encodeFont(bold);
+  const outPath = resolve(root, "packages/ui/src/fonts/faces", file);
+  writeFileSync(
+    outPath,
+    `// Generated from System 7.5.3 ${from} + Font Manager bold smear. Do not hand-edit.
 //   npx tsx scripts/import-geneva-bold.ts
-// Apple shipped no intrinsic Geneva Bold strike; this is Bold on body.
-//
-// Cell ${bold.maxWidth}×${bold.glyphHeight}, spacing ${bold.spacing}.
-export const BUILTIN_FONT_BODY_BOLD = "${escaped}";
+// Apple shipped no intrinsic Geneva Bold strike; this is Bold on ${name.replace("Bold", "")}.
+export const ${constName} = "${record}";
 `,
-  "utf8",
-);
+    "utf8",
+  );
+  console.log(`Wrote ${outPath}`);
+}
 
-const count = bold.glyphWidths.reduce((n, w) => n + (w > 0 ? 1 : 0), 0);
-console.log(
-  `Wrote ${outPath} — ${count} glyphs, ${bold.maxWidth}×${bold.glyphHeight} cell`,
-);
+bake(SYSTEM_FONT_GENEVA_9, 9, "bodyBold", "BUILTIN_FONT_BODY_BOLD", "bodyBold.ts", "FONT 393 (Geneva 9)");
+bake(SYSTEM_FONT_GENEVA_12, 12, "geneva12Bold", "BUILTIN_FONT_GENEVA_12_BOLD", "genevaTwelveBold.ts", "FONT 396 (Geneva 12)");

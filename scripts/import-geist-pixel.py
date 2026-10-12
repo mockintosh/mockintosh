@@ -22,7 +22,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-DROM_PATH = ROOT / "packages/ui/src/fonts/drom.ts"
+DROM_PATH = ROOT / "packages/ui/src/fonts/legacy.ts"
 OUT_PATH = ROOT / "packages/ui/src/fonts/faces/pixel.ts"
 LICENSE_PATH = ROOT / "packages/ui/src/fonts/faces/LICENSE-GeistPixel.txt"
 
@@ -44,9 +44,9 @@ FACE_NAME = "pixel"
 
 def read_drom_chars() -> str:
     source = DROM_PATH.read_text(encoding="utf-8")
-    match = re.search(r'const DROM_CHARS =\s*"([^"]*)"', source)
+    match = re.search(r'const LEGACY_CHARS =\s*"([^"]*)"', source)
     if not match:
-        raise SystemExit(f"Could not parse DROM_CHARS from {DROM_PATH}")
+        raise SystemExit(f"Could not parse LEGACY_CHARS from {DROM_PATH}")
     return match.group(1)
 
 
