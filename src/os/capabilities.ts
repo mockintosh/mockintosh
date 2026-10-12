@@ -23,6 +23,7 @@ export function platformCapabilities(platform: Platform): CapabilitySet {
   if (platform.microphone) caps.add("microphone");
   if (platform.browser) caps.add("browser");
   if (platform.signInRelay) caps.add("sign-in");
+  if (platform.musicKit) caps.add("music-kit");
   if (platform.agentRuntime) caps.add("agent-runtime");
   if (platform.fonts) caps.add("fonts");
   if (platform.gpu) caps.add("gpu");
@@ -49,6 +50,7 @@ const DESCRIPTIONS: Record<Capability, string> = {
   microphone: "a microphone",
   browser: "a web browser",
   "sign-in": "a way to sign in from a phone",
+  "music-kit": "Apple Music playback",
   "agent-runtime": "a way to run AI agents",
   fonts: "TrueType rasterizing",
   gpu: "a graphics processor",

@@ -501,7 +501,7 @@ function Synth(): JSX.Element {
             { label: state.playing ? "Stop" : "Play", onClick: () => setPlay(!engine.playing) },
             { type: "separator" },
             { label: "Roll the Dice", shortcut: "D", onClick: () => setPattern(rollPattern(random, scale())) },
-            { label: "Mutate", shortcut: "M", onClick: () => setPattern((p) => mutatePattern(p, random, scale())) },
+            { label: "Mutate", shortcut: "⇧M", onClick: () => setPattern((p) => mutatePattern(p, random, scale())) },
             { label: "Clear", onClick: () => setPattern(emptyPattern()) },
             { type: "separator" },
             { label: "Shift Left", shortcut: "[", onClick: () => setPattern((p) => rotatePattern(p, -1)) },

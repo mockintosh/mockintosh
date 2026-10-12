@@ -10,12 +10,13 @@ import { APP_MODULES } from "@/src/appModules";
 import { iconSprites } from "@/src/os/sprites/icons";
 import AppStore from "@/apps/AppStore";
 import IconGallery from "@/apps/IconGallery";
+import Spotlight from "@/apps/Spotlight";
 
 /** Apps whose 32×32 is a full square (no transparent edge). Remove an id when its mask is fixed. */
 const UNMASKED = new Set(["dither", "foundry", "assistant"]);
 
 it("every app has a masked 32×32 icon and a hand-drawn 16×16", async () => {
-  const apps = [AppStore, IconGallery];
+  const apps = [AppStore, IconGallery, Spotlight];
   for (const load of Object.values(APP_MODULES)) apps.push((await load()).default);
 
   for (const app of apps) {

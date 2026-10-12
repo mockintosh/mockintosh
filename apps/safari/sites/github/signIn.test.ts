@@ -30,14 +30,14 @@ describe("signInToGithub", () => {
       expect(url).toBe("/api/github/token");
       if (options?.method !== "POST") return reply({ clientId: "Iv1.abc" });
       posts.push(JSON.parse(String(options.body)));
-      return reply({ access_token: "gho_token", scope: "public_repo" });
+      return reply({ access_token: "gho_token", scope: "public_repo,notifications" });
     };
     const signIn = phone({ code: "the-code" });
     expect(await signInToGithub(fetch, signIn, crypto)).toBe("gho_token");
 
     const authorize = new URL(signIn.asked[0]);
     expect(authorize.origin + authorize.pathname).toBe("https://github.com/login/oauth/authorize");
-    expect(Object.fromEntries(authorize.searchParams)).toMatchObject({ client_id: "Iv1.abc", scope: "public_repo", code_challenge_method: "S256" });
+    expect(Object.fromEntries(authorize.searchParams)).toMatchObject({ client_id: "Iv1.abc", scope: "public_repo notifications", code_challenge_method: "S256" });
     expect(posts).toEqual([{ code: "the-code", code_verifier: expect.stringMatching(/^[\w-]{64}$/), redirect_uri: signIn.redirectUri }]);
   });
 

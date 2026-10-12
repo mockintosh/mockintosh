@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AppContext, WindowSpec } from "@mockintosh/sdk";
+import { MUSIC_KIT_IDLE, type AppContext, type MusicKitError, type MusicKitService, type MusicKitState, type WindowSpec } from "@mockintosh/sdk";
 import type { OSServices } from "../context";
 import { registerApp, unregisterApp } from "../apps";
 import { AppProcess } from "./host";
@@ -17,7 +17,7 @@ function fakePort() {
   return { port, posted, receive };
 }
 
-function setup() {
+function setup(extra: Partial<AppContext> = {}) {
   const { port, posted, receive } = fakePort();
   const opened: WindowSpec[] = [];
   const release = vi.fn();
@@ -41,6 +41,7 @@ function setup() {
     fonts: { register: vi.fn(), list: () => [], onChange: () => () => {} },
     quit: vi.fn(),
     os: { showDialog: vi.fn(async () => "OK") },
+    ...extra,
   } as unknown as AppContext;
   const os = {
     resolution: { width: 512, height: 342 },
@@ -68,6 +69,26 @@ function setup() {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** A MusicKit the test drives: `change` and `fail` play the page's events. */
+function fakeMusicKit() {
+  const changes = new Set<(state: MusicKitState) => void>();
+  const errors = new Set<(error: MusicKitError) => void>();
+  const musicKit = {
+    state: MUSIC_KIT_IDLE,
+    onChange: (listener: (state: MusicKitState) => void) => (changes.add(listener), () => void changes.delete(listener)),
+    onError: (listener: (error: MusicKitError) => void) => (errors.add(listener), () => void errors.delete(listener)),
+    setQueue: vi.fn(async () => {}),
+    setVolume: vi.fn(),
+    openSignUp: vi.fn(async () => {}),
+    openInAppleMusic: vi.fn(async () => {}),
+  } as unknown as MusicKitService;
+  return {
+    musicKit,
+    change: (state: MusicKitState) => changes.forEach((listener) => listener(state)),
+    fail: (error: MusicKitError) => errors.forEach((listener) => listener(error)),
+  };
+}
 
 describe("AppProcess", () => {
   it("starts the worker with the launch and holds the launch until onOpen has run", () => {
@@ -114,6 +135,42 @@ describe("AppProcess", () => {
     const messages = posted.map((p) => p.message);
     expect(messages).toContainEqual({ t: "kernelStream", id: 9, stream: "stdout", bytes: new Uint8Array([104, 105]) });
     expect(messages.at(-1)).toEqual({ t: "reply", id: 9, ok: true, value: { ok: true } });
+  });
+
+  it("starts the worker with MusicKit's state, and sends each change once the app listens, until it stops", () => {
+    const { musicKit, change, fail } = fakeMusicKit();
+    const { proc, posted, receive } = setup({ musicKit });
+    expect(posted[0]!.message.t === "start" && posted[0]!.message.start.musicKit).toEqual(MUSIC_KIT_IDLE);
+    const playing = { ...MUSIC_KIT_IDLE, ready: true, playing: true, time: 12 };
+    change(playing);
+    expect(posted.map((p) => p.message.t)).not.toContain("musicKit");
+
+    receive({ t: "call", id: 0, method: "musicKit.listen", args: [] });
+    change(playing);
+    const refused = { message: "Apple Music membership required", membershipRequired: true };
+    fail(refused);
+    expect(posted.map((p) => p.message)).toContainEqual({ t: "musicKit", state: playing });
+    expect(posted.map((p) => p.message)).toContainEqual({ t: "musicKitError", error: refused });
+
+    proc.stop();
+    const sent = posted.length;
+    change({ ...playing, time: 13 });
+    expect(posted.slice(sent).map((p) => p.message.t)).not.toContain("musicKit");
+  });
+
+  it("drives MusicKit for the app by name", async () => {
+    const { musicKit } = fakeMusicKit();
+    const { posted, receive } = setup({ musicKit });
+    receive({ t: "call", id: 11, method: "musicKit.setQueue", args: [{ playlist: "pl.1", startPlaying: true }] });
+    receive({ t: "call", id: 0, method: "musicKit.setVolume", args: [0.4] });
+    receive({ t: "call", id: 12, method: "musicKit.openSignUp", args: [] });
+    receive({ t: "call", id: 13, method: "musicKit.openInAppleMusic", args: ["https://music.apple.com/se/playlist/pl.1"] });
+    await settle();
+    expect(musicKit.openSignUp).toHaveBeenCalledTimes(1);
+    expect(musicKit.openInAppleMusic).toHaveBeenCalledWith("https://music.apple.com/se/playlist/pl.1");
+    expect(musicKit.setQueue).toHaveBeenCalledWith({ playlist: "pl.1", startPlaying: true });
+    expect(musicKit.setVolume).toHaveBeenCalledWith(0.4);
+    expect(posted.map((p) => p.message)).toContainEqual({ t: "reply", id: 11, ok: true, value: undefined });
   });
 
   it("sends the worker which app opens which file type, again when an app is installed", () => {

@@ -6,7 +6,8 @@
  * so the page loads an app's code only if it has to run it on the OS's
  * thread; in a process the app loads it there. The Finder registers itself:
  * it is part of the shell and the boot sequence depends on it. App Store and
- * Icon Gallery are shell apps too and are loaded here.
+ * Icon Gallery are shell apps too and are loaded here. Spotlight is a shell
+ * app the App Store installs; it runs on the OS's thread once it is.
  */
 import { registerApp } from "./os/apps";
 import { registerBundledApp } from "./os/bundledApps";
@@ -15,9 +16,11 @@ import { APP_MODULES } from "./appModules";
 import declarations from "@/apps/declarations.generated.json";
 import AppStore from "@/apps/AppStore";
 import IconGallery from "@/apps/IconGallery";
+import { sprites as spotlightSprites } from "@/apps/spotlight/icons";
 import { sprites as ditherSprites } from "@/apps/dither/icons";
 import { sprites as traceSprites } from "@/apps/trace/icons";
 import { spotifySprites } from "@/apps/sprites/spotify";
+import { sprites as musicSprites } from "@/apps/music/icons";
 import { sprites as macpaintSprites } from "@/apps/macpaint/icons";
 import { sprites as canvasSprites } from "@/apps/canvas/icons";
 import { sprites as surfaceSprites } from "@/apps/surface/icons";
@@ -34,9 +37,19 @@ const declared = declarations as Record<string, AppDeclaration>;
 
 for (const app of [AppStore, IconGallery]) registerApp(app);
 
-for (const id of ["testing", "file", "preview", "video", "photobooth", "safari", "maps", "showreel", "terminal"]) {
+for (const id of ["testing", "file", "preview", "video", "photobooth", "safari", "maps", "calendar", "showreel", "terminal"]) {
   registerApp(declaredApp(declared[id]!, APP_MODULES[id]!));
 }
+
+registerBundledApp({
+  id: "spotlight",
+  title: "Spotlight",
+  description:
+    "Finds anything from the menubar: applications, documents, folders, System panels and App Store apps, the answer to a sum, and the web. ⌘Space (Control-Space in a browser) brings it up from anywhere.",
+  icon: "spotlight/icon",
+  sprites: spotlightSprites,
+  load: () => import("@/apps/Spotlight"),
+});
 
 registerBundledApp({
   id: "dither",
@@ -80,6 +93,17 @@ registerBundledApp({
   sprites: spotifySprites,
   requires: ["network", "browser", "sign-in"],
   load: () => import("@/apps/SpotifyPlayer"),
+});
+
+registerBundledApp({
+  id: "music",
+  declaration: declared["music"],
+  title: "Music",
+  description: "Plays Apple Music: 30-second previews for anyone, and whole songs and your library with an Apple Music membership. Not affiliated with or endorsed by Apple.",
+  icon: "music/icon",
+  sprites: musicSprites,
+  requires: ["network", "music-kit"],
+  load: () => import("@/apps/Music"),
 });
 
 registerBundledApp({

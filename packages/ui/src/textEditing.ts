@@ -67,6 +67,13 @@ export function insertText(state: TextEditState, text: string): TextEditState {
   return { value, anchor: lo + text.length, caret: lo + text.length };
 }
 
+/** ⌘-keys `editingKey` acts on in a focused editor, which a host should not also act on (⌘← is a browser's Back). */
+const EDITING_CHORD_KEYS = new Set(["a", "c", "x", "z", "y", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Backspace", "Delete"]);
+
+export function isEditingChord(key: string): boolean {
+  return EDITING_CHORD_KEYS.has(key.length === 1 ? key.toLowerCase() : key);
+}
+
 const oneLine = (text: string): TextLines => ({
   lineAt: () => ({ start: 0, end: text.length }),
   vertical: (_index, rows) => (rows < 0 ? 0 : text.length),

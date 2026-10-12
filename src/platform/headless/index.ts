@@ -48,8 +48,8 @@ export interface HeadlessPlatform extends Platform {
   lastFrame(): Uint8Array | null;
   /** Inject a pointer event as if the mouse/touch driver produced it. */
   pointer(event: PlatformPointerEvent): void;
-  /** Inject a key event as if the keyboard driver produced it. */
-  key(event: PlatformKeyEvent): void;
+  /** Inject a key event as if the keyboard driver produced it; `true` when the OS used it. */
+  key(event: PlatformKeyEvent): boolean;
   /** Inject a host file drop as if the user dragged onto the screen. */
   drop(event: PlatformDropEvent): void;
   /** Press and release at (x, y). */
@@ -69,7 +69,7 @@ export function createHeadlessPlatform(options: HeadlessPlatformOptions): Headle
   let frameCount = 0;
 
   const pointerHandlers = new Set<(e: PlatformPointerEvent) => void>();
-  const keyHandlers = new Set<(e: PlatformKeyEvent) => void>();
+  const keyHandlers = new Set<(e: PlatformKeyEvent) => boolean | void>();
   const dropHandlers = new Set<(e: PlatformDropEvent) => void>();
 
   let clock = 0;
@@ -133,7 +133,9 @@ export function createHeadlessPlatform(options: HeadlessPlatformOptions): Headle
       pointerHandlers.forEach((h) => h(event));
     },
     key(event) {
-      keyHandlers.forEach((h) => h(event));
+      let used = false;
+      keyHandlers.forEach((h) => { if (h(event)) used = true; });
+      return used;
     },
     drop(event) {
       dropHandlers.forEach((h) => h(event));

@@ -37,7 +37,7 @@ export function AppAboutBox(props: AppAboutBoxProps): JSX.Element {
           />
         )}
       </Show>
-      <box flexDirection="column" gap={4} flexGrow={1}>
+      <box flexDirection="column" gap={4} flexGrow={1} flexShrink={1} minWidth={0}>
         <text font="body" nowrap>{app()?.title ?? props.appId}</text>
         <Show when={version()}>
           {(v) => <text font="body" nowrap>{`Version ${v()}`}</text>}

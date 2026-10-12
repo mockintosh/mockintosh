@@ -73,6 +73,8 @@ export interface OSServices {
   fontFolder?: import("./fontFolder").FontFolder;
   crypto: AppCrypto;
   browser?: BrowserService;
+  /** Apple Music playback (`useApp().musicKit`), when the platform holds MusicKit. */
+  musicKit?: import("@mockintosh/sdk").MusicKitService;
   /** Phone sign-in (`useApp().signIn`), when the platform has a relay. */
   signIn?: import("./signIn").SystemSignIn;
   /** Installs App Store apps. Remote bundles also need `Platform.loadModule`. */
@@ -95,6 +97,11 @@ export interface OSServices {
   ) => string;
   openFolderWindow: (title: string, directoryId: string, fromRect?: IconScreenRect) => void;
   openFSNode: (nodeId: string, fromRect?: IconScreenRect) => void;
+  /**
+   * What a menubar app's icon (and its hotkey) does: close the app's windows
+   * when it has any open, otherwise open it the way `openApp` does.
+   */
+  toggleMenubarApp: (appId: string) => void;
   closeWindow: (id: string) => void;
   showDialog: (options: DialogOptions) => Promise<string | null>;
   /** The Open dialog (`AppContext.os.showOpenDialog`). */

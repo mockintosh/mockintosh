@@ -495,9 +495,9 @@ function Earth(_props: Record<string, unknown>): JSX.Element {
           items: [
             ...destinations,
             { type: "separator" },
-            { label: "The Moon", shortcut: "M", onClick: toMoon },
+            { label: "The Moon", shortcut: "⇧M", onClick: toMoon },
             { label: "Apollo 8 Free Return", shortcut: "L", onClick: startMission },
-            { label: "Home", shortcut: "H", onClick: () => flyTo({ ...HOME, radius: fitRadius(width(), height()) }) },
+            { label: "Home", shortcut: "⇧H", onClick: () => flyTo({ ...HOME, radius: fitRadius(width(), height()) }) },
           ],
         },
       ]);

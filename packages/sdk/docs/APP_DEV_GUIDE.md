@@ -21,6 +21,7 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Foundry | `Foundry.tsx` | SDK-clean |
 | Safari | `Safari.tsx` | SDK-clean |
 | Maps | `Maps.tsx` | SDK-clean |
+| Calendar | `Calendar.tsx` | SDK-clean |
 | Testing | `Testing.tsx` | SDK-clean |
 | File | `FileViewer.tsx` | SDK-clean |
 | Preview | `Preview.tsx` | SDK-clean |
@@ -41,9 +42,11 @@ These ship with the OS. SDK-clean apps compile under the in-OS project compiler 
 | Terminal | `Terminal.tsx` | SDK-clean |
 | Assistant | `Assistant.tsx` | SDK-clean |
 | Spotify | `SpotifyPlayer.tsx` | SDK-clean |
+| Music | `Music.tsx` | SDK-clean |
 | Finder | `Finder.solid.tsx` | Shell |
 | App Store | `AppStore.tsx` | Shell |
 | Icon Gallery | `IconGallery.tsx` | Shell |
+| Spotlight | `Spotlight.tsx` | Shell |
 
 ## Quick Start
 
@@ -282,6 +285,7 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `microphone` | `useApp().microphone` is available (see [Sound input](#sound-input)) |
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
 | `sign-in`   | `useApp().signIn` is available (see [Signing in](#signing-in))        |
+| `music-kit` | `useApp().musicKit` is available (see [Apple Music](#apple-music))    |
 | `gpu`       | `useApp().gpu` is available: WGSL pixel programs rendered to an `ImageFrame`, and a rasterizer for meshes kept on the GPU, drawn by a WGSL corner program with a depth test (see `GpuService`) |
 | `agent-runtime` | `useApp().agentRuntime` is available (see [Agents](#agents))      |
 
@@ -340,6 +344,42 @@ The provider must support the **authorization code flow with PKCE**. The relay o
    ```
 
 `authorize` resolves `null` when the user cancels, closes the sheet, or declines on the phone. It rejects when the provider reports another error or the host is not declared. `apps/spotify/api.ts` (`signInWithPhone`) is a complete example.
+
+## Apple Music
+
+`useApp().musicKit` plays Apple Music through MusicKit on the Web (capability `music-kit`). MusicKit is a live object in the page and plays DRM-protected audio through the page's media element, so the OS holds it and your app drives it, the same on the OS's thread or in a process. It's one player per page: every app that uses it drives the same music.
+
+1. Have your server sign a developer token from a MusicKit key (this deployment's is `/api/apple-music/token`) and configure with it. Signed out, MusicKit plays 30-second previews:
+
+   ```tsx
+   const { musicKit } = useApp();
+   const state = await musicKit!.configure({ developerToken });
+   ```
+
+2. Sign in for whole songs and the user's library. `authorize` puts up this deployment's sign-in window and resolves with the Music User Token, for your app to keep and to send to the Apple Music API as `Music-User-Token`. Configure again afterwards, so MusicKit picks it up:
+
+   ```tsx
+   const musicUserToken = await musicKit!.authorize();
+   await musicKit!.configure({ developerToken, musicUserToken });
+   ```
+
+3. Queue and play, and follow the player's state, which is plain data (`playing`, `item`, `time`, `duration`, `shuffleMode`, `repeatMode`, …):
+
+   ```tsx
+   musicKit!.onChange((state) => setTitle(state.item?.title ?? "Not Playing"));
+   await musicKit!.setQueue({ playlist: "pl.f4d106fed2bd41149aaacabb233eb5eb", startPlaying: true });
+   ```
+
+4. Offer a membership to someone who signs in without one. A play their account can't make reaches `onError` with `membershipRequired`; `openSignUp`, called from a click, opens Apple Music's sign-up page with Apple's current trial:
+
+   ```tsx
+   musicKit!.onError((error) => setOfferTrial(error.membershipRequired));
+   // <Button label="Try Apple Music" onClick={() => void musicKit!.openSignUp()} />
+   ```
+
+5. Link what you show to Apple Music: Apple asks apps that play previews to link each one to its music. The Apple Music API gives catalog items a `url`, and `state.item.url` is the playing song's; `openInAppleMusic(url)` opens it in a new tab (and only `music.apple.com` links).
+
+The music stops when your app quits. `apps/Music.tsx` is a complete example.
 
 ## Sound
 
@@ -665,6 +705,7 @@ Like the Macintosh's `NewWindow`, you choose what kind of window you get:
 | `alert`      | `plain` and system-modal: nothing else takes input until it closes         |
 | `fullscreen` | no chrome at all — the whole screen, menubar included (see below)          |
 | `desk`       | your app's own desktop: no chrome, the whole screen below the menubar, always behind your other windows. Content coordinates are screen coordinates. Clicking it does not take the key window; hidden while another app is front. MacPaint's gray desk with its palettes is one. |
+| `panel`      | `plain` with a shadow, above documents, palettes and full-screen pictures, opened in the upper centre of the screen. What a menubar app opens (below). |
 
 ### Deciding what opening does: `onOpen`
 
@@ -690,6 +731,34 @@ export default defineApp({
 `onOpen` receives an `AppContext`: everything `useApp()` has except `window` and `setMenus`, since there is no window yet. It runs outside any component — open windows and dialogs there; keep signals and effects inside components.
 
 `openWindow(spec)` takes a `WindowSpec` whose every field is optional and defaults to your `defineApp`: `kind`, `title`, `size` (content pixels), `position`, `scrollable`, `resizable`, `minSize`, `Component` (a different component for this window — a preferences dialog, a palette) and `props`. `movable: false` pins a window where it opened. `onGoAway` makes the close box ask instead of close — run your Close command and call `window.close()` once the user agrees. `modal: false` keeps an `alert`-framed window from blocking the rest of the screen, for dialogs that decide themselves what clicks elsewhere do. It returns the window id, which `os.closeWindow` accepts. `openWindow()` with no argument is the main window.
+
+### Menubar apps
+
+An app declared `kind: "menubar"` lives in the menubar instead of the application menu, like a macOS menu bar extra (Spotlight is one). The OS draws its `menubarIcon` (16×16; `smallIcon` when omitted) at the right end of the menubar, in a slot like the application menu's beside it. A click on the icon opens the app — `onOpen`, or the main window — and a click while any of its windows is open closes them. `hotkey` does the same from anywhere: `hotkey: " "` is ⌘Space (⌃Space too, since a Mac host keeps ⌘Space for itself).
+
+Its windows take the keyboard but not the menubar: the menus of the app you were in stay up, ⌘ keys go to your window instead of to those menus, and closing the window gives the keyboard back to the window it came up over. A menubar app is never listed in the application menu, and installing one from the App Store leaves no desktop shortcut; its `.app` is in Applications, and trashing that uninstalls it. Open a `panel` and close it when the user is done, or when `window.isActive()` goes false, so a click elsewhere puts it away:
+
+```tsx
+export default defineApp({
+  id: "clock",
+  title: "Clock",
+  kind: "menubar",
+  icon: "clock/icon",
+  smallIcon: "clock/icon-16x16",
+  hotkey: "k",
+  defaultSize: { width: 160, height: 60 },
+  windowKind: "panel",
+  Component() {
+    const { window: win } = useApp();
+    let shown = false;
+    createEffect(win.isActive, (active) => {
+      if (active) shown = true;
+      else if (shown) win.close();
+    });
+    return <text font="menu">{new Date().toLocaleTimeString()}</text>;
+  },
+});
+```
 
 ### Full screen
 

@@ -1,8 +1,9 @@
 import { appleMenu, runMenuItem, runRadioItem } from "../kernel/menus";
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
-import { measureText, COMMAND_KEY, CHECK_MARK, smallIcon, type Sprite } from "@mockintosh/ui";
-import { getApp } from "../apps";
+import { measureText, CHECK_MARK, smallIcon, type Sprite } from "@mockintosh/ui";
+import { shortcutLabel } from "../shortcuts";
+import { getAllApps, getApp, onAppsChanged } from "../apps";
 import { runningAppIds } from "../appSwitcher";
 import { useOS } from "../context";
 import {
@@ -16,6 +17,8 @@ import {
   getWindows,
   setHighlightedMenuItem,
   setOpenMenuIndex,
+  getContextMenu,
+  closeContextMenu,
 } from "../state";
 import type {
   MenubarDefinition,
@@ -82,7 +85,7 @@ function menuDropdownWidth(items: MenubarItemDef[]): number {
   for (const item of items) {
     if ("label" in item && item.label) {
       const shortcut = "shortcut" in item ? (item as MenubarActionItem).shortcut : undefined;
-      const sw = shortcut ? measureText(`${COMMAND_KEY}${shortcut}`, MENU_FONT) + 16
+      const sw = shortcut ? measureText(shortcutLabel(shortcut), MENU_FONT) + 16
         : item.type === "submenu" ? SUBMENU_ARROW.width + 16 : 0;
       max = Math.max(max, TEXT_X + measureText(item.label, MENU_FONT) + sw);
     } else if ((item as MenubarRadioGroupDef).type === "radiogroup") {
@@ -153,6 +156,26 @@ export function Menubar(props: MenubarProps): JSX.Element {
   );
   const activeIcon = () => running().find((app) => app.id === getActiveAppId())?.icon;
   const switcherX = () => os.resolution.width - SWITCHER_GAP - SWITCHER_W;
+
+  // Menubar apps, in registration order from the application menu leftwards.
+  const [appsVersion, setAppsVersion] = createSignal(0, { ownedWrite: true });
+  onCleanup(onAppsChanged(() => setAppsVersion((v) => v + 1)));
+  const extras = createMemo(() => {
+    appsVersion();
+    return getAllApps()
+      .filter((app) => app.kind === "menubar")
+      .map((app, index) => {
+        const sprite = os.sprites.get(app.menubarIcon ?? app.smallIcon ?? app.icon);
+        return {
+          id: app.id,
+          title: app.title,
+          icon: sprite && (sprite.width === SMALL_ICON && sprite.height === SMALL_ICON ? sprite : smallIcon(sprite)),
+          left: switcherX() - (index + 1) * SWITCHER_W,
+        };
+      });
+  });
+  /** The menubar app whose icon the button went down on: lit until the button comes up, as a title is. */
+  const [pressedExtra, setPressedExtra] = createSignal<string | null>(null, { ownedWrite: true });
 
   const openIdx   = () => getOpenMenuIndex();
   const openMenu  = () => {
@@ -308,30 +331,32 @@ export function Menubar(props: MenubarProps): JSX.Element {
         }}
         </For>
 
+      {/* Menubar apps — each one's icon, lit while the button is down on it. */}
+      <For each={extras()}>
+        {(extra) => (
+          <IconTitle
+            left={extra.left}
+            icon={extra.icon}
+            lit={pressedExtra() === extra.id}
+            semantic={{ name: extra.title, role: "button" }}
+            onMouseDown={() => {
+              closeMenu();
+              setPressedExtra(extra.id);
+              os.toggleMenubarApp(extra.id);
+            }}
+            onMouseUp={() => setPressedExtra(null)}
+          />
+        )}
+      </For>
+
       {/* Application menu — the front app's 16×16 icon, at the right end. */}
-      <box
-        position="absolute"
+      <IconTitle
         left={switcherX()}
-        top={TITLE_TOP}
-        width={SWITCHER_W}
-        height={TITLE_H}
-        justifyContent="center"
-        alignItems="center"
-        background={openIdx() === APP_MENU ? 1 : undefined}
+        icon={activeIcon()}
+        lit={openIdx() === APP_MENU}
         semantic={{ name: "Application", role: "menu" }}
         {...titleHandlers(APP_MENU)}
-      >
-        <Show when={activeIcon()}>
-          {(icon) => (
-            <image
-              width={SMALL_ICON}
-              height={SMALL_ICON}
-              src={spriteSrc(icon())}
-              mode={openIdx() === APP_MENU ? "inverted" : "normal"}
-            />
-          )}
-        </Show>
-      </box>
+      />
 
       <Show when={openIdx() === APP_MENU}>
         <AppMenuDropdown
@@ -398,6 +423,71 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
         )}
       </Show>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ContextMenu — a menu popped up at the pointer by a secondary click
+// ---------------------------------------------------------------------------
+
+/**
+ * The button that popped up the contextual menu came up. Over an item, that
+ * chooses it. A click that didn't move leaves the menu up to choose from with
+ * another click; a drag that ends off the menu closes it.
+ */
+export function releaseContextMenu(moved: boolean): void {
+  if (!getContextMenu()) return;
+  const run = armed;
+  if (!run && !moved) return;
+  arm(null);
+  closeContextMenu();
+  run?.();
+}
+
+/** The open contextual menu, if any, above everything else on the screen. */
+export function ContextMenu(): JSX.Element {
+  const os = useOS();
+  const [highlighted, setHighlighted] = createSignal<number | null>(null);
+
+  function close() {
+    arm(null);
+    setHighlighted(null);
+    closeContextMenu();
+  }
+
+  return (
+    <Show when={getContextMenu()} keyed>
+      {(menu) => {
+        const w = menuDropdownWidth(menu.items);
+        return (
+          <>
+            {/* A press anywhere off the menu only closes it. */}
+            <box
+              position="absolute"
+              left={0}
+              top={0}
+              width={os.resolution.width}
+              height={os.resolution.height}
+              onMouseDown={close}
+            />
+            <MenuPanel
+              items={menu.items}
+              left={Math.max(0, Math.min(menu.x, os.resolution.width - w - 1))}
+              top={menu.y}
+              screenWidth={os.resolution.width}
+              screenBottom={os.resolution.height - 1}
+              highlighted={highlighted}
+              setHighlighted={setHighlighted}
+              onClose={close}
+              onRun={(item) => {
+                close();
+                if (!item.disabled && item.onClick) runMenuItem(item);
+              }}
+            />
+          </>
+        );
+      }}
+    </Show>
   );
 }
 
@@ -603,12 +693,18 @@ function MenuPanel(props: MenuPanelProps): JSX.Element {
             </text>
           </box>
           <Show when={ai.shortcut}>
-            <box position="absolute" left={rowW - 40} top={0} width={36} height={ITEM_H} justifyContent="center">
-              <text font={MENU_FONT} nowrap align="right" verticalAlign="middle"
-                color={isHighlighted() && !ai.disabled ? 0 : 1} stipple={ai.disabled}>
-                {`${COMMAND_KEY}${ai.shortcut}`}
-              </text>
-            </box>
+            {(shortcut) => {
+              const label = shortcutLabel(shortcut());
+              const width = Math.max(36, measureText(label, MENU_FONT));
+              return (
+                <box position="absolute" left={rowW - 4 - width} top={0} width={width} height={ITEM_H} justifyContent="center">
+                  <text font={MENU_FONT} nowrap align="right" verticalAlign="middle"
+                    color={isHighlighted() && !ai.disabled ? 0 : 1} stipple={ai.disabled}>
+                    {label}
+                  </text>
+                </box>
+              );
+            }}
           </Show>
         </box>
       );
@@ -668,6 +764,45 @@ function SubmenuArrow(props: { left: number; ink: 0 | 1 }): JSX.Element {
         />
       )}
     </For>
+  );
+}
+
+/**
+ * A menubar title that is an icon rather than a word: the application menu,
+ * and each menubar app beside it. One slot for both, so they line up: the
+ * title's full height, `SWITCHER_W` wide, a 16×16 icon centred in it, and the
+ * whole title inverted while it is lit.
+ */
+function IconTitle(props: {
+  left: number;
+  icon: Sprite | undefined;
+  lit: boolean;
+  semantic: { name: string; role: "menu" | "button" };
+  onMouseDown?: () => void;
+  onMouseEnter?: () => void;
+  onMouseUp?: () => void;
+}): JSX.Element {
+  return (
+    <box
+      position="absolute"
+      left={props.left}
+      top={TITLE_TOP}
+      width={SWITCHER_W}
+      height={TITLE_H}
+      justifyContent="center"
+      alignItems="center"
+      background={props.lit ? 1 : undefined}
+      semantic={props.semantic}
+      onMouseDown={props.onMouseDown}
+      onMouseEnter={props.onMouseEnter}
+      onMouseUp={props.onMouseUp}
+    >
+      <Show when={props.icon}>
+        {(icon) => (
+          <image width={SMALL_ICON} height={SMALL_ICON} src={spriteSrc(icon())} mode={props.lit ? "inverted" : "normal"} />
+        )}
+      </Show>
+    </box>
   );
 }
 

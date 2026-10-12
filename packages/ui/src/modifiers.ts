@@ -23,3 +23,20 @@ export function noteModifiers(modifiers: Modifiers): void {
   held.alt = modifiers.alt;
   held.meta = modifiers.meta;
 }
+
+/**
+ * A host key in the Macintosh's terms. ⌘ and ⌃ are both the Macintosh's ⌘:
+ * a browser keeps ⌘W, ⌘N and ⌘Q for itself, so ⌃W, ⌃N, ⌃Q reach those
+ * commands, and a PC keyboard's Ctrl is where its ⌘ is. A focus that takes
+ * raw keys (a terminal) keeps ⌃ as ⌃, for ⌃C and the rest; there ⌃⇧ and a
+ * letter is ⌘, as in a PC's terminals, since a terminal can't tell ⌃⇧C from ⌃C.
+ */
+export function macKey(key: string, host: Modifiers, rawFocus: boolean): { key: string; modifiers: Modifiers } {
+  // ⌃Tab stays: it always moves focus (⌘Tab is the host's app switcher).
+  if (!host.ctrl || key === "Tab") return { key, modifiers: host };
+  if (!rawFocus) return { key, modifiers: { ...host, ctrl: false, meta: true } };
+  if (host.shift && /^[a-z]$/i.test(key)) {
+    return { key: key.toLowerCase(), modifiers: { ...host, shift: false, ctrl: false, meta: true } };
+  }
+  return { key, modifiers: host };
+}

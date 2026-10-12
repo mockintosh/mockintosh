@@ -22,6 +22,7 @@ import type { KernelClient, KernelPermission } from "./kernel";
 import type { AppCrypto } from "./crypto";
 import type { BrowserService } from "./browser";
 import type { SignInDeclaration, SignInService } from "./signIn";
+import type { MusicKitService } from "./musicKit";
 
 export type { MenubarDefinition, MenubarItemDef, MenubarActionItem, MenubarRadioGroupDef, MenubarSubmenuDef, MenubarSeparator } from "./menus";
 
@@ -198,6 +199,16 @@ import type { AppDeclaration } from "./declaration";
 export type { AppCrypto } from "./crypto";
 export type { BrowserService } from "./browser";
 export type { SignInService, SignInDeclaration } from "./signIn";
+export {
+  MUSIC_KIT_IDLE,
+  type MusicKitService,
+  type MusicKitState,
+  type MusicKitError,
+  type MusicKitItem,
+  type MusicKitQueueOptions,
+  type MusicKitShuffleMode,
+  type MusicKitRepeatMode,
+} from "./musicKit";
 export { encodeQR } from "./qr";
 export type { Resource, Job, Diagnostic, ChatMessage, CompleteResult, OpenAITool, ContentPart, ChatContent } from "@mockintosh/protocol";
 export { parse, resource, jobSchema } from "@mockintosh/protocol";
@@ -424,8 +435,25 @@ export interface PrintService {
  *                  does not take the key window, and it is hidden while
  *                  another app is frontmost. MacPaint's gray desk with its
  *                  palettes is one.
+ * - `panel`      — a plain box with a shadow that floats above documents,
+ *                  full-screen windows and palettes, and never drags: what a
+ *                  menubar app (`kind: "menubar"`) opens from its menubar
+ *                  icon. It takes the keyboard but not the menubar.
  */
-export type WindowKind = "document" | "dialog" | "utility" | "plain" | "alert" | "fullscreen" | "desk";
+export type WindowKind = "document" | "dialog" | "utility" | "plain" | "alert" | "fullscreen" | "desk" | "panel";
+
+/**
+ * What sort of app this is. `"application"` (the default) is an app you
+ * switch to: its windows bring its menus into the menubar and it is listed
+ * in the application menu while it runs. `"menubar"` is a menubar app (the
+ * macOS menu bar extra): it has no menus of its own and is never in the
+ * application menu. Instead the OS puts its `menubarIcon` at the right end of
+ * the menubar, beside the application menu. A click on the icon opens the
+ * app (`onOpen`), and a click while any of its windows is open closes them,
+ * as does its `hotkey`. Its windows (usually a `panel`) take the keyboard
+ * while the menubar keeps showing the app you were in.
+ */
+export type AppKind = "application" | "menubar";
 
 /**
  * What an app asks for when it opens a window. Everything is optional: the
@@ -538,6 +566,8 @@ export interface AppContext {
   browser?: BrowserService;
   /** Sign in to an OAuth provider from the user's phone, when this Macintosh can. */
   signIn?: SignInService;
+  /** Apple Music playback, MusicKit held by the OS; see `MusicKitService`. */
+  musicKit?: MusicKitService;
   /**
    * What this Macintosh can do. Apps that work with or without a feature
    * check here instead of declaring it in `requires`.
@@ -616,13 +646,14 @@ export type FetchFunction = (url: string, options?: FetchRequest) => Promise<Fet
  * - `microphone` — `useApp().microphone` is available
  * - `browser`   — `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`)
  * - `sign-in`   — `useApp().signIn` is available (sign in from a phone; see `SignInService`)
+ * - `music-kit` — `useApp().musicKit` is available (Apple Music playback; see `MusicKitService`)
  * - `agent-runtime` — `useApp().agentRuntime` is available (language-model agents; see `AgentRuntime`)
  * - `fonts`     — `useApp().fontRaster` is available
  * - `gpu`       — `useApp().gpu` is available (pixel programs; see `GpuService`)
  */
 export type Capability =
   | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in"
-  | "agent-runtime" | "fonts" | "gpu";
+  | "music-kit" | "agent-runtime" | "fonts" | "gpu";
 
 /**
  * What "About <app>…" — the first Apple-menu item while the app is frontmost —
@@ -679,6 +710,19 @@ export interface SolidApp<P extends Record<string, unknown> = Record<string, unk
    * processes). Declare `"main"` only for something a process can't serve.
    */
   runtime?: "worker" | "main";
+  /** An application (the default) or a menubar app; see `AppKind`. */
+  kind?: AppKind;
+  /**
+   * A menubar app's icon in the menubar, in the same 16×16 slot the
+   * application menu draws the front app's `smallIcon` in. `smallIcon` when
+   * omitted; anything not 16×16 is reduced to it. Ignored for applications.
+   */
+  menubarIcon?: string;
+  /**
+   * A menubar app's ⌘ key: ⌘ (or ⌃) and this key open it from anywhere, and
+   * close it again. `" "` is ⌘Space. Ignored for applications.
+   */
+  hotkey?: string;
   /** Size of the main window, measured as `WindowSpec.size` is. */
   defaultSize: { width: number; height: number };
   /** Kind of the main window (default `document`). */

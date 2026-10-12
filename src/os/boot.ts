@@ -17,7 +17,7 @@ import { registerFileOperations } from "./kernel/files";
 
 import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd, type Rect } from "@mockintosh/quickdraw";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
-import { copyBitMapBytes, createDoubleClickTracker, createUI, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
+import { copyBitMapBytes, createDoubleClickTracker, DOUBLE_CLICK_DIST, createUI, isEditingChord, macKey, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
 import { FileSystem, type FSFile } from "@mockintosh/fs";
 import type { AppContext } from "@mockintosh/sdk";
 import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEvent } from "../platform/types";
@@ -50,7 +50,13 @@ import {
   FINDER_APP_ID,
   hideApps as hideAppsInState,
   isAppHidden,
+  isAccessoryKey,
+  getActiveWindow,
+  getContextMenu,
+  closeContextMenu,
+  type OSWindow,
 } from "./state";
+import { releaseContextMenu } from "./components/Menubar.solid";
 import type { OSServices } from "./context";
 import { getAllApps, getApp, registerApp } from "./apps";
 import { bundledApps, getBundledApp } from "./bundledApps";
@@ -79,6 +85,7 @@ import { createSystemPrinters } from "./printers/manager";
 
 import { createDesktopSettings, registerDesktopSettings } from "./kernel/settings";
 import { menuCommands, runMenuItem } from "./kernel/menus";
+import { shortcutMatches } from "./shortcuts";
 import { registerShell } from "./shell";
 import { registerUIOperations } from "./kernel/uiService";
 import { Cancellation } from "./kernel/cancellation";
@@ -105,7 +112,8 @@ export interface BootedOS {
   kernel: Kernel;
   input: {
     pointer(event: PlatformPointerEvent): void;
-    key(event: PlatformKeyEvent): void;
+    /** `true` when the Macintosh used the key. */
+    key(event: PlatformKeyEvent): boolean;
     drop(event: PlatformDropEvent): void;
   };
   render(cancellation?: Cancellation): Promise<void>;
@@ -281,6 +289,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     fontFolder,
     crypto: platform.crypto,
     browser: platform.browser,
+    musicKit: platform.musicKit,
     signIn: platform.signInRelay && systemSignIn(platform.signInRelay),
     installer,
     openApp(appId, props = {}, fromRect?) {
@@ -361,6 +370,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
         openWindowCount: getWindows().length,
       });
       win.Component ??= app.Component;
+      if (app.kind === "menubar") win.accessory = true;
       win.instanceId = instanceId ?? instances.create(appId, osServices.projects?.selectedBuild(appId));
       instances.addWindow(win.instanceId, win.id);
       win.openedFromRect = fromRect;
@@ -427,6 +437,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     },
     openFSNode(nodeId, fromRect?) {
       void openFSNodeImpl(nodeId, fromRect);
+    },
+    toggleMenubarApp(appId) {
+      const open = getWindows().filter((w) => w.appId === appId);
+      if (open.length === 0) {
+        osServices.openApp(appId);
+        return;
+      }
+      for (const win of open) osServices.closeWindow(win.id);
     },
     closeWindow(id) {
       const win = getWindows().find((w) => w.id === id);
@@ -791,6 +809,27 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
 
   // --- Input ---
   const doubleClick = createDoubleClickTracker();
+  /** Where the press that popped up a contextual menu went down, until it comes up. */
+  let contextPress: { x: number; y: number } | null = null;
+
+  /** The right button, or ⌃ with the only button a Mac mouse had. */
+  function isContextClick(e: PlatformPointerEvent): boolean {
+    if (e.button === 2) return true;
+    return (e.button ?? 0) === 0 && !!e.modifiers?.ctrl && !e.modifiers.meta;
+  }
+
+  /**
+   * A menubar app's panel had the keyboard and a press landed somewhere else
+   * (the desktop, a window, the menubar): put the panel away, as on the Mac.
+   * Run after the press is dispatched, so a press on the app's own icon only
+   * toggles it.
+   */
+  function dismissAccessory(before: OSWindow | undefined, x: number, y: number): void {
+    if (!before?.accessory || !getWindows().some((w) => w.id === before.id)) return;
+    const r = windowOuterRect(before);
+    if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) return;
+    osServices.closeWindow(before.id);
+  }
 
   function onPointer(e: PlatformPointerEvent): void {
     if (stopped) throw new ServiceError("disconnect", "Boot has ended");
@@ -830,10 +869,22 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       case "down": {
         cursorX = e.x;
         cursorY = e.y;
+        const keyWindow = getActiveWindow();
+        if (isContextClick(e)) {
+          doubleClick.reset();
+          // A second secondary click only puts away the menu the first one opened.
+          if (getContextMenu()) closeContextMenu();
+          else if (ui.dispatchPointer("contextmenu", e.x, e.y, { modifiers: e.modifiers })) contextPress = { x: e.x, y: e.y };
+          dismissAccessory(keyWindow, e.x, e.y);
+          trackCursor(e.x, e.y);
+          scheduleRepaint();
+          return;
+        }
         ui.dispatchPointer("mousedown", e.x, e.y, { modifiers: e.modifiers });
         if (doubleClick.down(e.x, e.y, scheduler.now())) {
           ui.dispatchPointer("dblclick", e.x, e.y);
         }
+        dismissAccessory(keyWindow, e.x, e.y);
         trackCursor(e.x, e.y);
         scheduleRepaint();
         return;
@@ -841,6 +892,14 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       case "up":
         cursorX = e.x;
         cursorY = e.y;
+        if (contextPress) {
+          const moved = Math.abs(e.x - contextPress.x) >= DOUBLE_CLICK_DIST || Math.abs(e.y - contextPress.y) >= DOUBLE_CLICK_DIST;
+          contextPress = null;
+          releaseContextMenu(moved);
+          trackCursor(e.x, e.y);
+          scheduleRepaint();
+          return;
+        }
         ui.dispatchPointer("mouseup", e.x, e.y, { modifiers: e.modifiers });
         trackCursor(e.x, e.y);
         scheduleRepaint();
@@ -854,19 +913,28 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     }
   }
 
-  /** ⌘-shortcut from the current menubar, if any. Returns true when handled. */
-  function runMenuShortcut(key: string): boolean {
+  /**
+   * ⌘-shortcut from the current menubar: `"ran"` when an enabled item took
+   * it, `"disabled"` when the key only belongs to a dimmed item, else null.
+   */
+  function runMenuShortcut(e: PlatformKeyEvent): "ran" | "disabled" | null {
+    // A menubar app's panel is key: the menubar belongs to the app behind it, and the keys to the panel.
+    if (isAccessoryKey()) return null;
+    let dimmed = false;
     for (const menu of getMenubarMenus()) {
       for (const item of menuCommands(menu.items)) {
         if (item.type === "radiogroup") continue;
-        if (item.shortcut && item.shortcut.toLowerCase() === key.toLowerCase() && !item.disabled) {
-          if (item.onClick) runMenuItem(item);
-          setOpenMenuIndex(null);
-          return true;
+        if (!item.shortcut || !shortcutMatches(item.shortcut, e.key, e.code, e.modifiers)) continue;
+        if (item.disabled) {
+          dimmed = true;
+          continue;
         }
+        if (item.onClick) runMenuItem(item);
+        setOpenMenuIndex(null);
+        return "ran";
       }
     }
-    return false;
+    return dimmed ? "disabled" : null;
   }
 
   function pasteFromClipboard(): void {
@@ -882,42 +950,69 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       });
   }
 
-  function onKey(e: PlatformKeyEvent): void {
+  /**
+   * Handles a key and says whether the Macintosh used it, so the host can
+   * keep its own action for it (a browser's Save Page on ⌘S, Reload on ⌘R)
+   * only when nothing here did. Keys no menu or editor claims stay the host's.
+   */
+  function onKey(hostEvent: PlatformKeyEvent): boolean {
     if (stopped) throw new ServiceError("disconnect", "Boot has ended");
+    // From here on, meta is the Macintosh's ⌘ and ctrl its ⌃ (a terminal's).
+    const e: PlatformKeyEvent = { ...hostEvent, ...macKey(hostEvent.key, hostEvent.modifiers, ui.focusedTakesRawKeys()) };
     if (screenshotCapture.key(e)) {
       trackCursor();
       scheduleRepaint();
-      return;
+      return true;
     }
     const mods: Modifiers = e.modifiers;
     if (e.type === "up") {
       ui.dispatchKeyboard("keyup", e.key, mods);
-      return;
+      return false;
     }
-    const command = mods.meta || mods.ctrl;
-    // ⌘⌥Esc, as on the Mac; the host keeps that one on a Mac, so ⌃⌥Esc too.
+    if (e.key === "Escape" && getContextMenu()) {
+      closeContextMenu();
+      scheduleRepaint();
+      return true;
+    }
+    const command = mods.meta;
+    // ⌘⌥Esc, as on the Mac (the host keeps that one on a Mac; ⌃⌥Esc is ⌘⌥Esc too).
     if (command && mods.alt && e.key === "Escape") {
       osServices.forceQuit();
       scheduleRepaint();
-      return;
+      return true;
+    }
+    // A menubar app's hotkey works from anywhere (⌘Space: Spotlight; a host's
+    // ⌃Space is ⌘Space here, except in a terminal, whose ⌃ keys are its own).
+    if (command && !mods.alt) {
+      const menubarApp = getAllApps().find((app) => app.kind === "menubar" && app.hotkey?.toLowerCase() === e.key.toLowerCase());
+      if (menubarApp) {
+        osServices.toggleMenubarApp(menubarApp.id);
+        scheduleRepaint();
+        return true;
+      }
     }
     // An app's own enabled Paste owns ⌘V; otherwise the host clipboard types in.
-    // ⌃V is a key of its own for a terminal ("insert the next character literally").
-    const rawControlKey = mods.ctrl && !mods.meta && ui.focusedTakesRawKeys();
-    if (command && e.key.toLowerCase() === "v" && !rawControlKey) {
-      if (!(mods.meta && runMenuShortcut(e.key))) pasteFromClipboard();
+    if (command && e.key.toLowerCase() === "v") {
+      if (runMenuShortcut(e) !== "ran") pasteFromClipboard();
       scheduleRepaint();
-      return;
+      return true;
     }
-    if (mods.meta && e.key.length === 1 && runMenuShortcut(e.key)) {
+    const shortcut = command && e.key.length === 1 ? runMenuShortcut(e) : null;
+    if (shortcut === "ran") {
       scheduleRepaint();
-      return;
+      return true;
     }
+    const focused = ui.focusManager.focused !== null;
     ui.dispatchKeyboard("keydown", e.key, mods);
-    if (e.key.length === 1 && !command) {
+    if (e.key.length === 1 && !command && !mods.ctrl) {
       ui.dispatchKeyboard("keypress", e.key, mods);
     }
     scheduleRepaint();
+    // A dimmed item's key is still the Mac's (no Save Page under a dim Save),
+    // though the focused field gets it: Finder dims Select All while renaming.
+    // A terminal takes ⌃R, ⌃W and the rest as its own (only a terminal sees ⌃);
+    // a text field takes ⌘A, ⌘Z and ⌘← (which a browser would read as Back).
+    return shortcut === "disabled" || (focused && (mods.ctrl || (command && isEditingChord(e.key))));
   }
 
   async function onDrop(e: PlatformDropEvent): Promise<void> {

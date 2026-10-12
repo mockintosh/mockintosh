@@ -11,6 +11,7 @@ export const SDK_CLEAN = [
   "Foundry.tsx",
   "Safari.tsx",
   "Maps.tsx",
+  "Calendar.tsx",
   "Testing.tsx",
   "FileViewer.tsx",
   "Preview.tsx",
@@ -31,6 +32,7 @@ export const SDK_CLEAN = [
   "Terminal.tsx",
   "Assistant.tsx",
   "SpotifyPlayer.tsx",
+  "Music.tsx",
 ] as const;
 
 /** App entry files that are OS shell and are not expected to be SDK-clean. */
@@ -38,6 +40,7 @@ export const SHELL_APPS = [
   "Finder.solid.tsx",
   "AppStore.tsx",
   "IconGallery.tsx",
+  "Spotlight.tsx",
 ] as const;
 
 /** Every bundled app entry, including those still being cleaned. */
@@ -47,6 +50,7 @@ export const BUNDLED_APPS = [
   "Foundry.tsx",
   "Safari.tsx",
   "Maps.tsx",
+  "Calendar.tsx",
   "Testing.tsx",
   "FileViewer.tsx",
   "Preview.tsx",
@@ -64,12 +68,14 @@ export const BUNDLED_APPS = [
   "VideoPlayer.tsx",
   "PhotoBooth.tsx",
   "SpotifyPlayer.tsx",
+  "Music.tsx",
   "SourceEditor.tsx",
   "Terminal.tsx",
   "Assistant.tsx",
   "Finder.solid.tsx",
   "AppStore.tsx",
   "IconGallery.tsx",
+  "Spotlight.tsx",
 ] as const;
 
 export type BundledAppEntry = (typeof BUNDLED_APPS)[number];
@@ -80,8 +86,10 @@ export const APP_SIBLING_DIRS: Partial<Record<BundledAppEntry, readonly string[]
   "Canvas.tsx": ["canvas"],
   "Safari.tsx": ["safari"],
   "Maps.tsx": ["maps"],
+  "Calendar.tsx": ["calendar"],
   "Foundry.tsx": ["foundry"],
   "SpotifyPlayer.tsx": ["spotify", "sprites"],
+  "Music.tsx": ["music"],
   "Finder.solid.tsx": ["finder"],
   "PhotoBooth.tsx": ["photobooth"],
   "Dither.tsx": ["photobooth", "dither"],
@@ -105,6 +113,7 @@ export const APP_TITLES: Record<BundledAppEntry, string> = {
   "Foundry.tsx": "Foundry",
   "Safari.tsx": "Safari",
   "Maps.tsx": "Maps",
+  "Calendar.tsx": "Calendar",
   "Testing.tsx": "Testing",
   "FileViewer.tsx": "File",
   "Preview.tsx": "Preview",
@@ -122,12 +131,14 @@ export const APP_TITLES: Record<BundledAppEntry, string> = {
   "VideoPlayer.tsx": "Video Player",
   "PhotoBooth.tsx": "Photo Booth",
   "SpotifyPlayer.tsx": "Spotify",
+  "Music.tsx": "Music",
   "SourceEditor.tsx": "Source Editor",
   "Terminal.tsx": "Terminal",
   "Assistant.tsx": "Assistant",
   "Finder.solid.tsx": "Finder",
   "AppStore.tsx": "App Store",
   "IconGallery.tsx": "Icon Gallery",
+  "Spotlight.tsx": "Spotlight",
 };
 
 export function isSdkClean(entry: string): boolean {

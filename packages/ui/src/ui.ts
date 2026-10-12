@@ -74,7 +74,8 @@ export interface UIInstance {
   /**
    * Dispatch a pointer event. Hit-tests the live node tree with capture.
    * `"scroll"` returns whether a scroll view or `onScroll` handler consumed
-   * the delta. Other pointer types return false.
+   * the delta; `"contextmenu"` whether an `onContextMenu` handler took the
+   * secondary click. Other pointer types return false.
    */
   dispatchPointer(
     type: PointerType,

@@ -7,6 +7,7 @@ import { iconSprites } from "./icons";
 import { uiSprites } from "./ui";
 import { chromeSprites } from "./chrome";
 import { standardFileSprites } from "./standardFile";
+import { transportSprites } from "./transport";
 
 export { SpriteRegistry } from "./registry";
 
@@ -15,4 +16,5 @@ export function registerBuiltinSprites(registry: SpriteRegistry): void {
   registry.registerAll(uiSprites);
   registry.registerAll(chromeSprites);
   registry.registerAll(standardFileSprites);
+  registry.registerAll(transportSprites);
 }

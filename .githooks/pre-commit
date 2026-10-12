@@ -1,0 +1,12 @@
+#!/bin/sh
+# Keeps apps/declarations.generated.json in step with the apps: a commit that
+# touches an app or the SDK regenerates it and takes the new copy along.
+# Turned on by `npm install` (package.json's prepare script).
+
+if git diff --cached --name-only | grep -qE '^(apps|packages/sdk)/'; then
+  if npm run -s apps:declarations >/dev/null 2>&1; then
+    git add apps/declarations.generated.json
+  else
+    echo "pre-commit: couldn't regenerate apps/declarations.generated.json; run npm run apps:declarations to see why." >&2
+  fi
+fi

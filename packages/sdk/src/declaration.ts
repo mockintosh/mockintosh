@@ -25,6 +25,9 @@ export interface AppDeclaration {
   permissions?: SolidApp["permissions"];
   signIn?: SolidApp["signIn"];
   runtime?: SolidApp["runtime"];
+  kind?: SolidApp["kind"];
+  menubarIcon?: string;
+  hotkey?: string;
   defaultSize: { width: number; height: number };
   windowKind?: string;
   scrollable?: boolean;
@@ -50,6 +53,9 @@ export function appDeclaration(app: SolidApp<any>): AppDeclaration {
   copy("permissions", app.permissions);
   copy("signIn", app.signIn);
   copy("runtime", app.runtime);
+  copy("kind", app.kind);
+  copy("menubarIcon", app.menubarIcon);
+  copy("hotkey", app.hotkey);
   copy("windowKind", app.windowKind);
   copy("scrollable", app.scrollable);
   copy("resizable", app.resizable);

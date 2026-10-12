@@ -147,6 +147,10 @@ Windows belong to apps via `OSWindow.appId`; the **active app** is derived, neve
 
 Menus are owned by apps, not windows. `SolidApp.menus` (or `setAppMenus(appId, …)` for menus that change at runtime) registers an app's menubar; `useWindow().setMenus` sets a *per-window override* for menus that depend on window state (Finder's "Clean Up" is enabled only inside a folder). `getMenubarMenus()` resolves override → app menus → `[]`, so switching windows always shows the right menus with no imperative sync.
 
+### Menubar apps
+
+An app declared `kind: "menubar"` (Spotlight) has no menus and is never in the application menu. The menubar draws its `menubarIcon` left of the application menu, in the same 16×16 slot (`IconTitle` in `Menubar.solid.tsx`); a click on it, or its `hotkey` with ⌘/⌃ from anywhere (`onKey` in `boot.ts`), calls `toggleMenubarApp`: close the app's windows if it has any, else `openApp`. The icon is lit only while the button is down on it, like a menu title. A press anywhere outside a key menubar app window (the desktop, another window, the menubar) closes it (`dismissAccessory` in `boot.ts`, run after the press is dispatched so the app's own icon still just toggles it). Its windows are marked `accessory` (`openWindow` in `boot.ts`) and remember the key window they came up over (`openedOver`): `menubarWindow()` follows that back, so the menubar keeps the app you were in, `runMenuShortcut` leaves ⌘ keys to the panel, and closing it gives the keyboard back. Installing one leaves no desktop shortcut. Spotlight is a bundled App Store listing and a shell app (it reads the app registry, the App Store listings and the whole disk); it opens the App Store on an app's page through `src/os/appStoreLink.ts`.
+
 ### Third-party apps (SDK v3)
 
 ```ts
@@ -317,6 +321,7 @@ A window's `kind` selects a **window definition** (`src/os/windowKinds.ts`) — 
 | `"alert"`         | `dBoxProc`        | 1px / 2px white / 2px square frame and shadow; system-modal | 5 front              |
 | `"fullscreen"`    | —                 | none; bounds are the screen, menubar hidden         | 3 above documents            |
 | `"desk"`          | —                 | none; the screen under the menubar, local = global coordinates; a press does not take the key window | behind the app's other windows; hidden when another app is front |
+| `"panel"`         | `plainDBox`       | 1px frame and shadow, not movable; opens in the upper centre | 4 above fullscreen |
 
 `buildAppWindow` clamps size/position to the desktop (gray region minus 3 px). Zoom box toggles `standardBounds` vs `userBounds`. Opening from a Finder icon plays the zoom-rect animation.
 
@@ -331,6 +336,8 @@ platform.input (raw down/up/move/scroll, key down/up)
              ⌘ shortcut scan of the active menubar
    → ui.dispatchPointer / dispatchKeyboard
 ```
+
+`onKey` first reads the host key in the Macintosh's terms (`macKey`): ⌘ and ⌃ (a PC's Ctrl) are both ⌘, since a browser keeps ⌘W, ⌘N and ⌘Q for itself, except while a terminal has focus, where ⌃ stays ⌃ and ⌃⇧ with a letter is ⌘. A menu item's `shortcut` is a key after any of ⌥ and ⇧ (`"⇧S"`), matched with exactly those modifiers (`src/os/shortcuts.ts`). It then returns whether the Macintosh used the key: a menu shortcut (a dimmed one too, though the focused field still gets it), paste, Force Quit, a terminal's raw ⌃ key, or a focused editor's ⌘A/⌘Z/⌘←. The web platform then cancels the browser's own action for it (Save Page on ⌘S, Reload on ⌘R); any other key stays the browser's. Keys the browser never hands the page (⌘Q, ⌘W, ⌘N, ⌘T) can't be caught, so a production build asks before leaving while any app runs (`guardUnload`). See `docs/keyboard-shortcuts-plan.md`.
 
 ## File System
 
@@ -410,7 +417,7 @@ Pty master ── line discipline (cooked/raw, echo, ISIG, ONLCR, SIGWINCH) ─�
 ```
 
 - **Screen and view** (`src/screen.ts`, `src/view/`). xterm types stay in `screen.ts`. `monochromeStyle` is the one place colour becomes ink: dark greys and faint text dither, backgrounds become a 25% pattern or black paper. Box drawing, blocks, shades, Braille and common TUI symbols are drawn by rule (`glyphs.ts`). The view's screen text is its semantic `value`, so `inspect`, MCP and agents read a terminal.
-- **Keys.** The UI kit's `rawKeys` gives a focused terminal Tab and ⌃V, and `onPaste` delivers a paste in one piece (bracketed when the program asks); both cross into app processes. ⌘ keys stay the menubar's.
+- **Keys.** The UI kit's `rawKeys` gives a focused terminal Tab and ⌃V, and `onPaste` delivers a paste in one piece (bracketed when the program asks); both cross into app processes. ⌘ keys stay the menubar's; there ⌃ is the terminal's, and ⌃⇧C, ⌃⇧V and the rest are ⌘C, ⌘V (`macKey`).
 - **Bash** (`src/bash/`). just-bash runs each line; `BashSession` carries variables, aliases, options, `$?` and function definitions between lines. Files are the kernel's file traps, so the Finder and bash see the same disk. S1's Macintosh commands (`open`, `windows`, `click`, `screenshot`, `ps`, `kill`, …) are bash commands that run through `run_shell`; `mac <command>` reaches any of them.
 - **Jobs.** The shell registers itself on a new tty and each command as its child in the kernel's process table; `kill` from anywhere reaches the foreground job.
 - **WebAssembly programs** (`src/wasi/`). Each runs in its own worker; WASI system calls block on shared memory while Terminal's worker answers them from the shell's file system and the tty. Programs built here link `scripts/wasi/mactty.c` for termios and the window size, and enter `$PWD` at startup. `npm run wasi:build` builds Lua, kilo and SQLite's shell with wasi-sdk into `public/wasi/` and copies CPython's WASI build there. Needs a cross-origin-isolated page (Safari has none, so programs don't run there).

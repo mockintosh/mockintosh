@@ -2,6 +2,11 @@ import { formatUrl, parseMarkdown, parseUrl, queryParams, type BitmapTip, type F
 import { PageError, type DocumentPage, type SiteContext, type SiteAdapter } from "../../page";
 import {
   GithubError,
+  MissingScopeError,
+  canWatch,
+  watchScopeError,
+  NOT_FOUND,
+  RateLimitError,
   addDiscussionComment,
   addIssueComment,
   createDiscussion,
@@ -58,8 +63,11 @@ export const githubSite: SiteAdapter = {
       return loadLocation(await post(posted, fields, context), context, {});
     } catch (error) {
       if (!(error instanceof GithubError)) throw error;
-      // A star or a watch has no form to come back to: say why GitHub refused it.
-      if (posted.kind === "star" || posted.kind === "watch") throw new PageError(error.message);
+      // A star or a watch has no form to come back to: say why GitHub refused it, header and all.
+      if (posted.kind === "star" || posted.kind === "watch") {
+        const viewer = context.settings.githubToken ? await viewerOf(context) : null;
+        return withHeader(errorPage(posted.form, error, context.settings.githubToken !== "", Date.now()), viewer);
+      }
       // Back to the form, with what was written and why GitHub refused it.
       return loadLocation(posted.form, context, { draft: fields, error: error.message });
     }
@@ -79,6 +87,8 @@ export interface PageForms extends FormState {
   signedIn: boolean;
   /** Who is signed in; empty when signed out, or when GitHub won't say. */
   viewer?: string;
+  /** False when the sign-in can't watch repositories, so Watch asks to sign in again. */
+  canWatch?: boolean;
 }
 
 function locationOf(url: WebUrl): GithubLocation {
@@ -117,9 +127,10 @@ async function loadBody(location: Exclude<GithubLocation, { kind: "login" | "log
   const target: ApiLocation = jump ? { kind: "tree", owner: jump[1], repo: jump[2], ref: "", path: "" } : location;
   try {
     const [page, viewer] = await Promise.all([loadPage(context.fetch, token, target), token ? viewerOf(context) : null]);
-    return githubPage(page, Date.now(), { signedIn: token !== "", viewer: viewer?.login ?? "", ...state });
+    return githubPage(page, Date.now(), { signedIn: token !== "", viewer: viewer?.login ?? "", canWatch: viewer ? canWatch(viewer) : true, ...state });
   } catch (error) {
-    if (error instanceof GithubError) throw new PageError(error.message);
+    // A GitHub page still, header and all, so signing in or searching is a click away.
+    if (error instanceof GithubError) return errorPage(location, error, token !== "", Date.now());
     throw error;
   }
 }
@@ -143,7 +154,7 @@ function viewerOf(context: SiteContext): Promise<Viewer> {
   if (!viewer) {
     viewer = getViewer(context.fetch, token).catch(() => {
       viewers.delete(token);
-      return { login: "", avatarUrl: "" };
+      return { login: "", avatarUrl: "", scopes: null };
     });
     viewers.set(token, viewer);
   }
@@ -320,6 +331,8 @@ async function post(posted: Posted, fields: Record<string, string>, context: Sit
   if (!token) throw new GithubError("Sign in to GitHub first.", 401);
   const { owner, repo } = posted;
   if (posted.kind === "watch") {
+    // Don't ask GitHub for what the sign-in can't do: it would only say "Not found".
+    if (!canWatch(await viewerOf(context))) throw watchScopeError(posted.watching);
     await setWatching(fetch, token, owner, repo, posted.watching);
     return posted.form;
   }
@@ -530,6 +543,48 @@ function signInFirstPage(location: GithubLocation, why: string): DocumentPage {
     title: "Sign in to GitHub",
     nodes: [heading(1, "Sign in to GitHub"), paragraph(text(why)), signInForm(location, "Sign In")],
   };
+}
+
+/** Why GitHub won't show `location`, and what might get it to: signing in, or trying again. */
+function errorPage(location: GithubLocation, error: GithubError, signedIn: boolean, now: number): DocumentPage {
+  if (error instanceof RateLimitError) return rateLimitPage(location, signedIn, error.resetsAt, now);
+  const page = (title: string, ...nodes: LayoutNode[]): DocumentPage => ({ kind: "document", url: githubUrl(location), title, nodes: [heading(1, title), ...nodes] });
+  if (error instanceof MissingScopeError) return page("Sign in to GitHub", paragraph(text(error.message)), signInForm(location, "Sign In Again"));
+  if (error.status === 404) {
+    // A file opened as a folder, a category that isn't there: GitHub's own word for it.
+    if (error.message !== NOT_FOUND) return page("Not found", paragraph(text(error.message)));
+    // GitHub says a private repository isn't there to anyone who can't see it.
+    return signedIn
+      ? page("Not found", paragraph(text("There's nothing at this address on GitHub, or it's private and this account can't see it.")))
+      : page("Not found", paragraph(text("There's nothing at this address on GitHub, or it's private. Signed in, Safari can open private repositories you have access to.")), signInForm(location, "Sign In"));
+  }
+  if (error.status === 401) {
+    return signedIn
+      ? page("Sign in to GitHub", paragraph(text("GitHub no longer accepts Safari's sign-in. It may have expired or been revoked.")), signInForm(location, "Sign In Again"))
+      : page("Sign in to GitHub", paragraph(text(error.message)), signInForm(location, "Sign In"));
+  }
+  const nodes = [paragraph(text(`${error.message} `), link("Try Again", location))];
+  if (!signedIn && error.status === 403) nodes.push(paragraph(text("Signed in, GitHub may let Safari open it.")), signInForm(location, "Sign In"));
+  return page(error.status === 403 ? "GitHub refused" : "GitHub can't open this page", ...nodes);
+}
+
+/** GitHub won't answer more requests yet: why, when it will, and, signed out, how to get more. */
+function rateLimitPage(location: GithubLocation, signedIn: boolean, resetsAt: number | null, now: number): DocumentPage {
+  const minutes = resetsAt === null ? null : Math.max(1, Math.ceil((resetsAt - now) / 60_000));
+  const when = minutes === null ? "in a little while" : minutes === 1 ? "in a minute" : `in ${minutes} minutes`;
+  const retry = paragraph(text(`GitHub answers again ${when}. `), link("Try Again", location));
+  const nodes: LayoutNode[] = [heading(1, "GitHub needs a break")];
+  if (signedIn) {
+    nodes.push(paragraph(text("GitHub answers 5,000 requests an hour for each account, and Safari has used them up.")), retry);
+  } else {
+    nodes.push(
+      paragraph(text("GitHub answers only 60 requests an hour for a computer that isn't signed in, and Safari has used them up.")),
+      retry,
+      paragraph(text("Signed in, GitHub answers 5,000 an hour, and opens this page at once.")),
+      signInForm(location, "Sign In"),
+    );
+  }
+  return { kind: "document", url: githubUrl(location), title: "GitHub needs a break", nodes };
 }
 
 /** A form that is only a button, posting to `location`. */
@@ -912,7 +967,7 @@ const REPO_BUTTONS_WIDTH = 310;
  * outline star to star with, a filled one once starred). Signed out
  * (`starred` null), all three sign in and come back.
  */
-function repoButtons(repo: RepoInfo, starred: boolean | null, watching: boolean | null, here: GithubLocation): LayoutNode {
+function repoButtons(repo: RepoInfo, starred: boolean | null, watching: boolean | null, here: GithubLocation, watchable = true): LayoutNode {
   const watchers = formatCount(repo.watchers);
   const forks = `Fork ${formatCount(repo.forks)}`;
   const stars = formatCount(repo.stars);
@@ -942,7 +997,7 @@ function repoButtons(repo: RepoInfo, starred: boolean | null, watching: boolean 
       controls: [
         watching
           ? { kind: "submit", name: "watch", value: "unwatch", label: `Unwatch ${watchers}`, icon: GITHUB_WATCH, tooltip: `Unwatch ${name}` }
-          : { kind: "submit", name: "watch", value: "watch", label: `Watch ${watchers}`, icon: GITHUB_WATCH, tooltip: `Watch ${name}` },
+          : { kind: "submit", name: "watch", value: "watch", label: `Watch ${watchers}`, icon: GITHUB_WATCH, tooltip: watchable ? `Watch ${name}` : "Sign in again to watch" },
         { kind: "submit", name: "fork", value: "fork", label: forks, icon: GITHUB_FORK, tooltip: `Fork ${name}` },
         starred
           ? { kind: "submit", name: "star", value: "unstar", label: `Starred ${stars}`, icon: GITHUB_STARRED, tooltip: `Unstar ${name}` }
@@ -1052,7 +1107,7 @@ function repoBody(page: RepoPage, location: GithubLocation, now: number, forms: 
           gap: 8,
           minWidth: 0,
           center: true,
-          columns: [{ nodes: [heading(1, repo.name)] }, { width: REPO_BUTTONS_WIDTH, nodes: [repoButtons(repo, page.starred, page.watching, location)] }],
+          columns: [{ nodes: [heading(1, repo.name)] }, { width: REPO_BUTTONS_WIDTH, nodes: [repoButtons(repo, page.starred, page.watching, location, forms.canWatch)] }],
         },
         RULE_GAP,
         { type: "hr", dotted: true },

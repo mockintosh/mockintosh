@@ -264,7 +264,7 @@ function Showreel(props: ShowreelProps): JSX.Element {
             { label: "Previous Chapter", shortcut: "-", onClick: () => seekChapter(-1) },
             { type: "separator" },
             { label: state.looping ? "Don't Loop" : "Loop", onClick: toggleLoop },
-            { label: state.muted ? "Unmute Sound" : "Mute Sound", shortcut: "M", disabled: state.silent, onClick: toggleMute },
+            { label: state.muted ? "Unmute Sound" : "Mute Sound", shortcut: "⇧M", disabled: state.silent, onClick: toggleMute },
           ],
         },
         {

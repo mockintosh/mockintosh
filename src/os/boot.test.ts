@@ -403,6 +403,54 @@ describe("bootOS on the headless platform", () => {
     expect(isAppHidden("hide-a")).toBe(false);
   });
 
+  it("pops up the desktop's contextual menu on a right-click and chooses the item the button is let go over", () => {
+    const fs = os.services.fs;
+    const desktop = fs.locate("desktop")!;
+    const before = fs.children(desktop.id).length;
+    const desktopInk = () => inkCoverage(platform.lastFrame()!, 100, 150, 60, 20);
+    expect(desktopInk()).toBeGreaterThan(0.45);
+
+    platform.pointer({ type: "down", x: 100, y: 150, button: 2 });
+    platform.tick();
+    // A white panel hangs from the pointer: its rows cover the desktop pattern.
+    expect(desktopInk()).toBeLessThan(0.3);
+
+    // Drag onto the first row, "New Folder", and let go there.
+    platform.pointer({ type: "move", x: 120, y: 159 });
+    platform.pointer({ type: "up", x: 120, y: 159, button: 2 });
+    platform.tick();
+    expect(fs.children(desktop.id).length).toBe(before + 1);
+    expect(desktopInk()).toBeGreaterThan(0.45);
+  });
+
+  it("keeps a ⌃-clicked contextual menu up for a second click, and puts it away with Escape", () => {
+    const fs = os.services.fs;
+    const desktop = fs.locate("desktop")!;
+    const before = fs.children(desktop.id).length;
+    const ctrl = { shift: false, ctrl: true, alt: false, meta: false };
+    const none = { shift: false, ctrl: false, alt: false, meta: false };
+    const desktopInk = () => inkCoverage(platform.lastFrame()!, 100, 150, 60, 20);
+
+    platform.pointer({ type: "down", x: 100, y: 150, button: 0, modifiers: ctrl });
+    platform.pointer({ type: "up", x: 100, y: 150, button: 0, modifiers: ctrl });
+    platform.tick();
+    expect(desktopInk()).toBeLessThan(0.3);
+
+    platform.key({ type: "down", key: "Escape", modifiers: none });
+    platform.tick();
+    expect(desktopInk()).toBeGreaterThan(0.45);
+    expect(fs.children(desktop.id).length).toBe(before);
+
+    platform.pointer({ type: "down", x: 100, y: 150, button: 0, modifiers: ctrl });
+    platform.pointer({ type: "up", x: 100, y: 150, button: 0, modifiers: ctrl });
+    platform.pointer({ type: "move", x: 120, y: 159, modifiers: none });
+    platform.pointer({ type: "down", x: 120, y: 159, button: 0, modifiers: none });
+    platform.pointer({ type: "up", x: 120, y: 159, button: 0, modifiers: none });
+    platform.tick();
+    expect(fs.children(desktop.id).length).toBe(before + 1);
+    expect(desktopInk()).toBeGreaterThan(0.45);
+  });
+
   it("runs ⌘-shortcuts from the active menubar (⌘N creates a folder on the desktop)", () => {
     const before = platform.lastFrame()!.slice();
     const meta = { shift: false, ctrl: false, alt: false, meta: true };
@@ -413,6 +461,87 @@ describe("bootOS on the headless platform", () => {
     let changed = 0;
     for (let i = 0; i < after.length; i++) if (after[i] !== before[i]) changed++;
     expect(changed).toBeGreaterThan(100); // a new folder icon + label appeared
+  });
+
+  it("says which keys it used, so the host keeps its own action for the rest", () => {
+    const ran: string[] = [];
+    registerApp({
+      id: "test-used-keys",
+      title: "Keys",
+      icon: "icon/computer",
+      defaultSize: { width: 80, height: 60 },
+      Component: () => whiteBox(),
+      menus: [
+        {
+          label: "File",
+          items: [
+            { label: "Save", shortcut: "S", disabled: true, onClick: () => ran.push("Save") },
+            { label: "Record", shortcut: "R", onClick: () => ran.push("Record") },
+            { label: "Record Again", shortcut: "⇧R", onClick: () => ran.push("Record Again") },
+          ],
+        },
+      ],
+    });
+    os.services.openApp("test-used-keys");
+    platform.tick();
+
+    const meta = { shift: false, ctrl: false, alt: false, meta: true };
+    const none = { shift: false, ctrl: false, alt: false, meta: false };
+    const down = (key: string, modifiers = meta) => platform.key({ type: "down", key, modifiers });
+
+    expect(down("r")).toBe(true); // the app's Record, not the browser's Reload
+    expect(down("s")).toBe(true); // a dimmed Save still owns ⌘S: no Save Page
+    expect(down("R", { ...meta, shift: true })).toBe(true); // ⇧⌘R is its own
+    expect(ran).toEqual(["Record", "Record Again"]);
+    expect(down("l")).toBe(false); // nothing here has ⌘L
+    expect(down("ArrowLeft")).toBe(false); // no editor focused: Back stays the browser's
+    expect(down("x", none)).toBe(false);
+    expect(platform.key({ type: "up", key: "r", modifiers: meta })).toBe(false);
+    expect(down("Escape", { ...meta, alt: true })).toBe(true); // Force Quit
+  });
+
+  it("takes ⌃ as ⌘ (a browser keeps ⌘W, ⌘N, ⌘Q; a PC's ⌘ is Ctrl), except in a terminal", async () => {
+    const ran: string[] = [];
+    const keys: string[] = [];
+    let field: ReturnType<typeof fillNode> | undefined;
+    registerApp({
+      id: "test-control-keys",
+      title: "Ctl",
+      icon: "icon/computer",
+      defaultSize: { width: 80, height: 60 },
+      Component: () => {
+        const node = (field = fillNode(0));
+        setProp(node, "tabIndex", 0);
+        setProp(node, "autoFocus", true);
+        setProp(node, "onKeyDown", (key: string, m: { ctrl: boolean; meta: boolean }) =>
+          keys.push(`${m.ctrl ? "⌃" : ""}${m.meta ? "⌘" : ""}${key}`));
+        return node as unknown as JSX.Element;
+      },
+      menus: [{ label: "File", items: [{ label: "Close", shortcut: "W", onClick: () => ran.push("Close") }] }],
+    });
+    os.services.openApp("test-control-keys");
+    platform.tick();
+    await Promise.resolve(); // autoFocus is scheduled on a microtask
+    await os.render();
+
+    const none = { shift: false, ctrl: false, alt: false, meta: false };
+    const ctrl = { ...none, ctrl: true };
+    const down = (key: string, modifiers = ctrl) => platform.key({ type: "down", key, modifiers });
+
+    expect(down("w")).toBe(true);
+    expect(ran).toEqual(["Close"]);
+    expect(down("z")).toBe(true); // ⌘Z for the focused node
+    expect(keys).toEqual(["⌘z"]);
+
+    // A terminal: ⌃W and ⌃C are its own keys, and ⌃⇧W is ⌘W.
+    setProp(field!, "rawKeys", true);
+    keys.length = 0;
+    expect(down("w")).toBe(true);
+    expect(down("c")).toBe(true);
+    expect(ran).toEqual(["Close"]);
+    expect(keys).toEqual(["⌃w", "⌃c"]);
+    expect(down("W", { ...ctrl, shift: true })).toBe(true);
+    expect(ran).toEqual(["Close", "Close"]);
   });
 
   it("names new folders \"Empty folder\", \"Empty folder 2\", … and selects each one", async () => {
@@ -481,6 +610,9 @@ describe("bootOS on the headless platform", () => {
       platform.key({ type: "down", key: ch, modifiers: none });
       platform.key({ type: "up", key: ch, modifiers: none });
     }
+    // ⌘→ is the field's (line end), not the browser's Forward.
+    expect(platform.key({ type: "down", key: "ArrowRight", modifiers: meta })).toBe(true);
+    platform.key({ type: "up", key: "ArrowRight", modifiers: meta });
     platform.key({ type: "down", key: "Enter", modifiers: none });
     platform.key({ type: "up", key: "Enter", modifiers: none });
     platform.tick();

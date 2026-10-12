@@ -12,7 +12,7 @@ import {
 import { Splash } from "./components/Splash.solid";
 import { Desktop } from "./components/Desktop.solid";
 import { WindowStack } from "./components/WindowStack.solid";
-import { Menubar } from "./components/Menubar.solid";
+import { ContextMenu, Menubar } from "./components/Menubar.solid";
 import { menubarTop } from "./menubarReveal";
 import { ScreenCorners } from "./components/ScreenCorners.solid";
 import { FinderDragGhost } from "../../apps/Finder.solid";
@@ -51,6 +51,7 @@ export function OSRoot(props: OSRootProps): JSX.Element {
           </Show>
           {/* Tucked above a full-screen window until the top edge brings it down. */}
           <Menubar height={props.menubarHeight} top={menubarTop()} menus={getMenubarMenus()} />
+          <ContextMenu />
           <Show when={getScreenshotMarquee()}>
             {(r) => (
               <box
