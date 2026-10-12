@@ -2,6 +2,7 @@
 
 import { SYSTEM_FONT_CHICAGO_12 } from "./chicago_12";
 import { SYSTEM_FONT_GENEVA_9 } from "./geneva_9";
+import { SYSTEM_FONT_GENEVA_9_ITALIC } from "./geneva_9_italic";
 import { SYSTEM_FONT_GENEVA_10 } from "./geneva_10";
 import { SYSTEM_FONT_GENEVA_12 } from "./geneva_12";
 import { SYSTEM_FONT_GENEVA_14 } from "./geneva_14";
@@ -21,14 +22,17 @@ import { SYSTEM_FONT_NEW_YORK_24 } from "./newYork_24";
 export interface SystemStrike {
   family: string;
   size: number;
+  /** Apple's own styled strike (2 italic); plain when absent. */
+  style?: 1 | 2;
   data: string;
   info: { ascent: number; descent: number; leading: number };
 }
 
 /** Chicago, Geneva, Monaco and New York as System 7.5.3 ships them. */
 export const SYSTEM_STRIKES: readonly SystemStrike[] = [
-  { family: "chicago", size: 12, data: SYSTEM_FONT_CHICAGO_12, info: { ascent: 12, descent: 3, leading: 0 } },
+  { family: "chicago", size: 12, data: SYSTEM_FONT_CHICAGO_12, info: { ascent: 12, descent: 3, leading: 1 } },
   { family: "geneva", size: 9, data: SYSTEM_FONT_GENEVA_9, info: { ascent: 10, descent: 2, leading: 0 } },
+  { family: "geneva", size: 9, style: 2, data: SYSTEM_FONT_GENEVA_9_ITALIC, info: { ascent: 10, descent: 2, leading: 0 } },
   { family: "geneva", size: 10, data: SYSTEM_FONT_GENEVA_10, info: { ascent: 10, descent: 2, leading: 1 } },
   { family: "geneva", size: 12, data: SYSTEM_FONT_GENEVA_12, info: { ascent: 12, descent: 3, leading: 1 } },
   { family: "geneva", size: 14, data: SYSTEM_FONT_GENEVA_14, info: { ascent: 14, descent: 4, leading: 1 } },

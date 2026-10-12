@@ -18,6 +18,7 @@ import { CURRENT_CATALOG_VERSION, emptyCatalog, parseCatalog, type CatalogDocume
 import { FSError } from "./errors";
 import { inferMimeType } from "./mime";
 import { assertNewNameFits, availableChildName } from "./names";
+import type { VolumeImage, VolumeImageEntry } from "./volumeImage";
 import {
   ROOT_ID,
   type AttributeValue,
@@ -117,6 +118,10 @@ export class FileSystem {
 
   private writes: Promise<unknown> = Promise.resolve();
   private locked = new Set<NodeId>();
+  /** Nodes of mounted images: shown, never persisted. */
+  private mountedIds = new Set<NodeId>();
+  /** A mounted file's body, read from its image. */
+  private mountedBodies = new Map<NodeId, () => Promise<Uint8Array>>();
 
   private constructor(options: FileSystemOptions, doc: CatalogDocument) {
     this.backend = options.backend;
@@ -245,8 +250,15 @@ export class FileSystem {
     return false;
   }
 
+  /** The disks: the user's first (the startup volume leads), then mounted locked ones. */
   volumes(): FSDirectory[] {
-    return this.children(ROOT_ID).filter((n): n is FSDirectory => n.kind === "directory");
+    const all = this.children(ROOT_ID).filter((n): n is FSDirectory => n.kind === "directory");
+    return [...all.filter((v) => !v.locked), ...all.filter((v) => v.locked)];
+  }
+
+  /** Whether `id` is on a locked disk, where nothing can change. */
+  isLocked(id: NodeId): boolean {
+    return !!this.volumeOf(id)?.locked;
   }
 
   /**
@@ -294,6 +306,8 @@ export class FileSystem {
   async readBytes(id: NodeId): Promise<Uint8Array | null> {
     const n = this.state.nodes[id];
     if (!n || n.kind !== "file") return null;
+    const mounted = this.mountedBodies.get(id);
+    if (mounted) return mounted();
     return this.backend.readBlob(id);
   }
 
@@ -418,6 +432,7 @@ export class FileSystem {
       size: bytes.byteLength,
     };
     if (existing?.role) file.role = existing.role;
+    if (options.url) file.url = options.url;
 
     this.locked.add(parentId);
     this.locked.add(id);
@@ -529,6 +544,84 @@ export class FileSystem {
     this.commit((s) => { mergeAttributes(s, id, patch); touch(s, id, this.now()); });
   }
 
+  // =========================================================================
+  // Mounted disks
+  // =========================================================================
+
+  /**
+   * Show `image` as a locked volume (see `VolumeImage`). Its node ids are
+   * `<key>:<path>`, so attributes and open windows can find them again.
+   */
+  mount(image: VolumeImage): FSDirectory {
+    const volumeId = `${image.key}:`;
+    if (this.state.nodes[volumeId]) throw new FSError("exists", `"${image.name}" is already mounted`);
+    assertValidName(image.name);
+    const now = this.now();
+    const nodes: FSNode[] = [];
+    const attributes: [NodeId, NodeAttributes][] = [];
+    const bodies: [NodeId, () => Promise<Uint8Array>][] = [];
+    const volume: FSDirectory = {
+      id: volumeId, name: image.name, kind: "directory", parentId: ROOT_ID,
+      createdAt: now, modifiedAt: now, revision: 1, role: "volume", locked: true,
+      ...(image.ejectable ? { ejectable: true } : {}),
+    };
+    nodes.push(volume);
+    if (image.attributes) attributes.push([volumeId, image.attributes]);
+    const add = (entries: readonly VolumeImageEntry[], parentId: NodeId, path: string): void => {
+      for (const entry of entries) {
+        assertValidName(entry.name);
+        const id = `${volumeId}${path}${entry.name}`;
+        if (entry.attributes) attributes.push([id, entry.attributes]);
+        if (entry.kind === "directory") {
+          nodes.push({ id, name: entry.name, kind: "directory", parentId, createdAt: now, modifiedAt: now, revision: 1 });
+          add(entry.entries, id, `${path}${entry.name}/`);
+          continue;
+        }
+        const inline = entry.content === undefined ? undefined : typeof entry.content === "string" ? textEncoder.encode(entry.content) : entry.content;
+        const read = inline ? async () => inline.slice() : entry.read;
+        if (!read) throw new FSError("not-found", `"${entry.name}" has no content`);
+        bodies.push([id, read]);
+        nodes.push({
+          id, name: entry.name, kind: "file", parentId, createdAt: now, modifiedAt: now, revision: 1,
+          type: entry.type, size: inline?.byteLength ?? entry.size ?? 0, ...(entry.url ? { url: entry.url } : {}),
+        });
+      }
+    };
+    add(image.entries, volumeId, "");
+    for (const n of nodes) this.mountedIds.add(n.id);
+    for (const [id, read] of bodies) this.mountedBodies.set(id, read);
+    this.commit((s) => {
+      for (const n of nodes) {
+        s.nodes[n.id] = n;
+        if (n.kind === "directory") s.childIds[n.id] ??= [];
+        s.childIds[n.parentId!]!.push(n.id);
+      }
+      for (const [id, attrs] of attributes) mergeAttributes(s, id, attrs);
+    });
+    return this.state.nodes[volumeId] as FSDirectory;
+  }
+
+  /** Take a mounted volume away: eject it. Its nodes go; the user's disks are untouched. */
+  unmount(volumeId: NodeId): void {
+    const volume = this.state.nodes[volumeId];
+    if (!volume || volume.parentId !== ROOT_ID || !this.mountedIds.has(volumeId)) {
+      throw new FSError("invalid-move", "Only a mounted disk can be ejected");
+    }
+    const doomed = this.collectSubtree(volumeId);
+    this.commit((s) => {
+      s.childIds[ROOT_ID] = s.childIds[ROOT_ID]!.filter((c) => c !== volumeId);
+      for (const d of doomed) {
+        delete s.nodes[d];
+        delete s.attributes[d];
+        delete s.childIds[d];
+      }
+    });
+    for (const d of doomed) {
+      this.mountedIds.delete(d);
+      this.mountedBodies.delete(d);
+    }
+  }
+
   /**
    * Run several mutations as one unit: listeners see a single reactive update
    * and the catalog is persisted once.
@@ -560,6 +653,8 @@ export class FileSystem {
       try { await this.persistInFlight; } catch { /* wipe anyway */ }
     }
     await this.backend.clear();
+    this.mountedIds.clear();
+    this.mountedBodies.clear();
     const empty = emptyCatalog(this.now());
     this.commit((s) => {
       for (const id of Object.keys(s.nodes)) {
@@ -586,10 +681,13 @@ export class FileSystem {
     if (this.catalogDirty) await this.persistNow();
   }
 
-  /** Serialised catalog — what `flush()` writes. */
+  /** Serialised catalog — what `flush()` writes. Mounted disks aren't part of it. */
   toJSON(): CatalogDocument {
     const s = snapshot(this.state);
-    return { version: CURRENT_CATALOG_VERSION, nodes: s.nodes, attributes: s.attributes };
+    if (this.mountedIds.size === 0) return { version: CURRENT_CATALOG_VERSION, nodes: s.nodes, attributes: s.attributes };
+    const kept = <T,>(record: Record<NodeId, T>) =>
+      Object.fromEntries(Object.entries(record).filter(([id]) => !this.mountedIds.has(id)));
+    return { version: CURRENT_CATALOG_VERSION, nodes: kept(s.nodes), attributes: kept(s.attributes) };
   }
 
   private commit(mutate: (s: CatalogState) => void): void {
@@ -660,6 +758,7 @@ export class FileSystem {
     const n = this.state.nodes[id];
     if (!n) throw new FSError("not-found", `No such directory: ${id}`);
     if (n.kind !== "directory") throw new FSError("not-a-directory", `"${n.name}" is not a folder`);
+    this.assertWritable(id);
     return n;
   }
 
@@ -668,7 +767,14 @@ export class FileSystem {
     const n = this.state.nodes[id];
     if (!n) throw new FSError("not-found", `No such node: ${id}`);
     if (n.parentId === null) throw new FSError("immutable", "The root cannot be changed");
+    this.assertWritable(id);
     return n;
+  }
+
+  /** A locked disk refuses every change; the Finder's own attributes are still kept, in memory. */
+  private assertWritable(id: NodeId): void {
+    const volume = this.volumeOf(id);
+    if (volume?.locked) throw new FSError("locked", `"${volume.name}" is locked, so nothing on it can be changed.`);
   }
 
   private collectSubtree(id: NodeId): NodeId[] {

@@ -134,8 +134,8 @@ def open_rsrc(fork: bytes) -> rsrcfork.ResourceFile:
     return rf
 
 
-def fond_sizes(rf: rsrcfork.ResourceFile, family: str) -> list[tuple[int, int]]:
-    """(size, resource ID) for each plain bitmap strike the FOND lists."""
+def fond_sizes(rf: rsrcfork.ResourceFile, family: str) -> list[tuple[int, int, int]]:
+    """(size, style, resource ID) for each bitmap strike the FOND lists (size 0 is an outline)."""
     if b"FOND" not in rf:
         return []
     for res in rf[b"FOND"].values():
@@ -144,7 +144,7 @@ def fond_sizes(rf: rsrcfork.ResourceFile, family: str) -> list[tuple[int, int]]:
         d = res.data
         n = struct.unpack(">h", d[52:54])[0] + 1
         entries = [struct.unpack(">3h", d[54 + i * 6 : 60 + i * 6]) for i in range(n)]
-        return [(size, rid) for size, style, rid in entries if size > 0 and style == 0]
+        return [(size, style, rid) for size, style, rid in entries if size > 0]
     return []
 
 
@@ -152,13 +152,15 @@ def has_font(rf: rsrcfork.ResourceFile, rid: int) -> bool:
     return any(kind in rf and rid in rf[kind] for kind in (b"NFNT", b"FONT"))
 
 
-def strike_ids(system: rsrcfork.ResourceFile, suitcase: rsrcfork.ResourceFile, family: str) -> dict[int, tuple[int, rsrcfork.ResourceFile]]:
-    """size → (resource ID, file): the System file's own strikes first (what it draws with), else the suitcase's.
+def strike_ids(
+    system: rsrcfork.ResourceFile, suitcase: rsrcfork.ResourceFile, family: str
+) -> dict[tuple[int, int], tuple[int, rsrcfork.ResourceFile]]:
+    """(size, style) → (resource ID, file): the System file's own strikes first (what it draws with), else the suitcase's.
     Chicago 12 is listed in the System FOND but lives in ROM; the suitcase has it."""
-    sizes = {size: (rid, suitcase) for size, rid in fond_sizes(suitcase, family)}
-    for size, rid in fond_sizes(system, family):
+    sizes = {(size, style): (rid, suitcase) for size, style, rid in fond_sizes(suitcase, family) if has_font(suitcase, rid)}
+    for size, style, rid in fond_sizes(system, family):
         if has_font(system, rid):
-            sizes[size] = (rid, system)
+            sizes[(size, style)] = (rid, system)
     return sizes
 
 
@@ -283,16 +285,20 @@ def encode(height: int, above: int, below: int, spacing: int, glyphs: list[dict]
     return "%%MFN1" + base64.b64encode(bytes(out)).decode("ascii")
 
 
-def const_name(family: str, size: int) -> str:
-    return f"SYSTEM_FONT_{re.sub(r'([a-z])([A-Z])', r'\1_\2', family).upper()}_{size}"
+# FOND style bits → the name a strike file carries.
+STYLE_NAMES = {1: "bold", 2: "italic", 3: "bold_italic"}
 
 
-# Header leading the layout was tuned against, where it differs from the
-# strike's own (Chicago 12's NFNT says 1; menus and controls lay out with 0).
-LEADING = {("chicago", 12): 0}
+def file_stem(family: str, size: int, style: int) -> str:
+    return f"{family}_{size}" + (f"_{STYLE_NAMES[style]}" if style else "")
 
 
-def bake(family: str, size: int, raw: bytes, high: str) -> tuple[str, dict, int, int]:
+def const_name(family: str, size: int, style: int) -> str:
+    base = f"SYSTEM_FONT_{re.sub(r'([a-z])([A-Z])', r'\1_\2', family).upper()}_{size}"
+    return base + (f"_{STYLE_NAMES[style].upper()}" if style else "")
+
+
+def bake(family: str, size: int, style: int, raw: bytes, high: str) -> tuple[str, dict, int, int]:
     font = parse_nfnt(raw)
     crop, height, spacing = LAYOUT[(family, size)]
     below = font["height"] - crop - height
@@ -313,7 +319,8 @@ def bake(family: str, size: int, raw: bytes, high: str) -> tuple[str, dict, int,
         glyphs.append(glyph)
         have.add(cp)
     apple = len(glyphs)
-    const = DECKER_SUPPLEMENTS.get((family, size))
+    # Decker drew plain faces only.
+    const = None if style else DECKER_SUPPLEMENTS.get((family, size))
     if const:
         deck, extra = decker_glyphs(const)
         if deck["height"] != height:
@@ -330,7 +337,7 @@ def bake(family: str, size: int, raw: bytes, high: str) -> tuple[str, dict, int,
             )
             have.add(g["codePoint"])
     record = encode(height, crop, below, spacing, glyphs)
-    info = {"ascent": font["ascent"], "descent": font["descent"], "leading": LEADING.get((family, size), font["leading"])}
+    info = {"ascent": font["ascent"], "descent": font["descent"], "leading": font["leading"]}
     return record, info, apple, len(glyphs) - apple
 
 
@@ -347,18 +354,21 @@ def main() -> None:
     for fond_name, family in FAMILIES.items():
         suitcase = open_rsrc(system_folder["Fonts"][fond_name].rsrc)
         sizes = strike_ids(system, suitcase, fond_name)
-        for size in sorted(sizes):
+        for size, style in sorted(sizes):
             if (family, size) not in LAYOUT:
                 raise SystemExit(f"No LAYOUT for {family} {size}")
-            rid, source = sizes[size]
+            if style not in (0, 2):
+                raise SystemExit(f"{family} {size}: style {style} strikes aren't wired up (FontStrikeSpec.style)")
+            rid, source = sizes[(size, style)]
             raw = font_resource([source], rid)
-            record, info, apple, decker = bake(family, size, raw, high)
-            name = const_name(family, size)
-            path = OUT_DIR / f"{family}_{size}.ts"
+            record, info, apple, decker = bake(family, size, style, raw, high)
+            name = const_name(family, size, style)
+            stem = file_stem(family, size, style)
+            path = OUT_DIR / f"{stem}.ts"
             kind = "FONT" if source is system else "NFNT"
             extra = f", plus {decker} of Decker's letters Apple's strike lacks" if decker else ""
             path.write_text(
-                f"// Generated from System 7.5.3 {kind} {rid} ({fond_name} {size}). Do not hand-edit.\n"
+                f"// Generated from System 7.5.3 {kind} {rid} ({fond_name} {size}{' ' + STYLE_NAMES[style].replace('_', ' ') if style else ''}). Do not hand-edit.\n"
                 f"//   python3 scripts/import-system-fonts.py\n"
                 f"//\n"
                 f"// FONT header: ascent {info['ascent']}, descent {info['descent']}, leading {info['leading']}.\n"
@@ -366,16 +376,18 @@ def main() -> None:
                 f'export const {name} = "{record}";\n',
                 encoding="utf-8",
             )
-            entries.append((family, size, name, info))
-            print(f"{family} {size}: {apple} Apple glyphs{extra}")
+            entries.append((family, size, style, stem, name, info))
+            print(f"{stem}: {apple} Apple glyphs{extra}")
     lines = ["// Generated by scripts/import-system-fonts.py. Do not hand-edit.", ""]
-    for family, size, name, _ in entries:
-        lines.append(f'import {{ {name} }} from "./{family}_{size}";')
+    for _, _, _, stem, name, _ in entries:
+        lines.append(f'import {{ {name} }} from "./{stem}";')
     lines += [
         "",
         "export interface SystemStrike {",
         "  family: string;",
         "  size: number;",
+        "  /** Apple's own styled strike (2 italic); plain when absent. */",
+        "  style?: 1 | 2;",
         "  data: string;",
         "  info: { ascent: number; descent: number; leading: number };",
         "}",
@@ -383,9 +395,10 @@ def main() -> None:
         "/** Chicago, Geneva, Monaco and New York as System 7.5.3 ships them. */",
         "export const SYSTEM_STRIKES: readonly SystemStrike[] = [",
     ]
-    for family, size, name, info in entries:
+    for family, size, style, _, name, info in entries:
+        styled = f", style: {style}" if style else ""
         lines.append(
-            f'  {{ family: "{family}", size: {size}, data: {name}, info: {{ ascent: {info["ascent"]}, descent: {info["descent"]}, leading: {info["leading"]} }} }},'
+            f'  {{ family: "{family}", size: {size}{styled}, data: {name}, info: {{ ascent: {info["ascent"]}, descent: {info["descent"]}, leading: {info["leading"]} }} }},'
         )
     lines += ["];", ""]
     (OUT_DIR / "generated.ts").write_text("\n".join(lines), encoding="utf-8")

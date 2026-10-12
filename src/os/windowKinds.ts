@@ -109,8 +109,8 @@ const WINDOW_DEFINITIONS: Record<OSWindowKind, WindowDefinition> = {
     toolPalette: true,
   },
   plain: PLAIN,
-  // dBoxProc: 1px outer, 2px white, 2px inner band; square; system-modal.
-  alert: { ...PLAIN, frameGap: 2, innerFrame: 2, modal: true, layer: 5, upperCentre: true },
+  // dBoxProc: 1px outer, 2px white, 2px inner band; square; no shadow; system-modal.
+  alert: { ...PLAIN, frameGap: 2, innerFrame: 2, shadow: false, modal: true, layer: 5, upperCentre: true },
   desk: { ...PLAIN, frame: 0, shadow: false, backdrop: true },
   // A menubar app's panel: plain, above palettes and full-screen pictures, under alerts.
   panel: { ...PLAIN, layer: 4, upperCentre: true },

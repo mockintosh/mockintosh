@@ -11,6 +11,7 @@ import { registerApp } from "./apps";
 import { FINDER_APP_ID, getActiveAppId, getMenubarMenus } from "./state";
 import { menubarProblems } from "./shortcuts";
 import { createHeadlessPlatform } from "../platform/headless";
+import { TOUR_DISK_ID } from "./tourDisk";
 import type { Platform } from "../platform/types";
 
 /**
@@ -19,6 +20,15 @@ import type { Platform } from "../platform/types";
  */
 const inert = <T>(members: Record<string, unknown> = {}): T =>
   new Proxy(members, { get: (target, key) => (key in target ? target[key as string] : () => new Promise(() => {})) }) as T;
+
+/**
+ * Apps that open documents put up the Open dialog when opened by themselves;
+ * these open one from the Tour disk instead, so their own menubar is checked.
+ */
+const DOCUMENTS: Record<string, { fileId: string; title: string }> = {
+  showreel: { fileId: `${TOUR_DISK_ID}Reels/One Bit.motion`, title: "One Bit.motion" },
+  video: { fileId: `${TOUR_DISK_ID}1984.mp4`, title: "1984.mp4" },
+};
 
 describe("bundled apps' menu shortcuts", () => {
   let os: BootedOS | undefined;
@@ -56,7 +66,7 @@ describe("bundled apps' menu shortcuts", () => {
       os = await bootOS(platform);
       vi.advanceTimersByTime(1000); // the splash
       registerApp((await APP_MODULES[id]!()).default);
-      os.services.openApp(id);
+      os.services.openApp(id, DOCUMENTS[id]);
       // Some apps open their window only after an `await` in `onOpen`.
       await vi.waitFor(async () => {
         platform.tick();

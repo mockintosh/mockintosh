@@ -260,6 +260,7 @@ export function createAppContext(
       openersFor: (type) => openersForFileType(type),
       closeWindow: (id) => os.closeWindow(id),
       showDialog: (opts) => os.showDialog(opts),
+      showOpenDialog: (opts) => os.showOpenDialog(opts),
       busy: (work) => os.busy(work),
     },
     openWindow<P extends Record<string, unknown>>(spec?: WindowSpec<P>): string {

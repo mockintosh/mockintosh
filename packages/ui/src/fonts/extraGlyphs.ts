@@ -42,21 +42,20 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
     char: COMMAND_KEY,
     name: "command key",
     perFont: {
-      // Chicago 12: 2px strokes, caps on rows 1–9. The loops are 1px so the symbol
-      // stays open at 10px; it sits one row above cap height like the original.
+      // Chicago 12: Apple's own glyph (System 6/7 Chicago 12, character 17),
+      // caps-high on rows 1–9.
       menu: {
-        top: 0,
+        top: 1,
         rows: [
-          ".##....##.",
-          "#..#..#..#",
-          "#..#..#..#",
-          ".########.",
-          "..#....#..",
-          "..#....#..",
-          ".########.",
-          "#..#..#..#",
-          "#..#..#..#",
-          ".##....##.",
+          ".##...##.",
+          "#..#.#..#",
+          "#..#.#..#",
+          ".#######.",
+          "...#.#...",
+          ".#######.",
+          "#..#.#..#",
+          "#..#.#..#",
+          ".##...##.",
         ],
       },
       // Geneva 9: 1px strokes, caps on rows 1–7.
@@ -133,18 +132,18 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
     char: CHECK_MARK,
     name: "check mark",
     perFont: {
+      // Chicago 12: Apple's own glyph (character 18).
       menu: {
-        top: 1,
+        top: 2,
         rows: [
-          ".........#",
-          "........##",
-          ".......##.",
-          "......##..",
-          ".....##...",
-          "##..##....",
-          ".##.##....",
-          "..###.....",
-          "...#......",
+          "........#",
+          ".......##",
+          "......##.",
+          ".....##..",
+          "#...##...",
+          "##.##....",
+          ".###.....",
+          "..#......",
         ],
       },
       body: {

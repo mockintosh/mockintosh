@@ -248,7 +248,7 @@ export default defineApp({
 - `fs` — the shared file system (see [Files](#files))
 - `window` — the window this component is in (see [Windows](#windows))
 - `openWindow(spec?)` — open another window of your app (see [Windows](#windows))
-- `os.openApp / closeWindow / showDialog` — `showDialog` resolves with the label of the button pressed or, with `showInput`, the text typed; pressing "Cancel" in an input dialog resolves `null`
+- `os.openApp / closeWindow / showDialog / showOpenDialog` — `showDialog` resolves with the label of the button pressed or, with `showInput`, the text typed; pressing "Cancel" in an input dialog resolves `null`. `showOpenDialog` is the system Open dialog (see [Opening documents](#opening-documents))
 - `os.busy(work)` — run something that freezes the Macintosh for a moment under the watch cursor: the watch reaches the screen first, then `work` runs, and the cursor comes back when it (or its promise) settles
 - `setMenus(menus)` — this window's menubar (see [Menus](#menus))
 - `quit()` — end this launch: close every one of its windows and return to the Finder (see [Menus](#menus))
@@ -517,6 +517,8 @@ async function saveNote(fs: AppFileSystem, text: string) {
 
 Files have one MIME `type` (`MIME.text`, `MIME.markdown`, `MIME.sprite`, …; `inferMimeType(name)` guesses from an extension). Mutations throw `FSError` (`isFSError(err, "exists")`) on name clashes and invalid moves — show the message in a dialog rather than swallowing it.
 
+Some disks are locked: the Mockintosh Tour disk the system ships is one. You can read and open everything on it, but writing, renaming, moving or removing anything there throws `FSError` with code `"locked"`. Check `fs.isLocked(id)` before offering Save on a document opened from one, and offer Save As instead. A file on such a disk may carry a `url` it can be streamed from (Movie Player opens movies that way); `readBytes` still returns the whole body.
+
 A file or folder name holds at most `MAX_NAME_LENGTH` (28) characters; a longer new name throws `FSError` with code `"invalid-name"`. Fit names you build rather than letting the save fail: `fitName("A very long photo name.png")` cuts the stem and keeps the extension, `fitNameWithSuffix(title, " copy")` keeps the suffix, and `uniqueChildName(fs, folderId, name)` does both and numbers clashes. When you ask for a name, pass `inputMaxLength: MAX_NAME_LENGTH` to `showDialog`.
 
 `<Markdown text={src} />` (and `parseMarkdown`) render markdown through the 1-bit layout tree. Import them from `@mockintosh/sdk`, not `@mockintosh/markdown`.
@@ -552,6 +554,13 @@ fileTypes: alternateFileTypes([MIME.sprite, ...IMAGE_TYPES]),
 ```
 
 `useApp().os.openersFor(type)` lists every app that opens a type, defaults first, for an "Open With" menu; hand the document over with `os.openApp(opener.appId, { fileId, title })`. Preview does this for pictures.
+
+For File › Open…, put up the system's Open dialog rather than building one. `os.showOpenDialog({ types, near })` lists folders and the files whose MIME type is in `types` (every document when omitted), starting beside `near` (a file or folder id — the open document, usually) or else where the last Open dialog was left. It resolves with the chosen `FSFile`, or `null` on Cancel:
+
+```tsx
+const file = await app.os.showOpenDialog({ types: [MIME.canvas], near: currentFileId });
+if (file) await load(file.id, file.name);
+```
 
 ## Sprites
 

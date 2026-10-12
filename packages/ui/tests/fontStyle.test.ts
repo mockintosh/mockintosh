@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { smearDeckerFontBold } from "../src/fonts/boldSmear";
 import { getGlyphWidth } from "../src/fonts/font";
-import { initBuiltinFonts, listFonts, requireFont } from "../src/fonts/registry";
+import { getRealFace, initBuiltinFonts, listFonts, requireFont } from "../src/fonts/registry";
 import { resolveFont } from "../src/fonts/style";
 import { measureText } from "../src/fonts/bridge";
 import { faceMetrics } from "../src/fonts/metrics";
@@ -9,6 +9,9 @@ import { hostSwapFont, italicShearUnits, STRIKE_DESCENT, uiFontMetrics } from ".
 import { italic as italicFace, outline as outlineFace } from "@mockintosh/quickdraw";
 
 initBuiltinFonts();
+
+/** QuickDraw's italic style bit. */
+const ITALIC_BITS = 2;
 
 function sampleAdvance(font: ReturnType<typeof requireFont>): number {
   for (let ord = 32; ord < 127; ord++) {
@@ -58,8 +61,9 @@ describe("resolveFont bold smear", () => {
 });
 
 describe("resolveFont italic extra", () => {
-  it("grows every built-in face one pixel without changing cell height", () => {
+  it("grows every built-in face without an italic of its own one pixel, keeping cell height", () => {
     for (const name of listFonts()) {
+      if (getRealFace(name, ITALIC_BITS)?.covered) continue;
       const plain = requireFont(name);
       const italic = resolveFont(name, { italic: true });
       expect(italic.name).toBe(plain.name);
@@ -72,6 +76,14 @@ describe("resolveFont italic extra", () => {
     }
   });
 
+  it("draws Geneva 9 italic with Apple's own strike instead of shearing", () => {
+    expect(getRealFace("body", ITALIC_BITS)?.covered).toBe(ITALIC_BITS);
+    const plain = requireFont("body");
+    const italic = resolveFont("body", { italic: true });
+    expect(italic.glyphHeight).toBe(plain.glyphHeight);
+    expect(italic.glyphData).not.toEqual(plain.glyphData);
+  });
+
   it("stacks with bold", () => {
     const plain = requireFont("mono");
     const both = resolveFont("mono", { bold: true, italic: true });
@@ -79,8 +91,8 @@ describe("resolveFont italic extra", () => {
     expect(getGlyphWidth(both, "A".charCodeAt(0))).toBe(
       getGlyphWidth(plain, "A".charCodeAt(0)) + 2,
     );
-    expect(measureText("Hi", "body", { bold: true, italic: true })).toBe(
-      measureText("Hi", "body") + 4,
+    expect(measureText("Hi", "mono", { bold: true, italic: true })).toBe(
+      measureText("Hi", "mono") + 4,
     );
   });
 
@@ -89,7 +101,7 @@ describe("resolveFont italic extra", () => {
     expect(resolveFont("lisa", { italic: true })).not.toBe(resolveFont("lisa", { bold: true }));
   });
 
-  it("asks DrawText for a slope that moves the top of short faces", () => {
+  it("asks DrawText for a slope that moves the top of short faces, and none for Apple's own italic", () => {
     const body = uiFontMetrics(requireFont("body"));
     const pixel = uiFontMetrics(requireFont("pixel"));
     expect(italicShearUnits(body.ascent, STRIKE_DESCENT)).toBeGreaterThan(body.ascent >> 3);
@@ -104,7 +116,8 @@ describe("resolveFont italic extra", () => {
       numer: { h: 1, v: 1 },
       denom: { h: 1, v: 1 },
     });
-    expect(fm.italic).toBe(italicShearUnits(body.ascent, STRIKE_DESCENT));
+    // Geneva 9 has Apple's own italic strike, so there is nothing left to shear.
+    expect(fm.italic).toBe(0);
   });
 });
 
@@ -151,9 +164,9 @@ describe("resolveFont shadow extra", () => {
   });
 
   it("stacks bold, italic, outline, and shadow", () => {
-    const plain = measureText("Hi", "body");
+    const plain = measureText("Hi", "mono");
     expect(
-      measureText("Hi", "body", { bold: true, italic: true, outline: true, shadow: true }),
+      measureText("Hi", "mono", { bold: true, italic: true, outline: true, shadow: true }),
     ).toBe(plain + 10);
   });
 });

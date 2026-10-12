@@ -75,7 +75,11 @@ export function createFsMirror(call: Call, notify: Notify): FsMirror {
     });
   };
   const child = (dirId: string, name: string): FSNode | undefined => children(dirId).find((n) => n.name === name);
-  const volumes = (): FSDirectory[] => children(index().rootId).filter((n): n is FSDirectory => n.kind === "directory");
+  /** The user's disks first (the startup volume leads), then mounted locked ones, as `FileSystem.volumes`. */
+  const volumes = (): FSDirectory[] => {
+    const all = children(index().rootId).filter((n): n is FSDirectory => n.kind === "directory");
+    return [...all.filter((v) => !v.locked), ...all.filter((v) => v.locked)];
+  };
   const volumeOf = (id: string): FSDirectory | undefined => {
     const idx = index();
     let current = idx.nodes.get(id);
@@ -98,9 +102,16 @@ export function createFsMirror(call: Call, notify: Notify): FsMirror {
     setIndex(indexNodes(idx.rootId, nodes.values()));
   }
 
+  /** As the host's file system: nothing on a locked disk can change. */
+  function assertWritable(id: string): void {
+    const volume = volumeOf(id);
+    if (volume?.locked) throw new FSError("locked", `"${volume.name}" is locked, so nothing on it can be changed.`);
+  }
+
   function requireDirectory(id: string): FSDirectory {
     const dir = directory(id);
     if (!dir) throw new FSError("not-found", `No folder ${id}`);
+    assertWritable(id);
     return dir;
   }
 
@@ -108,6 +119,7 @@ export function createFsMirror(call: Call, notify: Notify): FsMirror {
     const n = node(id);
     if (!n) throw new FSError("not-found", `No node ${id}`);
     if (n.parentId === null || n.id === ROOT_ID) throw new FSError("invalid-move", "The root can't be changed");
+    assertWritable(id);
     return n;
   }
 
@@ -152,6 +164,7 @@ export function createFsMirror(call: Call, notify: Notify): FsMirror {
     },
     volumes,
     volumeOf,
+    isLocked: (id: string) => !!volumeOf(id)?.locked,
   };
 
   const mutations = {

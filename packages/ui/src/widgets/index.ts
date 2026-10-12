@@ -65,6 +65,8 @@ export type { ProgressProps } from "./Progress";
 export { Radio, RadioGroup } from "./Radio";
 export type { RadioProps, RadioGroupProps, RadioOption } from "./Radio";
 export { Select } from "./Select";
+export { PopUpFace, POPUP_TRIANGLE } from "./PopUpFace";
+export type { PopUpFaceProps } from "./PopUpFace";
 export type { SelectProps, SelectOption } from "./Select";
 export { Slider } from "./Slider";
 export type { SliderProps } from "./Slider";

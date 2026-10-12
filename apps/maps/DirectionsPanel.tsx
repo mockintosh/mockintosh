@@ -3,10 +3,10 @@
  * from and where to, then the ways there to choose between — or, for the
  * chosen way, its steps.
  */
-import { For, Show, TextInput, createMemo, fontLineHeight, measureText, spacedFontName } from "@mockintosh/sdk";
+import { For, Show, TextInput, createMemo, fontLineHeight, measureText, spacedFontName, truncateText } from "@mockintosh/sdk";
 import type { JSX } from "@mockintosh/ui";
 import { TRAVEL_MODES, formatArrival, formatDuration, formatRouteDistance, type Route, type TravelMode } from "./directions";
-import { CloseBox, Icon, Panel, ScrollArea, fitted, wrapped } from "./ui";
+import { CloseBox, Icon, Panel, ScrollArea, wrapped } from "./ui";
 
 export type Endpoint = "from" | "to";
 
@@ -70,7 +70,7 @@ export function DirectionsPanel(props: {
     const first = `ETA ${formatArrival(props.now, route.duration)} · ${formatRouteDistance(route.distance)}`;
     const second = [index === 0 ? "Fastest" : route.via ? `via ${route.via}` : "", route.tolls ? "Tolls" : ""].filter(Boolean).join(" · ");
     const width = inner() - 8 - 16;
-    return [fitted(first, width, TEXT_FONT), fitted(second, width, TEXT_FONT)];
+    return [truncateText(first, width, TEXT_FONT), truncateText(second, width, TEXT_FONT)];
   };
 
   // The steps, laid out ahead so the list knows its height.

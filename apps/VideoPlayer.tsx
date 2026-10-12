@@ -1,8 +1,12 @@
 import { createEffect, createSignal, onCleanup, onSettled } from "solid-js";
 import type { ImageFrame, JSX } from "@mockintosh/ui";
-import { Button, Slider, createDitherer, defineApp, useApp, type VideoSource } from "@mockintosh/sdk";
+import { Button, Slider, createDitherer, defineApp, useApp, type AppContext, type FileDocumentProps, type VideoSource } from "@mockintosh/sdk";
 
 const BAR_H = 22;
+const MOVIE_TYPES = ["video/mp4"];
+
+/** A movie, opened: the file, and the address its frames stream from. */
+type MovieProps = Partial<FileDocumentProps> & { url?: string } & Record<string, unknown>;
 const CLOCK_W = 78;
 
 function formatTime(seconds: number): string {
@@ -36,12 +40,19 @@ function containFrame(src: ImageFrame, dest: ImageFrame): void {
   }
 }
 
-function VideoPlayer(_props: Record<string, unknown>): JSX.Element {
+function VideoPlayer(props: MovieProps): JSX.Element {
   const app = useApp();
   const win = app.window;
   createEffect(() => true, () => {
     app.setMenus([
-      { label: "File", items: [{ label: "Quit", shortcut: "Q", onClick: () => app.quit() }] },
+      {
+        label: "File",
+        items: [
+          { label: "Open…", shortcut: "O", onClick: () => void chooseMovie(app, props.fileId) },
+          { type: "separator" },
+          { label: "Quit", shortcut: "Q", onClick: () => app.quit() },
+        ],
+      },
     ]);
   });
   const [playing, setPlaying] = createSignal(false);
@@ -141,7 +152,8 @@ function VideoPlayer(_props: Record<string, unknown>): JSX.Element {
   );
 
   onSettled(() => {
-    void app.video!.open("/1984.mp4", { loop: true }).then((opened) => {
+    if (!props.url) return;
+    void app.video!.open(props.url, { loop: true }).then((opened) => {
       if (cancelled) {
         opened.close();
         return;
@@ -192,10 +204,28 @@ function VideoPlayer(_props: Record<string, unknown>): JSX.Element {
   );
 }
 
-export default defineApp({
+/** Play a movie file in a window of its own; say so when it has nowhere to stream from. */
+async function openMovie(app: AppContext, { fileId, title }: FileDocumentProps): Promise<void> {
+  const url = app.fs.file(fileId)?.url;
+  if (!url) {
+    await app.os.showDialog({ message: `"${title}" can't be played: Movie Player plays movies from disks that stream them.`, variant: "caution" });
+    return;
+  }
+  app.openWindow<MovieProps>({ title, props: { fileId, title, url } });
+}
+
+/** File › Open…, and Movie Player opened by itself: choose a movie. */
+async function chooseMovie(app: AppContext, near?: string): Promise<void> {
+  const file = await app.os.showOpenDialog({ types: MOVIE_TYPES, near });
+  if (file) app.os.openApp("video", { fileId: file.id, title: file.name });
+}
+
+export default defineApp<MovieProps>({
   id: "video",
   requires: ["video"],
-  title: "1984.mp4",
+  title: "Movie Player",
+  about: { version: "2.0", description: "Plays movies in one bit, dithered as they play." },
+  fileTypes: MOVIE_TYPES,
   icon: "icon/MacFlim",
   smallIcon: "icon/MacFlim-16x16",
   defaultSize: { width: 340, height: 260 },
@@ -203,4 +233,10 @@ export default defineApp({
   scrollable: false,
   resizable: true,
   Component: VideoPlayer,
+  onOpen(app, props) {
+    const release = app.keepAlive?.();
+    const { fileId, title } = props;
+    const opening = fileId ? openMovie(app, { fileId, title: title ?? "Untitled" }) : chooseMovie(app);
+    void opening.finally(() => release?.());
+  },
 });
