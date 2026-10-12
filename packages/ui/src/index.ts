@@ -122,6 +122,7 @@ export {
   fontRegistrations,
   onFontRegistration,
   replayFontRegistration,
+  getRealFace,
 } from "./fonts/registry";
 export type { FontFamilyInfo, FontRegistration, OutlineFaceRegistration } from "./fonts/registry";
 export type { FamilyScalerSettings } from "./fonts/outlineStrike";
@@ -144,7 +145,7 @@ export { encodeFont, decodeFont } from "./fonts/codec";
 export { deckerFontFromDraft, draftFromDeckerFont } from "./fonts/draft";
 export type { FontStrikeDraft, FontStrikeGlyph } from "./fonts/draft";
 export { MISSING_SLOT, charForSlot, codePointForSlot, macRomanCharset, slotForCodePoint } from "./fonts/charmap";
-export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar, glyphAdvance, glyphOriginX } from "./fonts/font";
+export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar, glyphAdvance, glyphOriginX, locateGlyph, lookalikeGlyph } from "./fonts/font";
 export type { DeckerFont } from "./fonts/font";
 export { resolveFont, fontStyleFromProps, fontFromProps, textFace } from "./fonts/style";
 export type { FontStyle } from "./fonts/style";
