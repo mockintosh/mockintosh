@@ -24,8 +24,8 @@
    "bytes": 2090233
   },
   {
-   "family": "Geist Pixel",
-   "file": "geist-pixel.suit",
+   "family": "Geist",
+   "file": "geist.suit",
    "designer": "Vercel",
    "description": "The Square cut of Geist Pixel.",
    "license": "SIL Open Font License 1.1",
@@ -36,7 +36,7 @@
    "styles": [
     "Regular"
    ],
-   "bytes": 41619
+   "bytes": 41613
   },
   {
    "family": "Lisa",
@@ -51,7 +51,7 @@
    "styles": [
     "Regular"
    ],
-   "bytes": 4272
+   "bytes": 32896
   },
   {
    "family": "Jiskan",

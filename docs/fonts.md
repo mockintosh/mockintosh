@@ -17,7 +17,7 @@ Chicago 12 draws 2px between glyphs, as the Mac's NFNT does (`i` advances 4, `H`
 ### Where families come from
 
 - **Built in:** compiled into `@mockintosh/ui` (`fonts/families.ts`, `fonts/faces/`): Chicago, Geneva, Monaco, New York and the city fonts. A built-in strike is a styled face when its `FontStrikeSpec` sets `style` (1 bold, 2 italic).
-- **Font library:** Redaction, Geist Pixel, Lisa and Jiskan aren't built in. They're suitcases in `public/fonts/library/`, listed by its `index.json`, and the App Store's Fonts section installs one by downloading it into System Folder › Fonts (`src/os/fontLibrary.ts`). See [The font library](#the-font-library).
+- **Font library:** Redaction, Geist, Lisa and Jiskan aren't built in. They're suitcases in `public/fonts/library/`, listed by its `index.json`, and the App Store's Fonts section installs one by downloading it into System Folder › Fonts (`src/os/fontLibrary.ts`). See [The font library](#the-font-library).
 - **System Folder › Fonts** (`src/os/fontFolder.ts`): every `.suit` suitcase, loose `.ttf` / `.otf` / `.ttc`, and `family-size.fnt` strike in it is installed at boot and again whenever the folder changes. Loose outlines join a family by their own family name and `OS/2` style bits. A folder named "Fonts" made before the role existed is adopted. Files that fail log `Fonts: couldn't install …`.
 - **Run time:** `app.fonts.register(name, data, size)` installs a strike for this boot only; `app.fonts.install(suitcase)` writes a suitcase into the Fonts folder.
 
@@ -36,7 +36,7 @@ Venice 14, London 18, Athens 18, San Francisco 18, Cairo 18 and Los Angeles 12 a
 `npm run fonts:library` (`scripts/build-font-library.py`) builds one suitcase per family into `public/fonts/library/`, every strike an `%%MFN1` record with every character its source draws, plus `index.json` for the App Store:
 
 - **Redaction** (SIL OFL): every pixel cut, Regular, Bold and Italic, each at the size where its grid is one pixel (Redaction 100 → 10, 70 → 14, 50 → 20, 35 → 29, 20 → 50, 10 → 100), from the `@fontsource/redaction-<cut>` packages.
-- **Geist Pixel** (SIL OFL): Square at 24, from the `geist` package.
+- **Geist** (SIL OFL): Geist Pixel Square at 24, from the `geist` package.
 - **Lisa** (Kreative Relay Free Use): LisaTerminal Paper Raw at 12, from Kreative's `lisa1.zip` (`--lisa`); without it the suitcase in the library is kept.
 - **Jiskan** 16, from the AngelCode BMFont in `public/fonts`.
 

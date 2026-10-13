@@ -382,7 +382,7 @@ export function Preview(props: { code: string; children?: JSX.Element }): JSX.El
 export function PageTitle(props: { title: string; lede?: string }): JSX.Element {
   return (
     <box flexDirection="column" gap={8}>
-      <text font="pixel" wrap>{props.title}</text>
+      <text font="geist" wrap>{props.title}</text>
       <Show when={props.lede}>
         <text font="body" wrap selectable>
           {props.lede!}

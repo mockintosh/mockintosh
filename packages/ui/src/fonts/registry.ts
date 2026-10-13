@@ -593,7 +593,7 @@ export function familySettings(family: string): FamilyScalerSettings | undefined
  * Built-in strikes are restored on the next {@link initBuiltinFonts}; this
  * only drops what was registered.
  */
-/** Names for menus that installed families gave themselves (a suitcase's "Geist Pixel" for `geistpixel`). */
+/** Names for menus that installed families gave themselves (a suitcase's "Los Angeles" for `losangeles`). */
 const familyNames = new Map<string, string>();
 
 /** Give an installed bitmap family the name its menus show. */

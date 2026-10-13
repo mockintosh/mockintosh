@@ -10,7 +10,7 @@ the source draws.
                Italic, each at the size where its grid is one pixel:
                Redaction 100 → 10, 70 → 14, 50 → 20, 35 → 29, 20 → 50, 10 → 100.
                Sources: `@fontsource/redaction-<cut>` (npm).
-  Geist Pixel  Geist Pixel Square (SIL OFL) on its 38-unit grid, at 24.
+  Geist        Geist Pixel Square (SIL OFL) on its 38-unit grid, at 24.
                Source: the `geist` npm package.
   Lisa         LisaTerminal Paper Raw (Kreative Relay Free Use 1.2f) on its
                100-unit grid, at 12. Source: lisa1.zip from kreativekorp.com
@@ -59,13 +59,13 @@ LAYOUT = {
     ("redaction", 29, 1): (28, 9), ("redaction", 50, 1): (48, 15), ("redaction", 100, 1): (97, 30),
     ("redaction", 10, 2): (10, 3), ("redaction", 14, 2): (14, 5), ("redaction", 20, 2): (18, 6),
     ("redaction", 29, 2): (27, 9), ("redaction", 50, 2): (47, 15), ("redaction", 100, 2): (95, 30),
-    ("geistpixel", 24, 0): (25, 6),
+    ("geist", 24, 0): (25, 6),
     ("lisa", 12, 0): (10, 2),
     ("jiskan", 16, 0): (14, 3),
 }
 
 # The size a font menu picks each family at.
-DEFAULT_SIZES = {"redaction": 20, "geistpixel": 24, "lisa": 12, "jiskan": 16}
+DEFAULT_SIZES = {"redaction": 20, "geist": 24, "lisa": 12, "jiskan": 16}
 
 REDACTION_CUTS = (100, 70, 50, 35, 20, 10)
 # Suitcase style bits → fontsource file suffix.
@@ -80,9 +80,9 @@ ABOUT = {
         "license": "SIL Open Font License 1.1",
         "licenseFile": "LICENSE-Redaction.txt",
     },
-    "geistpixel": {
-        "family": "Geist Pixel",
-        "file": "geist-pixel.suit",
+    "geist": {
+        "family": "Geist",
+        "file": "geist.suit",
         "designer": "Vercel",
         "description": "The Square cut of Geist Pixel.",
         "license": "SIL Open Font License 1.1",
@@ -256,7 +256,7 @@ def main() -> None:
                 raise SystemExit(f"No redaction-{cut}-latin-{suffix}.woff2 under {args.redaction}")
             redaction.append(bake("redaction", round(1000 / cut), style, grid_glyphs(files[0], cut)))
     write_suitcase("redaction", redaction)
-    write_suitcase("geistpixel", [bake("geistpixel", 24, 0, grid_glyphs(args.geist, 38))])
+    write_suitcase("geist", [bake("geist", 24, 0, grid_glyphs(args.geist, 38))])
     if args.lisa:
         write_suitcase("lisa", [bake("lisa", 12, 0, grid_glyphs(args.lisa, 100))])
     elif not (LIBRARY / ABOUT["lisa"]["file"]).exists():

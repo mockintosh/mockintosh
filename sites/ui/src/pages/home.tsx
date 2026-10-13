@@ -24,7 +24,7 @@ export function HomePage(): JSX.Element {
         maxWidth={HERO_MAX}
         alignSelf="center"
       >
-        <text font="pixel" wrap>
+        <text font="geist" wrap>
           A 1-bit renderer and UI kit for Solid.js
         </text>
         <text font="body" wrap selectable>

@@ -15,7 +15,7 @@ export default defineConfig({
   server: {
     allowedHosts: true,
     fs: {
-      allow: [root, kit],
+      allow: [root, kit, resolve(repo, "public/fonts/library")],
     },
     watch: {
       ignored: ["!**/node_modules/@mockintosh/**"],

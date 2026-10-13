@@ -35,8 +35,6 @@ const FACE_ORDER = [
   "toronto",
   "cairo",
   "losAngeles",
-  "lisa",
-  "pixel",
 ] as const;
 
 const FACE_SOURCE: Readonly<Record<string, string>> = {
@@ -54,8 +52,6 @@ const FACE_SOURCE: Readonly<Record<string, string>> = {
   toronto: "Slab. Native 9 12 14 18 24. Removed after System 6.",
   cairo: "Dingbats. Native 18. z is the dogcow.",
   losAngeles: "Handwriting. Native 12 24.",
-  lisa: "LisaTerminal Paper Raw. 8x12 TILE.",
-  pixel: "Geist Pixel Square. Display face.",
 };
 
 const SYMBOL_FACES = new Set(["body", "menu", "mono", "geneva", "chicago"]);
@@ -148,7 +144,7 @@ export function FontsPage(): JSX.Element {
         lede={'Pass font and an optional native size. body / menu / mono stay as aliases. bold, italic, outline, and shadow are Font Manager synthesis and combine freely.'}
       />
       <text font="body" wrap selectable>
-        City families ship every bitmap size Apple published for that face. size picks a strike; a missing size snaps to the nearest native one. lisa and pixel are third-party display faces.
+        City families ship every bitmap size Apple published for that face. size picks a strike; a missing size snaps to the nearest native one. Third-party fonts such as Lisa and Geist come from the font library in the App Store.
       </text>
       <box flexDirection="column" gap={3}>
         <text font="geneva" size={12}>
@@ -205,7 +201,6 @@ export function FontsPage(): JSX.Element {
 }
 
 function FontCard(props: { face: FontFaceNote }): JSX.Element {
-  const display = props.face.name === "pixel";
   const sizes = listFontSizes(props.face.name);
   const def = defaultFontSize(props.face.name);
   return (
@@ -233,22 +228,22 @@ function FontCard(props: { face: FontFaceNote }): JSX.Element {
           </For>
         </box>
         <text font={props.face.name} size={def} wrap selectable>
-          {display ? "Geist Pixel" : PANGRAM}
+          {PANGRAM}
         </text>
         <text font={props.face.name} size={def} bold wrap selectable>
-          {display ? "Geist Pixel" : PANGRAM}
+          {PANGRAM}
         </text>
         <text font={props.face.name} size={def} italic wrap selectable>
-          {display ? "Geist Pixel" : PANGRAM}
+          {PANGRAM}
         </text>
         <text font={props.face.name} size={def} outline wrap selectable>
-          {display ? "Geist Pixel" : PANGRAM}
+          {PANGRAM}
         </text>
         <text font={props.face.name} size={def} shadow wrap selectable>
-          {display ? "Geist Pixel" : PANGRAM}
+          {PANGRAM}
         </text>
         <text font={props.face.name} size={def} wrap selectable>
-          {display ? "ABC abc 0123" : LETTERS}
+          {LETTERS}
         </text>
         <text font={props.face.name} size={def} wrap selectable>
           {FIGURES}

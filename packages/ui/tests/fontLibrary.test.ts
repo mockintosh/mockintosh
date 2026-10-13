@@ -34,11 +34,11 @@ initBuiltinFonts();
 describe("the font library", () => {
   it("isn't built in", () => {
     const names = listFontFamilies().map((f) => f.name);
-    for (const name of ["redaction", "geistpixel", "lisa", "jiskan", "pixel"]) expect(names).not.toContain(name);
+    for (const name of ["redaction", "geist", "lisa", "jiskan", "pixel"]) expect(names).not.toContain(name);
   });
 
   it("lists every suitcase with the sizes and styles it holds", () => {
-    expect(catalog.fonts.map((f) => f.family)).toEqual(["Redaction", "Geist Pixel", "Lisa", "Jiskan"]);
+    expect(catalog.fonts.map((f) => f.family)).toEqual(["Redaction", "Geist", "Lisa", "Jiskan"]);
     for (const entry of catalog.fonts) {
       const bytes = readFileSync(resolve(LIBRARY, entry.file));
       expect(entry.bytes, entry.file).toBe(bytes.length);
@@ -61,7 +61,7 @@ describe("installed library fonts", () => {
   it("join the font menus under their own names", () => {
     const families = listFontFamilies().map((f) => [f.name, f.displayName, f.builtIn]);
     expect(families).toContainEqual(["redaction", "Redaction", false]);
-    expect(families).toContainEqual(["geistpixel", "Geist Pixel", false]);
+    expect(families).toContainEqual(["geist", "Geist", false]);
     expect(families).toContainEqual(["lisa", "Lisa", false]);
     expect(families).toContainEqual(["jiskan", "Jiskan", false]);
     expect(listFontSizes("redaction")).toEqual([10, 14, 20, 29, 50, 100]);
@@ -72,9 +72,9 @@ describe("installed library fonts", () => {
     for (const size of [10, 14, 20, 29, 50, 100]) {
       for (const ch of "AgÅé€ŁŞĞőž™") expect(ink("redaction", size, ch), `redaction ${size} ${ch}`).toBeGreaterThan(0);
     }
-    for (const ch of "AgÅé€Łő™→√") expect(ink("geistpixel", 24, ch), ch).toBeGreaterThan(0);
+    for (const ch of "AgÅé€Łő™→√") expect(ink("geist", 24, ch), ch).toBeGreaterThan(0);
     for (const ch of "AgÅé€ŁőĜ") expect(ink("jiskan", 16, ch), ch).toBeGreaterThan(0);
-    for (const ch of "AaGgWw0$?.") expect(ink("lisa", 12, ch), ch).toBeGreaterThan(0);
+    for (const ch of "AaGgWw0$?.Åé€™ΩЖ→░") expect(ink("lisa", 12, ch), ch).toBeGreaterThan(0);
     expect(charAdvance(requireFont("redaction", 20), " ")).toBeGreaterThan(0);
   });
 
@@ -102,7 +102,7 @@ describe("installed library fonts", () => {
   });
 
   it("keep their native advances", () => {
-    expect(measureText("IA", "geistpixel")).toBe(6 + 16);
+    expect(measureText("IA", "geist")).toBe(6 + 16);
     expect(measureText("IA", "lisa")).toBe(8 + 8);
   });
 
@@ -111,13 +111,13 @@ describe("installed library fonts", () => {
     expect(faceMetrics(requireFont("redaction", 20))).toMatchObject({ ascent: 19, descent: 6 });
     expect(faceMetrics(requireFont("redaction", 100))).toMatchObject({ ascent: 95, descent: 30 });
     expect(faceMetrics(requireFont("lisa"))).toMatchObject({ ascent: 10, descent: 2, cellHeight: 12, capHeight: 8 });
-    expect(faceMetrics(requireFont("geistpixel")).capHeight).toBe(19);
+    expect(faceMetrics(requireFont("geist")).capHeight).toBe(19);
   });
 
   it("leave the menus when uninstalled", () => {
-    unregisterFamily("geistpixel");
+    unregisterFamily("geist");
     const families = listFontFamilies().map((f) => f.name);
-    expect(families).not.toContain("geistpixel");
-    install("geist-pixel.suit");
+    expect(families).not.toContain("geist");
+    install("geist.suit");
   });
 });
