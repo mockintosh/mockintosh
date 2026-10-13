@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { indexAtPoint, layoutNodeText, layoutText } from "../src/fonts/textLayout";
-import type { DeckerFont } from "../src/fonts/font";
+import type { BitmapFace } from "../src/fonts/font";
 import { computeLayout } from "../src/layout";
 import { createDrawContext, drawTree } from "../src/draw";
 import { createNode, type CanvasNode } from "../src/nodes";
@@ -16,7 +16,7 @@ import { faceMetrics } from "../src/fonts/metrics";
 import { textWraps } from "../src/nodes";
 
 // Synthetic monospace font: every printable ASCII glyph is 5px + 1px spacing = 6px advance.
-function monoFont(): DeckerFont {
+function monoFont(): BitmapFace {
   const glyphWidths = new Uint8Array(256);
   for (let c = 32; c <= 126; c++) glyphWidths[c] = 5;
   return {

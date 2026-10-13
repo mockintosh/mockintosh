@@ -15,8 +15,8 @@ import {
   clampBakeSize,
   decodeFont,
   decodeSuitcase,
-  deckerFontFromDraft,
-  draftFromDeckerFont,
+  bitmapFaceFromDraft,
+  draftFromBitmapFace,
   encodeFont,
   encodeSuitcase,
   familyKey,
@@ -182,7 +182,7 @@ function Foundry(props: FoundryProps): JSX.Element {
           const first = opened.strikes[0];
           setSourceBytes(null);
           setSize(first.size);
-          applyDraft(draftFromDeckerFont(decodeFont(first.data, opened.family), opened.family, first.size));
+          applyDraft(draftFromBitmapFace(decodeFont(first.data, opened.family), opened.family, first.size));
         }
         setDirty(false);
         setError("");
@@ -191,7 +191,7 @@ function Foundry(props: FoundryProps): JSX.Element {
       }
       return;
     }
-    if (file.type === MIME.deckerFont) {
+    if (file.type === MIME.bitmapFont) {
       const text = await app.fs.readText(fileId);
       if (!text) {
         setError("That strike is empty.");
@@ -199,7 +199,7 @@ function Foundry(props: FoundryProps): JSX.Element {
       }
       try {
         const font = decodeFont(text, family());
-        const next = draftFromDeckerFont(font, sanitizeOpenName(file.name), font.size ?? font.glyphHeight);
+        const next = draftFromBitmapFace(font, sanitizeOpenName(file.name), font.size ?? font.glyphHeight);
         setSourceBytes(null);
         setSize(next.size);
         applyDraft(next);
@@ -240,7 +240,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     const desktop = app.fs.locate("desktop");
     if (!desktop) return [];
     return app.fs.children(desktop.id).filter(
-      (n) => n.kind === "file" && (isFontType(n.type) || n.type === MIME.deckerFont || n.type === MIME.suitcase),
+      (n) => n.kind === "file" && (isFontType(n.type) || n.type === MIME.bitmapFont || n.type === MIME.suitcase),
     );
   };
 
@@ -285,7 +285,7 @@ function Foundry(props: FoundryProps): JSX.Element {
   async function installStrike(): Promise<void> {
     const d = currentDraft();
     if (!d) return;
-    const packed = encodeFont(deckerFontFromDraft(d));
+    const packed = encodeFont(bitmapFaceFromDraft(d));
     app.fonts.register(d.family, packed, d.size);
     await app.os.showDialog({
       message: `Installed “${d.family}” ${d.size} for this session.`,
@@ -301,7 +301,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     if (!s) return null;
     s = { ...s, family: family() || s.family };
     if (d && (dirty() || s.outlines.length === 0)) {
-      s = withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeFont(deckerFontFromDraft(d)));
+      s = withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeFont(bitmapFaceFromDraft(d)));
     }
     return s;
   }
@@ -310,7 +310,7 @@ function Foundry(props: FoundryProps): JSX.Element {
     const d = currentDraft();
     const s = currentSuitcase();
     if (!d || !s) return;
-    setSuitcase(withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeFont(deckerFontFromDraft(d))));
+    setSuitcase(withStrike(s, d.size, styleOfOutline(s, sourceBytes()), encodeFont(bitmapFaceFromDraft(d))));
     setDirty(false);
   }
 
@@ -382,9 +382,9 @@ function Foundry(props: FoundryProps): JSX.Element {
     const d = currentDraft();
     const desktop = app.fs.locate("desktop");
     if (!d || !desktop) return;
-    const packed = encodeFont(deckerFontFromDraft(d));
+    const packed = encodeFont(bitmapFaceFromDraft(d));
     const name = uniqueChildName(app.fs, desktop.id, fitNameWithSuffix(d.family, `-${d.size}.fnt`));
-    await app.fs.writeFile(desktop.id, name, packed, { type: MIME.deckerFont });
+    await app.fs.writeFile(desktop.id, name, packed, { type: MIME.bitmapFont });
     setDirty(false);
   }
 
@@ -706,7 +706,7 @@ export default defineApp({
   defaultSize: { width: 420, height: 300 },
   minSize: { width: 300, height: 220 },
   resizable: true,
-  fileTypes: [...FONT_TYPES, MIME.deckerFont, MIME.suitcase],
+  fileTypes: [...FONT_TYPES, MIME.bitmapFont, MIME.suitcase],
   sprites,
   about: {
     version: "2.0",

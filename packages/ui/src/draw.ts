@@ -585,7 +585,7 @@ function drawText(
 
   // Same line breaking as the measure pass, so drawn geometry matches layout.
   const block = layoutNodeText(node, font, text, wrap ? innerW : undefined);
-  // Strike ascent = cell height (baseline at the Decker cell bottom).
+  // Strike ascent = cell height (baseline at the cell bottom).
   // Outlined strikes are 2px taller; baseline is the padded cell bottom.
   const strikeAscent = font.glyphHeight;
   const face = faceMetrics(font);

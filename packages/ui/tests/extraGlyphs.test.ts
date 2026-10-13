@@ -19,7 +19,7 @@ import {
   getGlyphWidth,
   glyphAdvance,
   ordinalForCharCode,
-  type DeckerFont,
+  type BitmapFace,
 } from "../src/fonts/font";
 import { requireFont } from "../src/fonts/registry";
 import { measureText } from "../src/fonts/bridge";
@@ -27,7 +27,7 @@ import { measureText } from "../src/fonts/bridge";
 const BUILTIN_FONTS = ["body", "menu", "mono", "bodyBold", "geneva12", "geneva12Bold"] as const;
 const SYMBOLS = [COMMAND_KEY, CHECK_MARK, BULLET];
 
-function glyphHasInk(font: DeckerFont, ordinal: number): boolean {
+function glyphHasInk(font: BitmapFace, ordinal: number): boolean {
   const width = getGlyphWidth(font, ordinal);
   for (let y = 0; y < font.glyphHeight; y++) {
     for (let x = 0; x < width; x++) {
@@ -37,7 +37,7 @@ function glyphHasInk(font: DeckerFont, ordinal: number): boolean {
   return false;
 }
 
-function syntheticFont(name: string, maxWidth: number, glyphHeight: number): DeckerFont {
+function syntheticFont(name: string, maxWidth: number, glyphHeight: number): BitmapFace {
   const glyphStride = Math.ceil(maxWidth / 8) * glyphHeight;
   return {
     name,

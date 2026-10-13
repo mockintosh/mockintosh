@@ -1,4 +1,4 @@
-import type { DeckerFont } from "./font";
+import type { BitmapFace } from "./font";
 import { getGlyphPixel } from "./font";
 
 /** One glyph in an unpacked 1-bit strike draft. `pixels` is row-major, 0/1. */
@@ -18,7 +18,7 @@ export interface FontStrikeDraft {
   glyphs: FontStrikeGlyph[];
 }
 
-export function deckerFontFromDraft(draft: FontStrikeDraft): DeckerFont {
+export function bitmapFaceFromDraft(draft: FontStrikeDraft): BitmapFace {
   const maxWidth = Math.max(1, draft.maxWidth, ...draft.glyphs.map((g) => g.width));
   const glyphHeight = Math.max(1, draft.glyphHeight);
   const glyphStride = Math.ceil(maxWidth / 8) * glyphHeight;
@@ -48,7 +48,7 @@ export function deckerFontFromDraft(draft: FontStrikeDraft): DeckerFont {
   };
 }
 
-export function draftFromDeckerFont(font: DeckerFont, family = font.name, size = font.size ?? font.glyphHeight): FontStrikeDraft {
+export function draftFromBitmapFace(font: BitmapFace, family = font.name, size = font.size ?? font.glyphHeight): FontStrikeDraft {
   const glyphs: FontStrikeGlyph[] = [];
   for (let ordinal = 0; ordinal < 256; ordinal++) {
     const width = font.glyphWidths[ordinal] ?? 0;

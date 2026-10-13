@@ -11,7 +11,7 @@
  */
 
 import { MISSING_SLOT, codePointForSlot as pageZeroCodePoint, codePointOnPage, pageOfCodePoint, slotForCodePoint } from "./charmap";
-import { getGlyphWidth, type DeckerFont, type OutlineGlyphSource } from "./font";
+import { getGlyphWidth, type BitmapFace, type OutlineGlyphSource } from "./font";
 import type { OutlineFace, ScalerOptions } from "./truetype/scaler";
 
 /** Per-family scaler switches (a suitcase's options block). */
@@ -46,10 +46,10 @@ export interface OutlineStrikeRequest {
   page: number;
   settings: FamilyScalerSettings;
   /** Sibling page strike of the same face and size (the registry's cache). */
-  pageStrike(page: number): DeckerFont | null;
+  pageStrike(page: number): BitmapFace | null;
 }
 
-export function createOutlineStrike(req: OutlineStrikeRequest): DeckerFont {
+export function createOutlineStrike(req: OutlineStrikeRequest): BitmapFace {
   const { face, ppem, page, settings } = req;
   const metrics = face.metrics(ppem);
   const gids = new Int32Array(256);
@@ -83,7 +83,7 @@ export function createOutlineStrike(req: OutlineStrikeRequest): DeckerFont {
   const filled = new Uint8Array(256);
   for (let ord = 0; ord < 256; ord++) if (glyphWidths[ord] === 0) filled[ord] = 1;
 
-  const font: DeckerFont = {
+  const font: BitmapFace = {
     name: pageFaceKey(req.family, page),
     size: ppem,
     maxWidth,

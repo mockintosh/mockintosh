@@ -1,4 +1,4 @@
-import type { DeckerFont } from "./font";
+import type { BitmapFace } from "./font";
 import { carryAdvances, getGlyphPixel, getGlyphWidth } from "./font";
 
 /**
@@ -6,7 +6,7 @@ import { carryAdvances, getGlyphPixel, getGlyphWidth } from "./font";
  * neighbor and the advance grows 1px. Apple never shipped an intrinsic
  * Geneva Bold strike; this is what Bold on Geneva 9 actually painted.
  */
-export function smearDeckerFontBold(font: DeckerFont, name: string): DeckerFont {
+export function smearBitmapFaceBold(font: BitmapFace, name: string): BitmapFace {
   const maxWidth = font.maxWidth + 1;
   const glyphHeight = font.glyphHeight;
   const above = font.inkAbove ?? 0;

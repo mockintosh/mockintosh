@@ -3,12 +3,12 @@ import { decodeFont, encodeFont } from "../src/fonts/codec";
 import { MISSING_SLOT, slotForCodePoint } from "../src/fonts/charmap";
 import { locateGlyph } from "../src/fonts/font";
 import { legacyCodePoint } from "../src/fonts/legacy";
-import { getGlyphPixel, type DeckerFont } from "../src/fonts/font";
+import { getGlyphPixel, type BitmapFace } from "../src/fonts/font";
 import { requireFont, initBuiltinFonts } from "../src/fonts/registry";
 
 initBuiltinFonts();
 
-function tinyFont(): DeckerFont {
+function tinyFont(): BitmapFace {
   const maxWidth = 8;
   const glyphHeight = 2;
   const glyphStride = glyphHeight;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { smearDeckerFontBold } from "../src/fonts/boldSmear";
+import { smearBitmapFaceBold } from "../src/fonts/boldSmear";
 import { decodeFont } from "../src/fonts/codec";
 import { getGlyphPixel, getGlyphWidth } from "../src/fonts/font";
 import { initBuiltinFonts, listFonts, requireFont } from "../src/fonts/registry";
@@ -44,7 +44,7 @@ describe("bodyBold (Geneva 9 Font Manager smear)", () => {
   });
 
   it("matches a fresh smear of System 7.5.3 Geneva 9", () => {
-    const expected = smearDeckerFontBold(decodeFont(SYSTEM_FONT_GENEVA_9, "geneva"), "bodyBold");
+    const expected = smearBitmapFaceBold(decodeFont(SYSTEM_FONT_GENEVA_9, "geneva"), "bodyBold");
     const actual = requireFont("bodyBold");
     expect(actual.maxWidth).toBe(expected.maxWidth);
     expect(getGlyphWidth(actual, "W".charCodeAt(0))).toBe(getGlyphWidth(expected, "W".charCodeAt(0)));

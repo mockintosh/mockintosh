@@ -158,8 +158,8 @@ export type { FontRasterMode, FontRasterOptions, FontRasterService, FontRegistry
 export {
   encodeFont,
   decodeFont,
-  deckerFontFromDraft,
-  draftFromDeckerFont,
+  bitmapFaceFromDraft,
+  draftFromBitmapFace,
   macRomanCharset,
   slotForCodePoint,
   getGlyphPixel,
@@ -186,7 +186,7 @@ export {
 export type {
   FontStrikeDraft,
   FontStrikeGlyph,
-  DeckerFont,
+  BitmapFace,
   FontFamilyInfo,
   FontSuitcase,
   SuitcaseStrike,

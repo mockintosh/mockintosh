@@ -20,7 +20,7 @@ import { fontFamilyId, hostSwapFont, uiTextRuns } from "../../src/fonts/strike";
 import { encodeFont } from "../../src/fonts/codec";
 import { slotForCodePoint } from "../../src/fonts/charmap";
 import { OutlineFace } from "../../src/fonts/truetype/scaler";
-import { deckerFontFromDraft } from "../../src/fonts/draft";
+import { bitmapFaceFromDraft } from "../../src/fonts/draft";
 import { resolveFont } from "../../src/fonts/style";
 import { testFontBytes } from "./testFont";
 
@@ -73,7 +73,7 @@ describe("outline families in the Font Manager", () => {
       spacing: 1,
       glyphs: [{ ordinal: 72, width: 4, pixels: new Uint8Array(40).fill(1) }],
     };
-    registerFont("testsans", encodeFont(deckerFontFromDraft(draft)), 12);
+    registerFont("testsans", encodeFont(bitmapFaceFromDraft(draft)), 12);
     const bitmap = requireFont("testsans", 12);
     expect(bitmap).not.toBe(scaled);
     expect(bitmap.outline).toBeUndefined();
@@ -127,7 +127,7 @@ describe("outline families in the Font Manager", () => {
       spacing: 0,
       glyphs: [{ ordinal: 72, width: 3, pixels: new Uint8Array(30).fill(1) }],
     };
-    const strike = registerStyledStrike("testsans", 12, encodeFont(deckerFontFromDraft(draft)), 1);
+    const strike = registerStyledStrike("testsans", 12, encodeFont(bitmapFaceFromDraft(draft)), 1);
     expect(getRealFace("testsans", 1, 12)?.font).toBe(strike);
   });
 });

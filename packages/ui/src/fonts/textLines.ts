@@ -3,12 +3,12 @@
  * ← → to a line's ends, ↑ ↓ to the line above or below at the same x.
  */
 
-import type { DeckerFont } from "./font";
+import type { BitmapFace } from "./font";
 import type { TextAlign } from "../nodes";
 import type { TextLines } from "../textEditing";
 import { caretPoint, indexAtPoint, lineOfIndex, lineTop, type TextBlock } from "./textLayout";
 
-export function blockLines(block: TextBlock, font: DeckerFont, align: TextAlign, width: number): TextLines {
+export function blockLines(block: TextBlock, font: BitmapFace, align: TextAlign, width: number): TextLines {
   return {
     lineAt(index) {
       const line = block.lines[lineOfIndex(block, index)]!;

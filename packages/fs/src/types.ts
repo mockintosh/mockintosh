@@ -121,7 +121,7 @@ export const MIME = {
   /** Host TrueType / OpenType bytes dropped onto the desktop. */
   truetype: "font/ttf",
   /** Font strike record text (`%%MFN1`, or Decker's `%%FNT1`). */
-  deckerFont: "application/x-mockintosh-font",
+  bitmapFont: "application/x-mockintosh-font",
   /** Font suitcase (FOND): a family's bitmap strikes and outlines, as JSON. */
   suitcase: "application/x-mockintosh-suitcase",
 } as const;

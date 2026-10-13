@@ -142,11 +142,11 @@ export {
 } from "./fonts/suitcase";
 export type { FontSuitcase, SuitcaseStrike, SuitcaseOutline } from "./fonts/suitcase";
 export { encodeFont, decodeFont } from "./fonts/codec";
-export { deckerFontFromDraft, draftFromDeckerFont } from "./fonts/draft";
+export { bitmapFaceFromDraft, draftFromBitmapFace } from "./fonts/draft";
 export type { FontStrikeDraft, FontStrikeGlyph } from "./fonts/draft";
 export { MISSING_SLOT, charForSlot, codePointForSlot, macRomanCharset, slotForCodePoint } from "./fonts/charmap";
 export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar, glyphAdvance, glyphOriginX, locateGlyph, lookalikeGlyph } from "./fonts/font";
-export type { DeckerFont } from "./fonts/font";
+export type { BitmapFace } from "./fonts/font";
 export { resolveFont, fontStyleFromProps, fontFromProps, textFace } from "./fonts/style";
 export type { FontStyle } from "./fonts/style";
 export { measureText, truncateText, fontLineHeight, drawString } from "./fonts/bridge";

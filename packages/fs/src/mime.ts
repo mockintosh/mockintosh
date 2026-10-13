@@ -23,7 +23,7 @@ const BY_EXTENSION: Readonly<Record<string, string>> = {
   wav: "audio/wav",
   ttf: MIME.truetype,
   otf: "font/otf",
-  fnt: MIME.deckerFont,
+  fnt: MIME.bitmapFont,
   ttc: "font/collection",
   suit: MIME.suitcase,
 };
@@ -72,7 +72,7 @@ export function isTextType(type: string): boolean {
     type === MIME.sprite ||
     type === MIME.appShortcut ||
     type === MIME.app ||
-    type === MIME.deckerFont ||
+    type === MIME.bitmapFont ||
     type === MIME.suitcase ||
     type.endsWith("+json") ||
     type.endsWith("+xml")

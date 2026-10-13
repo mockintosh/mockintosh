@@ -7,7 +7,7 @@
  * Layout is still placed on the 320×180 stage (`x`, `y`, `len`) so shots
  * compose the same at any window size; chrome is sized in device pixels × `z`.
  */
-import { getFont, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, type DeckerFont } from "@mockintosh/ui";
+import { getFont, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, type BitmapFace } from "@mockintosh/ui";
 import type { Sprite } from "@mockintosh/sdk";
 import type { Frame, PixelRect, Stage } from "./painter";
 
@@ -25,9 +25,9 @@ export interface FontStyle {
   ink?: Ink;
 }
 
-const fonts = new Map<string, DeckerFont>();
+const fonts = new Map<string, BitmapFace>();
 
-function fontFor(style: FontStyle): DeckerFont {
+function fontFor(style: FontStyle): BitmapFace {
   const key = `${style.font}:${style.size ?? ""}`;
   let font = fonts.get(key);
   if (!font) {

@@ -1,5 +1,5 @@
 /**
- * Decker → `FontStrike` and the host `_SwapFont`.
+ * Bitmap faces → `FontStrike` and the host `_SwapFont`.
  *
  * Family numbering, size fallback, baseline (ascent = glyph cell height),
  * and style synthesis live here — not in `@mockintosh/quickdraw`.
@@ -31,7 +31,7 @@ import {
   locateGlyph,
   lookalikeGlyph,
   missingGlyphIndex,
-  type DeckerFont,
+  type BitmapFace,
 } from "./font";
 import { MISSING_SLOT } from "./charmap";
 import { pageFaceKey } from "./outlineStrike";
@@ -97,8 +97,8 @@ export function fontFamilyName(id: number): string {
   return "body";
 }
 
-/** QuickDraw strike metrics. Baseline is the bottom of the Decker cell. */
-export function uiFontMetrics(font: DeckerFont): UiFontMetrics {
+/** QuickDraw strike metrics. Baseline is the bottom of the cell. */
+export function uiFontMetrics(font: BitmapFace): UiFontMetrics {
   return {
     ascent: font.glyphHeight,
     descent: STRIKE_DESCENT,
@@ -119,13 +119,13 @@ export function fontAscent(fontName: string, size?: number): number {
  */
 export interface UiTextRun {
   faceKey?: string;
-  font: DeckerFont;
+  font: BitmapFace;
   bytes: number[];
   x: number;
 }
 
 /** `TextFont` name for page `page` of a bitmap face. */
-function bitmapPageKey(face: DeckerFont, page: DeckerFont): string | undefined {
+function bitmapPageKey(face: BitmapFace, page: BitmapFace): string | undefined {
   if (page === face) return undefined;
   for (const [n, strike] of face.pages ?? []) {
     if (strike !== page) continue;
@@ -140,7 +140,7 @@ function bitmapPageKey(face: DeckerFont, page: DeckerFont): string | undefined {
  * another page strike or where pair kerning moves the pen. A face that
  * draws everything from page 0 comes back as one run.
  */
-export function uiTextRuns(font: DeckerFont, text: string): UiTextRun[] {
+export function uiTextRuns(font: BitmapFace, text: string): UiTextRun[] {
   if (!isPaged(font)) return [{ font, bytes: encodeUiText(font, text), x: 0 }];
   const src = font.outline;
   const runs: UiTextRun[] = [];
@@ -173,7 +173,7 @@ export function uiTextRuns(font: DeckerFont, text: string): UiTextRun[] {
  * `MoveTo` + `DrawText` for one line at `baseline` (the cell bottom).
  * A run on another page strike switches `TextFont` for that run, then restores it.
  */
-export function drawUiText(font: DeckerFont, text: string, x: number, baseline: number): void {
+export function drawUiText(font: BitmapFace, text: string, x: number, baseline: number): void {
   if (!isPaged(font)) {
     const bytes = encodeUiText(font, text);
     MoveTo(x, baseline);
@@ -191,7 +191,7 @@ export function drawUiText(font: DeckerFont, text: string, x: number, baseline: 
 }
 
 /** Map a JS string to page-0 slots for `DrawText`. */
-export function encodeUiText(font: DeckerFont, text: string): number[] {
+export function encodeUiText(font: BitmapFace, text: string): number[] {
   const out: number[] = new Array(text.length);
   for (let i = 0; i < text.length; i++) {
     const idx = getGlyphIndexForChar(font, text[i]!);
@@ -200,19 +200,19 @@ export function encodeUiText(font: DeckerFont, text: string): number[] {
   return out;
 }
 
-const strikeCache = new WeakMap<DeckerFont, FontStrike>();
+const strikeCache = new WeakMap<BitmapFace, FontStrike>();
 
-function ordinalAdvance(font: DeckerFont, ord: number): number {
+function ordinalAdvance(font: BitmapFace, ord: number): number {
   const idx = hasGlyph(font, ord) ? ord : missingGlyphIndex(font);
   if (idx < 0) return 0;
   return glyphAdvance(font, idx) + font.spacing;
 }
 
 /**
- * Pack every Decker glyph into a Macintosh kerned strike.
- * Baseline is the bottom of the Decker cell (`ascent = glyphHeight`).
+ * Pack every glyph of a face into a Macintosh kerned strike.
+ * Baseline is the bottom of the cell (`ascent = glyphHeight`).
  */
-export function deckerToStrike(font: DeckerFont): FontStrike {
+export function deckerToStrike(font: BitmapFace): FontStrike {
   const cached = strikeCache.get(font);
   if (cached) return cached;
 
@@ -337,7 +337,7 @@ function synthesis(face: number, ascent: number): {
   let ulThick = 0;
   let shadowPx = 0;
   if (face & outline) {
-    // Strike is already a hollow ring (`outlineDeckerFont`), including any
+    // Strike is already a hollow ring (`outlineBitmapFace`), including any
     // bold smear. Do not also run DrawText's outline/bold extras.
     italicPx = face & italic ? italicShearUnits(ascent, STRIKE_DESCENT) : 0;
   } else {
@@ -373,7 +373,7 @@ function synthesis(face: number, ascent: number): {
 
 const WIDTH_TABLE_CACHE_SIZE = 12;
 const widthTables = new Map<string, Int32Array>();
-const widthTableFontIds = new WeakMap<DeckerFont, number>();
+const widthTableFontIds = new WeakMap<BitmapFace, number>();
 let nextWidthTableFontId = 1;
 
 /**
@@ -381,7 +381,7 @@ let nextWidthTableFontId = 1;
  * `TextFace` round trip didn't rebuild one. Keyed by strike, style extra,
  * and the port's `spExtra`; treat the result as read-only.
  */
-function cachedWidthTable(font: DeckerFont, extra: number, spExtra: number): Int32Array {
+function cachedWidthTable(font: BitmapFace, extra: number, spExtra: number): Int32Array {
   let id = widthTableFontIds.get(font);
   if (id === undefined) {
     id = nextWidthTableFontId++;
@@ -405,7 +405,7 @@ function cachedWidthTable(font: DeckerFont, extra: number, spExtra: number): Int
 }
 
 /**
- * Host `_SwapFont`: map family/size/face onto a cached Decker strike.
+ * Host `_SwapFont`: map family/size/face onto a cached bitmap strike.
  * `spExtra` is folded into `widthTable[32]` as the original Font Manager did.
  */
 export function hostSwapFont(inRec: FMInput): FMOutput {

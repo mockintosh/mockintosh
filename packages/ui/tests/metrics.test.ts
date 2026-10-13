@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { initBuiltinFonts, requireFont } from "../src/fonts/registry";
 import { alignmentHeight, cdefBaseline, faceMetrics } from "../src/fonts/metrics";
-import type { DeckerFont } from "../src/fonts/font";
+import type { BitmapFace } from "../src/fonts/font";
 
 initBuiltinFonts();
 
-function emptyFont(glyphHeight: number): DeckerFont {
+function emptyFont(glyphHeight: number): BitmapFace {
   return {
     name: "empty",
     maxWidth: 8,

@@ -6,7 +6,7 @@ How Mockintosh finds, scales and draws type, the System 7 techniques it borrows,
 
 The Font Manager (`packages/ui/src/fonts/registry.ts`) knows **families**, as a System 7 FOND did. A family holds:
 
-- **Bitmap strikes**, by size and style (plain, bold, italic, bold italic). Stored as `%%MFN1` records (`fonts/codec.ts`, glyphs keyed by code point); `DeckerFont` in memory. Decker's older `%%FNT0` / `%%FNT1` records still load (`fonts/legacy.ts`).
+- **Bitmap strikes**, by size and style (plain, bold, italic, bold italic). Stored as `%%MFN1` records (`fonts/codec.ts`, glyphs keyed by code point); `BitmapFace` in memory. Decker's older `%%FNT0` / `%%FNT1` records still load (`fonts/legacy.ts`).
 - **Outlines**, by style: TrueType (`glyf`) or PostScript-flavoured OpenType (`CFF `), parsed into an `OutlineFace`.
 - **Settings**: kerning, hinting, dropout control, preserveGlyph, preferOutline.
 
@@ -58,9 +58,9 @@ A `.suit` file (`fonts/suitcase.ts`) is one family as JSON: `strikes` (`size`, `
 
 ### Strikes from outlines
 
-`outlineStrike.ts` builds a `DeckerFont` whose widths come from the font's metrics and whose pixels are rendered **one glyph at a time on first use** (about 40 µs a glyph), which is how a 68000 coped. `FontStrike.prepare` lets `DrText` ask for glyphs it is about to blit. Scaled strikes live in an 8 MB LRU.
+`outlineStrike.ts` builds a `BitmapFace` whose widths come from the font's metrics and whose pixels are rendered **one glyph at a time on first use** (about 40 µs a glyph), which is how a 68000 coped. `FontStrike.prepare` lets `DrText` ask for glyphs it is about to blit. Scaled strikes live in an 8 MB LRU.
 
-- **Beyond 256 characters:** page 0 is Mac OS Roman (`fonts/charmap.ts`), with Chicago's ⌘ ✓ ◆ (and Mockintosh's ⇧ ⌥) in the control range and the missing glyph at slot 0; any other code point lives on page `(codePoint >> 8) + 1`, named `family\u0001p<page>` for `TextFont`. Bitmap and outline faces share this: a bitmap face carries its pages in `DeckerFont.pages`. `drawUiText` splits a line into runs at page changes.
+- **Beyond 256 characters:** page 0 is Mac OS Roman (`fonts/charmap.ts`), with Chicago's ⌘ ✓ ◆ (and Mockintosh's ⇧ ⌥) in the control range and the missing glyph at slot 0; any other code point lives on page `(codePoint >> 8) + 1`, named `family\u0001p<page>` for `TextFont`. Bitmap and outline faces share this: a bitmap face carries its pages in `BitmapFace.pages`. `drawUiText` splits a line into runs at page changes.
 - **Advances and overhangs:** strikes carry NFNT-style `advances` and `originX`, packed into the QuickDraw strike's offset/width table and `kernMax`, so italic ink can overhang without loosening spacing.
 - **Kerning** is applied by UI text (`textAdvance`, `uiTextRuns`), which splits draw runs where a pair moves the pen. QuickDraw `DrawText` from apps such as MacPaint does not kern, as on the original.
 

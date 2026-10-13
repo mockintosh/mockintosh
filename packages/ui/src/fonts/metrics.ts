@@ -4,10 +4,10 @@
  *
  * `verticalAlign="middle"` is the Control Manager rule: center
  * `ascent + descent + leading` in the box, then `MoveTo` the baseline.
- * Built-in faces use the System 6 FONT headers. Custom Decker fonts fall
+ * Built-in faces use the System 6 FONT headers. Custom fonts fall
  * back to an ink-derived split of the cell.
  *
- * Cap ink (`capAscent`) only maps that baseline onto the Decker cell.
+ * Cap ink (`capAscent`) only maps that baseline onto the cell.
  * Strike packing still uses `uiFontMetrics` (`ascent = glyphHeight`).
  */
 
@@ -15,7 +15,7 @@ import {
   getGlyphPixel,
   getGlyphWidth,
   hasGlyph,
-  type DeckerFont,
+  type BitmapFace,
 } from "./font";
 import { lookupFontInfo, requireFont } from "./registry";
 
@@ -43,7 +43,7 @@ const SYSTEM_FONT_INFO: Readonly<Record<string, FontInfo>> = {
 };
 
 export interface FontFaceMetrics extends FontInfo {
-  /** Decker cell height — QuickDraw line box and wrapped-text advance. */
+  /** Cell height — QuickDraw line box and wrapped-text advance. */
   cellHeight: number;
   /** Cell top → scanline just below typical A–Z. Maps FontInfo baseline → cell. */
   capAscent: number;
@@ -55,9 +55,9 @@ export interface FontFaceMetrics extends FontInfo {
   lineHeight: number;
 }
 
-const cache = new WeakMap<DeckerFont, FontFaceMetrics>();
+const cache = new WeakMap<BitmapFace, FontFaceMetrics>();
 
-export function faceMetrics(font: DeckerFont): FontFaceMetrics {
+export function faceMetrics(font: BitmapFace): FontFaceMetrics {
   const cached = cache.get(font);
   if (cached) return cached;
   const computed = computeFaceMetrics(font);
@@ -76,7 +76,7 @@ export function faceMetricsByName(fontName: string = "body", size?: number): Fon
  * ascent + descent + leading.
  */
 export function alignmentHeight(
-  font: DeckerFont,
+  font: BitmapFace,
   lineCount: number,
   blockHeight: number,
   verticalAlign: "top" | "middle" | "bottom" = "top"
@@ -96,12 +96,12 @@ export function cdefBaseline(top: number, height: number, m: FontFaceMetrics): n
   return top + height - ((height - m.lineHeight) >> 1) - m.leading - m.descent;
 }
 
-/** Decker cell top so caps sit on {@link cdefBaseline}. */
+/** Cell top so caps sit on {@link cdefBaseline}. */
 export function middleCellTop(top: number, height: number, m: FontFaceMetrics): number {
   return cdefBaseline(top, height, m) - m.capAscent;
 }
 
-function computeFaceMetrics(font: DeckerFont): FontFaceMetrics {
+function computeFaceMetrics(font: BitmapFace): FontFaceMetrics {
   const cellHeight = font.glyphHeight;
   const caps = scanTypicalCapInk(font);
   const capTop = caps?.minY ?? 0;
@@ -133,7 +133,7 @@ function computeFaceMetrics(font: DeckerFont): FontFaceMetrics {
  * Typical A–Z ink, not the union. `Q`'s tail is a one-off descender and
  * must not pull the cap baseline down a row.
  */
-function scanTypicalCapInk(font: DeckerFont): { minY: number; maxY: number } | null {
+function scanTypicalCapInk(font: BitmapFace): { minY: number; maxY: number } | null {
   const minYs: number[] = [];
   const maxYs: number[] = [];
   for (let ord = 65; ord <= 90; ord++) {
@@ -154,7 +154,7 @@ function median(values: number[]): number {
 }
 
 function glyphInkY(
-  font: DeckerFont,
+  font: BitmapFace,
   glyphIndex: number
 ): { minY: number; maxY: number } | null {
   const width = getGlyphWidth(font, glyphIndex);

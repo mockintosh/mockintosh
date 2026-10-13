@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { smearDeckerFontBold } from "../src/fonts/boldSmear";
+import { smearBitmapFaceBold } from "../src/fonts/boldSmear";
 import { getGlyphWidth } from "../src/fonts/font";
 import { getRealFace, initBuiltinFonts, listFonts, requireFont } from "../src/fonts/registry";
 import { resolveFont } from "../src/fonts/style";
@@ -40,7 +40,7 @@ describe("resolveFont bold smear", () => {
   });
 
   it("matches a fresh smear of the named face", () => {
-    const expected = smearDeckerFontBold(requireFont("mono"), "mono");
+    const expected = smearBitmapFaceBold(requireFont("mono"), "mono");
     const actual = resolveFont("mono", { bold: true });
     expect(getGlyphWidth(actual, "W".charCodeAt(0))).toBe(getGlyphWidth(expected, "W".charCodeAt(0)));
   });

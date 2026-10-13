@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FileSystem, InMemoryBackend, MIME, ROOT_ID } from "@mockintosh/fs";
 import {
   decodeSuitcase,
-  deckerFontFromDraft,
+  bitmapFaceFromDraft,
   encodeFont,
   encodeSuitcase,
   getFont,
@@ -21,7 +21,7 @@ async function bootedFS() {
 
 function strike(size: number): string {
   return encodeFont(
-    deckerFontFromDraft({
+    bitmapFaceFromDraft({
       family: "x",
       size,
       maxWidth: 3,

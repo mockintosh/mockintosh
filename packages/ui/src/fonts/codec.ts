@@ -15,7 +15,7 @@
 
 import { decodeBase64, encodeBase64 } from "../base64";
 import { MISSING_SLOT, codePointForSlot, codePointOnPage, placeCodePoint } from "./charmap";
-import type { DeckerFont } from "./font";
+import type { BitmapFace } from "./font";
 import { decodeLegacyRecord, isLegacyRecord } from "./legacy";
 
 const PREFIX = "%%MFN1";
@@ -133,7 +133,7 @@ export function encodeFaceRecord(record: FaceRecord): string {
 }
 
 /** Pack one 256-slot strike of a face. */
-function packStrike(name: string, layout: FaceLayout, slots: readonly (FaceGlyph | undefined)[]): DeckerFont {
+function packStrike(name: string, layout: FaceLayout, slots: readonly (FaceGlyph | undefined)[]): BitmapFace {
   let maxWidth = 1;
   for (let slot = 0; slot < 256; slot++) maxWidth = Math.max(maxWidth, slots[slot]?.width ?? 0);
   const rows = layout.inkAbove + layout.glyphHeight + layout.inkBelow;
@@ -173,7 +173,7 @@ function packStrike(name: string, layout: FaceLayout, slots: readonly (FaceGlyph
 }
 
 /** Build a face's page-0 strike, with its other pages attached. */
-export function buildFace(name: string, record: FaceRecord, size?: number): DeckerFont {
+export function buildFace(name: string, record: FaceRecord, size?: number): BitmapFace {
   const pages = new Map<number, (FaceGlyph | undefined)[]>();
   const slotsOf = (page: number) => {
     let slots = pages.get(page);
@@ -193,7 +193,7 @@ export function buildFace(name: string, record: FaceRecord, size?: number): Deck
   const font = packStrike(name, record, pages.get(0)!);
   if (size !== undefined) font.size = size;
   if (pages.size > 1) {
-    const strikes = new Map<number, DeckerFont>();
+    const strikes = new Map<number, BitmapFace>();
     for (const [page, slots] of pages) {
       if (page === 0) continue;
       const strike = packStrike(name, record, slots);
@@ -206,17 +206,17 @@ export function buildFace(name: string, record: FaceRecord, size?: number): Deck
 }
 
 /** Decode any font record (`%%MFN1`, or Decker's `%%FNT0` / `%%FNT1`) into a face. */
-export function decodeFont(data: string, name: string = "unnamed", options: DecodeOptions = {}): DeckerFont {
+export function decodeFont(data: string, name: string = "unnamed", options: DecodeOptions = {}): BitmapFace {
   return buildFace(name, decodeFaceRecord(data, options), options.size);
 }
 
 /** The glyphs of a face (page 0 and its pages), ready to encode. */
-export function faceRecordOf(font: DeckerFont): FaceRecord {
+export function faceRecordOf(font: BitmapFace): FaceRecord {
   const glyphs: FaceGlyph[] = [];
   const rowsAbove = font.inkAbove ?? 0;
   const rowsBelow = font.inkBelow ?? 0;
   const rows = rowsAbove + font.glyphHeight + rowsBelow;
-  const collect = (strike: DeckerFont, codePointAt: (slot: number) => number | "missing" | undefined) => {
+  const collect = (strike: BitmapFace, codePointAt: (slot: number) => number | "missing" | undefined) => {
     const byteWidth = Math.ceil(strike.maxWidth / 8);
     for (let slot = 0; slot < 256; slot++) {
       const width = strike.glyphWidths[slot] ?? 0;
@@ -244,6 +244,6 @@ export function faceRecordOf(font: DeckerFont): FaceRecord {
 }
 
 /** Pack a face back into a `%%MFN1` record. */
-export function encodeFont(font: DeckerFont): string {
+export function encodeFont(font: BitmapFace): string {
   return encodeFaceRecord(faceRecordOf(font));
 }

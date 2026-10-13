@@ -1,6 +1,6 @@
 import { MISSING_SLOT, charForSlot, pageOfCodePoint, slotForCodePoint } from "./charmap";
 
-export interface DeckerFont {
+export interface BitmapFace {
   name: string;
   /** Native bitmap point size. Role aliases share the family name (geneva, not body). */
   size?: number;
@@ -37,7 +37,7 @@ export interface DeckerFont {
    * A bitmap face's other strikes, by page (`charmap.ts`): the characters
    * outside page 0's 256 slots. Only page 0 carries them.
    */
-  pages?: ReadonlyMap<number, DeckerFont>;
+  pages?: ReadonlyMap<number, BitmapFace>;
 }
 
 /**
@@ -52,7 +52,7 @@ export interface OutlineGlyphSource {
   /** Name `TextFont` resolves back to this strike (family, plus a page suffix). */
   readonly faceKey: string;
   /** Which strike and ordinal draw `codePoint`; undefined when the face lacks it. */
-  locate(codePoint: number): { font: DeckerFont; ordinal: number } | undefined;
+  locate(codePoint: number): { font: BitmapFace; ordinal: number } | undefined;
   /** Pair kerning in whole pixels (0 when the family turns kerning off). */
   kern(left: number, right: number): number;
 }
@@ -80,7 +80,7 @@ const LOOKALIKES: ReadonlyMap<number, string> = new Map([
   [0x00d7, "x"],
 ]);
 
-export function getGlyphIndexForChar(font: DeckerFont, ch: string): number {
+export function getGlyphIndexForChar(font: BitmapFace, ch: string): number {
   if (!ch) return -1;
   const code = ch.charCodeAt(0);
   const ord = ordinalForCharCode(code);
@@ -92,7 +92,7 @@ export function getGlyphIndexForChar(font: DeckerFont, ch: string): number {
 }
 
 /** What a strike draws for a character it lacks: its missing-character box, else `?`. */
-export function missingGlyphIndex(font: DeckerFont): number {
+export function missingGlyphIndex(font: BitmapFace): number {
   if (hasGlyph(font, MISSING_SLOT)) return MISSING_SLOT;
   return hasGlyph(font, QUESTION_MARK) ? QUESTION_MARK : -1;
 }
@@ -101,7 +101,7 @@ export function missingGlyphIndex(font: DeckerFont): number {
  * The strike and slot that draw `codePoint` in this face: page 0, one of its
  * page strikes, or an outline face's. Undefined when the face lacks it.
  */
-export function locateGlyph(font: DeckerFont, codePoint: number): { font: DeckerFont; ordinal: number } | undefined {
+export function locateGlyph(font: BitmapFace, codePoint: number): { font: BitmapFace; ordinal: number } | undefined {
   if (font.outline) return font.outline.locate(codePoint);
   const slot = slotForCodePoint(codePoint);
   if (slot >= 0) return hasGlyph(font, slot) ? { font, ordinal: slot } : undefined;
@@ -111,23 +111,23 @@ export function locateGlyph(font: DeckerFont, codePoint: number): { font: Decker
 }
 
 /** Whether a face draws characters beyond its own 256 slots. */
-export function isPaged(font: DeckerFont): boolean {
+export function isPaged(font: BitmapFace): boolean {
   return Boolean(font.outline || font.pages);
 }
 
-export function getGlyphWidth(font: DeckerFont, glyphIndex: number): number {
+export function getGlyphWidth(font: BitmapFace, glyphIndex: number): number {
   if (glyphIndex < 0 || glyphIndex > 255) return 0;
   return font.glyphWidths[glyphIndex] ?? 0;
 }
 
 /** How far the pen moves after a glyph (before `spacing`). */
-export function glyphAdvance(font: DeckerFont, glyphIndex: number): number {
+export function glyphAdvance(font: BitmapFace, glyphIndex: number): number {
   if (glyphIndex < 0 || glyphIndex > 255) return 0;
   return font.advances ? font.advances[glyphIndex]! : (font.glyphWidths[glyphIndex] ?? 0);
 }
 
 /** Columns of a glyph's image that sit left of the pen. */
-export function glyphOriginX(font: DeckerFont, glyphIndex: number): number {
+export function glyphOriginX(font: BitmapFace, glyphIndex: number): number {
   return font.originX?.[glyphIndex] ?? 0;
 }
 
@@ -136,9 +136,9 @@ export function glyphOriginX(font: DeckerFont, glyphIndex: number): number {
  * ring, …) whose cells grew from `base.glyphWidths` to `glyphWidths`.
  */
 export function carryAdvances(
-  base: DeckerFont,
+  base: BitmapFace,
   glyphWidths: Uint8Array,
-): Pick<DeckerFont, "advances" | "originX" | "inkAbove" | "inkBelow"> {
+): Pick<BitmapFace, "advances" | "originX" | "inkAbove" | "inkBelow"> {
   const overflow = base.inkAbove || base.inkBelow ? { inkAbove: base.inkAbove, inkBelow: base.inkBelow } : {};
   if (!base.advances) return overflow;
   const advances = new Uint8Array(256);
@@ -148,16 +148,16 @@ export function carryAdvances(
   return { advances, originX: base.originX, ...overflow };
 }
 
-export function hasGlyph(font: DeckerFont, glyphIndex: number): boolean {
+export function hasGlyph(font: BitmapFace, glyphIndex: number): boolean {
   return getGlyphWidth(font, glyphIndex) > 0;
 }
 
-export function getGlyphDataOffset(font: DeckerFont, glyphIndex: number): number {
+export function getGlyphDataOffset(font: BitmapFace, glyphIndex: number): number {
   return glyphIndex * font.glyphStride;
 }
 
 export function getGlyphPixel(
-  font: DeckerFont,
+  font: BitmapFace,
   glyphIndex: number,
   x: number,
   y: number
@@ -176,7 +176,7 @@ export function getGlyphPixel(
 }
 
 /** Advance of one character, including trailing `spacing` (matches the FM width table). */
-export function charAdvance(font: DeckerFont, ch: string): number {
+export function charAdvance(font: BitmapFace, ch: string): number {
   if (isPaged(font) && ch) {
     const cp = ch.codePointAt(0)!;
     if (cp >= 0xdc00 && cp <= 0xdfff) return 0;
@@ -189,13 +189,13 @@ export function charAdvance(font: DeckerFont, ch: string): number {
 }
 
 /** A lookalike's glyph for a character the face lacks (curly quote → straight). */
-export function lookalikeGlyph(font: DeckerFont, codePoint: number): { font: DeckerFont; ordinal: number } | undefined {
+export function lookalikeGlyph(font: BitmapFace, codePoint: number): { font: BitmapFace; ordinal: number } | undefined {
   const lookalike = LOOKALIKES.get(codePoint);
   return lookalike === undefined ? undefined : locateGlyph(font, lookalike.charCodeAt(0));
 }
 
 /** Sum of {@link charAdvance} over `text` plus pair kerning (no newline handling). */
-export function textAdvance(font: DeckerFont, text: string): number {
+export function textAdvance(font: BitmapFace, text: string): number {
   let w = 0;
   if (!isPaged(font)) {
     for (let i = 0; i < text.length; i++) w += charAdvance(font, text[i]!);

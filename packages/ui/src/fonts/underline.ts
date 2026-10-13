@@ -1,7 +1,7 @@
 /**
  * Underlines on the face's own baseline.
  *
- * The strike puts QuickDraw's baseline at the Decker cell bottom, below the
+ * The strike puts QuickDraw's baseline at the cell bottom, below the
  * descenders, so DrawText's underline would run under the whole cell and
  * touch the next line. The UI draws it instead, one row below the cap
  * baseline (`capAscent`), with DrawText's 1-px halo around descender ink
@@ -10,7 +10,7 @@
 
 import { EraseRect, PaintRect } from "@mockintosh/quickdraw";
 import { makeRect } from "@mockintosh/quickdraw/bits";
-import { charAdvance, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, glyphOriginX, textAdvance, type DeckerFont } from "./font";
+import { charAdvance, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, glyphOriginX, textAdvance, type BitmapFace } from "./font";
 import { faceMetrics } from "./metrics";
 
 /** Pixels `[left, right)` of an underline, measured from the pen. */
@@ -20,12 +20,12 @@ export interface UnderlineSpan {
 }
 
 /** Cell row the underline is drawn on. */
-export function underlineRow(font: DeckerFont): number {
+export function underlineRow(font: BitmapFace): number {
   return faceMetrics(font).capAscent + 1;
 }
 
 /** Where `text`'s underline is drawn: its advance, minus the halo around ink that crosses it. */
-export function underlineSpans(font: DeckerFont, text: string): UnderlineSpan[] {
+export function underlineSpans(font: BitmapFace, text: string): UnderlineSpan[] {
   const width = textAdvance(font, text);
   if (width <= 0) return [];
   const row = underlineRow(font);
@@ -57,7 +57,7 @@ export function underlineSpans(font: DeckerFont, text: string): UnderlineSpan[] 
 }
 
 /** Paint `text`'s underline for a line whose cell top-left is `(x, cellTop)`, in black or white. */
-export function drawUnderline(font: DeckerFont, text: string, x: number, cellTop: number, color: number): void {
+export function drawUnderline(font: BitmapFace, text: string, x: number, cellTop: number, color: number): void {
   const y = cellTop + underlineRow(font);
   for (const span of underlineSpans(font, text)) {
     const rect = makeRect(y, x + span.left, y + 1, x + span.right);

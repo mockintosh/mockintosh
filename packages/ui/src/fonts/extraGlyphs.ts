@@ -8,7 +8,7 @@
  * (`charmap.ts`). A glyph the font already draws is left alone.
  */
 import { MISSING_SLOT, slotForCodePoint } from "./charmap";
-import type { DeckerFont } from "./font";
+import type { BitmapFace } from "./font";
 
 /**
  * A glyph as pixel art: one string per row, `#` = ink, anything else = paper.
@@ -320,7 +320,7 @@ export function extraGlyphSlot(def: ExtraGlyphDefinition): number {
 }
 
 /** Whether a drawing fits inside the font's glyph cell without widening `maxWidth`. */
-export function pixelGlyphFitsFont(font: DeckerFont, glyph: PixelGlyph): boolean {
+export function pixelGlyphFitsFont(font: BitmapFace, glyph: PixelGlyph): boolean {
   const width = glyph.rows[0]?.length ?? 0;
   return (
     width >= 1 &&
@@ -335,7 +335,7 @@ export function pixelGlyphFitsFont(font: DeckerFont, glyph: PixelGlyph): boolean
  * Throws if the drawing doesn't fit the font cell — a glyph that needs more room must be
  * redesigned, never accommodated by widening the font.
  */
-export function writePixelGlyph(font: DeckerFont, ordinal: number, glyph: PixelGlyph): void {
+export function writePixelGlyph(font: BitmapFace, ordinal: number, glyph: PixelGlyph): void {
   const width = glyph.rows[0]?.length ?? 0;
   if (!pixelGlyphFitsFont(font, glyph)) {
     throw new Error(
@@ -377,7 +377,7 @@ const EXTRA_FACE_ALIASES: Readonly<Record<string, string>> = {
   "geneva/12": "geneva12",
 };
 
-function extraGlyphLookupKeys(font: DeckerFont): string[] {
+function extraGlyphLookupKeys(font: BitmapFace): string[] {
   const keys = [font.name];
   if (font.size != null) {
     const sized = `${font.name}/${font.size}`;
@@ -388,7 +388,7 @@ function extraGlyphLookupKeys(font: DeckerFont): string[] {
   return keys;
 }
 
-export function applyExtraGlyphs(font: DeckerFont): DeckerFont {
+export function applyExtraGlyphs(font: BitmapFace): BitmapFace {
   const keys = extraGlyphLookupKeys(font);
   for (const def of EXTRA_GLYPHS) {
     const slot = extraGlyphSlot(def);
@@ -404,7 +404,7 @@ export function applyExtraGlyphs(font: DeckerFont): DeckerFont {
  * (Geneva 9's is 5×7 on the baseline): what QuickDraw draws for a
  * character the font lacks. `descent` places the baseline in the cell.
  */
-export function ensureMissingGlyph(font: DeckerFont, descent: number): DeckerFont {
+export function ensureMissingGlyph(font: BitmapFace, descent: number): BitmapFace {
   if (font.glyphWidths[MISSING_SLOT]) return font;
   const baseline = font.glyphHeight - Math.max(0, Math.min(descent, font.glyphHeight - 1));
   const height = Math.max(3, Math.min(baseline, Math.round(baseline * 0.7)));

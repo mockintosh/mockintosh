@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { decodeFont, encodeFont, listFontFamilies, registerFont } from "@mockintosh/sdk";
-import { OutlineFace, deckerFontFromDraft, draftFromDeckerFont } from "@mockintosh/ui";
+import { OutlineFace, bitmapFaceFromDraft, draftFromBitmapFace } from "@mockintosh/ui";
 import { createOutlineFontRasterService } from "./service";
 import { rasterizeWithScaler } from "./raster";
 import { buildTinyTtf } from "./tinyTtf";
@@ -29,9 +29,9 @@ describe("baking strikes", () => {
     expect(letterA.width).toBeGreaterThan(0);
     expect(letterA.pixels.some((p) => p === 1)).toBe(true);
 
-    const packed = encodeFont(deckerFontFromDraft(draft));
+    const packed = encodeFont(bitmapFaceFromDraft(draft));
     expect(packed.startsWith("%%MFN1")).toBe(true);
-    const again = draftFromDeckerFont(decodeFont(packed, draft.family), draft.family, draft.size).glyphs.find(
+    const again = draftFromBitmapFace(decodeFont(packed, draft.family), draft.family, draft.size).glyphs.find(
       (g) => g.ordinal === 65,
     )!;
     expect(again.width).toBe(letterA.width);
@@ -40,7 +40,7 @@ describe("baking strikes", () => {
 
   it("registers the packed strike on the SDK font list", () => {
     const draft = rasterizeWithScaler(buildTinyTtf(), { size: 24, mode: "auto", threshold: 96, spacing: 0, chars: "A" });
-    registerFont(draft.family, encodeFont(deckerFontFromDraft(draft)), draft.size);
+    registerFont(draft.family, encodeFont(bitmapFaceFromDraft(draft)), draft.size);
     expect(listFontFamilies().find((f) => f.name === draft.family)?.sizes).toContain(24);
   });
 

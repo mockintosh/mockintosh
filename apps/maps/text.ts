@@ -15,7 +15,7 @@ import {
   locateGlyph,
   lookalikeGlyph,
   resolveFont,
-  type DeckerFont,
+  type BitmapFace,
 } from "@mockintosh/ui";
 import type { Bitmap } from "./bitmap";
 
@@ -51,13 +51,13 @@ const PLAIN: Readonly<Record<string, string>> = {
 const ITALIC = 2;
 
 /** The face's own italic strike, when `f` asks for italic and the family has one. */
-function realItalic(f: LabelFace): DeckerFont | null {
+function realItalic(f: LabelFace): BitmapFace | null {
   if (!f.italic) return null;
   const real = getRealFace(f.font, ITALIC, f.size);
   return real && real.covered & ITALIC ? real.font : null;
 }
 
-function face(f: LabelFace): DeckerFont {
+function face(f: LabelFace): BitmapFace {
   return realItalic(f) ?? resolveFont(f.font, {}, f.size);
 }
 
@@ -67,12 +67,12 @@ function slanted(f: LabelFace): boolean {
 }
 
 /** The strike and slot that draw `ch` (its page, or a look-alike), or undefined. */
-function glyphOf(font: DeckerFont, ch: string): { font: DeckerFont; ordinal: number } | undefined {
+function glyphOf(font: BitmapFace, ch: string): { font: BitmapFace; ordinal: number } | undefined {
   const cp = ch.codePointAt(0)!;
   return locateGlyph(font, cp) ?? lookalikeGlyph(font, cp);
 }
 
-function hasGlyph(font: DeckerFont, ch: string): boolean {
+function hasGlyph(font: BitmapFace, ch: string): boolean {
   return glyphOf(font, ch) !== undefined;
 }
 

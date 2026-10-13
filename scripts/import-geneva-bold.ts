@@ -10,18 +10,18 @@
 import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { smearDeckerFontBold } from "../packages/ui/src/fonts/boldSmear";
+import { smearBitmapFaceBold } from "../packages/ui/src/fonts/boldSmear";
 import { decodeFont, encodeFont } from "../packages/ui/src/fonts/codec";
-import type { DeckerFont } from "../packages/ui/src/fonts/font";
+import type { BitmapFace } from "../packages/ui/src/fonts/font";
 import { SYSTEM_FONT_GENEVA_9 } from "../packages/ui/src/fonts/faces/system/geneva_9";
 import { SYSTEM_FONT_GENEVA_12 } from "../packages/ui/src/fonts/faces/system/geneva_12";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Smear a face and every page strike it carries. */
-function smearFace(face: DeckerFont, name: string): DeckerFont {
-  const bold = smearDeckerFontBold(face, name);
-  if (face.pages) bold.pages = new Map([...face.pages].map(([page, strike]) => [page, smearDeckerFontBold(strike, name)]));
+function smearFace(face: BitmapFace, name: string): BitmapFace {
+  const bold = smearBitmapFaceBold(face, name);
+  if (face.pages) bold.pages = new Map([...face.pages].map(([page, strike]) => [page, smearBitmapFaceBold(strike, name)]));
   return bold;
 }
 

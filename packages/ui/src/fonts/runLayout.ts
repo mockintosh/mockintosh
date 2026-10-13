@@ -7,7 +7,7 @@
  */
 
 import type { CanvasNode, TextAlign, TextRun } from "../nodes";
-import { textAdvance, type DeckerFont } from "./font";
+import { textAdvance, type BitmapFace } from "./font";
 import { faceMetrics } from "./metrics";
 import { resolveFont, type FontStyle } from "./style";
 
@@ -49,7 +49,7 @@ export function runStyle(base: FontStyle, run: TextRun): FontStyle {
   };
 }
 
-export function runFont(face: RunFace, run: TextRun): DeckerFont {
+export function runFont(face: RunFace, run: TextRun): BitmapFace {
   return resolveFont(face.fontName, runStyle(face.style, run), face.size);
 }
 

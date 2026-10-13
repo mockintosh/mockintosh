@@ -1,6 +1,6 @@
 /**
  * The outline scaler: one `OutlineFace` per font file, rendering one glyph
- * at a time into 1-bit cells the Decker strike format can hold.
+ * at a time into 1-bit cells the bitmap strike format can hold.
  *
  * Cell layout matches Foundry's baked strikes: the cell is
  * `ascent + descent` rows with the baseline at row `ascent`; a glyph's
@@ -95,7 +95,7 @@ export class OutlineFace {
    * strike holds (accented capitals), paid for from the line gap first: fonts
    * that split one em between ascender and descender (Adobe's convention)
    * keep their accent room there. Descent takes the rest, and at least the
-   * font's descender and its deepest glyph, so accents beyond the gap grow the line. Ink outside this box is only characters beyond Decker's
+   * font's descender and its deepest glyph, so accents beyond the gap grow the line. Ink outside this box is only characters beyond a strike's
    * 256 (see {@link inkRoom}).
    */
   metrics(ppem: number): StrikeMetrics {

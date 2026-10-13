@@ -4,7 +4,7 @@
  * selection over it, the cursor on it), so a blinking cursor redraws one
  * row and streaming output the rows it touched.
  */
-import { getFont, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, type DeckerFont } from "@mockintosh/ui";
+import { getFont, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, type BitmapFace } from "@mockintosh/ui";
 import { CELL_HEIGHT, CELL_WIDTH, proceduralGlyph } from "../glyphs";
 import type { TerminalFrame, TerminalRow } from "../screen";
 import type { CellStyle } from "../style";
@@ -30,9 +30,9 @@ export function gridSize(width: number, height: number): { cols: number; rows: n
 }
 
 const glyphCache = new Map<string, Uint8Array>();
-let cachedFont: DeckerFont | null = null;
+let cachedFont: BitmapFace | null = null;
 
-function monoFont(): DeckerFont | null {
+function monoFont(): BitmapFace | null {
   if (!cachedFont) cachedFont = getFont("mono");
   return cachedFont;
 }
@@ -46,7 +46,7 @@ function missingGlyph(width: 1 | 2): Uint8Array {
   return p;
 }
 
-function fontGlyph(font: DeckerFont, ch: string): Uint8Array | null {
+function fontGlyph(font: BitmapFace, ch: string): Uint8Array | null {
   const index = getGlyphIndexForChar(font, ch);
   if (index < 0 || (index === 63 && ch !== "?")) return null;
   const p = new Uint8Array(CELL_WIDTH * CELL_HEIGHT);

@@ -455,7 +455,7 @@ export function Window(props: WindowProps): JSX.Element {
             </Show>
           </Show>
 
-          {/* Title text — optical middle (cap box), not the full Decker cell, centered
+          {/* Title text — optical middle (cap box), not the full cell, centered
               above the separator line. Untitled palettes omit it. */}
           <Show when={props.win.title}>
           <text
