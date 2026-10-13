@@ -24,37 +24,37 @@ const FACE_ORDER = [
   "body",
   "menu",
   "mono",
-  "chicago",
-  "geneva",
-  "newYork",
-  "monaco",
-  "venice",
-  "london",
-  "athens",
-  "sanFrancisco",
-  "toronto",
-  "cairo",
-  "losAngeles",
+  "chicane",
+  "genova",
+  "newark",
+  "monoco",
+  "vence",
+  "londinium",
+  "athene",
+  "sanfrisco",
+  "taranto",
+  "kairos",
+  "losalamos",
 ] as const;
 
 const FACE_SOURCE: Readonly<Record<string, string>> = {
-  body: "Alias for geneva 9. Default <text> face.",
-  menu: "Alias for chicago 12. Classic system UI face.",
-  mono: "Alias for monaco 9. Fixed-width.",
-  chicago: "System font. Native 12.",
-  geneva: "Application font. Native 9 10 12 14 18 20 24.",
-  newYork: "Serif. Native 9 10 12 14 18 20 24.",
-  monaco: "Monospace. Native 9 12.",
-  venice: "Script. Native 14.",
-  london: "Blackletter. Native 18.",
-  athens: "Slab. Native 18.",
-  sanFrancisco: "Ransom-note. Native 18.",
-  toronto: "Slab. Native 9 12 14 18 24. Removed after System 6.",
-  cairo: "Dingbats. Native 18. z is the dogcow.",
-  losAngeles: "Handwriting. Native 12 24.",
+  body: "Alias for genova 9. Default <text> face.",
+  menu: "Alias for chicane 12. Classic system UI face.",
+  mono: "Alias for monoco 9. Fixed-width.",
+  chicane: "System font. Native 12.",
+  genova: "Application font. Native 9 10 12 14 18 20 24.",
+  newark: "Serif. Native 9 10 12 14 18 20 24.",
+  monoco: "Monospace. Native 9 12.",
+  vence: "Script. Native 14.",
+  londinium: "Blackletter. Native 18.",
+  athene: "Slab. Native 18.",
+  sanfrisco: "Ransom-note. Native 18.",
+  taranto: "Slab. Native 9 12 14 18 24. Removed after System 6.",
+  kairos: "Dingbats. Native 18. z is the dogcow.",
+  losalamos: "Handwriting. Native 12 24.",
 };
 
-const SYMBOL_FACES = new Set(["body", "menu", "mono", "geneva", "chicago"]);
+const SYMBOL_FACES = new Set(["body", "menu", "mono", "genova", "chicane"]);
 
 const PANGRAM = "The quick brown fox jumps over the lazy dog.";
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ  abcdefghijklmnopqrstuvwxyz";
@@ -106,11 +106,11 @@ export function InstallationPage(): JSX.Element {
         title="Installation"
         lede="The kit is @mockintosh/ui. The default web host is mountCanvasUI."
       />
-      <text font="geneva" size={10}>Package</text>
+      <text font="genova" size={10}>Package</text>
       <text font="body" wrap selectable>
         npm install @mockintosh/ui solid-js
       </text>
-      <text font="geneva" size={10}>Mount a canvas</text>
+      <text font="genova" size={10}>Mount a canvas</text>
       <text font="body" wrap selectable>
         {"mountCanvasUI({ root, size: { mode: \"viewport\", scale: 2 }, component: () => <App /> })"}
       </text>
@@ -147,28 +147,28 @@ export function FontsPage(): JSX.Element {
         City families ship every bitmap size Apple published for that face. size picks a strike; a missing size snaps to the nearest native one. Third-party fonts such as Lisa and Geist come from the font library in the App Store.
       </text>
       <box flexDirection="column" gap={3}>
-        <text font="geneva" size={12}>
+        <text font="genova" size={12}>
           Plain text
         </text>
-        <text font="geneva" size={12} bold>
+        <text font="genova" size={12} bold>
           Bold
         </text>
-        <text font="geneva" size={12} italic>
+        <text font="genova" size={12} italic>
           Italic
         </text>
-        <text font="geneva" size={12} outline>
+        <text font="genova" size={12} outline>
           Outline
         </text>
-        <text font="geneva" size={12} shadow>
+        <text font="genova" size={12} shadow>
           Shadow
         </text>
-        <text font="geneva" size={12} shadow outline>
+        <text font="genova" size={12} shadow outline>
           Shadow Outline
         </text>
-        <text font="geneva" size={12} shadow outline bold>
+        <text font="genova" size={12} shadow outline bold>
           Shadow Outline Bold
         </text>
-        <text font="geneva" size={12} shadow outline bold italic>
+        <text font="genova" size={12} shadow outline bold italic>
           Shadow Outline Bold Italic
         </text>
       </box>

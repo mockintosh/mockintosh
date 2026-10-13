@@ -97,7 +97,7 @@ function ChromeButton(props: {
         if (key === "Enter" || key === " ") props.onClick();
       }}
     >
-      <text font="geneva" size={10} color={props.pressed ? 0 : 1} nowrap>
+      <text font="genova" size={10} color={props.pressed ? 0 : 1} nowrap>
         {props.label}
       </text>
     </box>
@@ -226,11 +226,11 @@ function DevToolsPanel(): JSX.Element {
           pressed={picking()}
           onClick={() => setPickMode(!picking())}
         />
-        <text font="geneva" size={10} nowrap>
+        <text font="genova" size={10} nowrap>
           DevTools
         </text>
         <Show when={selected()}>
-          <text font="geneva" size={10} nowrap>
+          <text font="genova" size={10} nowrap>
             {visibleOwners(selected()!)[0] ?? (selected()!.type === "_root" ? "" : selected()!.type)}
           </text>
         </Show>
@@ -275,7 +275,7 @@ function DevToolsPanel(): JSX.Element {
         <box width={1} height="100%" background="vstripe" />
         <box flexGrow={1} minWidth={0} height="100%" overflow="scroll" padding={6} gap={4}>
           <Show when={owners().length > 0}>
-            <text font="geneva" size={10} wrap>
+            <text font="genova" size={10} wrap>
               {owners().map((name) => `<${name}>`).join(" ← ")}
             </text>
           </Show>

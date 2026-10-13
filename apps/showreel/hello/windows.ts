@@ -48,7 +48,7 @@ function icons(sc: Screen, c: PixelRect, t: number, cast: Cast): void {
     if (k <= 0) continue;
     const x = Math.round(cx - (app.icon.width * z) / 2);
     sc.sprite(app.icon, x, top, z);
-    sc.centered(app.label, cx, top + 34 * z, { font: "geneva", size: 9 });
+    sc.centered(app.label, cx, top + 34 * z, { font: "genova", size: 9 });
   }
 }
 
@@ -62,7 +62,7 @@ function readMe(sc: Screen, c: PixelRect, t: number): void {
     if (budget <= 0) break;
     const shown = line.slice(0, budget);
     budget -= line.length;
-    const w = sc.text(shown, c.x0 + 6 * z, y, { font: "newYork", size: 12 });
+    const w = sc.text(shown, c.x0 + 6 * z, y, { font: "newark", size: 12 });
     if (budget < 0 && Math.floor(t * 4) % 2 === 0) sc.fill(c.x0 + 7 * z + w, y, c.x0 + 8 * z + w, y + 13 * z, 1);
     y += 15 * z;
   }
@@ -115,22 +115,22 @@ function puzzle(sc: Screen, c: PixelRect, t: number): void {
     const r = { x0: x + z, y0: y + z, x1: x + cell - z, y1: y + cell - z };
     sc.fillRect(r, 0);
     sc.box(r, z);
-    sc.centered(String(n), (r.x0 + r.x1) / 2, Math.round((r.y0 + r.y1) / 2 - 6 * z), { font: "chicago" });
+    sc.centered(String(n), (r.x0 + r.x1) / 2, Math.round((r.y0 + r.y1) / 2 - 6 * z), { font: "chicane" });
   }
 }
 
 const FONT_LIST: readonly (readonly [string, string, number])[] = [
-  ["Chicago", "chicago", 12],
-  ["New York", "newYork", 14],
-  ["Geneva", "geneva", 12],
-  ["Venice", "venice", 14],
-  ["London", "london", 18],
-  ["Athens", "athens", 18],
-  ["San Francisco", "sanFrancisco", 18],
-  ["Toronto", "toronto", 14],
-  ["Los Angeles", "losAngeles", 12],
-  ["Monaco", "monaco", 12],
-  ["Cairo", "cairo", 18],
+  ["Chicane", "chicane", 12],
+  ["Newark", "newark", 14],
+  ["Genova", "genova", 12],
+  ["Vence", "vence", 14],
+  ["Londinium", "londinium", 18],
+  ["Athene", "athene", 18],
+  ["Sanfrisco", "sanfrisco", 18],
+  ["Taranto", "taranto", 14],
+  ["Los Alamos", "losalamos", 12],
+  ["Monoco", "monoco", 12],
+  ["Kairos", "kairos", 18],
 ];
 
 function fonts(sc: Screen, c: PixelRect, t: number): void {
@@ -138,7 +138,7 @@ function fonts(sc: Screen, c: PixelRect, t: number): void {
   let y = c.y0 + 4 * z - Math.round(t * 60 * z);
   for (const [label, font, size] of FONT_LIST) {
     const style = { font, size };
-    sc.text(font === "cairo" ? "abcdefgh" : label, c.x0 + 6 * z, y, style);
+    sc.text(font === "kairos" ? "abcdefgh" : label, c.x0 + 6 * z, y, style);
     y += sc.measure(label, style).height + 3 * z;
   }
 }
@@ -152,7 +152,7 @@ function keyCaps(sc: Screen, c: PixelRect, t: number): void {
   const pressed = Math.floor(t * 9) < TYPED.length && (t * 9) % 1 < 0.6 ? TYPED[n] : "";
   const field = { x0: c.x0 + 6 * z, y0: c.y0 + 4 * z, x1: c.x1 - 6 * z, y1: c.y0 + 18 * z };
   sc.box(field, z);
-  sc.text(TYPED.slice(0, n).toLowerCase(), field.x0 + 4 * z, field.y0 + 2 * z, { font: "geneva", size: 12 });
+  sc.text(TYPED.slice(0, n).toLowerCase(), field.x0 + 4 * z, field.y0 + 2 * z, { font: "genova", size: 12 });
   const key = Math.floor((c.x1 - c.x0 - 12 * z) / 10);
   KEY_ROWS.forEach((row, ri) => {
     [...row].forEach((ch, ci) => {
@@ -162,7 +162,7 @@ function keyCaps(sc: Screen, c: PixelRect, t: number): void {
       const down = ch === pressed;
       sc.fillRect(r, down ? 1 : 0);
       sc.box(r, z);
-      sc.centered(ch, x + key / 2, y + Math.round(key / 2) - 5 * z, { font: "geneva", size: 9, ink: down ? 0 : 1 });
+      sc.centered(ch, x + key / 2, y + Math.round(key / 2) - 5 * z, { font: "genova", size: 9, ink: down ? 0 : 1 });
     });
   });
 }
@@ -172,8 +172,8 @@ function scrapbook(sc: Screen, c: PixelRect, t: number): void {
   const pictures = "ahtwp";
   const ch = pictures[Math.floor(t * 5) % pictures.length]!;
   const k = 2 * z;
-  const { height } = sc.measure(ch, { font: "cairo", size: 18, k });
-  sc.centered(ch, (c.x0 + c.x1) / 2, Math.round((c.y0 + c.y1 - height) / 2), { font: "cairo", size: 18, k });
+  const { height } = sc.measure(ch, { font: "kairos", size: 18, k });
+  sc.centered(ch, (c.x0 + c.x1) / 2, Math.round((c.y0 + c.y1 - height) / 2), { font: "kairos", size: 18, k });
 }
 
 function calculator(sc: Screen, c: PixelRect, t: number): void {
@@ -181,8 +181,8 @@ function calculator(sc: Screen, c: PixelRect, t: number): void {
   const shown = t < 0.25 ? "512" : t < 0.5 ? "342" : "175104";
   const display = { x0: c.x0 + 4 * z, y0: c.y0 + 4 * z, x1: c.x1 - 4 * z, y1: c.y0 + 18 * z };
   sc.box(display, z);
-  const w = sc.measure(shown, { font: "chicago" }).width;
-  sc.text(shown, display.x1 - 4 * z - w, display.y0 + 2 * z, { font: "chicago" });
+  const w = sc.measure(shown, { font: "chicane" }).width;
+  sc.text(shown, display.x1 - 4 * z - w, display.y0 + 2 * z, { font: "chicane" });
   const keys = "789/456x123-0.=+";
   const kw = Math.floor((c.x1 - c.x0 - 8 * z) / 4);
   const kh = Math.floor((c.y1 - display.y1 - 6 * z) / 4);
@@ -194,14 +194,14 @@ function calculator(sc: Screen, c: PixelRect, t: number): void {
     const down = i === hot && t % 0.25 < 0.1;
     sc.fillRect(r, down ? 1 : 0);
     sc.box(r, z);
-    sc.centered(ch, x + kw / 2, y + Math.round(kh / 2) - 6 * z, { font: "chicago", ink: down ? 0 : 1 });
+    sc.centered(ch, x + kw / 2, y + Math.round(kh / 2) - 6 * z, { font: "chicane", ink: down ? 0 : 1 });
   });
 }
 
 function copying(sc: Screen, c: PixelRect, t: number): void {
   const z = sc.z;
-  sc.text("Copying 342 items to", c.x0 + 10 * z, c.y0 + 6 * z, { font: "chicago" });
-  sc.text("Mockintosh HD", c.x0 + 10 * z, c.y0 + 22 * z, { font: "chicago" });
+  sc.text("Copying 342 items to", c.x0 + 10 * z, c.y0 + 6 * z, { font: "chicane" });
+  sc.text("Mockintosh HD", c.x0 + 10 * z, c.y0 + 22 * z, { font: "chicane" });
   const stutter = Math.floor(t * 10) + hash(Math.floor(t * 10), 5);
   progressBar(sc, { x0: c.x0 + 10 * z, y0: c.y1 - 20 * z, x1: c.x1 - 10 * z, y1: c.y1 - 10 * z }, stutter / 8);
 }
@@ -209,8 +209,8 @@ function copying(sc: Screen, c: PixelRect, t: number): void {
 function reality(sc: Screen, c: PixelRect, t: number, cast: Cast): void {
   const z = sc.z;
   sc.sprite(cast.stop, c.x0 + 10 * z, c.y0 + 8 * z, z);
-  sc.text("The application Reality", c.x0 + 52 * z, c.y0 + 8 * z, { font: "chicago" });
-  sc.text("has unexpectedly quit.", c.x0 + 52 * z, c.y0 + 24 * z, { font: "chicago" });
+  sc.text("The application Reality", c.x0 + 52 * z, c.y0 + 8 * z, { font: "chicane" });
+  sc.text("has unexpectedly quit.", c.x0 + 52 * z, c.y0 + 24 * z, { font: "chicane" });
   button(sc, { x0: c.x1 - 70 * z, y0: c.y1 - 26 * z, x1: c.x1 - 12 * z, y1: c.y1 - 8 * z }, "OK", {
     isDefault: true,
     pressed: t > 0.45 && t < 0.55,

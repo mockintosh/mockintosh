@@ -39,7 +39,7 @@ export function Avatar(props: AvatarProps): JSX.Element {
         <Dithered src={props.src!} width={face()} height={face()} />
       </Show>
       <Show when={!props.src}>
-        <text font="geneva" size={9} outline color={1} nowrap>
+        <text font="genova" size={9} outline color={1} nowrap>
           {letters()}
         </text>
       </Show>

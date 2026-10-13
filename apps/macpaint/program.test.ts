@@ -68,9 +68,9 @@ function boot(): Harness {
       return { id: "saved", name };
     },
     printPage: async () => {},
-    fontNames: () => ["chicago", "geneva", "newYork", "monaco", "venice", "london", "athens", "sanFrancisco", "toronto", "cairo", "losAngeles"],
+    fontNames: () => ["chicane", "genova", "newark", "monoco", "vence", "londinium", "athene", "sanfrisco", "taranto", "kairos", "losalamos"],
     fontNumber: (name) => fontFamilyId(name),
-    applicationFont: () => "geneva",
+    applicationFont: () => "genova",
   };
   const program = new PaintProgram(host, () => now, rect(0, 0, 512, 342), null);
   return {

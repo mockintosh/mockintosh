@@ -46,8 +46,8 @@ describe("resolveFont bold smear", () => {
   });
 
   it("keeps the base face FontInfo", () => {
-    const plain = faceMetrics(requireFont("geneva12"));
-    const bold = faceMetrics(resolveFont("geneva12", { bold: true }));
+    const plain = faceMetrics(requireFont("genova12"));
+    const bold = faceMetrics(resolveFont("genova12", { bold: true }));
     expect(bold.ascent).toBe(plain.ascent);
     expect(bold.descent).toBe(plain.descent);
     expect(bold.leading).toBe(plain.leading);
@@ -97,13 +97,13 @@ describe("resolveFont italic extra", () => {
   });
 
   it("caches italic and bold+italic separately", () => {
-    expect(resolveFont("venice", { italic: true })).toBe(resolveFont("venice", { italic: true }));
-    expect(resolveFont("venice", { italic: true })).not.toBe(resolveFont("venice", { bold: true }));
+    expect(resolveFont("vence", { italic: true })).toBe(resolveFont("vence", { italic: true }));
+    expect(resolveFont("vence", { italic: true })).not.toBe(resolveFont("vence", { bold: true }));
   });
 
   it("asks DrawText for a slope that moves the top of short faces, and none for Apple's own italic", () => {
     const body = uiFontMetrics(requireFont("body"));
-    const tall = uiFontMetrics(requireFont("athens"));
+    const tall = uiFontMetrics(requireFont("athene"));
     expect(italicShearUnits(body.ascent, STRIKE_DESCENT)).toBeGreaterThan(body.ascent >> 3);
     expect(italicShearUnits(tall.ascent, STRIKE_DESCENT)).toBe(tall.ascent >> 3);
 

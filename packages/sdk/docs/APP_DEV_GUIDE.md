@@ -156,7 +156,7 @@ The screen is 1-bit. Every colour prop (`background`, `color`, `borderColor`) ta
 - `"menu"` — titles and control labels
 - `"mono"` — fixed-width content
 
-Any installed family works too: the Mac city fonts (`"geneva"`, `"newYork"`, …) and whatever the user put in System Folder › Fonts, by registry key (`familyKey("Futura")` → `"futura"`). `<text size={n}>` picks the strike: a bitmap family snaps to its nearest bitmap size, a TrueType family draws at exactly `n`, rendered and hinted by the Font Manager's scaler. `bold` / `italic` use a real Bold or Italic face when the family has one and synthesize otherwise.
+Any installed family works too: the Mac city fonts (`"genova"`, `"newark"`, …) and whatever the user put in System Folder › Fonts, by registry key (`familyKey("Futura")` → `"futura"`). `<text size={n}>` picks the strike: a bitmap family snaps to its nearest bitmap size, a TrueType family draws at exactly `n`, rendered and hinted by the Font Manager's scaler. `bold` / `italic` use a real Bold or Italic face when the family has one and synthesize otherwise.
 
 `<text spacing={n}>` puts `n` pixels between glyphs instead of the face's own gap. Chicago (`"menu"`) has the real Mac's 2px, the look of menus, dialogs and window titles. Inside your app's windows, set `spacing={1}` on Chicago text for the tighter look the bundled apps use:
 

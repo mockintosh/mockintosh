@@ -60,7 +60,7 @@ export function menubar(sc: Screen, titles: readonly string[], open = -1, drop =
   let x = c.x0 + 10 * z;
   const labels = ["", ...titles];
   labels.forEach((label, i) => {
-    const w = i === 0 ? APPLE.width * z : sc.measure(label, { font: "chicago" }).width;
+    const w = i === 0 ? APPLE.width * z : sc.measure(label, { font: "chicane" }).width;
     const x0 = x - 7 * z;
     const x1 = x + w + 7 * z;
     if (i - 1 === open) sc.fill(x0, top, x1, top + h - z, 1);
@@ -68,7 +68,7 @@ export function menubar(sc: Screen, titles: readonly string[], open = -1, drop =
     if (i === 0) {
       sc.sprite(APPLE, x, top + 4 * z, z, ink === 0);
     } else {
-      sc.text(label, x, top + 3 * z, { font: "chicago", ink });
+      sc.text(label, x, top + 3 * z, { font: "chicane", ink });
     }
     out.push({ label, x0, x1 });
     x = x1 + 7 * z;
@@ -82,7 +82,7 @@ export type MenuItem = string | { label: string; disabled?: boolean } | "-";
 export function menu(sc: Screen, title: MenuTitle, items: readonly MenuItem[], hilite = -1): PixelRect {
   const z = sc.z;
   const labels = items.map((it) => (typeof it === "string" ? it : it.label));
-  const width = Math.max(...labels.map((l) => sc.measure(l, { font: "chicago" }).width)) + 34 * z;
+  const width = Math.max(...labels.map((l) => sc.measure(l, { font: "chicane" }).width)) + 34 * z;
   const height = items.reduce((h, it) => h + (it === "-" ? 8 : MENU_ITEM_H) * z, 0) + 2 * z;
   const r = { x0: title.x0, y0: sc.clip.y0 + (MENUBAR_H - 1) * z, x1: title.x0 + width, y1: 0 };
   r.y1 = r.y0 + height;
@@ -100,7 +100,7 @@ export function menu(sc: Screen, title: MenuTitle, items: readonly MenuItem[], h
     const disabled = typeof it !== "string" && it.disabled;
     const on = i === hilite && !disabled;
     if (on) sc.fill(r.x0 + z, y, r.x1 - z, y + MENU_ITEM_H * z, 1);
-    sc.text(label, r.x0 + 14 * z, y + 2 * z, { font: "chicago", ink: on ? 0 : disabled ? "gray" : 1 });
+    sc.text(label, r.x0 + 14 * z, y + 2 * z, { font: "chicane", ink: on ? 0 : disabled ? "gray" : 1 });
     y += MENU_ITEM_H * z;
   });
   return r;
@@ -132,13 +132,13 @@ export function windowFrame(sc: Screen, r: PixelRect, title: string, options: Wi
     sc.fill(bx - z, by, bx + 12 * z, by + 11 * z, 0);
     sc.box({ x0: bx, y0: by, x1: bx + 11 * z, y1: by + 11 * z }, z);
   }
-  const tw = sc.measure(title, { font: "chicago" }).width;
+  const tw = sc.measure(title, { font: "chicane" }).width;
   const cx = Math.round((r.x0 + r.x1) / 2);
   const tx0 = Math.max(r.x0 + 24 * z, cx - Math.round(tw / 2) - 6 * z);
   const tx1 = Math.min(r.x1 - 6 * z, tx0 + tw + 12 * z);
   if (tx1 > tx0 + 12 * z) {
     sc.fill(tx0, r.y0 + z, tx1, tb - z, 0);
-    sc.text(title, tx0 + 6 * z, r.y0 + 3 * z, { font: "chicago" });
+    sc.text(title, tx0 + 6 * z, r.y0 + 3 * z, { font: "chicane" });
   }
   const content = { x0: r.x0 + z, y0: tb, x1: r.x1 - z, y1: r.y1 - z };
   if (options.scroll === undefined) return content;
@@ -212,9 +212,9 @@ export function button(sc: Screen, r: PixelRect, label: string, options: ButtonO
   }
   roundRect(sc, r, 5 * z, 1);
   roundRect(sc, { x0: r.x0 + z, y0: r.y0 + z, x1: r.x1 - z, y1: r.y1 - z }, 4 * z, options.pressed ? 1 : 0);
-  const h = sc.measure(label, { font: "chicago" }).height;
+  const h = sc.measure(label, { font: "chicane" }).height;
   const top = Math.round((r.y0 + r.y1 - h) / 2);
-  sc.centered(label, (r.x0 + r.x1) / 2, top, { font: "chicago", ink: options.pressed ? 0 : 1 });
+  sc.centered(label, (r.x0 + r.x1) / 2, top, { font: "chicane", ink: options.pressed ? 0 : 1 });
 }
 
 /** A progress bar, filled to `fraction`. */
@@ -280,7 +280,7 @@ export function desktopIcon(sc: Screen, sprite: Sprite, cx: number, top: number,
   sc.sprite(sprite, x, top, k, selected);
   if (!label) return;
   const z = sc.z;
-  const style = { font: "geneva", size: 9, k: z };
+  const style = { font: "genova", size: 9, k: z };
   const { width, height } = sc.measure(label, style);
   const ly = top + sprite.height * k + 2 * z;
   const lx = Math.round(cx - width / 2);

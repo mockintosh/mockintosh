@@ -60,7 +60,7 @@ export function FillsPage(): JSX.Element {
         Ink is 0 paper or 1 black. Named patterns tile an 8x8. checker and gray50 are the same tile. Gradients are not tiled: ditherGradient rasterizes a 0 to 1 blackness ramp at the laid-out size.
       </text>
 
-      <text font="geneva" size={10}>Ink</text>
+      <text font="genova" size={10}>Ink</text>
       <FillRow
         items={[
           { label: "0 paper", fill: 0 },
@@ -68,10 +68,10 @@ export function FillsPage(): JSX.Element {
         ]}
       />
 
-      <text font="geneva" size={10}>Named patterns</text>
+      <text font="genova" size={10}>Named patterns</text>
       <FillRow items={NAMED.map((name) => ({ label: name, fill: name }))} />
 
-      <text font="geneva" size={10}>Raw PatternBits</text>
+      <text font="genova" size={10}>Raw PatternBits</text>
       <text font="body" wrap selectable>
         An 8-byte Uint8Array is a QuickDraw Pattern. Each byte is one row, MSB on the left.
       </text>
@@ -92,7 +92,7 @@ export function FillsPage(): JSX.Element {
         </box>
       </Preview>
 
-      <text font="geneva" size={10}>Gradients</text>
+      <text font="genova" size={10}>Gradients</text>
       <text font="body" wrap selectable>
         CSS has three families: linear, radial, and conic, plus a repeating form of each. from and to are blackness (0 paper, 1 ink). Headings follow CSS linear-gradient: a compass alias, a to keyword, or degrees (0 is up, clockwise). se, to bottom right, and 135 are the same vector. Bayer is the default dither; pass atkinson for error diffusion.
       </text>
@@ -112,16 +112,16 @@ ditherGradient({ from: 0.2, to: 0.8, direction: "e", repeat: 0.25 })`}
         </box>
       </Preview>
 
-      <text font="geneva" size={10}>Linear compass</text>
+      <text font="genova" size={10}>Linear compass</text>
       <FillRow items={COMPASS} />
 
-      <text font="geneva" size={10}>CSS to keywords</text>
+      <text font="genova" size={10}>CSS to keywords</text>
       <FillRow items={CSS_TO} />
 
-      <text font="geneva" size={10}>CSS degrees</text>
+      <text font="genova" size={10}>CSS degrees</text>
       <FillRow items={ANGLES} />
 
-      <text font="geneva" size={10}>Radial</text>
+      <text font="genova" size={10}>Radial</text>
       <text font="body" wrap selectable>
         Origin is at (default center). shape ellipse fits the box; circle is isotropic.
       </text>
@@ -134,7 +134,7 @@ ditherGradient({ from: 0.2, to: 0.8, direction: "e", repeat: 0.25 })`}
         ]}
       />
 
-      <text font="geneva" size={10}>Conic</text>
+      <text font="genova" size={10}>Conic</text>
       <text font="body" wrap selectable>
         Sweeps clockwise from start (CSS degrees; default 0 up). Numeric direction is the start when start is omitted.
       </text>
@@ -147,7 +147,7 @@ ditherGradient({ from: 0.2, to: 0.8, direction: "e", repeat: 0.25 })`}
         ]}
       />
 
-      <text font="geneva" size={10}>Repeating</text>
+      <text font="genova" size={10}>Repeating</text>
       <text font="body" wrap selectable>
         repeat is the period in the 0 to 1 parameter. 0.25 repeats four times.
       </text>
@@ -160,7 +160,7 @@ ditherGradient({ from: 0.2, to: 0.8, direction: "e", repeat: 0.25 })`}
         ]}
       />
 
-      <text font="geneva" size={10}>Dither mode</text>
+      <text font="genova" size={10}>Dither mode</text>
       <text font="body" wrap selectable>
         Bayer is stable chrome with no error-diffusion fringe. Atkinson walks the error into neighbors.
       </text>
@@ -198,7 +198,7 @@ function FillSwatch(props: { label: string; fill: Fill }): JSX.Element {
   return (
     <box flexDirection="column" gap={3} width={64}>
       <box width={64} height={64} borderWidth={1} borderColor={1} background={props.fill} />
-      <text font="geneva" size={10} wrap>
+      <text font="genova" size={10} wrap>
         {props.label}
       </text>
     </box>

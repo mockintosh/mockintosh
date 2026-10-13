@@ -44,7 +44,7 @@ describe("bodyBold (Geneva 9 Font Manager smear)", () => {
   });
 
   it("matches a fresh smear of System 7.5.3 Geneva 9", () => {
-    const expected = smearBitmapFaceBold(decodeFont(SYSTEM_FONT_GENEVA_9, "geneva"), "bodyBold");
+    const expected = smearBitmapFaceBold(decodeFont(SYSTEM_FONT_GENEVA_9, "genova"), "bodyBold");
     const actual = requireFont("bodyBold");
     expect(actual.maxWidth).toBe(expected.maxWidth);
     expect(getGlyphWidth(actual, "W".charCodeAt(0))).toBe(getGlyphWidth(expected, "W".charCodeAt(0)));

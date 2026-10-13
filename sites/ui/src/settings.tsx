@@ -46,7 +46,7 @@ function HostSettingsPanel(): JSX.Element {
   return (
     <box flexDirection="column" gap={10} width={panelWidth()}>
       <box flexDirection="column" gap={6}>
-        <text font="geneva" size={10} nowrap>
+        <text font="genova" size={10} nowrap>
           Host Settings
         </text>
         <For each={paletteRows}>
@@ -76,7 +76,7 @@ function HostSettingsPanel(): JSX.Element {
         </box>
       </box>
       <box flexDirection="column" gap={6}>
-        <text font="geneva" size={10} nowrap>
+        <text font="genova" size={10} nowrap>
           Radius
         </text>
         <box flexDirection="row" gap={6}>
@@ -119,7 +119,7 @@ export function SettingsMenu(): JSX.Element {
             if (key === "Enter" || key === " ") setOpen((on) => !on);
           }}
         >
-          <text font="geneva" size={10} color={open() ? 0 : 1} nowrap>
+          <text font="genova" size={10} color={open() ? 0 : 1} nowrap>
             Settings
           </text>
         </box>

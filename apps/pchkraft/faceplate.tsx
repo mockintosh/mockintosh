@@ -102,7 +102,7 @@ export function Screen(props: {
       semantic={{ name: "display", role: "status", value: props.summary }}
     >
       <box flexDirection="row" justifyContent="space-between" height={16}>
-        <text font="geneva" size={12} bold color={0} nowrap>
+        <text font="genova" size={12} bold color={0} nowrap>
           {props.title}
         </text>
         <text font="body" color={0} nowrap>
@@ -161,7 +161,7 @@ export function Pad(props: {
       <text font="body" color={ink()} align="center" nowrap>
         {props.caption}
       </text>
-      <text font="geneva" size={14} bold color={ink()} align="center" nowrap>
+      <text font="genova" size={14} bold color={ink()} align="center" nowrap>
         {props.title}
       </text>
       <text font="body" color={ink()} align="center" nowrap>

@@ -41,8 +41,8 @@ describe("faceMetrics", () => {
     expect(m.capAscent).toBe(8);
   });
 
-  it("uses FONT 396 FontInfo for geneva12", () => {
-    const m = faceMetrics(requireFont("geneva12"));
+  it("uses FONT 396 FontInfo for genova12", () => {
+    const m = faceMetrics(requireFont("genova12"));
     expect(m.cellHeight).toBe(13);
     expect(m.ascent).toBe(12);
     expect(m.descent).toBe(3);

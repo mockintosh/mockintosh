@@ -195,11 +195,11 @@ export function ComputerClub(_props: Record<string, unknown>): JSX.Element {
         />
         <box width={AD_COLUMN_W} flexDirection="column" gap={8}>
           <box flexDirection="column">
-            <text font="newYork" size={24} width={AD_COLUMN_W} semantic={{ name: "club-headline", role: "heading" }}>
+            <text font="newark" size={24} width={AD_COLUMN_W} semantic={{ name: "club-headline", role: "heading" }}>
               Introducing the Computer Club.
             </text>
             <Show when={!connecting()}>
-              <text font="newYork" size={12} width={AD_COLUMN_W}>Members only. Everyone welcome.</text>
+              <text font="newark" size={12} width={AD_COLUMN_W}>Members only. Everyone welcome.</text>
             </Show>
           </box>
           {props.children}

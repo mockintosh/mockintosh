@@ -32,71 +32,81 @@ describe("city font families", () => {
       "body",
       "menu",
       "mono",
-      "chicago",
-      "geneva",
-      "newYork",
-      "monaco",
-      "venice",
-      "london",
-      "athens",
-      "sanFrancisco",
-      "toronto",
-      "cairo",
-      "losAngeles",
+      "chicane",
+      "genova",
+      "newark",
+      "monoco",
+      "vence",
+      "londinium",
+      "athene",
+      "sanfrisco",
+      "taranto",
+      "kairos",
+      "losalamos",
     ]));
-    expect(listFontSizes("chicago")).toEqual([12]);
-    expect(listFontSizes("geneva")).toEqual([9, 10, 12, 14, 18, 20, 24]);
-    expect(listFontSizes("monaco")).toEqual([9, 12]);
-    expect(listFontSizes("newYork")).toEqual([9, 10, 12, 14, 18, 20, 24]);
-    expect(listFontSizes("venice")).toEqual([14]);
-    expect(listFontSizes("london")).toEqual([18]);
-    expect(listFontSizes("athens")).toEqual([18]);
-    expect(listFontSizes("sanFrancisco")).toEqual([18]);
-    expect(listFontSizes("toronto")).toEqual([9, 12, 14, 18, 24]);
-    expect(listFontSizes("cairo")).toEqual([18]);
-    expect(listFontSizes("losAngeles")).toEqual([12, 24]);
+    expect(listFontSizes("chicane")).toEqual([12]);
+    expect(listFontSizes("genova")).toEqual([9, 10, 12, 14, 18, 20, 24]);
+    expect(listFontSizes("monoco")).toEqual([9, 12]);
+    expect(listFontSizes("newark")).toEqual([9, 10, 12, 14, 18, 20, 24]);
+    expect(listFontSizes("vence")).toEqual([14]);
+    expect(listFontSizes("londinium")).toEqual([18]);
+    expect(listFontSizes("athene")).toEqual([18]);
+    expect(listFontSizes("sanfrisco")).toEqual([18]);
+    expect(listFontSizes("taranto")).toEqual([9, 12, 14, 18, 24]);
+    expect(listFontSizes("kairos")).toEqual([18]);
+    expect(listFontSizes("losalamos")).toEqual([12, 24]);
   });
 
   it("keeps body / menu / mono as aliases onto Geneva 9, Chicago 12, Monaco 9", () => {
     expect(defaultFontSize("body")).toBe(9);
     expect(defaultFontSize("menu")).toBe(12);
     expect(defaultFontSize("mono")).toBe(9);
-    expect(requireFont("body")).toBe(requireFont("geneva", 9));
-    expect(requireFont("menu")).toBe(requireFont("chicago", 12));
-    expect(requireFont("mono")).toBe(requireFont("monaco", 9));
+    expect(requireFont("body")).toBe(requireFont("genova", 9));
+    expect(requireFont("menu")).toBe(requireFont("chicane", 12));
+    expect(requireFont("mono")).toBe(requireFont("monoco", 9));
   });
 
   it("snaps a missing size to the nearest native strike", () => {
-    expect(requireFont("geneva", 11)).toBe(requireFont("geneva", 12));
-    expect(requireFont("geneva", 13)).toBe(requireFont("geneva", 14));
-    expect(requireFont("geneva", 16)).toBe(requireFont("geneva", 18));
+    expect(requireFont("genova", 11)).toBe(requireFont("genova", 12));
+    expect(requireFont("genova", 13)).toBe(requireFont("genova", 14));
+    expect(requireFont("genova", 16)).toBe(requireFont("genova", 18));
   });
 
   it("lets body size={12} select Geneva 12", () => {
-    expect(requireFont("body", 12)).toBe(requireFont("geneva", 12));
+    expect(requireFont("body", 12)).toBe(requireFont("genova", 12));
+  });
+
+  it("opens the Apple names the families used to go by, without listing them", () => {
+    expect(requireFont("geneva", 12)).toBe(requireFont("genova", 12));
+    expect(requireFont("chicago")).toBe(requireFont("chicane", 12));
+    expect(requireFont("losAngeles", 24)).toBe(requireFont("losalamos", 24));
+    const names = listFontFamilies().map((f) => f.name);
+    expect(names).not.toContain("geneva");
+    expect(names).not.toContain("newYork");
+    expect(listFontFamilies().find((f) => f.name === "losalamos")?.displayName).toBe("Los Alamos");
   });
 
   it("does not advertise baked bold names as families", () => {
     expect(listFonts()).not.toContain("bodyBold");
-    expect(listFonts()).not.toContain("geneva12Bold");
+    expect(listFonts()).not.toContain("genova12Bold");
     expect(getFont("bodyBold")).toBeTruthy();
-    expect(listFontFamilies().some((family) => family.name === "geneva")).toBe(true);
+    expect(listFontFamilies().some((family) => family.name === "genova")).toBe(true);
   });
 
   it("draws ink in each city family at its default size", () => {
-    for (const name of ["chicago", "geneva", "newYork", "monaco", "venice", "london", "athens", "sanFrancisco", "toronto", "losAngeles"]) {
+    for (const name of ["chicane", "genova", "newark", "monoco", "vence", "londinium", "athene", "sanfrisco", "taranto", "losalamos"]) {
       expect(glyphHasInk(name, defaultFontSize(name), "A")).toBe(true);
     }
-    expect(glyphHasInk("cairo", 18, "z")).toBe(true);
+    expect(glyphHasInk("kairos", 18, "z")).toBe(true);
   });
 
   it("makes larger Geneva wider than Geneva 9", () => {
-    expect(measureText("Washington", "geneva", {}, 12)).toBeGreaterThan(measureText("Washington", "geneva", {}, 9));
-    expect(requireFont("geneva", 24).glyphHeight).toBeGreaterThan(requireFont("geneva", 9).glyphHeight);
+    expect(measureText("Washington", "genova", {}, 12)).toBeGreaterThan(measureText("Washington", "genova", {}, 9));
+    expect(requireFont("genova", 24).glyphHeight).toBeGreaterThan(requireFont("genova", 9).glyphHeight);
   });
 
   it("uses the FONT header for New York 12", () => {
-    const m = faceMetrics(requireFont("newYork", 12));
+    const m = faceMetrics(requireFont("newark", 12));
     expect(m.ascent).toBe(12);
     expect(m.descent).toBe(3);
     expect(m.leading).toBe(1);

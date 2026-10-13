@@ -40,14 +40,14 @@ _spec.loader.exec_module(sysfonts)
 
 # FOND family → registry key.
 FAMILIES = {
-    "Venice": "venice",
-    "London": "london",
-    "Athens": "athens",
-    "San Francisco": "sanFrancisco",
-    "Cairo": "cairo",
-    "Los Angeles": "losAngeles",
+    "Venice": "vence",
+    "London": "londinium",
+    "Athens": "athene",
+    "San Francisco": "sanfrisco",
+    "Cairo": "kairos",
+    "Los Angeles": "losalamos",
 }
-TORONTO = "toronto"
+TORONTO = "taranto"
 
 
 def const_name(family: str, size: int) -> str:
