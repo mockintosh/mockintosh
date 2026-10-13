@@ -36,11 +36,12 @@ export async function findPhotoLibrary(
   storage: AppStorage,
 ): Promise<FSDirectory | null> {
   const saved = await storage.read(LIBRARY_ID_KEY);
+  const pictures = fs.locate("pictures");
   if (saved) {
     const remembered = fs.directory(saved);
-    if (remembered) return remembered;
+    // A library on another disk (Mockintosh HD, while a member's disk is mounted) stays there; new pictures go to this one's.
+    if (remembered && (!pictures || fs.volumeOf(remembered.id)?.id === fs.volumeOf(pictures.id)?.id)) return remembered;
   }
-  const pictures = fs.locate("pictures");
   if (!pictures) return null;
   const named = fs.child(pictures.id, PHOTO_LIBRARY_NAME);
   if (named?.kind !== "directory") return null;

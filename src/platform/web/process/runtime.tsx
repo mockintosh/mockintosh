@@ -39,6 +39,8 @@ import {
   type AppServices,
   type AppWindow,
   type Capability,
+  type ClubStatus,
+  type FetchResponse,
   type MenubarDefinition,
   type PrintService,
   type SolidApp,
@@ -99,6 +101,26 @@ interface ProcessWindow {
   rawKeys?: boolean;
   /** Action ids of this window's current menus, dropped when it sets new ones. */
   menuIds: number[];
+}
+
+/** A Club response as the OS sends it across (`src/os/process/host.ts`, `clubReply`). */
+interface ClubReply {
+  status: number;
+  headers: Record<string, string>;
+  body: string;
+}
+
+/** The app's `FetchResponse` for a Club reply. */
+function clubResponse(reply: ClubReply): FetchResponse {
+  const headers = new Map(Object.entries(reply.headers).map(([name, value]) => [name.toLowerCase(), value]));
+  return {
+    ok: reply.status >= 200 && reply.status < 300,
+    status: reply.status,
+    headers: { get: (name) => headers.get(name.toLowerCase()) ?? null },
+    text: async () => reply.body,
+    json: async () => JSON.parse(reply.body) as unknown,
+    arrayBuffer: async () => new TextEncoder().encode(reply.body).buffer as ArrayBuffer,
+  };
 }
 
 function isNode(value: unknown): value is FSNode {
@@ -378,6 +400,13 @@ export function runProcess(scope: ProcessScope, load: LoadApp, services: Process
         },
       },
       download: start.download ? { save: (file) => call("download.save", [file]) as Promise<void> } : undefined,
+      club: start.club
+        ? {
+            status: () => call("club.status", []) as Promise<ClubStatus>,
+            open: () => void call("club.open", []),
+            fetch: async (path, init) => clubResponse((await call("club.fetch", [path, init])) as ClubReply),
+          }
+        : undefined,
       signIn: start.signIn && {
         redirectUri: start.signIn.redirectUri,
         authorize: (url) => call("signIn.authorize", [url]) as Promise<Record<string, string> | null>,

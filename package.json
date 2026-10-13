@@ -18,6 +18,8 @@
     "build": "npm run build:content && vite build",
     "preview": "vite preview",
     "dev:api": "npm run -s context && tsx scripts/dev-api.ts",
+    "dev:club": "npm run dev --prefix sites/club",
+    "db:migrate": "npm run migrate --prefix sites/club",
     "build:content": "npm run -s context && tsx scripts/build-contributors.ts",
     "contributors:refresh": "tsx scripts/build-contributors.ts --refresh",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.core.json && tsc -p tsconfig.host.json",
@@ -85,5 +87,10 @@
     "vite": "^8.3.0",
     "vitest": "^5.0.1",
     "ws": "^8.20.0"
+  },
+  "overrides": {
+    "better-auth": {
+      "solid-js": "$solid-js"
+    }
   }
 }

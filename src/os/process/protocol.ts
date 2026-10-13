@@ -71,6 +71,8 @@ export interface ProcessStart {
   signIn?: { redirectUri: string };
   /** Apple Music (`AppContext.musicKit`) as it stands; absent when the host holds no MusicKit. */
   musicKit?: MusicKitState;
+  /** The Computer Club (`AppContext.club`). */
+  club: boolean;
   /** The host can decode video excerpts (`VideoService.excerpt`). */
   video: boolean;
   /** The host can play video live (`VideoService.open`). */

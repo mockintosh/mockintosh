@@ -23,6 +23,7 @@ import type { AppCrypto } from "./crypto";
 import type { BrowserService } from "./browser";
 import type { SignInDeclaration, SignInService } from "./signIn";
 import type { MusicKitService } from "./musicKit";
+import type { ClubService } from "./club";
 
 export type { MenubarDefinition, MenubarItemDef, MenubarActionItem, MenubarRadioGroupDef, MenubarSubmenuDef, MenubarSeparator } from "./menus";
 
@@ -209,6 +210,7 @@ export {
   type MusicKitShuffleMode,
   type MusicKitRepeatMode,
 } from "./musicKit";
+export type { ClubService, ClubStatus } from "./club";
 export { encodeQR } from "./qr";
 export type { Resource, Job, Diagnostic, ChatMessage, CompleteResult, OpenAITool, ContentPart, ChatContent } from "@mockintosh/protocol";
 export { parse, resource, jobSchema } from "@mockintosh/protocol";
@@ -286,7 +288,9 @@ export interface AppStorage {
 /**
  * The shared file system as seen by apps: reactive catalog reads (call them
  * inside memos/effects), content access, and mutations. Well-known folders
- * are found by role (`fs.locate("desktop")`), never by name.
+ * are found by role (`fs.locate("desktop")`), never by name; while a
+ * Computer Club member is signed in, their own disk's Desktop Folder,
+ * Pictures and Documents are found first.
  */
 export type AppFileSystem = Pick<
   FileSystem,
@@ -568,6 +572,8 @@ export interface AppContext {
   signIn?: SignInService;
   /** Apple Music playback, MusicKit held by the OS; see `MusicKitService`. */
   musicKit?: MusicKitService;
+  /** The Mockintosh Computer Club (membership and AI credits), when this Macintosh has one. */
+  club?: ClubService;
   /**
    * What this Macintosh can do. Apps that work with or without a feature
    * check here instead of declaring it in `requires`.
@@ -647,12 +653,13 @@ export type FetchFunction = (url: string, options?: FetchRequest) => Promise<Fet
  * - `browser`   — `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`)
  * - `sign-in`   — `useApp().signIn` is available (sign in from a phone; see `SignInService`)
  * - `music-kit` — `useApp().musicKit` is available (Apple Music playback; see `MusicKitService`)
+ * - `club`      — `useApp().club` is available (the Computer Club's membership and credits; see `ClubService`)
  * - `agent-runtime` — `useApp().agentRuntime` is available (language-model agents; see `AgentRuntime`)
  * - `fonts`     — `useApp().fontRaster` is available
  * - `gpu`       — `useApp().gpu` is available (pixel programs; see `GpuService`)
  */
 export type Capability =
-  | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in"
+  | "network" | "clipboard" | "printer" | "download" | "camera" | "video" | "images" | "audio" | "microphone" | "browser" | "sign-in" | "club"
   | "music-kit" | "agent-runtime" | "fonts" | "gpu";
 
 /**

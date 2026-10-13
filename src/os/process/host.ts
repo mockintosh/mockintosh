@@ -18,6 +18,7 @@ import type {
   AudioPortOptions,
   AudioPortStream,
   AudioMonitor,
+  FetchResponse,
   MicrophonePortInput,
   MicrophonePortOptions,
   MenubarDefinition,
@@ -58,6 +59,17 @@ export interface AppProcessOptions {
 }
 
 /** Timing samples for the Worker menu. */
+/** A Club response's parts, which can cross to the process where the response can't (`runtime.tsx` rebuilds it). */
+async function clubReply(pending: Promise<FetchResponse>): Promise<{ status: number; headers: Record<string, string>; body: string }> {
+  const resp = await pending;
+  const headers: Record<string, string> = {};
+  for (const name of ["content-type", "retry-after"]) {
+    const value = resp.headers.get(name);
+    if (value !== null) headers[name] = value;
+  }
+  return { status: resp.status, headers, body: await resp.text() };
+}
+
 export class Samples {
   private values: number[] = [];
   add(value: number): void {
@@ -199,6 +211,7 @@ export class AppProcess {
         download: this.context.download !== undefined,
         signIn: this.context.signIn && { redirectUri: this.context.signIn.redirectUri },
         musicKit: this.context.musicKit?.state,
+        club: this.context.club !== undefined,
         video: typeof this.context.video?.excerpt === "function",
         videoPlayback: this.context.video !== undefined,
         camera: this.context.camera !== undefined,
@@ -502,6 +515,12 @@ export class AppProcess {
         return ctx.signIn.authorize(args[0] as string);
       case "musicKit":
         return this.musicKitCall(name, args);
+      case "club":
+        if (!ctx.club) throw new Error("This Macintosh has no Computer Club");
+        if (name === "status") return ctx.club.status();
+        if (name === "open") return ctx.club.open();
+        if (name === "fetch") return clubReply(ctx.club.fetch(args[0] as string, args[1] as never));
+        break;
       case "os":
         if (name === "showDialog") return ctx.os.showDialog(args[0] as never);
         if (name === "showOpenDialog") return ctx.os.showOpenDialog(args[0] as never);

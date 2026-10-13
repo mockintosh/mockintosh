@@ -11,6 +11,7 @@ import type {
   AudioPortOptions,
   AudioPortStream,
   AudioService,
+  ClubService,
   KernelClient,
   MicrophonePortInput,
   MicrophonePortOptions,
@@ -22,6 +23,8 @@ import type {
 import { listFontFamilies, onFontsChanged, registerFont } from "@mockintosh/ui";
 import type { OSServices, IconScreenRect } from "./context";
 import { createAppSignIn, type SystemSignIn } from "./signIn";
+import type { SystemClub } from "./club";
+import { openComputerClub } from "../../apps/finder/ComputerClub";
 import { createAppStorage } from "./appStorage";
 import { getApp } from "./apps";
 import { openersForFileType } from "./openers";
@@ -231,6 +234,18 @@ function instanceMusicKit(os: OSServices, musicKit: MusicKitService, instanceId?
 }
 
 /** Sign-in as one app sees it: limited to its declared hosts, its sheet closing when the launch ends. */
+/** `useApp().club`: membership and credits, and the Club window. */
+function appClub(os: OSServices, club: SystemClub): ClubService {
+  return {
+    async status() {
+      const { member, credits } = await club.refresh();
+      return { member: !!member, credits: credits?.balance ?? null };
+    },
+    open: () => void openComputerClub(os),
+    fetch: (path, init) => club.fetch(path, init),
+  };
+}
+
 function appSignIn(os: OSServices, signIn: SystemSignIn, appId: string, instanceId?: string): SignInService {
   const app = getApp(appId);
   return createAppSignIn({
@@ -273,6 +288,7 @@ export function createAppContext(
     browser: os.browser,
     musicKit: os.musicKit && instanceMusicKit(os, os.musicKit, options.instanceId),
     signIn: os.signIn && appSignIn(os, os.signIn, appId, options.instanceId),
+    club: os.club && appClub(os, os.club),
     capabilities: os.capabilities,
     fetch: os.fetch,
     print: os.printers,

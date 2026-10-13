@@ -9,7 +9,7 @@ const DECODABLE = new Set(["image/png", "image/jpeg", "image/jpg", "image/gif", 
  * `GET /api/web-image?url=…` — an image from a web page, for Safari to
  * decode and dither. Pages are cross-origin; the browser cannot read them.
  */
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   if (req.method !== "GET") return new Response("Method not allowed", { status: 405 });
   if (!fromOwnSite(req)) return new Response("Forbidden", { status: 403 });
   const target = new URL(req.url).searchParams.get("url");
@@ -27,3 +27,6 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response(error instanceof Error ? error.message : "Could not load image", { status });
   }
 }
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };

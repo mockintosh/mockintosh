@@ -17,8 +17,9 @@ import type { FSBackend } from "./backend";
 import { CURRENT_CATALOG_VERSION, emptyCatalog, parseCatalog, type CatalogDocument } from "./catalogDocument";
 import { FSError } from "./errors";
 import { inferMimeType } from "./mime";
-import { assertNewNameFits, availableChildName } from "./names";
+import { assertNewNameFits, availableChildName, fitName, fitNameWithSuffix } from "./names";
 import type { VolumeImage, VolumeImageEntry } from "./volumeImage";
+import { mountedVolumes, roleSearchOrder } from "./volumes";
 import {
   ROOT_ID,
   type AttributeValue,
@@ -162,31 +163,32 @@ export class FileSystem {
   // =========================================================================
 
   node(id: NodeId): FSNode | undefined {
-    return this.state.nodes[id];
+    const n = this.state.nodes[id];
+    return n && !this.isEjected(id) ? n : undefined;
   }
 
   file(id: NodeId): FSFile | undefined {
-    const n = this.state.nodes[id];
+    const n = this.node(id);
     return n?.kind === "file" ? n : undefined;
   }
 
   directory(id: NodeId): FSDirectory | undefined {
-    const n = this.state.nodes[id];
+    const n = this.node(id);
     return n?.kind === "directory" ? n : undefined;
   }
 
   exists(id: NodeId): boolean {
-    return this.state.nodes[id] !== undefined;
+    return this.node(id) !== undefined;
   }
 
   /** Children of a directory: folders first, then files, each A→Z. */
   children(dirId: NodeId): FSNode[] {
     const ids = this.state.childIds[dirId];
-    if (!ids) return [];
+    if (!ids || this.isEjected(dirId)) return [];
     const out: FSNode[] = [];
     for (const id of ids) {
       const n = this.state.nodes[id];
-      if (n) out.push(n);
+      if (n && !(n.parentId === ROOT_ID && (n as FSDirectory).ejected)) out.push(n);
     }
     out.sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1;
@@ -196,15 +198,16 @@ export class FileSystem {
   }
 
   childCount(dirId: NodeId): number {
-    return this.state.childIds[dirId]?.length ?? 0;
+    if (dirId === ROOT_ID) return this.volumes().length;
+    return this.isEjected(dirId) ? 0 : (this.state.childIds[dirId]?.length ?? 0);
   }
 
   child(dirId: NodeId, name: string): FSNode | undefined {
     const ids = this.state.childIds[dirId];
-    if (!ids) return undefined;
+    if (!ids || this.isEjected(dirId)) return undefined;
     for (const id of ids) {
       const n = this.state.nodes[id];
-      if (n && n.name === name) return n;
+      if (n && n.name === name && !(n.parentId === ROOT_ID && (n as FSDirectory).ejected)) return n;
     }
     return undefined;
   }
@@ -250,10 +253,9 @@ export class FileSystem {
     return false;
   }
 
-  /** The disks: the user's first (the startup volume leads), then mounted locked ones. */
+  /** Mounted volumes: the startup disk first, then any home disk, then mounted locked ones. */
   volumes(): FSDirectory[] {
-    const all = this.children(ROOT_ID).filter((n): n is FSDirectory => n.kind === "directory");
-    return [...all.filter((v) => !v.locked), ...all.filter((v) => v.locked)];
+    return mountedVolumes(this.children(ROOT_ID).filter((n): n is FSDirectory => n.kind === "directory"));
   }
 
   /** Whether `id` is on a locked disk, where nothing can change. */
@@ -263,14 +265,16 @@ export class FileSystem {
 
   /**
    * Find the directory with a well-known role. Searches the given volume, or
-   * every volume in order when omitted.
+   * every mounted volume when omitted: a home disk first (so new files go to
+   * the member's disk), then the startup disk. `volume` without an id is the
+   * startup disk.
    */
   locate(role: NodeRole, volumeId?: NodeId): FSDirectory | undefined {
     if (role === "root") return this.directory(ROOT_ID);
     if (role === "volume") {
       return volumeId ? this.directory(volumeId) : this.volumes()[0];
     }
-    const volumes = volumeId ? [volumeId] : this.volumes().map((v) => v.id);
+    const volumes = volumeId ? [volumeId] : roleSearchOrder(this.volumes()).map((v) => v.id);
     for (const vid of volumes) {
       const id = this.state.roles[roleKey(vid, role)];
       if (id) return this.directory(id);
@@ -637,6 +641,112 @@ export class FileSystem {
   }
 
   // =========================================================================
+  // Home disks
+  // =========================================================================
+
+  /** The home disk of `member`, mounted or ejected. */
+  homeVolume(member: string): FSDirectory | undefined {
+    for (const id of this.state.childIds[ROOT_ID] ?? []) {
+      const n = this.state.nodes[id];
+      if (n?.kind === "directory" && n.home === member) return n;
+    }
+    return undefined;
+  }
+
+  /**
+   * Mount `member`'s home disk, creating it as `name` (with `id`, when
+   * given) the first time. Its folders are the caller's to create (`locate`
+   * finds them by role).
+   */
+  mountHome(member: string, name: string, id?: NodeId): FSDirectory {
+    const existing = this.homeVolume(member);
+    if (existing) {
+      if (!existing.ejected) return existing;
+      const mounted: FSDirectory = { ...existing };
+      delete mounted.ejected;
+      this.commit((s) => { delete (s.nodes[existing.id] as FSDirectory).ejected; });
+      return (this.state.nodes[existing.id] as FSDirectory | undefined) ?? mounted;
+    }
+    // Every volume's name counts, ejected ones too, so two members' disks never share one.
+    const taken = new Set((this.state.childIds[ROOT_ID] ?? []).map((id) => this.state.nodes[id]?.name));
+    let candidate = fitName(name.trim() || "Home");
+    for (let n = 2; taken.has(candidate); n++) candidate = fitNameWithSuffix(name.trim() || "Home", ` ${n}`);
+    const volume = this.mkdir(ROOT_ID, candidate, { role: "volume", id });
+    this.commit((s) => { (s.nodes[volume.id] as FSDirectory).home = member; });
+    return (this.state.nodes[volume.id] as FSDirectory | undefined) ?? { ...volume, home: member };
+  }
+
+  /** Eject a volume: it and everything on it read as absent until mounted again. */
+  eject(volumeId: NodeId): void {
+    const volume = this.state.nodes[volumeId];
+    if (volume?.kind !== "directory" || volume.parentId !== ROOT_ID) throw new FSError("not-found", `No such volume: ${volumeId}`);
+    if (volume.ejected) return;
+    this.commit((s) => { (s.nodes[volumeId] as FSDirectory).ejected = true; });
+  }
+
+  // =========================================================================
+  // Sync
+  // =========================================================================
+
+  /**
+   * Put `node` in the catalog exactly as another computer has it: its id,
+   * name, folder, revision and times, its attributes replaced, and for a
+   * file `content` as its body. Used by a synced disk to take in what the
+   * Club sends; ordinary changes go through the methods above, which keep
+   * revisions and names in order. Its folder must exist.
+   */
+  async applyRemote(node: FSNode, attributes: NodeAttributes | undefined, content?: Uint8Array): Promise<void> {
+    const parent = node.parentId === null ? undefined : this.state.nodes[node.parentId];
+    if (!parent || parent.kind !== "directory") throw new FSError("not-found", `No such directory: ${node.parentId}`);
+    const existing = this.state.nodes[node.id];
+    if (existing && existing.kind !== node.kind) throw new FSError("conflict", `${node.id} changed between file and folder`);
+    if (node.kind === "file" && content) await this.backend.writeBlob(node.id, content);
+    this.commit((s) => {
+      const before = s.nodes[node.id];
+      if (before && before.parentId !== node.parentId && before.parentId !== null) {
+        s.childIds[before.parentId] = (s.childIds[before.parentId] ?? []).filter((c) => c !== node.id);
+      }
+      if (!before || before.parentId !== node.parentId) (s.childIds[node.parentId!] ??= []).push(node.id);
+      if (node.kind === "directory") s.childIds[node.id] ??= [];
+      s.nodes[node.id] = { ...node };
+      if (attributes && Object.keys(attributes).length) s.attributes[node.id] = { ...attributes };
+      else delete s.attributes[node.id];
+      for (const id of this.collectSubtreeIn(s, node.id)) {
+        unindexRole(s, id);
+        indexRole(s, id);
+      }
+    });
+  }
+
+  /**
+   * Give a folder a new id: its contents, attributes and role go with it.
+   * For a home disk made before its folders had the ids every Mac derives.
+   */
+  renumberDirectory(oldId: NodeId, newId: NodeId): void {
+    const dir = this.state.nodes[oldId];
+    if (dir?.kind !== "directory" || dir.parentId === null) throw new FSError("not-found", `No such folder: ${oldId}`);
+    if (oldId === newId) return;
+    if (this.state.nodes[newId]) throw new FSError("exists", `Node ${newId} already exists`);
+    this.commit((s) => {
+      const node = { ...s.nodes[oldId], id: newId } as FSDirectory;
+      delete s.nodes[oldId];
+      s.nodes[newId] = node;
+      const siblings = s.childIds[node.parentId!] ?? [];
+      s.childIds[node.parentId!] = siblings.map((c) => (c === oldId ? newId : c));
+      s.childIds[newId] = s.childIds[oldId] ?? [];
+      delete s.childIds[oldId];
+      for (const child of s.childIds[newId]) if (s.nodes[child]) s.nodes[child].parentId = newId;
+      if (s.attributes[oldId]) {
+        s.attributes[newId] = s.attributes[oldId];
+        delete s.attributes[oldId];
+      }
+      // Roles are keyed by volume, which may be this folder: index them all again.
+      for (const key of Object.keys(s.roles)) delete s.roles[key];
+      for (const id of Object.keys(s.nodes)) indexRole(s, id);
+    });
+  }
+
+  // =========================================================================
   // Persistence
   // =========================================================================
 
@@ -747,6 +857,14 @@ export class FileSystem {
   // Internals
   // =========================================================================
 
+  /** Whether `id` is on an ejected volume. Cheap when nothing is ejected. */
+  private isEjected(id: NodeId): boolean {
+    const volumes = this.state.childIds[ROOT_ID];
+    if (!volumes?.some((v) => (this.state.nodes[v] as FSDirectory | undefined)?.ejected)) return false;
+    const volumeId = volumeIdOf(this.state.nodes, id);
+    return !!volumeId && !!(this.state.nodes[volumeId] as FSDirectory | undefined)?.ejected;
+  }
+
   private assertUnlocked(id: NodeId): void {
     if ([...this.locked].some((locked) => this.isWithin(locked, id))) {
       throw new FSError("conflict", "A content write is in progress");
@@ -755,7 +873,7 @@ export class FileSystem {
 
   private requireDirectory(id: NodeId): FSDirectory {
     this.assertUnlocked(id);
-    const n = this.state.nodes[id];
+    const n = this.node(id);
     if (!n) throw new FSError("not-found", `No such directory: ${id}`);
     if (n.kind !== "directory") throw new FSError("not-a-directory", `"${n.name}" is not a folder`);
     this.assertWritable(id);
@@ -764,7 +882,7 @@ export class FileSystem {
 
   private requireMutable(id: NodeId): FSNode {
     this.assertUnlocked(id);
-    const n = this.state.nodes[id];
+    const n = this.node(id);
     if (!n) throw new FSError("not-found", `No such node: ${id}`);
     if (n.parentId === null) throw new FSError("immutable", "The root cannot be changed");
     this.assertWritable(id);
@@ -775,6 +893,18 @@ export class FileSystem {
   private assertWritable(id: NodeId): void {
     const volume = this.volumeOf(id);
     if (volume?.locked) throw new FSError("locked", `"${volume.name}" is locked, so nothing on it can be changed.`);
+  }
+
+  /** `id` and everything under it, in a store being changed. */
+  private collectSubtreeIn(s: CatalogState, id: NodeId): NodeId[] {
+    const out: NodeId[] = [];
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      out.push(cur);
+      for (const c of s.childIds[cur] ?? []) stack.push(c);
+    }
+    return out;
   }
 
   private collectSubtree(id: NodeId): NodeId[] {

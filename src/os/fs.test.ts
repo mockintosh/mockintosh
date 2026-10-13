@@ -130,3 +130,54 @@ describe("createAppStorage", () => {
     expect(fs.child(folder.id, "take.wav")).toMatchObject({ kind: "file", type: "audio/wav" });
   });
 });
+
+describe("home disks", () => {
+  it("mounts a member's disk after the startup disk, and finds its role folders first", async () => {
+    const fs = await bootedFS();
+    const hd = fs.locate("volume")!;
+    const home = fs.mountHome("member-1", "Ada");
+    const desktop = fs.mkdir(home.id, "Desktop Folder", { role: "desktop" });
+
+    expect(fs.volumes().map((v) => v.name)).toEqual([STARTUP_VOLUME_NAME, "Ada"]);
+    expect(fs.locate("volume")!.id).toBe(hd.id);
+    expect(fs.locate("desktop")!.id).toBe(desktop.id);
+    // Roles the home disk lacks come from the startup disk.
+    expect(fs.volumeOf(fs.locate("preferences")!.id)!.id).toBe(hd.id);
+    expect(fs.mountHome("member-1", "Ada Lovelace").id).toBe(home.id);
+  });
+
+  it("hides an ejected disk and everything on it, and brings it back on mounting", async () => {
+    const fs = await bootedFS();
+    const home = fs.mountHome("member-1", "Ada");
+    const desktop = fs.mkdir(home.id, "Desktop Folder", { role: "desktop" });
+    const note = await fs.writeFile(desktop.id, "Note", "hello");
+
+    fs.eject(home.id);
+    expect(fs.volumes().map((v) => v.name)).toEqual([STARTUP_VOLUME_NAME]);
+    expect(fs.node(note.id)).toBeUndefined();
+    expect(fs.child(ROOT_ID, "Ada")).toBeUndefined();
+    expect(fs.volumeOf(fs.locate("desktop")!.id)!.name).toBe(STARTUP_VOLUME_NAME);
+    await expect(fs.writeFile(desktop.id, "Another", "x")).rejects.toThrow();
+    expect(() => fs.rename(note.id, "Renamed")).toThrow();
+
+    expect(fs.mountHome("member-1", "Ada").id).toBe(home.id);
+    expect(await fs.readText(note.id)).toBe("hello");
+  });
+
+  it("names a second member's disk apart from an ejected one", async () => {
+    const fs = await bootedFS();
+    fs.eject(fs.mountHome("member-1", "Ada").id);
+    expect(fs.mountHome("member-2", "Ada").name).toBe("Ada 2");
+  });
+
+  it("keeps home and ejected across a reopen", async () => {
+    const backend = new InMemoryBackend();
+    const fs = await FileSystem.open({ backend, persistDelayMs: 0 });
+    await bootstrapFileSystem(fs);
+    fs.eject(fs.mountHome("member-1", "Ada").id);
+    await fs.flush();
+    const reopened = await FileSystem.open({ backend, persistDelayMs: 0 });
+    expect(reopened.volumes().map((v) => v.name)).toEqual([STARTUP_VOLUME_NAME]);
+    expect(reopened.homeVolume("member-1")).toMatchObject({ name: "Ada", ejected: true });
+  });
+});

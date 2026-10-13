@@ -75,6 +75,8 @@ import { OPEN_DIALOG_SIZE, OpenDialog } from "./components/OpenDialog.solid";
 import { DESKTOP, placeExists, placeOf, type SFPlace } from "./standardFile";
 import { SignInSheet, type SignInSheetProps } from "./components/SignInSheet.solid";
 import type { SystemSignIn } from "./signIn";
+import { createSystemClub } from "./club";
+import { startHomeDisks } from "./home";
 import { createAppInstaller, migrateBundledDesktopShortcuts } from "./installedApps";
 import {
   describeMissingCapabilities,
@@ -291,6 +293,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     browser: platform.browser,
     musicKit: platform.musicKit,
     signIn: platform.signInRelay && systemSignIn(platform.signInRelay),
+    club: platform.club && createSystemClub(platform.club),
     installer,
     openApp(appId, props = {}, fromRect?) {
       const app = getApp(appId);
@@ -551,6 +554,8 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       mountTourDisk(fs, fetchBytes, { insert: true });
     },
   };
+
+  const stopHomeDisks = osServices.club ? startHomeDisks(osServices, osServices.club) : () => {};
 
   screenshotCapture = createScreenshots({
     fs,
@@ -1097,6 +1102,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
       for (const token of renderWaits) token.cancel();
       kernel.shutdown();
       osServices.projects?.close();
+      stopHomeDisks();
       desktopSettings.shutdown();
       offPointer();
       offKey();

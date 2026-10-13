@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMemoryCounters, fromOwnSite, guardRequest, type GuardEnv, type RouteLimits } from "./_guard";
+import { MAX_IN_FLIGHT, createMemoryCounters, fromOwnSite, guardRequest, type GuardEnv, type RouteLimits } from "./_guard";
 
 const LIMITS: RouteLimits = {
   route: "test",
@@ -8,14 +8,35 @@ const LIMITS: RouteLimits = {
   global: { max: 3, windowSeconds: 86400 },
 };
 
+/** Session cookies the fake session store knows, and whose they are. */
+const SESSIONS: Record<string, string> = { "session=ada": "user-ada", "session=bob": "user-bob", "session=cy": "user-cy" };
+/** Credits the fake ledger holds; anyone missing has 100. */
+const BALANCES: Record<string, number> = { "user-bob": 0 };
+
 function hostedEnv(clock = { t: 0 }): GuardEnv {
   const now = () => clock.t;
-  return { accessToken: "s3cret", hosted: true, allowedOrigins: ["https://mockintosh.com"], store: createMemoryCounters(now), now };
+  return {
+    accessToken: "s3cret",
+    async member(req) {
+      const id = SESSIONS[req.headers.get("cookie") ?? ""];
+      return id ? { id } : null;
+    },
+    async balance(id) {
+      return BALANCES[id] ?? 100;
+    },
+    hosted: true,
+    allowedOrigins: ["https://mockintosh.com"],
+    store: createMemoryCounters(now),
+    now,
+  };
 }
 
-function post(options: { origin?: string | null; ip?: string; body?: string; host?: string; auth?: string | null } = {}): Request {
+function post(
+  options: { origin?: string | null; ip?: string; body?: string; host?: string; auth?: string | null; cookie?: string } = {},
+): Request {
   const headers: Record<string, string> = { "Content-Type": "application/json", host: options.host ?? "app.vercel.app" };
-  if (options.auth !== null) headers.authorization = options.auth ?? "Bearer s3cret";
+  if (options.cookie) headers.cookie = options.cookie;
+  if (options.auth !== null && !options.cookie) headers.authorization = options.auth ?? "Bearer s3cret";
   if (options.origin !== null) headers.origin = options.origin ?? "https://app.vercel.app";
   if (options.ip) headers["x-forwarded-for"] = `${options.ip}, 10.0.0.1`;
   return new Request("https://app.vercel.app/api/test", { method: "POST", headers, body: options.body ?? "{}" });
@@ -24,7 +45,92 @@ function post(options: { origin?: string | null; ip?: string; body?: string; hos
 describe("guardRequest", () => {
   it("passes a same-origin POST and returns its body", async () => {
     const result = await guardRequest(post({ body: '{"a":1}' }), LIMITS, hostedEnv());
-    expect(result).toEqual({ ok: true, body: '{"a":1}' });
+    expect(result).toMatchObject({ ok: true, body: '{"a":1}', caller: { kind: "service" } });
+  });
+
+  it("passes a Computer Club member's session without a token", async () => {
+    const result = await guardRequest(post({ cookie: "session=ada" }), LIMITS, hostedEnv());
+    expect(result).toMatchObject({ ok: true, body: "{}", caller: { kind: "member", id: "user-ada" } });
+  });
+
+  it("refuses a member with no credits left", async () => {
+    const result = await guardRequest(post({ cookie: "session=bob" }), LIMITS, hostedEnv());
+    expect(!result.ok && result.response.status).toBe(402);
+    if (!result.ok) expect(await result.response.json()).toMatchObject({ code: "out_of_credits" });
+  });
+
+  it("refuses a session over its daily cap, and passes one under it", async () => {
+    const env = (left: number | null): GuardEnv => ({
+      ...hostedEnv(),
+      async member(req) {
+        const id = SESSIONS[req.headers.get("cookie") ?? ""];
+        return id ? { id, sessionId: `${id}:mac` } : null;
+      },
+      capLeft: async (caller) => (caller.sessionId === "user-ada:mac" ? left : null),
+    });
+    const over = await guardRequest(post({ cookie: "session=ada" }), LIMITS, env(0));
+    expect(!over.ok && over.response.status).toBe(402);
+    if (!over.ok) expect(await over.response.json()).toMatchObject({ code: "over_daily_cap" });
+    const under = await guardRequest(post({ cookie: "session=ada" }), LIMITS, env(5));
+    expect(under).toMatchObject({ ok: true, caller: { kind: "member", id: "user-ada", sessionId: "user-ada:mac" } });
+    expect((await guardRequest(post({ cookie: "session=ada" }), LIMITS, env(null))).ok).toBe(true);
+  });
+
+  it("lets a member run only a few requests at once, and frees each slot when it's done", async () => {
+    const env = { ...hostedEnv(), store: createMemoryCounters() };
+    const roomy = { ...LIMITS, perClient: { max: 100, windowSeconds: 60 }, global: { max: 100, windowSeconds: 60 } };
+    const running = [];
+    for (let i = 0; i < MAX_IN_FLIGHT; i++) {
+      const result = await guardRequest(post({ cookie: "session=ada" }), roomy, env);
+      expect(result.ok).toBe(true);
+      running.push(result);
+    }
+    const extra = await guardRequest(post({ cookie: "session=ada" }), roomy, env);
+    expect(!extra.ok && extra.response.status).toBe(429);
+    const first = running[0]!;
+    if (first.ok) {
+      await first.done();
+      await first.done();
+    }
+    expect((await guardRequest(post({ cookie: "session=ada" }), roomy, env)).ok).toBe(true);
+    expect((await guardRequest(post({ cookie: "session=ada" }), roomy, env)).ok).toBe(false);
+  });
+
+  it("doesn't check credits or slots for our scripts", async () => {
+    const env = { ...hostedEnv(), balance: () => Promise.reject(new Error("no ledger")) };
+    expect((await guardRequest(post(), LIMITS, env)).ok).toBe(true);
+  });
+
+  it("refuses while credits can't be looked up", async () => {
+    const env = { ...hostedEnv(), balance: () => Promise.reject(new Error("database down")) };
+    const result = await guardRequest(post({ cookie: "session=ada" }), LIMITS, env);
+    expect(!result.ok && result.response.status).toBe(503);
+  });
+
+  it("tells a caller with neither a session nor the token to join the Club", async () => {
+    const result = await guardRequest(post({ auth: null, cookie: "session=stranger" }), LIMITS, hostedEnv());
+    expect(!result.ok && result.response.status).toBe(401);
+    if (!result.ok) expect(await result.response.json()).toMatchObject({ code: "not_a_member" });
+  });
+
+  it("refuses another site spending a member's session", async () => {
+    const result = await guardRequest(post({ cookie: "session=ada", origin: "https://evil.example" }), LIMITS, hostedEnv());
+    expect(!result.ok && result.response.status).toBe(403);
+  });
+
+  it("counts a member's requests together, whatever their address", async () => {
+    const env = hostedEnv();
+    expect((await guardRequest(post({ cookie: "session=ada", ip: "1.1.1.1" }), LIMITS, env)).ok).toBe(true);
+    expect((await guardRequest(post({ cookie: "session=ada", ip: "2.2.2.2" }), LIMITS, env)).ok).toBe(true);
+    const third = await guardRequest(post({ cookie: "session=ada", ip: "3.3.3.3" }), LIMITS, env);
+    expect(!third.ok && third.response.status).toBe(429);
+    expect((await guardRequest(post({ cookie: "session=cy", ip: "1.1.1.1" }), LIMITS, env)).ok).toBe(true);
+  });
+
+  it("refuses while sessions can't be looked up", async () => {
+    const env = { ...hostedEnv(), member: () => Promise.reject(new Error("database down")) };
+    const result = await guardRequest(post({ cookie: "session=ada" }), LIMITS, env);
+    expect(!result.ok && result.response.status).toBe(503);
   });
 
   it("refuses a missing or wrong token, hosted or not", async () => {
@@ -105,7 +211,7 @@ describe("guardRequest", () => {
   });
 
   it("refuses when the store fails", async () => {
-    const env = { ...hostedEnv(), store: { hit: () => Promise.reject(new Error("down")) } };
+    const env = { ...hostedEnv(), store: { hit: () => Promise.reject(new Error("down")), release: async () => {} } };
     const result = await guardRequest(post(), LIMITS, env);
     expect(!result.ok && result.response.status).toBe(503);
   });

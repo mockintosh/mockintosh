@@ -1,10 +1,10 @@
 import { Show, onCleanup, onSettled } from "solid-js";
 import type { JSX } from "@mockintosh/ui";
 import { DialogButton, Spacer, createSignal } from "@mockintosh/ui";
-import { encodeQR, type Sprite } from "@mockintosh/sdk";
 import type { SignInPollResult, SignInRelay } from "../../platform/types";
 import type { SignInSheetRequest } from "../signIn";
 import { useWindow } from "../windowContext";
+import { QRCode } from "./QRCode.solid";
 
 export interface SignInSheetProps {
   request: SignInSheetRequest;
@@ -17,7 +17,7 @@ export interface SignInSheetProps {
 
 type SheetState =
   | { phase: "starting" }
-  | { phase: "showing"; link: string; browserLink: string; qr: Sprite }
+  | { phase: "showing"; link: string; browserLink: string }
   | { phase: "expired" }
   | { phase: "failed"; message: string };
 
@@ -25,23 +25,6 @@ type SheetState =
 const QR_BOX = 148;
 const PADDING = 12;
 const GAP = 12;
-/** White modules around the code that scanners need. */
-const QUIET_MODULES = 4;
-
-function qrScale(qr: Sprite): number {
-  return Math.max(1, Math.floor(QR_BOX / (qr.width + QUIET_MODULES * 2)));
-}
-
-function qrPixels(qr: Sprite, scale: number): Uint8Array {
-  const size = qr.width * scale;
-  const pixels = new Uint8Array(size * size);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      pixels[y * size + x] = qr.data[Math.floor(y / scale) * qr.width + Math.floor(x / scale)];
-    }
-  }
-  return pixels;
-}
 
 /**
  * The system sign-in sheet: pairs with the relay, shows the QR code the user
@@ -78,7 +61,7 @@ export function SignInSheet(props: SignInSheetProps): JSX.Element {
     try {
       const pairing = await props.relay.start({ url: props.request.url, appTitle: props.request.appTitle });
       if (!live()) return;
-      setState({ phase: "showing", link: pairing.link, browserLink: pairing.browserLink, qr: encodeQR(pairing.link) });
+      setState({ phase: "showing", link: pairing.link, browserLink: pairing.browserLink });
       const deadline = Date.now() + pairing.expiresInMs;
       const poll = async () => {
         if (!live()) return;
@@ -139,20 +122,9 @@ export function SignInSheet(props: SignInSheetProps): JSX.Element {
             </text>
           }
         >
-          {(s) => {
-            const scale = qrScale(s().qr);
-            const size = s().qr.width * scale;
-            const pixels = qrPixels(s().qr, scale);
-            return (
-              <raster
-                semantic={{ name: "sign-in-qr", role: "image", value: s().link }}
-                width={size}
-                height={size}
-                onClick={() => props.openExternal?.(s().browserLink)}
-                onPaint={({ blitPixels }) => blitPixels(pixels, size, size)}
-              />
-            );
-          }}
+          {(s) => (
+            <QRCode link={s().link} box={QR_BOX} name="sign-in-qr" onClick={() => props.openExternal?.(s().browserLink)} />
+          )}
         </Show>
       </box>
       <box width={textWidth()} flexDirection="column" gap={6}>

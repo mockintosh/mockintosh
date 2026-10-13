@@ -268,11 +268,19 @@ async function writeManifest(fs: FileSystem, manifest: AppManifest): Promise<FSF
   });
 }
 
+/**
+ * The startup disk's Desktop Folder: an install's shortcut is the Mac's, like
+ * the install, not on a member's home disk.
+ */
+function startupDesktop(fs: FileSystem) {
+  return fs.locate("desktop", fs.locate("volume")?.id);
+}
+
+/** Apps with a shortcut anywhere on the desktop (every mounted disk's Desktop Folder). */
 async function desktopShortcutAppIds(fs: FileSystem): Promise<Set<string>> {
   const ids = new Set<string>();
-  const desktop = fs.locate("desktop");
-  if (!desktop) return ids;
-  for (const node of fs.children(desktop.id)) {
+  const desktops = fs.volumes().flatMap((v) => fs.locate("desktop", v.id) ?? []);
+  for (const node of desktops.flatMap((desktop) => fs.children(desktop.id))) {
     if (node.kind !== "file" || node.type !== MIME.appShortcut) continue;
     const shortcut = await fs.readJSON<{ appId?: string }>(node.id);
     if (shortcut?.appId) ids.add(shortcut.appId);
@@ -282,7 +290,7 @@ async function desktopShortcutAppIds(fs: FileSystem): Promise<Set<string>> {
 
 /** A Finder icon for an install, unless the desktop already has one for this app. */
 async function ensureDesktopShortcut(fs: FileSystem, manifest: AppManifest): Promise<void> {
-  const desktop = fs.locate("desktop");
+  const desktop = startupDesktop(fs);
   if (!desktop) return;
   if ((await desktopShortcutAppIds(fs)).has(manifest.id)) return;
   const name = fitName(manifest.title);

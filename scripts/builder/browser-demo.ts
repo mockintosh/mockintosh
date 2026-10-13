@@ -17,7 +17,7 @@ const server = await createServer({server: {port: 0, hmr: false, ws: false}, plu
           import "/src/systemApps.ts";
           import {createWebPlatform} from "/src/platform/web/index.ts";
           import {bootOS} from "/src/os/boot.ts";
-          const os = await bootOS(createWebPlatform({root: document.getElementById("root"), width: 512, height: 342}));
+          const os = await bootOS(createWebPlatform({root: document.getElementById("root"), width: 512, height: 342, host: {club: null, ai: "key"}}));
           const caller = os.kernel.createSession();
           window.invoke = (name, args = {}) => os.kernel.invoke(caller, name, args);
         </script>`);

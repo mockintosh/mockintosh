@@ -168,6 +168,7 @@ export default defineConfig({
       "api/**/*.test.ts",
       "apps/**/*.test.ts",
       "sites/ui/src/**/*.test.ts",
+      "sites/club/**/*.test.ts",
     ],
   },
   build: {
