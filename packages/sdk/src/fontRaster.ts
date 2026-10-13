@@ -22,7 +22,7 @@ export interface FontRasterService {
 }
 
 export interface FontRegistryService {
-  /** Install a Decker strike for this boot only (Font/DA Mover). */
+  /** Install a bitmap strike for this boot only (Font/DA Mover). */
   register(name: string, data: string, size?: number): void;
   list(): FontFamilyInfo[];
   /** Call `listener` after any family is installed or removed; returns an unsubscribe. */

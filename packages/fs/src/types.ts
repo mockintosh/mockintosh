@@ -130,8 +130,8 @@ export const MIME = {
   paint: "image/x-macpaint",
   /** Host TrueType / OpenType bytes dropped onto the desktop. */
   truetype: "font/ttf",
-  /** Decker `%%FNT1` strike text. */
-  deckerFont: "application/x-mockintosh-font",
+  /** Font strike record text (`%%MFN1`, or Decker's `%%FNT1`). */
+  bitmapFont: "application/x-mockintosh-font",
   /** Font suitcase (FOND): a family's bitmap strikes and outlines, as JSON. */
   suitcase: "application/x-mockintosh-suitcase",
 } as const;

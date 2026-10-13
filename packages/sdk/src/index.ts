@@ -157,12 +157,12 @@ export type {
 export { readWavChunk, readWavMarkers, setWavChunk, setWavMarkers } from "./wav";
 export type { FontRasterMode, FontRasterOptions, FontRasterService, FontRegistryService } from "./fontRaster";
 export {
-  encodeDeckerFont,
-  decodeDeckerFont,
-  deckerFontFromDraft,
-  draftFromDeckerFont,
-  defaultRasterCharset,
-  deckerOrdinalForCharCode,
+  encodeFont,
+  decodeFont,
+  bitmapFaceFromDraft,
+  draftFromBitmapFace,
+  macRomanCharset,
+  slotForCodePoint,
   getGlyphPixel,
   getGlyphWidth,
   getGlyphIndexForChar,
@@ -187,7 +187,7 @@ export {
 export type {
   FontStrikeDraft,
   FontStrikeGlyph,
-  DeckerFont,
+  BitmapFace,
   FontFamilyInfo,
   FontSuitcase,
   SuitcaseStrike,

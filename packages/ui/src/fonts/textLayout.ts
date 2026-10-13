@@ -10,7 +10,7 @@
  */
 
 import type { CanvasNode } from "../nodes";
-import { textAdvance, type DeckerFont } from "./font";
+import { textAdvance, type BitmapFace } from "./font";
 import { faceMetrics } from "./metrics";
 
 export interface TextLine {
@@ -32,7 +32,7 @@ export interface TextBlock {
   height: number;
   /** Vertical advance from one line to the next (FontInfo ascent + descent + leading). */
   lineHeight: number;
-  /** Strike height of the last line (the Decker cell). */
+  /** Strike height of the last line (the cell). */
   lastLineHeight: number;
 }
 
@@ -46,7 +46,7 @@ export interface TextBlock {
  * - Without `maxWidth`, each paragraph is one line.
  */
 export function layoutText(
-  font: DeckerFont,
+  font: BitmapFace,
   text: string,
   maxWidth?: number
 ): TextBlock {
@@ -75,7 +75,7 @@ export function layoutText(
 }
 
 interface TextLayoutCache {
-  font: DeckerFont;
+  font: BitmapFace;
   text: string;
   maxWidth: number | undefined;
   block: TextBlock;
@@ -89,7 +89,7 @@ const textLayoutCache = new WeakMap<CanvasNode, TextLayoutCache>();
  */
 export function layoutNodeText(
   node: CanvasNode,
-  font: DeckerFont,
+  font: BitmapFace,
   text: string,
   maxWidth?: number,
 ): TextBlock {
@@ -112,12 +112,12 @@ export function lineBoxHeight(block: TextBlock, index: number): number {
   return index >= block.lines.length - 1 ? block.lastLineHeight : block.lineHeight;
 }
 
-function makeLine(font: DeckerFont, text: string, start: number): TextLine {
+function makeLine(font: BitmapFace, text: string, start: number): TextLine {
   return { text, width: text ? textAdvance(font, text) : 0, start };
 }
 
 function wrapParagraph(
-  font: DeckerFont,
+  font: BitmapFace,
   paragraph: string,
   maxWidth: number,
   paragraphStart: number,
@@ -198,7 +198,7 @@ export function lineOfIndex(block: TextBlock, index: number): number {
 /** Where the caret for `index` sits in a block laid out `width` wide and aligned `align`. */
 export function caretPoint(
   block: TextBlock,
-  font: DeckerFont,
+  font: BitmapFace,
   index: number,
   align: "left" | "center" | "right" = "left",
   width: number = block.width,
@@ -214,7 +214,7 @@ export function caretPoint(
 }
 
 /** Caret index in `text` for a click at `x` along the line (half-glyph rule). */
-export function charIndexAtX(font: DeckerFont, text: string, x: number): number {
+export function charIndexAtX(font: BitmapFace, text: string, x: number): number {
   let accumulated = 0;
   for (let i = 0; i < text.length; i++) {
     const cw = textAdvance(font, text[i]!);
@@ -227,7 +227,7 @@ export function charIndexAtX(font: DeckerFont, text: string, x: number): number 
 /** Source index in the original string for a point in a laid-out block. */
 export function indexAtPoint(
   block: TextBlock,
-  font: DeckerFont,
+  font: BitmapFace,
   x: number,
   y: number,
   align: "left" | "center" | "right" = "left",

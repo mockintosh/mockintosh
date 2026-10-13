@@ -7,7 +7,7 @@ export function ExamplesPage(): JSX.Element {
   return (
     <box flexDirection="column" gap={16} padding={8}>
       <box flexDirection="column" gap={8}>
-        <text font="pixel">Examples</text>
+        <text font="geist">Examples</text>
         <text font="body" wrap selectable>
           Composed widgets. More examples later — start with this form.
         </text>

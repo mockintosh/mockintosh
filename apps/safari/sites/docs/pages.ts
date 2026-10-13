@@ -162,7 +162,11 @@ Mockintosh's Font Manager works the way System 7's did. A family holds bitmap fo
 
 ## Built in
 
-Chicago, Geneva, Monaco and New York; the city fonts (Venice, London, Athens, San Francisco, Toronto, Cairo, Los Angeles); Lisa; Geist Pixel; Jiskan; and Redaction at 10, 14, 20, 29, 50 and 100 points in Regular, Bold and Italic.
+Chicago, Geneva, Monaco and New York, and the city fonts (Venice, London, Athens, San Francisco, Toronto, Cairo, Los Angeles).
+
+## Font library
+
+Redaction, Geist, Lisa and Jiskan aren't built in. Install them from the Fonts section of the App Store, which puts each suitcase in **System Folder › Fonts**.
 
 ## Choosing a face
 

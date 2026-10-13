@@ -3,7 +3,8 @@
  * System 7.0.1's NFNT 5478 (FOND 0, size 12), identical to System 6.0.8's
  * FONT 12. Per character code: [image width, offset, advance] — the image
  * starts `offset` pixels right of the pen, which then moves `advance`.
- * The glyph images themselves are the vendored strike's, which match Apple's.
+ * The strike itself is imported from System 7.5.3 (`faces/system/chicago_12.ts`);
+ * this table is the reference its tests check placement against.
  */
 export const CHICAGO_12_NFNT: Readonly<Record<number, readonly [number, number, number]>> = {
   32: [0, 4, 4], // space

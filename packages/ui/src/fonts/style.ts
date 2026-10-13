@@ -4,10 +4,10 @@ import {
   outline as outlineFace,
   type Style,
 } from "@mockintosh/quickdraw";
-import type { DeckerFont } from "./font";
+import type { BitmapFace } from "./font";
 import { carryAdvances, getGlyphPixel, getGlyphWidth } from "./font";
-import { smearDeckerFontBold } from "./boldSmear";
-import { outlineDeckerFont, padDeckerShadow } from "./outlineSmear";
+import { smearBitmapFaceBold } from "./boldSmear";
+import { outlineBitmapFace, padShadow } from "./outlineSmear";
 import { getRealFace, requireFont, spacedFontName } from "./registry";
 
 /**
@@ -30,8 +30,8 @@ const STYLE_ITALIC = 2;
 const STYLE_OUTLINE = 4;
 const STYLE_SHADOW = 8;
 
-let styleCache: WeakMap<DeckerFont, Map<number, DeckerFont>> | undefined;
-function styleCacheMap(): WeakMap<DeckerFont, Map<number, DeckerFont>> {
+let styleCache: WeakMap<BitmapFace, Map<number, BitmapFace>> | undefined;
+function styleCacheMap(): WeakMap<BitmapFace, Map<number, BitmapFace>> {
   return (styleCache ??= new WeakMap());
 }
 
@@ -58,7 +58,7 @@ export function fontSizeFromProps(props: Record<string, unknown> | undefined): n
 }
 
 /** Named face + optional native size + style extras, as `<text>` measures it. */
-export function fontFromProps(props: Record<string, unknown> | undefined): DeckerFont {
+export function fontFromProps(props: Record<string, unknown> | undefined): BitmapFace {
   return resolveFont(fontNameFromProps(props), fontStyleFromProps(props), fontSizeFromProps(props));
 }
 
@@ -81,12 +81,12 @@ function styleBits(style: FontStyle): number {
 }
 
 /**
- * The Decker face used for measure / wrap / selection.
+ * The bitmap face used for measure / wrap / selection.
  * Bold smears 1px; italic grows the advance 1px (FM `extra`).
  * Outline grows the cell 2px. Shadow is outline plus 1px right and down.
  * FontInfo stays on the base name. Drawing uses {@link textFace}.
  */
-export function resolveFont(name: string = "body", style: FontStyle = {}, size?: number): DeckerFont {
+export function resolveFont(name: string = "body", style: FontStyle = {}, size?: number): BitmapFace {
   // A real Bold / Italic face (suitcase strike or outline) replaces the smear / slant.
   const wanted = (style.bold ? STYLE_BOLD : 0) | (style.italic ? STYLE_ITALIC : 0);
   const real = wanted ? getRealFace(name, wanted, size) : null;
@@ -109,17 +109,23 @@ export function resolveFont(name: string = "body", style: FontStyle = {}, size?:
   const cached = byStyle.get(bits);
   if (cached) return cached;
 
-  let next = base;
-  if (style.bold) next = smearDeckerFontBold(next, base.name);
-  if (style.italic) next = widenDeckerAdvance(next, 1, base.name);
-  if (style.outline || style.shadow) next = outlineDeckerFont(next, base.name);
-  if (style.shadow) next = padDeckerShadow(next, base.name);
+  const restyle = (strike: BitmapFace): BitmapFace => {
+    let next = strike;
+    if (style.bold) next = smearBitmapFaceBold(next, base.name);
+    if (style.italic) next = widenAdvance(next, 1, base.name);
+    if (style.outline || style.shadow) next = outlineBitmapFace(next, base.name);
+    if (style.shadow) next = padShadow(next, base.name);
+    return next;
+  };
+  const next = restyle(base);
+  // A bitmap face's other pages take the same style, so measuring matches drawing.
+  if (base.pages) next.pages = new Map([...base.pages].map(([page, strike]) => [page, restyle(strike)]));
   byStyle.set(bits, next);
   return next;
 }
 
 /** Font Manager italic/bold `extra`: each glyph advance grows, pixels stay. */
-export function widenDeckerAdvance(font: DeckerFont, extra: number, name: string): DeckerFont {
+export function widenAdvance(font: BitmapFace, extra: number, name: string): BitmapFace {
   if (extra < 1) return font;
   const maxWidth = font.maxWidth + extra;
   const glyphHeight = font.glyphHeight;
@@ -154,7 +160,6 @@ export function widenDeckerAdvance(font: DeckerFont, extra: number, name: string
     glyphWidths,
     glyphData,
     ...carryAdvances(font, glyphWidths),
-    sourceFormat: "FNT1",
     outlinePad: font.outlinePad,
     shadowPad: font.shadowPad,
   };

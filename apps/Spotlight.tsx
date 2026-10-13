@@ -77,7 +77,7 @@ const KIND_BY_TYPE: Readonly<Record<string, string>> = {
   [MIME.canvas]: "Canvas drawing",
   [MIME.paint]: "MacPaint picture",
   [MIME.truetype]: "TrueType font",
-  [MIME.deckerFont]: "Bitmap font",
+  [MIME.bitmapFont]: "Bitmap font",
   [MIME.suitcase]: "Font suitcase",
   "image/png": "PNG image",
   "image/jpeg": "JPEG image",

@@ -1,17 +1,21 @@
 /**
  * Map lettering, drawn straight into the map's bitmap from the system's
  * bitmap fonts, with a one-pixel white halo so a name stays legible over
- * roads and patterns. Italic (water) is the Font Manager's slant, applied
- * here because a strike's pixels are upright; street names along north–south
+ * roads and patterns. Italic (water) is the face's own italic strike where it
+ * has one (Geneva 9, from System 7.5.3), else the Font Manager's slant,
+ * applied here because a strike's pixels are upright; street names along north–south
  * roads are turned to read upwards.
  */
 import {
-  getGlyphIndexForChar,
   getGlyphPixel,
   getGlyphWidth,
+  getRealFace,
   glyphAdvance,
   glyphOriginX,
+  locateGlyph,
+  lookalikeGlyph,
   resolveFont,
+  type BitmapFace,
 } from "@mockintosh/ui";
 import type { Bitmap } from "./bitmap";
 
@@ -37,22 +41,39 @@ interface LabelImage {
   halo: Uint8Array;
 }
 
-/** The glyph `getGlyphIndexForChar` falls back to for a character the font lacks. */
-const QUESTION = "?".charCodeAt(0);
-
 /** Letters no system font draws, for the ones `normalize("NFD")` can't take apart. */
 const PLAIN: Readonly<Record<string, string>> = {
   ł: "l", Ł: "L", đ: "d", Đ: "D", ħ: "h", Ħ: "H", ı: "i", ŀ: "l", Ŀ: "L", ŧ: "t", Ŧ: "T", ð: "d", Ð: "D",
   þ: "th", Þ: "Th", ə: "e", Ə: "E", ʻ: "'", ʼ: "'", "‐": "-",
 };
 
-function face(f: LabelFace) {
-  return resolveFont(f.font, {}, f.size);
+/** QuickDraw's italic style bit. */
+const ITALIC = 2;
+
+/** The face's own italic strike, when `f` asks for italic and the family has one. */
+function realItalic(f: LabelFace): BitmapFace | null {
+  if (!f.italic) return null;
+  const real = getRealFace(f.font, ITALIC, f.size);
+  return real && real.covered & ITALIC ? real.font : null;
 }
 
-function hasGlyph(font: ReturnType<typeof resolveFont>, ch: string): boolean {
-  const index = getGlyphIndexForChar(font, ch);
-  return index >= 0 && (index !== QUESTION || ch === "?");
+function face(f: LabelFace): BitmapFace {
+  return realItalic(f) ?? resolveFont(f.font, {}, f.size);
+}
+
+/** Italic still to slant here: asked for, and no italic strike draws it. */
+function slanted(f: LabelFace): boolean {
+  return Boolean(f.italic) && !realItalic(f);
+}
+
+/** The strike and slot that draw `ch` (its page, or a look-alike), or undefined. */
+function glyphOf(font: BitmapFace, ch: string): { font: BitmapFace; ordinal: number } | undefined {
+  const cp = ch.codePointAt(0)!;
+  return locateGlyph(font, cp) ?? lookalikeGlyph(font, cp);
+}
+
+function hasGlyph(font: BitmapFace, ch: string): boolean {
+  return glyphOf(font, ch) !== undefined;
 }
 
 /**
@@ -62,7 +83,7 @@ function hasGlyph(font: ReturnType<typeof resolveFont>, ch: string): boolean {
  */
 export function printable(text: string, labelFace: LabelFace): string | null {
   // Every frame of a new zoom asks again for the same names; each is worked out once.
-  const key = `${labelFace.font}|${labelFace.size ?? ""}|${labelFace.upper ? 1 : 0}|${text}`;
+  const key = `${labelFace.font}|${labelFace.size ?? ""}|${labelFace.italic ? 1 : 0}|${labelFace.upper ? 1 : 0}|${text}`;
   const known = printed.get(key);
   if (known !== undefined) return known;
   const result = printableNow(text, labelFace);
@@ -112,26 +133,45 @@ function render(text: string, labelFace: LabelFace): LabelImage {
   }
   const font = face(labelFace);
   const cellHeight = font.glyphHeight;
-  const lean = labelFace.italic ? slant(0, cellHeight) : 0;
-  const textWidth = advance(text, labelFace);
-  const width = textWidth + lean + 3;
-  const height = cellHeight + 2;
-  const ink = new Uint8Array(width * height);
-  let pen = 1;
-  for (const ch of text) {
-    const index = getGlyphIndexForChar(font, ch);
-    if (index < 0) continue;
-    const glyphWidth = getGlyphWidth(font, index);
-    const left = pen - glyphOriginX(font, index);
-    for (let gy = 0; gy < cellHeight; gy++) {
-      const shift = labelFace.italic ? slant(gy, cellHeight) : 0;
-      for (let gx = 0; gx < glyphWidth; gx++) {
-        if (!getGlyphPixel(font, index, gx, gy)) continue;
-        const x = left + gx + shift;
-        if (x >= 0 && x < width) ink[(gy + 1) * width + x] = 1;
+  const glyphs = [...text].map((ch) => glyphOf(font, ch));
+  // Accents on capitals can stand above the cell (Apple's strikes keep them
+  // there); the box grows only by the rows this text actually inks.
+  let top = 0;
+  let bottom = cellHeight;
+  for (const glyph of glyphs) {
+    if (!glyph) continue;
+    const rowsAbove = glyph.font.inkAbove ?? 0;
+    const rowsBelow = glyph.font.inkBelow ?? 0;
+    for (let gy = -rowsAbove; gy < cellHeight + rowsBelow; gy++) {
+      if (gy >= top && gy < bottom) continue;
+      for (let gx = 0; gx < getGlyphWidth(glyph.font, glyph.ordinal); gx++) {
+        if (!getGlyphPixel(glyph.font, glyph.ordinal, gx, gy)) continue;
+        top = Math.min(top, gy);
+        bottom = Math.max(bottom, gy + 1);
+        break;
       }
     }
-    pen += glyphAdvance(font, index) + font.spacing + (labelFace.tracking ?? 0);
+  }
+  const lean = slanted(labelFace) ? slant(top, cellHeight) : 0;
+  const textWidth = advance(text, labelFace);
+  const width = textWidth + lean + 3;
+  const height = bottom - top + 2;
+  const ink = new Uint8Array(width * height);
+  let pen = 1;
+  for (const glyph of glyphs) {
+    if (!glyph) continue;
+    const { font: strike, ordinal } = glyph;
+    const glyphWidth = getGlyphWidth(strike, ordinal);
+    const left = pen - glyphOriginX(strike, ordinal);
+    for (let gy = top; gy < bottom; gy++) {
+      const shift = lean ? slant(gy, cellHeight) : 0;
+      for (let gx = 0; gx < glyphWidth; gx++) {
+        if (!getGlyphPixel(strike, ordinal, gx, gy)) continue;
+        const x = left + gx + shift;
+        if (x >= 0 && x < width) ink[(gy - top + 1) * width + x] = 1;
+      }
+    }
+    pen += glyphAdvance(strike, ordinal) + font.spacing + (labelFace.tracking ?? 0);
   }
   const halo = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {
@@ -157,8 +197,8 @@ function advance(text: string, labelFace: LabelFace): number {
   const font = face(labelFace);
   let width = 0;
   for (const ch of text) {
-    const index = getGlyphIndexForChar(font, ch);
-    if (index >= 0) width += glyphAdvance(font, index) + font.spacing + (labelFace.tracking ?? 0);
+    const glyph = glyphOf(font, ch);
+    if (glyph) width += glyphAdvance(glyph.font, glyph.ordinal) + font.spacing + (labelFace.tracking ?? 0);
   }
   return width - font.spacing - (labelFace.tracking ?? 0);
 }

@@ -3,14 +3,15 @@
  * a FOND with its `'NFNT'` strikes and `'sfnt'` outlines.
  *
  * On disk a suitcase is JSON (`.suit`): hand-tuned bitmap strikes as
- * `%%FNT1` records, outlines as base64 TrueType / OpenType bytes, both
+ * font records (`codec.ts`), outlines as base64 TrueType / OpenType bytes, both
  * tagged with their style (1 bold, 2 italic), plus the family's scaler
  * switches. Installing registers everything with the Font Manager.
  */
 
 import { decodeBase64, encodeBase64 } from "../base64";
+import { isFontRecord } from "./codec";
 import type { FamilyScalerSettings } from "./outlineStrike";
-import { familyKey, registerFont, registerOutlineFace, registerStyledStrike } from "./registry";
+import { familyKey, nameFamily, registerOutlineFace, registerStyledStrike } from "./registry";
 import { OutlineFace } from "./truetype/scaler";
 
 const SUITCASE_FORMAT = "mockintosh-suitcase";
@@ -23,8 +24,10 @@ export interface SuitcaseStrike {
   size: number;
   /** 0 plain, 1 bold, 2 italic, 3 bold italic. */
   style: number;
-  /** `%%FNT1` record. */
+  /** Font record (`%%MFN1`, or a Decker `%%FNT1`). */
   data: string;
+  /** The strike's FontInfo, as its FONT header had it. */
+  info?: { ascent: number; descent: number; leading: number };
 }
 
 export interface SuitcaseOutline {
@@ -36,6 +39,8 @@ export interface SuitcaseOutline {
 export interface FontSuitcase {
   /** Name shown in font menus. */
   family: string;
+  /** The size a font menu picks the family at; else its last plain strike's. */
+  defaultSize?: number;
   strikes: SuitcaseStrike[];
   outlines: SuitcaseOutline[];
   settings?: Partial<Pick<FamilyScalerSettings, "kerning" | "hint" | "dropout" | "preserveGlyph" | "preferOutline">>;
@@ -45,6 +50,7 @@ interface SuitcaseJson {
   format: typeof SUITCASE_FORMAT;
   version: 1;
   family: string;
+  defaultSize?: number;
   strikes: SuitcaseStrike[];
   outlines: { style: number; data: string }[];
   settings?: FontSuitcase["settings"];
@@ -55,6 +61,7 @@ export function encodeSuitcase(suitcase: FontSuitcase): string {
     format: SUITCASE_FORMAT,
     version: 1,
     family: suitcase.family,
+    ...(suitcase.defaultSize ? { defaultSize: suitcase.defaultSize } : {}),
     strikes: [...suitcase.strikes].sort((a, b) => a.style - b.style || a.size - b.size),
     outlines: suitcase.outlines.map((o) => ({ style: o.style, data: encodeBase64(o.bytes) })),
     ...(suitcase.settings ? { settings: suitcase.settings } : {}),
@@ -73,12 +80,13 @@ export function decodeSuitcase(text: string): FontSuitcase {
     throw new Error("This isn't a font suitcase.");
   }
   const strikes = (json.strikes ?? []).filter(
-    (s) => typeof s?.data === "string" && s.data.startsWith("%%FNT") && Number.isFinite(s.size),
+    (s) => typeof s?.data === "string" && isFontRecord(s.data) && Number.isFinite(s.size),
   );
   const outlines = (json.outlines ?? [])
     .filter((o) => typeof o?.data === "string")
     .map((o) => ({ style: (o.style | 0) & 3, bytes: decodeBase64(o.data) }));
-  return { family: json.family, strikes, outlines, settings: json.settings };
+  const defaultSize = Number.isFinite(json.defaultSize) ? json.defaultSize : undefined;
+  return { family: json.family, ...(defaultSize ? { defaultSize } : {}), strikes, outlines, settings: json.settings };
 }
 
 /** Registry key a suitcase installs under. */
@@ -101,10 +109,12 @@ export function installSuitcase(suitcase: FontSuitcase): string {
       settings: suitcase.settings,
     });
   }
-  for (const strike of suitcase.strikes) {
-    if (strike.style) registerStyledStrike(family, strike.size, strike.data, strike.style & 3);
-    else registerFont(family, strike.data, strike.size);
+  // The family's default size is its last plain strike's: register the default one last.
+  const last = (s: SuitcaseStrike) => Number(!s.style && s.size === suitcase.defaultSize);
+  for (const strike of [...suitcase.strikes].sort((a, b) => last(a) - last(b))) {
+    registerStyledStrike(family, strike.size, strike.data, strike.style & 3, strike.info);
   }
+  if (suitcase.strikes.length) nameFamily(family, suitcase.family);
   return family;
 }
 

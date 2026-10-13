@@ -13,7 +13,7 @@ describe("Canvas font sizes", () => {
 
   it("lists every family by name and checks a role font under its family", () => {
     const menu = fontMenu(listFontFamilies()).map((f) => f.displayName);
-    expect(menu).toEqual(expect.arrayContaining(["Chicago", "Geneva", "New York", "San Francisco", "Venice", "Geist Pixel"]));
+    expect(menu).toEqual(expect.arrayContaining(["Chicago", "Geneva", "New York", "San Francisco", "Venice", "Los Angeles"]));
     expect(menu).toEqual([...menu].sort((a, b) => a.localeCompare(b)));
     expect(fontFamilyOf("body")).toBe("geneva");
     expect(fontLabel("menu", listFontFamilies())).toBe("Chicago");

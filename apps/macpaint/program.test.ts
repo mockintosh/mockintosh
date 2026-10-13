@@ -68,7 +68,7 @@ function boot(): Harness {
       return { id: "saved", name };
     },
     printPage: async () => {},
-    fontNames: () => ["chicago", "geneva", "newYork", "monaco", "venice", "london", "athens", "sanFrancisco", "toronto", "cairo", "losAngeles", "lisa", "pixel"],
+    fontNames: () => ["chicago", "geneva", "newYork", "monaco", "venice", "london", "athens", "sanFrancisco", "toronto", "cairo", "losAngeles"],
     fontNumber: (name) => fontFamilyId(name),
     applicationFont: () => "geneva",
   };

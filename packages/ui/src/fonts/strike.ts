@@ -1,5 +1,5 @@
 /**
- * Decker → `FontStrike` and the host `_SwapFont`.
+ * Bitmap faces → `FontStrike` and the host `_SwapFont`.
  *
  * Family numbering, size fallback, baseline (ascent = glyph cell height),
  * and style synthesis live here — not in `@mockintosh/quickdraw`.
@@ -27,10 +27,15 @@ import {
   glyphAdvance,
   glyphOriginX,
   hasGlyph,
-  ordinalForCharCode,
-  type DeckerFont,
+  isPaged,
+  locateGlyph,
+  lookalikeGlyph,
+  missingGlyphIndex,
+  type BitmapFace,
 } from "./font";
-import { getFontForScaling, getRealFace, requireFont } from "./registry";
+import { MISSING_SLOT } from "./charmap";
+import { pageFaceKey } from "./outlineStrike";
+import { getFontForScaling, getRealFace, requireFont, spacedFontName } from "./registry";
 import { resolveFont } from "./style";
 
 /** `txFont` ids. 0 is the system font (`body`), matching InitPort. */
@@ -92,8 +97,8 @@ export function fontFamilyName(id: number): string {
   return "body";
 }
 
-/** QuickDraw strike metrics. Baseline is the bottom of the Decker cell. */
-export function uiFontMetrics(font: DeckerFont): UiFontMetrics {
+/** QuickDraw strike metrics. Baseline is the bottom of the cell. */
+export function uiFontMetrics(font: BitmapFace): UiFontMetrics {
   return {
     ascent: font.glyphHeight,
     descent: STRIKE_DESCENT,
@@ -108,24 +113,36 @@ export function fontAscent(fontName: string, size?: number): number {
 }
 
 /**
- * One `DrawText` call's worth of a line: the strike (by `TextFont` name),
- * its ordinals, and where it starts relative to the line's left edge.
+ * One `DrawText` call's worth of a line: the strike, its ordinals, and where
+ * it starts relative to the line's left edge. `faceKey` is the `TextFont`
+ * name that draws it; undefined keeps the caller's font (page 0 of a bitmap face).
  */
 export interface UiTextRun {
-  faceKey: string;
-  font: DeckerFont;
+  faceKey?: string;
+  font: BitmapFace;
   bytes: number[];
   x: number;
 }
 
+/** `TextFont` name for page `page` of a bitmap face. */
+function bitmapPageKey(face: BitmapFace, page: BitmapFace): string | undefined {
+  if (page === face) return undefined;
+  for (const [n, strike] of face.pages ?? []) {
+    if (strike !== page) continue;
+    // Spelled with the face's spacing so a re-spaced face (`menu~s1`) draws its pages re-spaced too.
+    return spacedFontName(pageFaceKey(face.name, n), face.spacing);
+  }
+  return undefined;
+}
+
 /**
- * Split a line into runs for an outline-scaled strike: a new run starts
- * where a character lives on another page strike or where pair kerning
- * moves the pen. Bitmap strikes come back as one run.
+ * Split a line into runs: a new run starts where a character lives on
+ * another page strike or where pair kerning moves the pen. A face that
+ * draws everything from page 0 comes back as one run.
  */
-export function uiTextRuns(font: DeckerFont, text: string): UiTextRun[] {
+export function uiTextRuns(font: BitmapFace, text: string): UiTextRun[] {
+  if (!isPaged(font)) return [{ font, bytes: encodeUiText(font, text), x: 0 }];
   const src = font.outline;
-  if (!src) return [{ faceKey: font.name, font, bytes: encodeUiText(font, text), x: 0 }];
   const runs: UiTextRun[] = [];
   let run: UiTextRun | undefined;
   let pen = 0;
@@ -135,13 +152,13 @@ export function uiTextRuns(font: DeckerFont, text: string): UiTextRun[] {
     const wide = cp > 0xffff;
     const ch = wide ? text.slice(i, i + 2) : text[i]!;
     if (wide) i++;
-    const kern = prev >= 0 ? src.kern(prev, cp) : 0;
+    const kern = prev >= 0 && src ? src.kern(prev, cp) : 0;
     prev = cp;
     pen += kern;
-    const hit = src.locate(cp);
+    const hit = locateGlyph(font, cp) ?? lookalikeGlyph(font, cp);
     const target = hit?.font ?? font;
     const ordinal = hit?.ordinal ?? Math.max(0, getGlyphIndexForChar(font, ch));
-    const key = target.outline?.faceKey ?? src.faceKey;
+    const key = src ? (target.outline?.faceKey ?? src.faceKey) : bitmapPageKey(font, target);
     if (!run || run.faceKey !== key || kern !== 0) {
       run = { faceKey: key, font: target, bytes: [], x: pen };
       runs.push(run);
@@ -154,10 +171,10 @@ export function uiTextRuns(font: DeckerFont, text: string): UiTextRun[] {
 
 /**
  * `MoveTo` + `DrawText` for one line at `baseline` (the cell bottom).
- * Outline strikes switch `TextFont` per page run, then restore it.
+ * A run on another page strike switches `TextFont` for that run, then restores it.
  */
-export function drawUiText(font: DeckerFont, text: string, x: number, baseline: number): void {
-  if (!font.outline) {
+export function drawUiText(font: BitmapFace, text: string, x: number, baseline: number): void {
+  if (!isPaged(font)) {
     const bytes = encodeUiText(font, text);
     MoveTo(x, baseline);
     DrawText(bytes, 0, bytes.length);
@@ -165,36 +182,37 @@ export function drawUiText(font: DeckerFont, text: string, x: number, baseline: 
   }
   const saved = globals.thePort?.txFont;
   for (const run of uiTextRuns(font, text)) {
-    TextFont(fontFamilyId(run.faceKey));
+    if (run.faceKey !== undefined) TextFont(fontFamilyId(run.faceKey));
+    else if (saved !== undefined) TextFont(saved);
     MoveTo(x + run.x, baseline);
     DrawText(run.bytes, 0, run.bytes.length);
   }
   if (saved !== undefined) TextFont(saved);
 }
 
-/** Map a JS string to Decker/MacRoman ordinals for `DrawText`. */
-export function encodeUiText(font: DeckerFont, text: string): number[] {
+/** Map a JS string to page-0 slots for `DrawText`. */
+export function encodeUiText(font: BitmapFace, text: string): number[] {
   const out: number[] = new Array(text.length);
   for (let i = 0; i < text.length; i++) {
     const idx = getGlyphIndexForChar(font, text[i]!);
-    out[i] = idx < 0 ? 0 : idx;
+    out[i] = idx < 0 ? MISSING_SLOT : idx;
   }
   return out;
 }
 
-const strikeCache = new WeakMap<DeckerFont, FontStrike>();
+const strikeCache = new WeakMap<BitmapFace, FontStrike>();
 
-function ordinalAdvance(font: DeckerFont, ord: number): number {
-  const idx = hasGlyph(font, ord) ? ord : hasGlyph(font, 63) ? 63 : -1;
+function ordinalAdvance(font: BitmapFace, ord: number): number {
+  const idx = hasGlyph(font, ord) ? ord : missingGlyphIndex(font);
   if (idx < 0) return 0;
   return glyphAdvance(font, idx) + font.spacing;
 }
 
 /**
- * Pack every Decker glyph into a Macintosh kerned strike.
- * Baseline is the bottom of the Decker cell (`ascent = glyphHeight`).
+ * Pack every glyph of a face into a Macintosh kerned strike.
+ * Baseline is the bottom of the cell (`ascent = glyphHeight`).
  */
-export function deckerToStrike(font: DeckerFont): FontStrike {
+export function deckerToStrike(font: BitmapFace): FontStrike {
   const cached = strikeCache.get(font);
   if (cached) return cached;
 
@@ -221,11 +239,13 @@ export function deckerToStrike(font: DeckerFont): FontStrike {
       owTable[ch] = 0x8000;
     }
   }
-  const qCol = hasGlyph(font, 63) ? columns[63]! : col;
-  const qW = hasGlyph(font, 63) ? getGlyphWidth(font, 63) : 0;
+  // The missing-character glyph QuickDraw draws for an empty slot (`lastChar + 1`).
+  const missing = missingGlyphIndex(font);
+  const qCol = missing >= 0 ? columns[missing]! : col;
+  const qW = missing >= 0 ? getGlyphWidth(font, missing) : 0;
   locTable[256] = qCol;
   locTable[257] = qCol + qW;
-  owTable[256] = qW > 0 ? ow(63) : 0x8000;
+  owTable[256] = qW > 0 ? ow(missing) : 0x8000;
   owTable[257] = 0x8000;
 
   const fRectWidth = Math.max(1, col);
@@ -289,9 +309,10 @@ export function deckerToStrike(font: DeckerFont): FontStrike {
         packed[ch] = 1;
         pack(ch);
       }
-      if (!packed[63]) {
-        packed[63] = 1;
-        pack(63);
+      const missingSlot = missingGlyphIndex(font);
+      if (missingSlot >= 0 && !packed[missingSlot]) {
+        packed[missingSlot] = 1;
+        pack(missingSlot);
       }
     };
   }
@@ -316,7 +337,7 @@ function synthesis(face: number, ascent: number): {
   let ulThick = 0;
   let shadowPx = 0;
   if (face & outline) {
-    // Strike is already a hollow ring (`outlineDeckerFont`), including any
+    // Strike is already a hollow ring (`outlineBitmapFace`), including any
     // bold smear. Do not also run DrawText's outline/bold extras.
     italicPx = face & italic ? italicShearUnits(ascent, STRIKE_DESCENT) : 0;
   } else {
@@ -352,7 +373,7 @@ function synthesis(face: number, ascent: number): {
 
 const WIDTH_TABLE_CACHE_SIZE = 12;
 const widthTables = new Map<string, Int32Array>();
-const widthTableFontIds = new WeakMap<DeckerFont, number>();
+const widthTableFontIds = new WeakMap<BitmapFace, number>();
 let nextWidthTableFontId = 1;
 
 /**
@@ -360,7 +381,7 @@ let nextWidthTableFontId = 1;
  * `TextFace` round trip didn't rebuild one. Keyed by strike, style extra,
  * and the port's `spExtra`; treat the result as read-only.
  */
-function cachedWidthTable(font: DeckerFont, extra: number, spExtra: number): Int32Array {
+function cachedWidthTable(font: BitmapFace, extra: number, spExtra: number): Int32Array {
   let id = widthTableFontIds.get(font);
   if (id === undefined) {
     id = nextWidthTableFontId++;
@@ -384,7 +405,7 @@ function cachedWidthTable(font: DeckerFont, extra: number, spExtra: number): Int
 }
 
 /**
- * Host `_SwapFont`: map family/size/face onto a cached Decker strike.
+ * Host `_SwapFont`: map family/size/face onto a cached bitmap strike.
  * `spExtra` is folded into `widthTable[32]` as the original Font Manager did.
  */
 export function hostSwapFont(inRec: FMInput): FMOutput {

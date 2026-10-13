@@ -1,7 +1,6 @@
-import { DROM_CHARS, deckerOrdinalForCharCode } from "./drom";
-import { extraCharForOrdinal, extraOrdinalForCharCode } from "./extraGlyphs";
+import { MISSING_SLOT, charForSlot, pageOfCodePoint, slotForCodePoint } from "./charmap";
 
-export interface DeckerFont {
+export interface BitmapFace {
   name: string;
   /** Native bitmap point size. Role aliases share the family name (geneva, not body). */
   size?: number;
@@ -11,7 +10,6 @@ export interface DeckerFont {
   glyphStride: number;
   glyphWidths: Uint8Array;
   glyphData: Uint8Array;
-  sourceFormat: "FNT0" | "FNT1";
   /** 1px inset reserved so Font Manager outline sits inside the cell. */
   outlinePad?: number;
   /** Extra 1px right/bottom so a south-east drop shadow stays in the cell. */
@@ -35,12 +33,17 @@ export interface DeckerFont {
   fontInfo?: { ascent: number; descent: number; leading: number };
   /** Set on strikes the outline scaler fills one glyph at a time (`outlineStrike.ts`). */
   outline?: OutlineGlyphSource;
+  /**
+   * A bitmap face's other strikes, by page (`charmap.ts`): the characters
+   * outside page 0's 256 slots. Only page 0 carries them.
+   */
+  pages?: ReadonlyMap<number, BitmapFace>;
 }
 
 /**
  * An outline-scaled strike: glyph cells are sized up front from the font's
- * metrics, pixels arrive on first use. Characters outside Decker's 256
- * ordinals live on sibling "page" strikes of the same face and size.
+ * metrics, pixels arrive on first use. Characters outside page 0's 256
+ * slots live on sibling "page" strikes of the same face and size.
  */
 export interface OutlineGlyphSource {
   /** 1 once an ordinal's pixels are in `glyphData`. */
@@ -49,21 +52,16 @@ export interface OutlineGlyphSource {
   /** Name `TextFont` resolves back to this strike (family, plus a page suffix). */
   readonly faceKey: string;
   /** Which strike and ordinal draw `codePoint`; undefined when the face lacks it. */
-  locate(codePoint: number): { font: DeckerFont; ordinal: number } | undefined;
+  locate(codePoint: number): { font: BitmapFace; ordinal: number } | undefined;
   /** Pair kerning in whole pixels (0 when the family turns kerning off). */
   kern(left: number, right: number): number;
 }
 
-const FALLBACK_GLYPH_INDEX = "?".charCodeAt(0);
+const QUESTION_MARK = 63;
 
-/**
- * Glyph ordinal for a UTF-16 code unit: Decker's mapping first, then Mockintosh's extra
- * symbols (`extraGlyphs.ts`); 255 if neither knows the character.
- */
+/** Page-0 slot for a UTF-16 code unit (`charmap.ts`); -1 when it has none. */
 export function ordinalForCharCode(codeUnit: number): number {
-  const deckerOrd = deckerOrdinalForCharCode(codeUnit);
-  if (deckerOrd !== 255) return deckerOrd;
-  return extraOrdinalForCharCode(codeUnit) ?? 255;
+  return slotForCodePoint(codeUnit);
 }
 
 /**
@@ -82,30 +80,54 @@ const LOOKALIKES: ReadonlyMap<number, string> = new Map([
   [0x00d7, "x"],
 ]);
 
-export function getGlyphIndexForChar(font: DeckerFont, ch: string): number {
+export function getGlyphIndexForChar(font: BitmapFace, ch: string): number {
   if (!ch) return -1;
   const code = ch.charCodeAt(0);
   const ord = ordinalForCharCode(code);
-  if (ord !== 255 && hasGlyph(font, ord)) return ord;
+  if (ord >= 0 && hasGlyph(font, ord)) return ord;
   const lookalike = LOOKALIKES.get(code);
-  const lookalikeOrd = lookalike === undefined ? 255 : ordinalForCharCode(lookalike.charCodeAt(0));
-  if (lookalikeOrd !== 255 && hasGlyph(font, lookalikeOrd)) return lookalikeOrd;
-  return font.glyphWidths[FALLBACK_GLYPH_INDEX] > 0 ? FALLBACK_GLYPH_INDEX : -1;
+  const lookalikeOrd = lookalike === undefined ? -1 : ordinalForCharCode(lookalike.charCodeAt(0));
+  if (lookalikeOrd >= 0 && hasGlyph(font, lookalikeOrd)) return lookalikeOrd;
+  return missingGlyphIndex(font);
 }
 
-export function getGlyphWidth(font: DeckerFont, glyphIndex: number): number {
+/** What a strike draws for a character it lacks: its missing-character box, else `?`. */
+export function missingGlyphIndex(font: BitmapFace): number {
+  if (hasGlyph(font, MISSING_SLOT)) return MISSING_SLOT;
+  return hasGlyph(font, QUESTION_MARK) ? QUESTION_MARK : -1;
+}
+
+/**
+ * The strike and slot that draw `codePoint` in this face: page 0, one of its
+ * page strikes, or an outline face's. Undefined when the face lacks it.
+ */
+export function locateGlyph(font: BitmapFace, codePoint: number): { font: BitmapFace; ordinal: number } | undefined {
+  if (font.outline) return font.outline.locate(codePoint);
+  const slot = slotForCodePoint(codePoint);
+  if (slot >= 0) return hasGlyph(font, slot) ? { font, ordinal: slot } : undefined;
+  const page = font.pages?.get(pageOfCodePoint(codePoint));
+  const ordinal = codePoint & 0xff;
+  return page && hasGlyph(page, ordinal) ? { font: page, ordinal } : undefined;
+}
+
+/** Whether a face draws characters beyond its own 256 slots. */
+export function isPaged(font: BitmapFace): boolean {
+  return Boolean(font.outline || font.pages);
+}
+
+export function getGlyphWidth(font: BitmapFace, glyphIndex: number): number {
   if (glyphIndex < 0 || glyphIndex > 255) return 0;
   return font.glyphWidths[glyphIndex] ?? 0;
 }
 
 /** How far the pen moves after a glyph (before `spacing`). */
-export function glyphAdvance(font: DeckerFont, glyphIndex: number): number {
+export function glyphAdvance(font: BitmapFace, glyphIndex: number): number {
   if (glyphIndex < 0 || glyphIndex > 255) return 0;
   return font.advances ? font.advances[glyphIndex]! : (font.glyphWidths[glyphIndex] ?? 0);
 }
 
 /** Columns of a glyph's image that sit left of the pen. */
-export function glyphOriginX(font: DeckerFont, glyphIndex: number): number {
+export function glyphOriginX(font: BitmapFace, glyphIndex: number): number {
   return font.originX?.[glyphIndex] ?? 0;
 }
 
@@ -114,9 +136,9 @@ export function glyphOriginX(font: DeckerFont, glyphIndex: number): number {
  * ring, …) whose cells grew from `base.glyphWidths` to `glyphWidths`.
  */
 export function carryAdvances(
-  base: DeckerFont,
+  base: BitmapFace,
   glyphWidths: Uint8Array,
-): Pick<DeckerFont, "advances" | "originX" | "inkAbove" | "inkBelow"> {
+): Pick<BitmapFace, "advances" | "originX" | "inkAbove" | "inkBelow"> {
   const overflow = base.inkAbove || base.inkBelow ? { inkAbove: base.inkAbove, inkBelow: base.inkBelow } : {};
   if (!base.advances) return overflow;
   const advances = new Uint8Array(256);
@@ -126,16 +148,16 @@ export function carryAdvances(
   return { advances, originX: base.originX, ...overflow };
 }
 
-export function hasGlyph(font: DeckerFont, glyphIndex: number): boolean {
+export function hasGlyph(font: BitmapFace, glyphIndex: number): boolean {
   return getGlyphWidth(font, glyphIndex) > 0;
 }
 
-export function getGlyphDataOffset(font: DeckerFont, glyphIndex: number): number {
+export function getGlyphDataOffset(font: BitmapFace, glyphIndex: number): number {
   return glyphIndex * font.glyphStride;
 }
 
 export function getGlyphPixel(
-  font: DeckerFont,
+  font: BitmapFace,
   glyphIndex: number,
   x: number,
   y: number
@@ -154,11 +176,11 @@ export function getGlyphPixel(
 }
 
 /** Advance of one character, including trailing `spacing` (matches the FM width table). */
-export function charAdvance(font: DeckerFont, ch: string): number {
-  if (font.outline && ch) {
+export function charAdvance(font: BitmapFace, ch: string): number {
+  if (isPaged(font) && ch) {
     const cp = ch.codePointAt(0)!;
     if (cp >= 0xdc00 && cp <= 0xdfff) return 0;
-    const hit = font.outline.locate(cp);
+    const hit = locateGlyph(font, cp) ?? lookalikeGlyph(font, cp);
     if (hit) return glyphAdvance(hit.font, hit.ordinal) + font.spacing;
   }
   const glyphIndex = getGlyphIndexForChar(font, ch);
@@ -166,10 +188,16 @@ export function charAdvance(font: DeckerFont, ch: string): number {
   return glyphAdvance(font, glyphIndex) + font.spacing;
 }
 
+/** A lookalike's glyph for a character the face lacks (curly quote → straight). */
+export function lookalikeGlyph(font: BitmapFace, codePoint: number): { font: BitmapFace; ordinal: number } | undefined {
+  const lookalike = LOOKALIKES.get(codePoint);
+  return lookalike === undefined ? undefined : locateGlyph(font, lookalike.charCodeAt(0));
+}
+
 /** Sum of {@link charAdvance} over `text` plus pair kerning (no newline handling). */
-export function textAdvance(font: DeckerFont, text: string): number {
+export function textAdvance(font: BitmapFace, text: string): number {
   let w = 0;
-  if (!font.outline) {
+  if (!isPaged(font)) {
     for (let i = 0; i < text.length; i++) w += charAdvance(font, text[i]!);
     return w;
   }
@@ -178,20 +206,14 @@ export function textAdvance(font: DeckerFont, text: string): number {
     const cp = text.codePointAt(i)!;
     const ch = cp > 0xffff ? text.slice(i, i + 2) : text[i]!;
     if (cp > 0xffff) i++;
-    if (prev >= 0) w += font.outline.kern(prev, cp);
+    if (prev >= 0 && font.outline) w += font.outline.kern(prev, cp);
     w += charAdvance(font, ch);
     prev = cp;
   }
   return w;
 }
 
-/**
- * The Mac Roman-ish character a Decker ordinal stands for: ASCII, then
- * `DROM_CHARS`, then Mockintosh's extra symbols. Undefined for empty slots.
- */
+/** The character a page-0 slot draws (`charmap.ts`). Undefined for empty slots. */
 export function charForOrdinal(ordinal: number): string | undefined {
-  if (ordinal >= 32 && ordinal <= 126) return String.fromCharCode(ordinal);
-  if (ordinal >= 127 && ordinal < 127 + DROM_CHARS.length) return DROM_CHARS[ordinal - 127];
-  return extraCharForOrdinal(ordinal);
+  return charForSlot(ordinal);
 }
-

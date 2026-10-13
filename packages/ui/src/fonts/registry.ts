@@ -1,13 +1,12 @@
-import type { DeckerFont } from "./font";
-import { decodeDeckerFont } from "./codec";
+import type { BitmapFace } from "./font";
+import { decodeFont } from "./codec";
 import {
   createOutlineStrike,
   parsePageFaceKey,
   type FamilyScalerSettings,
 } from "./outlineStrike";
 import { DEFAULT_SCALER_OPTIONS, OutlineFace } from "./truetype/scaler";
-import { applyExtraGlyphs } from "./extraGlyphs";
-import { applyNfntMetrics } from "./nfnt";
+import { applyExtraGlyphs, ensureMissingGlyph } from "./extraGlyphs";
 import {
   BAKED_STYLE_ALIASES,
   BUILTIN_STRIKES,
@@ -19,24 +18,19 @@ import {
   type FontStrikeSpec,
 } from "./families";
 
-let strikes: Map<string, Map<number, DeckerFont>> | undefined;
+let strikes: Map<string, Map<number, BitmapFace>> | undefined;
 let pendingStrikes: Map<string, Map<number, string>> | undefined;
-let lazyStrikes: Map<string, Map<number, () => Promise<string>>> | undefined;
-let fetchingStrikes: Map<string, Promise<void>> | undefined;
 let pendingBaked: Map<string, { family: string; size: number; data: string }> | undefined;
 let aliases: Map<string, { family: string; size: number }> | undefined;
 let defaults: Map<string, number> | undefined;
 let infoByKey: Map<string, RegisteredFontInfo> | undefined;
-let bakedByName: Map<string, DeckerFont> | undefined;
+let bakedByName: Map<string, BitmapFace> | undefined;
 
-function strikeMap(): Map<string, Map<number, DeckerFont>> {
+function strikeMap(): Map<string, Map<number, BitmapFace>> {
   return (strikes ??= new Map());
 }
 function pendingStrikeMap(): Map<string, Map<number, string>> {
   return (pendingStrikes ??= new Map());
-}
-function lazyStrikeMap(): Map<string, Map<number, () => Promise<string>>> {
-  return (lazyStrikes ??= new Map());
 }
 function pendingBakedMap(): Map<string, { family: string; size: number; data: string }> {
   return (pendingBaked ??= new Map());
@@ -50,7 +44,7 @@ function defaultMap(): Map<string, number> {
 function infoMap(): Map<string, RegisteredFontInfo> {
   return (infoByKey ??= new Map());
 }
-function bakedMap(): Map<string, DeckerFont> {
+function bakedMap(): Map<string, BitmapFace> {
   return (bakedByName ??= new Map());
 }
 
@@ -82,20 +76,23 @@ function parseSpacing(name: string): { family: string; spacing?: number } {
   return Number.isInteger(spacing) ? { family: name.slice(0, at), spacing } : { family: name };
 }
 
-let spacedCache: WeakMap<DeckerFont, Map<number, DeckerFont>> | undefined;
+let spacedCache: WeakMap<BitmapFace, Map<number, BitmapFace>> | undefined;
 
-function withSpacing(font: DeckerFont, spacing: number): DeckerFont {
+function withSpacing(font: BitmapFace, spacing: number): BitmapFace {
   if (font.spacing === spacing) return font;
   spacedCache ??= new WeakMap();
   let bySpacing = spacedCache.get(font);
   if (!bySpacing) spacedCache.set(font, (bySpacing = new Map()));
   let spaced = bySpacing.get(spacing);
-  if (!spaced) bySpacing.set(spacing, (spaced = { ...font, spacing }));
+  if (!spaced) {
+    const pages = font.pages && new Map([...font.pages].map(([n, page]) => [n, withSpacing(page, spacing)]));
+    bySpacing.set(spacing, (spaced = { ...font, spacing, ...(pages ? { pages } : {}) }));
+  }
   return spaced;
 }
 
 /** Look up `name` without its spacing suffix, then re-space the result. */
-function spaced<T extends DeckerFont | null>(name: string, lookup: (family: string) => T): T {
+function spaced<T extends BitmapFace | null>(name: string, lookup: (family: string) => T): T {
   const { family, spacing } = parseSpacing(name);
   const font = lookup(family);
   return (font && spacing !== undefined ? withSpacing(font, spacing) : font) as T;
@@ -105,7 +102,7 @@ export function fontInfoKey(family: string, size: number): string {
   return `${family}/${size}`;
 }
 
-export function lookupFontInfo(font: DeckerFont): RegisteredFontInfo | undefined {
+export function lookupFontInfo(font: BitmapFace): RegisteredFontInfo | undefined {
   if (font.fontInfo) return font.fontInfo;
   if (font.size != null) {
     const sized = infoMap().get(fontInfoKey(font.name, font.size));
@@ -119,40 +116,20 @@ function rememberInfo(family: string, size: number, info: RegisteredFontInfo | u
   infoMap().set(fontInfoKey(family, size), info);
 }
 
-let nfntByKey: Map<string, NonNullable<FontStrikeSpec["nfnt"]>> | undefined;
-function nfntMap(): Map<string, NonNullable<FontStrikeSpec["nfnt"]>> {
-  return (nfntByKey ??= new Map());
+
+function loadStrike(family: string, size: number, data: string): BitmapFace {
+  const font = decodeFont(data, family, { size });
+  return finishFace(font, infoMap().get(fontInfoKey(family, size))?.descent);
 }
 
-let overhangsByKey: Map<string, Readonly<Record<number, readonly [number, number]>>> | undefined;
-function overhangMap(): Map<string, Readonly<Record<number, readonly [number, number]>>> {
-  return (overhangsByKey ??= new Map());
+/** Mockintosh's symbols, and a missing-character box for a face without one. */
+function finishFace(font: BitmapFace, descent: number | undefined): BitmapFace {
+  applyExtraGlyphs(font);
+  ensureMissingGlyph(font, descent ?? font.fontInfo?.descent ?? Math.max(1, Math.round(font.glyphHeight / 5)));
+  return font;
 }
 
-function loadStrike(family: string, size: number, data: string): DeckerFont {
-  const font = decodeDeckerFont(data, family);
-  font.size = size;
-  const overhangs = overhangMap().get(fontInfoKey(family, size));
-  if (overhangs) {
-    // The cell is the glyph's ink; these glyphs advance less than it (f, j, y).
-    font.advances = font.glyphWidths.slice();
-    font.originX = new Uint8Array(256);
-    for (const [ordinal, [advance, originX]] of Object.entries(overhangs)) {
-      font.advances[Number(ordinal)] = advance;
-      font.originX[Number(ordinal)] = originX;
-    }
-  }
-  const full = applyExtraGlyphs(font);
-  // After the extra glyphs, so ⌘ and the arrows are placed by the font's rule too.
-  const nfnt = nfntMap().get(fontInfoKey(family, size));
-  if (nfnt) {
-    const mismatched = applyNfntMetrics(full, nfnt.metrics, nfnt.offset);
-    if (mismatched.length) console.warn(`${family} ${size}: glyphs ${mismatched.join(", ")} don't match the NFNT image widths`);
-  }
-  return full;
-}
-
-function putStrike(family: string, size: number, font: DeckerFont): void {
+function putStrike(family: string, size: number, font: BitmapFace): void {
   let bySize = strikeMap().get(family);
   if (!bySize) {
     bySize = new Map();
@@ -176,8 +153,8 @@ function nearestSize(sizes: Iterable<number>, requested: number): number {
   return best;
 }
 
-/** Sizes in memory (decoded or not), without lazy strikes still to fetch. */
-function readySizes(family: string): number[] {
+/** Sizes in memory (decoded or not). */
+function knownSizes(family: string): number[] {
   const decoded = strikeMap().get(family);
   const pending = pendingStrikeMap().get(family);
   const sizes = new Set<number>();
@@ -186,48 +163,11 @@ function readySizes(family: string): number[] {
   return [...sizes];
 }
 
-function knownSizes(family: string): number[] {
-  const lazy = lazyStrikeMap().get(family);
-  return lazy ? [...new Set([...readySizes(family), ...lazy.keys()])] : readySizes(family);
-}
-
-/** Fetch a lazy built-in strike; fonts change once it lands (or is dropped on failure). */
-function fetchStrike(family: string, size: number): Promise<void> {
-  const key = fontInfoKey(family, size);
-  const fetching = (fetchingStrikes ??= new Map());
-  const inFlight = fetching.get(key);
-  if (inFlight) return inFlight;
-  const load = lazyStrikeMap().get(family)?.get(size);
-  if (!load) return Promise.resolve();
-  const done = load()
-    .then(
-      (data) => {
-        if (lazyStrikeMap().get(family)?.has(size)) sizesOf(pendingStrikeMap(), family).set(size, data);
-      },
-      (error: unknown) => console.warn(`Fonts: couldn't load ${family} ${size}`, error),
-    )
-    .finally(() => {
-      lazyStrikeMap().get(family)?.delete(size);
-      fetching.delete(key);
-      fontsChanged();
-    });
-  fetching.set(key, done);
-  return done;
-}
-
-function ensureStrike(family: string, size: number): DeckerFont | null {
+function ensureStrike(family: string, size: number): BitmapFace | null {
   const have = strikeMap().get(family)?.get(size);
   if (have) return have;
   const data = pendingStrikeMap().get(family)?.get(size);
-  if (!data) {
-    if (!lazyStrikeMap().get(family)?.has(size)) return null;
-    void fetchStrike(family, size);
-    // Until it lands a styled request is synthesized on the plain face;
-    // a plain one draws with the nearest size already in memory.
-    if (family.includes(STYLE_MARK)) return null;
-    const ready = readySizes(family);
-    return ready.length ? ensureStrike(family, nearestSize(ready, size)) : null;
-  }
+  if (!data) return null;
   const font = loadStrike(family, size, data);
   const mark = family.indexOf(STYLE_MARK);
   if (mark >= 0) {
@@ -240,7 +180,7 @@ function ensureStrike(family: string, size: number): DeckerFont | null {
   return font;
 }
 
-function ensureBaked(name: string): DeckerFont | null {
+function ensureBaked(name: string): BitmapFace | null {
   const have = bakedMap().get(name);
   if (have) return have;
   const pending = pendingBakedMap().get(name);
@@ -274,9 +214,9 @@ export function resolveFaceRef(name: string = "body", size?: number): { family: 
   return { family, size: nearestSize(sizes, requested) };
 }
 
-/** Decode a Decker font record and patch in Mockintosh's extra symbol glyphs for that name. */
-function loadFont(name: string, data: string): DeckerFont {
-  return applyExtraGlyphs(decodeDeckerFont(data, name));
+/** Decode a font record and patch in Mockintosh's extra symbol glyphs for that name. */
+function loadFont(name: string, data: string): BitmapFace {
+  return finishFace(decodeFont(data, name), infoMap().get(name)?.descent);
 }
 
 function sizesOf<T>(map: Map<string, Map<number, T>>, family: string): Map<number, T> {
@@ -290,8 +230,7 @@ function sizesOf<T>(map: Map<string, Map<number, T>>, family: string): Map<numbe
 
 function addBuiltinStrike({ family: base, size, style, data }: FontStrikeSpec): void {
   const family = strikeKey(base, style ?? 0);
-  if (typeof data === "string") sizesOf(pendingStrikeMap(), family).set(size, data);
-  else if (!readySizes(family).includes(size)) sizesOf(lazyStrikeMap(), family).set(size, data);
+  sizesOf(pendingStrikeMap(), family).set(size, data);
 }
 
 export function initBuiltinFonts(): void {
@@ -300,8 +239,6 @@ export function initBuiltinFonts(): void {
     addBuiltinStrike(strike);
     const key = strikeKey(strike.family, strike.style ?? 0);
     rememberInfo(key, strike.size, strike.info);
-    if (strike.overhangs) overhangMap().set(fontInfoKey(key, strike.size), strike.overhangs);
-    if (strike.nfnt) nfntMap().set(fontInfoKey(key, strike.size), strike.nfnt);
   }
   for (const [name, alias] of Object.entries(BAKED_STYLE_ALIASES)) {
     pendingBakedMap().set(name, alias);
@@ -312,16 +249,17 @@ export function initBuiltinFonts(): void {
 }
 
 /**
- * Register a custom font from a %%FNT0 / %%FNT1 data block string.
+ * Register a custom font from a font record (`%%MFN1`, or Decker's `%%FNT0` / `%%FNT1`).
  * Custom fonts can override built-in names. Extra symbol glyphs (see `extraGlyphs.ts`)
  * are applied when a drawing exists for `name`, so overriding `menu` keeps ⌘ / ✓ / • working.
  */
-export function registerFont(name: string, data: string, size?: number): DeckerFont {
+export function registerFont(name: string, data: string, size?: number, info?: RegisteredFontInfo): BitmapFace {
   initBuiltinFonts();
-  record({ op: "font", name, data, size });
+  record({ op: "font", name, data, size, info });
   const alias = aliasMap().get(name);
   const family = alias?.family ?? name;
   const point = size ?? alias?.size ?? defaultMap().get(family) ?? 12;
+  rememberInfo(family, point, info);
   const font = loadStrike(family, point, data);
   putStrike(family, point, font);
   defaultMap().set(family, point);
@@ -329,7 +267,7 @@ export function registerFont(name: string, data: string, size?: number): DeckerF
   return font;
 }
 
-export function getFont(name: string = "body", size?: number): DeckerFont | null {
+export function getFont(name: string = "body", size?: number): BitmapFace | null {
   if (parseSpacing(name).spacing !== undefined) return spaced(name, (family) => getFont(family, size));
   initBuiltinFonts();
   if (size === undefined && (bakedMap().has(name) || pendingBakedMap().has(name))) {
@@ -338,7 +276,12 @@ export function getFont(name: string = "body", size?: number): DeckerFont | null
   const paged = parsePageFaceKey(name);
   if (paged.page > 0) {
     const ref = resolveFaceRef(paged.family, size);
-    return outlineStrike(ref.family, 0, ref.size, paged.page);
+    if (outlineFamilyMap().has(ref.family)) {
+      const face = getFont(paged.family, size);
+      if (!face || face.outline) return outlineStrike(ref.family, 0, ref.size, paged.page);
+      return face.pages?.get(paged.page) ?? null;
+    }
+    return getFont(paged.family, size)?.pages?.get(paged.page) ?? null;
   }
   const ref = resolveFaceRef(name, size);
   if (bakedMap().has(ref.family) || pendingBakedMap().has(ref.family)) {
@@ -367,7 +310,7 @@ export function getRealFace(
   name: string = "body",
   bits: number,
   size?: number,
-): { font: DeckerFont; covered: number } | null {
+): { font: BitmapFace; covered: number } | null {
   if (parseSpacing(name).spacing !== undefined) {
     const real = getRealFace(parseSpacing(name).family, bits, size);
     return real && { ...real, font: withSpacing(real.font, parseSpacing(name).spacing!) };
@@ -399,7 +342,7 @@ export function getRealFace(
  * next larger, then the next smaller. Outline families and exact sizes
  * come back unscaled.
  */
-export function getFontForScaling(name: string = "body", size?: number): DeckerFont | null {
+export function getFontForScaling(name: string = "body", size?: number): BitmapFace | null {
   if (parseSpacing(name).spacing !== undefined) return spaced(name, (family) => getFontForScaling(family, size));
   initBuiltinFonts();
   if (size === undefined || size <= 0) return getFont(name, size);
@@ -420,21 +363,7 @@ export function getFontForScaling(name: string = "body", size?: number): DeckerF
   return ensureStrike(family, pick);
 }
 
-/**
- * {@link getFont}, after fetching the strike if it's a lazy built-in
- * (large sizes load on first use; until then `getFont` returns the nearest
- * size in memory). With `bits` (1 bold, 2 italic), that styled face's
- * strike, or null when the family has none at that size.
- */
-export async function fetchFont(name: string = "body", size?: number, bits = 0): Promise<DeckerFont | null> {
-  initBuiltinFonts();
-  const ref = resolveFaceRef(name, size);
-  const key = strikeKey(ref.family, bits & (STYLE_BOLD | STYLE_ITALIC));
-  await fetchStrike(key, ref.size);
-  return key === ref.family ? getFont(name, size) : ensureStrike(key, ref.size);
-}
-
-export function requireFont(name: string = "body", size?: number): DeckerFont {
+export function requireFont(name: string = "body", size?: number): BitmapFace {
   const font = getFont(name, size);
   if (!font) throw new Error(`Unknown font: "${name}"${size != null ? ` ${size}` : ""}`);
   return font;
@@ -471,7 +400,7 @@ export function listFontFamilies(): FontFamilyInfo[] {
         sizes,
         scalable: Boolean(outline),
         builtIn: !outline && BUILTIN_STRIKES.some((s) => s.family === name),
-        displayName: outline?.displayName ?? familyDisplayName(name),
+        displayName: outline?.displayName ?? familyNames.get(name) ?? familyDisplayName(name),
       };
     });
 }
@@ -487,7 +416,7 @@ export type { FontFamilyInfo };
 const STYLE_BOLD = 1;
 const STYLE_ITALIC = 2;
 const STYLE_MARK = "\u0002s";
-/** Scaled sizes stay inside Decker's one-byte cell. */
+/** Scaled sizes stay inside a record's one-byte cell width. */
 const MIN_SCALED_SIZE = 4;
 const MAX_SCALED_SIZE = 127;
 /** Glyph bytes the scaled-strike cache may hold before evicting the oldest. */
@@ -507,7 +436,7 @@ interface OutlineFamily {
 }
 
 let outlineFamilies: Map<string, OutlineFamily> | undefined;
-let scaledStrikes: Map<string, DeckerFont> | undefined;
+let scaledStrikes: Map<string, BitmapFace> | undefined;
 let scaledBytes = 0;
 let version = 0;
 const listeners = new Set<() => void>();
@@ -515,7 +444,7 @@ const listeners = new Set<() => void>();
 function outlineFamilyMap(): Map<string, OutlineFamily> {
   return (outlineFamilies ??= new Map());
 }
-function scaledMap(): Map<string, DeckerFont> {
+function scaledMap(): Map<string, BitmapFace> {
   return (scaledStrikes ??= new Map());
 }
 
@@ -527,7 +456,7 @@ function clampScaledSize(size: number): number {
   return Math.max(MIN_SCALED_SIZE, Math.min(MAX_SCALED_SIZE, Math.round(size)));
 }
 
-function outlineStrike(family: string, bits: number, size: number, page: number): DeckerFont {
+function outlineStrike(family: string, bits: number, size: number, page: number): BitmapFace {
   const entry = outlineFamilyMap().get(family)!;
   const face = entry.faces.get(bits) ?? entry.faces.get(0) ?? [...entry.faces.values()][0]!;
   const ppem = clampScaledSize(size);
@@ -626,11 +555,18 @@ export function registerOutlineFace(
 }
 
 /** Install a bitmap strike for a styled face (`bits`: 1 bold, 2 italic) of `family`. */
-export function registerStyledStrike(family: string, size: number, data: string, bits: number): DeckerFont {
-  if (!bits) return registerFont(family, data, size);
+export function registerStyledStrike(
+  family: string,
+  size: number,
+  data: string,
+  bits: number,
+  info?: RegisteredFontInfo,
+): BitmapFace {
+  if (!bits) return registerFont(family, data, size, info);
   initBuiltinFonts();
-  record({ op: "styled", family, size, data, bits });
+  record({ op: "styled", family, size, data, bits, info });
   const key = strikeKey(family, bits);
+  rememberInfo(key, size, info);
   const font = loadStrike(key, size, data);
   font.name = family;
   putStrike(key, size, font);
@@ -657,8 +593,19 @@ export function familySettings(family: string): FamilyScalerSettings | undefined
  * Built-in strikes are restored on the next {@link initBuiltinFonts}; this
  * only drops what was registered.
  */
+/** Names for menus that installed families gave themselves (a suitcase's "Los Angeles" for `losangeles`). */
+const familyNames = new Map<string, string>();
+
+/** Give an installed bitmap family the name its menus show. */
+export function nameFamily(family: string, displayName: string): void {
+  record({ op: "name", family, displayName });
+  familyNames.set(family, displayName);
+  fontsChanged();
+}
+
 export function unregisterFamily(family: string): void {
   forget(family);
+  familyNames.delete(family);
   outlineFamilyMap().delete(family);
   dropScaled(family);
   for (const key of [...strikeMap().keys()]) {
@@ -680,10 +627,11 @@ export function unregisterFamily(family: string): void {
 
 /** One registration, replayable with {@link replayFontRegistration}. */
 export type FontRegistration =
-  | { op: "font"; name: string; data: string; size?: number }
-  | { op: "styled"; family: string; size: number; data: string; bits: number }
+  | { op: "font"; name: string; data: string; size?: number; info?: RegisteredFontInfo }
+  | { op: "styled"; family: string; size: number; data: string; bits: number; info?: RegisteredFontInfo }
   | { op: "outline"; bytes: Uint8Array; options: OutlineFaceRegistration }
   | { op: "settings"; family: string; settings: Partial<FamilyScalerSettings> }
+  | { op: "name"; family: string; displayName: string }
   | { op: "unregister"; family: string };
 
 let journal: FontRegistration[] = [];
@@ -728,16 +676,19 @@ export function onFontRegistration(listener: (registration: FontRegistration) =>
 export function replayFontRegistration(registration: FontRegistration): void {
   switch (registration.op) {
     case "font":
-      registerFont(registration.name, registration.data, registration.size);
+      registerFont(registration.name, registration.data, registration.size, registration.info);
       return;
     case "styled":
-      registerStyledStrike(registration.family, registration.size, registration.data, registration.bits);
+      registerStyledStrike(registration.family, registration.size, registration.data, registration.bits, registration.info);
       return;
     case "outline":
       registerOutlineFace(registration.bytes, registration.options);
       return;
     case "settings":
       setFamilySettings(registration.family, registration.settings);
+      return;
+    case "name":
+      nameFamily(registration.family, registration.displayName);
       return;
     case "unregister":
       unregisterFamily(registration.family);

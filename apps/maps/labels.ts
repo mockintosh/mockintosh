@@ -47,8 +47,8 @@ const BODY: LabelFace = { font: "body" };
 const LARGE: LabelFace = { font: "geneva12" };
 const CHICAGO: LabelFace = { font: spacedFontName("menu", 1) };
 const CAPS: LabelFace = { font: "body", upper: true, tracking: 1 };
-/** Water and islands: New York, the Mac's serif, set apart from Geneva's land names without a slanted smear. */
-const WATER: LabelFace = { font: "newYork", size: 9 };
+/** Water and islands: Apple's own Geneva 9 Italic, set apart from the upright land names. */
+const WATER: LabelFace = { font: "body", italic: true };
 
 /**
  * Which of a feature's names to show, in order: English, as the search

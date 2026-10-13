@@ -1,9 +1,14 @@
+import { decodeSuitcase, installSuitcase } from "@mockintosh/ui";
 import { mountCanvasUI } from "@mockintosh/ui/web";
+// Geist sets the page titles; it lives in the font library, not the built-in fonts.
+import geist from "../../../public/fonts/library/geist.suit?raw";
 import { App } from "./App";
 import { bindCursorHost, readCursorMode } from "./cursorHost";
 import { bindDevTools } from "./devtools/bind";
 import { bindPaletteHost, readHostPalette } from "./hostPalette";
 import { bindThemeHost, readRadiusScale } from "./hostTheme";
+
+installSuitcase(decodeSuitcase(geist));
 
 const host = mountCanvasUI({
   root: document.getElementById("root")!,

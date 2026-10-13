@@ -1,4 +1,4 @@
-import type { DeckerFont } from "./font";
+import type { BitmapFace } from "./font";
 import { carryAdvances, getGlyphPixel, getGlyphWidth } from "./font";
 
 /** 1px on every side of the core. */
@@ -20,7 +20,7 @@ const RING: readonly [number, number][] = [
  * ring is inside the advance, unlike Font Manager outline (smear right/down
  * + XOR), which does not reserve the left/top pixels.
  */
-export function outlineDeckerFont(font: DeckerFont, name: string): DeckerFont {
+export function outlineBitmapFace(font: BitmapFace, name: string): BitmapFace {
   const pad = OUTLINE_PAD;
   const maxWidth = font.maxWidth + pad * 2;
   const glyphHeight = font.glyphHeight + pad * 2;
@@ -64,7 +64,6 @@ export function outlineDeckerFont(font: DeckerFont, name: string): DeckerFont {
     glyphWidths,
     glyphData,
     ...carryAdvances(font, glyphWidths),
-    sourceFormat: "FNT1",
     outlinePad: pad,
     shadowPad: font.shadowPad,
   };
@@ -73,7 +72,7 @@ export function outlineDeckerFont(font: DeckerFont, name: string): DeckerFont {
 /** 1px south-east drop. Empty column on the right and row on the bottom. */
 export const SHADOW_PAD = 1;
 
-export function padDeckerShadow(font: DeckerFont, name: string): DeckerFont {
+export function padShadow(font: BitmapFace, name: string): BitmapFace {
   const pad = SHADOW_PAD;
   const maxWidth = font.maxWidth + pad;
   const glyphHeight = font.glyphHeight + pad;
@@ -108,7 +107,6 @@ export function padDeckerShadow(font: DeckerFont, name: string): DeckerFont {
     glyphWidths,
     glyphData,
     ...carryAdvances(font, glyphWidths),
-    sourceFormat: "FNT1",
     outlinePad: font.outlinePad,
     shadowPad: (font.shadowPad ?? 0) + pad,
   };

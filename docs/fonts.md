@@ -6,25 +6,49 @@ How Mockintosh finds, scales and draws type, the System 7 techniques it borrows,
 
 The Font Manager (`packages/ui/src/fonts/registry.ts`) knows **families**, as a System 7 FOND did. A family holds:
 
-- **Bitmap strikes**, by size and style (plain, bold, italic, bold italic). Stored as Decker `%%FNT1` records; `DeckerFont` in memory.
+- **Bitmap strikes**, by size and style (plain, bold, italic, bold italic). Stored as `%%MFN1` records (`fonts/codec.ts`, glyphs keyed by code point); `BitmapFace` in memory. Decker's older `%%FNT0` / `%%FNT1` records still load (`fonts/legacy.ts`).
 - **Outlines**, by style: TrueType (`glyf`) or PostScript-flavoured OpenType (`CFF `), parsed into an `OutlineFace`.
 - **Settings**: kerning, hinting, dropout control, preserveGlyph, preferOutline.
 
 Family keys are lowercase letters and digits (`familyKey("Futura PT")` → `"futurapt"`); built-ins keep their historical keys (`newYork`). Every family has a `displayName` for menus. The roles `body`, `menu` and `mono` alias Geneva 9, Chicago 12 and Monaco 9.
 
-Chicago 12 draws 2px between glyphs, as the Mac's NFNT does (`i` advances 4, `H` 8). The vendored Decker strike says 1, so `families.ts` rewrites its header's spacing byte. A font name with a `~sN` suffix (`spacedFontName("menu", 1)` → `"menu~s1"`) is that face with `N` pixels between glyphs instead. `getFont`, `getRealFace`, `getFontForScaling` and `resolveFaceRef` strip the suffix, look up the face and return a cached copy with `spacing` replaced, so measuring, wrapping and the QuickDraw strike (its own family id, by name) all agree. `<text spacing={n}>` is that suffix on the node's font. System chrome uses Chicago's own 2px; app content sets 1.
+Chicago 12 draws 2px between glyphs, as the Mac's NFNT does (`i` advances 4, `H` 8). A font name with a `~sN` suffix (`spacedFontName("menu", 1)` → `"menu~s1"`) is that face with `N` pixels between glyphs instead. `getFont`, `getRealFace`, `getFontForScaling` and `resolveFaceRef` strip the suffix, look up the face and return a cached copy with `spacing` replaced, so measuring, wrapping and the QuickDraw strike (its own family id, by name) all agree. `<text spacing={n}>` is that suffix on the node's font. System chrome uses Chicago's own 2px; app content sets 1.
 
 ### Where families come from
 
-- **Built in:** compiled into `@mockintosh/ui` (`fonts/families.ts`, `fonts/faces/`): Chicago, Geneva, Monaco, New York, the city fonts, Lisa, Geist Pixel, Redaction (10, 14, 20, 29, 50, 100, each in Regular, Bold and Italic) and Jiskan (16). Redaction's pixel cuts 100, 70, 50, 35, 20 and 10 draw on an N-unit grid of a 1000-unit em, so each is imported at 1000 / N px, where one grid step is one pixel (`npm run fonts:import-redaction`, from the official OTFs). Only Regular 10–29 are bundled. The other strikes (Regular 50 and 100, all of Bold and Italic) are lazy: their bitmaps are separate chunks fetched the first time something asks for them. Until the fonts-changed notice, a plain request draws with the nearest size in memory and a styled one is synthesized on the plain face; `fetchFont(name, size, bits)` awaits it. A built-in strike is lazy when its `FontStrikeSpec.data` is a loader instead of a string, and a styled face when it sets `style` (1 bold, 2 italic). Jiskan comes from the AngelCode BMFont file in `public/fonts` via `npm run fonts:import-bmfont`, with kerning pairs dropped. Glyphs whose ink overhangs their advance keep it through an overhang table.
+- **Built in:** compiled into `@mockintosh/ui` (`fonts/families.ts`, `fonts/faces/`): Chicago, Geneva, Monaco, New York and the city fonts. A built-in strike is a styled face when its `FontStrikeSpec` sets `style` (1 bold, 2 italic).
+- **Font library:** Redaction, Geist, Lisa and Jiskan aren't built in. They're suitcases in `public/fonts/library/`, listed by its `index.json`, and the App Store's Fonts section installs one by downloading it into System Folder › Fonts (`src/os/fontLibrary.ts`). See [The font library](#the-font-library).
 - **System Folder › Fonts** (`src/os/fontFolder.ts`): every `.suit` suitcase, loose `.ttf` / `.otf` / `.ttc`, and `family-size.fnt` strike in it is installed at boot and again whenever the folder changes. Loose outlines join a family by their own family name and `OS/2` style bits. A folder named "Fonts" made before the role existed is adopted. Files that fail log `Fonts: couldn't install …`.
 - **Run time:** `app.fonts.register(name, data, size)` installs a strike for this boot only; `app.fonts.install(suitcase)` writes a suitcase into the Fonts folder.
 
 `onFontsChanged` fires after any install or removal: the UI relayouts, and MacPaint and Canvas rebuild their Font menus.
 
+### Apple's System 7.5.3 strikes
+
+Chicago 12, Geneva (9–24), Monaco (9, 12) and New York (9–24) are Apple's own NFNT/FONT bitmaps from System 7.5.3, with every Mac OS Roman character Apple drew (™, accented letters, curly quotes, ligatures), plus Apple's hand-drawn Geneva 9 Italic, the one styled bitmap strike System 7.5.3 ships. `scripts/import-system-fonts.py` reads them out of a System 7.5.3 disk image (`python3 scripts/import-system-fonts.py --image path/to/System7_5_3.img`; needs `pip install machfs rsrcfork`) into `fonts/faces/system/`. It keeps the cell geometry the earlier strikes had (its `LAYOUT` table), puts rows of ink above the cell (accents on capitals) in `inkAbove`, and fills letters Apple lacks (Ł, Ő, Ș, € and the like) in Geneva 9, Chicago 12 and Monaco 9 from Decker's drawings (`scripts/decker-fonts.ts`), on page strikes. Bold Geneva 9 and 12 are smeared from these (`scripts/import-geneva-bold.ts`).
+
+### The city fonts
+
+Venice 14, London 18, Athens 18, San Francisco 18, Cairo 18 and Los Angeles 12 and 24 are Apple's FONTs from the Fonts suitcase on the System 6.0.8 System Additions disk, read the same way into `fonts/faces/city/` (`python3 scripts/import-city-fonts.py --image path/to/MacOS_6.0.8_System_Additions.img`), with every Mac OS Roman character each strike has and its missing-character box. Toronto (9–24) isn't on any System 6 disk; its strikes came from the LOSTFONTS suitcase and are kept as committed unless `--toronto` names a suitcase that has it.
+
+### The font library
+
+`npm run fonts:library` (`scripts/build-font-library.py`) builds one suitcase per family into `public/fonts/library/`, every strike an `%%MFN1` record with every character its source draws, plus `index.json` for the App Store:
+
+- **Redaction** (SIL OFL): every pixel cut, Regular, Bold and Italic, each at the size where its grid is one pixel (Redaction 100 → 10, 70 → 14, 50 → 20, 35 → 29, 20 → 50, 10 → 100), from the `@fontsource/redaction-<cut>` packages.
+- **Geist** (SIL OFL): Geist Pixel Square at 24, from the `geist` package.
+- **Lisa** (Kreative Relay Free Use): LisaTerminal Paper Raw at 12, from Kreative's `lisa1.zip` (`--lisa`); without it the suitcase in the library is kept.
+- **Jiskan** 16, from the AngelCode BMFont in `public/fonts`.
+
+The outline sources draw every point on a pixel grid with straight edges, so each pixel is sampled at its centre, which is exact. Each strike keeps the line box it has always had; ink outside it is `inkAbove` / `inkBelow`. A suitcase strike carries its FontInfo (`info`), and a suitcase its `defaultSize`; a bitmap family is named in font menus by its suitcase's family name.
+
+### Missing characters
+
+A character no strike draws shows the font's missing-character glyph, a hollow box, as QuickDraw drew the glyph after `lastChar`. Bitmap strikes keep it at slot 0 (`MISSING_SLOT`); `ensureMissingGlyph` draws one for strikes that lack it. Outline strikes use the font's own `.notdef`. Curly quotes, dashes and odd spaces a font lacks still fall back to their ASCII look-alikes first.
+
 ### Suitcases
 
-A `.suit` file (`fonts/suitcase.ts`) is one family as JSON: `strikes` (`size`, `style`, `%%FNT1` data), `outlines` (`style`, base64 font bytes) and `settings`. Foundry builds them (TTConverter's job): open a TTF, add the Bold / Italic files, keep chosen sizes as hand-editable bitmaps, install.
+A `.suit` file (`fonts/suitcase.ts`) is one family as JSON: `strikes` (`size`, `style`, `%%MFN1` data), `outlines` (`style`, base64 font bytes) and `settings`. Foundry builds them (TTConverter's job): open a TTF, add the Bold / Italic files, keep chosen sizes as hand-editable bitmaps, install.
 
 ## Answering a request
 
@@ -46,13 +70,13 @@ A `.suit` file (`fonts/suitcase.ts`) is one family as JSON: `strikes` (`size`, `
 - `autohint.ts` grid-fits for 1-bit output, after FreeType's autofit: blue zones (baseline, x-height, cap height, ascender, descender) snap to whole rows, the x-height rounds up below 16 ppem, overshoots collapse at small sizes, and stems of equal design width get equal pixel widths. Untouched points are interpolated the way TrueType's IUP does. Active up to 40 ppem. The fonts' own bytecode is not run.
 - `raster.ts` fills pixel centres (non-zero winding) with SCANTYPE 1 dropout control in both directions, so stems thinner than a pixel survive.
 - `scaler.ts` sizes the line box (the strike's cell). Its height is the font's own line spacing, `hhea` ascender − descender + line gap; the gap is inside the line, not FontInfo leading. The ascent covers the tallest of the 256 characters a strike holds (accented capitals), paid for from the line gap first: many OpenType fonts (Adobe's convention) split one em between ascender and descender and keep accent room in the gap, so without this their caps sit against the top of the line and Å's ring falls outside it. Descent takes the rest of the line, and at least the descender and the deepest glyph. Bitmap fonts are unaffected; their line box is drawn into them.
-- Ink that still leaves the line box (characters beyond the 256, such as Ǻ or stacked accents) keeps its shape with PreserveGlyph on (our default): strikes carry `inkAbove` / `inkBelow` rows outside the cell, the QuickDraw strike's font rectangle includes them, and line height and FontInfo are unchanged, as on the Mac. Off (System 7's compatibility default), the glyph is squeezed to fit. Baked `%%FNT1` strikes have no rows outside the cell, so Foundry grows the cell instead.
+- Ink that still leaves the line box (characters beyond the 256, such as Ǻ or stacked accents) keeps its shape with PreserveGlyph on (our default): strikes carry `inkAbove` / `inkBelow` rows outside the cell, the QuickDraw strike's font rectangle includes them, and line height and FontInfo are unchanged, as on the Mac. Off (System 7's compatibility default), the glyph is squeezed to fit. Foundry's editable drafts have no rows outside the cell, so baking one grows the cell instead.
 
 ### Strikes from outlines
 
-`outlineStrike.ts` builds a `DeckerFont` whose widths come from the font's metrics and whose pixels are rendered **one glyph at a time on first use** (about 40 µs a glyph), which is how a 68000 coped. `FontStrike.prepare` lets `DrText` ask for glyphs it is about to blit. Scaled strikes live in an 8 MB LRU.
+`outlineStrike.ts` builds a `BitmapFace` whose widths come from the font's metrics and whose pixels are rendered **one glyph at a time on first use** (about 40 µs a glyph), which is how a 68000 coped. `FontStrike.prepare` lets `DrText` ask for glyphs it is about to blit. Scaled strikes live in an 8 MB LRU.
 
-- **Beyond 256 characters:** Decker's ordinals (ASCII, `DROM_CHARS`, Mockintosh symbols) are page 0; any other code point lives on a page strike keyed `codePoint >> 8`, named `family\u0001p<page>` for `TextFont`. `drawUiText` splits a line into runs at page changes.
+- **Beyond 256 characters:** page 0 is Mac OS Roman (`fonts/charmap.ts`), with Chicago's ⌘ ✓ ◆ (and Mockintosh's ⇧ ⌥) in the control range and the missing glyph at slot 0; any other code point lives on page `(codePoint >> 8) + 1`, named `family\u0001p<page>` for `TextFont`. Bitmap and outline faces share this: a bitmap face carries its pages in `BitmapFace.pages`. `drawUiText` splits a line into runs at page changes.
 - **Advances and overhangs:** strikes carry NFNT-style `advances` and `originX`, packed into the QuickDraw strike's offset/width table and `kernMax`, so italic ink can overhang without loosening spacing.
 - **Kerning** is applied by UI text (`textAdvance`, `uiTextRuns`), which splits draw runs where a pair moves the pen. QuickDraw `DrawText` from apps such as MacPaint does not kern, as on the original.
 
@@ -80,7 +104,7 @@ The research behind this, from *Inside Macintosh: Text* ch. 4 ([font requests](h
 Today every built-in family is compiled in, and System Folder › Fonts holds only what the user adds. System 7.1, which introduced the Fonts folder, kept the fonts the interface depends on in the System file and shipped the rest as ordinary suitcases in the folder. We could do the same:
 
 - **Stay built in:** Chicago, Geneva, Monaco. Menus and the `body` / `mono` roles depend on them, so they must not be removable.
-- **Become suitcases:** New York, Venice, London, Athens, San Francisco, Toronto, Cairo, Los Angeles, Lisa, Geist Pixel. `bootstrapFileSystem` writes one `.suit` per family on first boot (as it does the desktop shortcuts), and the registry stops registering them from built-in data; `fontFolder.ts` then installs them like any other suitcase.
+- **Become suitcases:** New York, Venice, London, Athens, San Francisco, Toronto, Cairo, Los Angeles. `bootstrapFileSystem` writes one `.suit` per family on first boot (as it does the desktop shortcuts), and the registry stops registering them from built-in data; `fontFolder.ts` then installs them like any other suitcase.
 
 It buys a Fonts folder that shows what is installed, removing a font by dragging it out, and Foundry editing of built-in families. It costs:
 

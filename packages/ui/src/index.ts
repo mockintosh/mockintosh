@@ -108,7 +108,6 @@ export {
   getFont,
   requireFont,
   spacedFontName,
-  fetchFont,
   defaultFontSize,
   registerOutlineFace,
   registerStyledStrike,
@@ -122,6 +121,7 @@ export {
   fontRegistrations,
   onFontRegistration,
   replayFontRegistration,
+  getRealFace,
 } from "./fonts/registry";
 export type { FontFamilyInfo, FontRegistration, OutlineFaceRegistration } from "./fonts/registry";
 export type { FamilyScalerSettings } from "./fonts/outlineStrike";
@@ -140,12 +140,12 @@ export {
   SUITCASE_ITALIC,
 } from "./fonts/suitcase";
 export type { FontSuitcase, SuitcaseStrike, SuitcaseOutline } from "./fonts/suitcase";
-export { encodeDeckerFont, decodeDeckerFont } from "./fonts/codec";
-export { deckerFontFromDraft, draftFromDeckerFont } from "./fonts/draft";
+export { encodeFont, decodeFont } from "./fonts/codec";
+export { bitmapFaceFromDraft, draftFromBitmapFace } from "./fonts/draft";
 export type { FontStrikeDraft, FontStrikeGlyph } from "./fonts/draft";
-export { DROM_CHARS, deckerOrdinalForCharCode, defaultRasterCharset } from "./fonts/drom";
-export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar, glyphAdvance, glyphOriginX } from "./fonts/font";
-export type { DeckerFont } from "./fonts/font";
+export { MISSING_SLOT, charForSlot, codePointForSlot, macRomanCharset, slotForCodePoint } from "./fonts/charmap";
+export { getGlyphPixel, getGlyphWidth, getGlyphIndexForChar, glyphAdvance, glyphOriginX, locateGlyph, lookalikeGlyph } from "./fonts/font";
+export type { BitmapFace } from "./fonts/font";
 export { resolveFont, fontStyleFromProps, fontFromProps, textFace } from "./fonts/style";
 export type { FontStyle } from "./fonts/style";
 export { measureText, truncateText, fontLineHeight, drawString } from "./fonts/bridge";

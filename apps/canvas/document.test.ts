@@ -54,16 +54,16 @@ describe("parseDocument", () => {
     const doc = parseDocument({
       version: 1,
       elements: [
-        { id: "e1", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "pixel", align: "left" },
+        { id: "e1", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "venice", align: "left" },
         { id: "e2", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "futura", align: "left" },
         { id: "e3", type: "text", x: 0, y: 0, width: 40, height: 20, text: "Hi", font: "", align: "left" },
       ],
     });
-    expect((doc.elements[0] as TextElement).font).toBe("pixel");
+    expect((doc.elements[0] as TextElement).font).toBe("venice");
     expect((doc.elements[1] as TextElement).font).toBe("futura");
     expect((doc.elements[2] as TextElement).font).toBe("body");
     expect(drawableFont("futura")).toBe("body");
-    expect(drawableFont("pixel")).toBe("pixel");
+    expect(drawableFont("venice")).toBe("venice");
   });
 
   it("keeps a text size in range and drops a bad one", () => {

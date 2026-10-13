@@ -4,14 +4,14 @@
  *
  * Like the System 7 scaler, glyphs are rendered only when first drawn or
  * measured for ink; widths come straight from the font's metrics, so
- * layout never waits on rasterizing. Page 0 holds Decker's 256 ordinals
- * (ASCII, `DROM_CHARS`, Mockintosh symbols); every other character lives on
- * a page strike keyed by `codePoint >> 8`, created on demand.
+ * layout never waits on rasterizing. Page 0 holds Mac OS Roman and the
+ * menu symbols (`charmap.ts`), with the font's `.notdef` as its missing
+ * glyph; every other character lives on a page strike keyed by
+ * `codePoint >> 8`, created on demand.
  */
 
-import { deckerOrdinalForCharCode } from "./drom";
-import { extraOrdinalForCharCode } from "./extraGlyphs";
-import { charForOrdinal, getGlyphWidth, type DeckerFont, type OutlineGlyphSource } from "./font";
+import { MISSING_SLOT, codePointForSlot as pageZeroCodePoint, codePointOnPage, pageOfCodePoint, slotForCodePoint } from "./charmap";
+import { getGlyphWidth, type BitmapFace, type OutlineGlyphSource } from "./font";
 import type { OutlineFace, ScalerOptions } from "./truetype/scaler";
 
 /** Per-family scaler switches (a suitcase's options block). */
@@ -35,22 +35,8 @@ export function parsePageFaceKey(name: string): { family: string; page: number }
   return { family: name.slice(0, at), page: Number(name.slice(at + PAGE_MARK.length)) || 0 };
 }
 
-/** Page strike holding a code point outside Decker's ordinals. */
-function pageOfCodePoint(codePoint: number): number {
-  return (codePoint >> 8) + 1;
-}
-
 function codePointForSlot(page: number, ordinal: number): number | undefined {
-  if (page > 0) return ((page - 1) << 8) | ordinal;
-  const ch = charForOrdinal(ordinal);
-  return ch === undefined ? undefined : ch.codePointAt(0);
-}
-
-function deckerOrdinal(codePoint: number): number {
-  if (codePoint > 0xffff) return 255;
-  const ord = deckerOrdinalForCharCode(codePoint);
-  if (ord !== 255) return ord;
-  return extraOrdinalForCharCode(codePoint) ?? 255;
+  return page > 0 ? codePointOnPage(page, ordinal) : pageZeroCodePoint(ordinal);
 }
 
 export interface OutlineStrikeRequest {
@@ -60,10 +46,10 @@ export interface OutlineStrikeRequest {
   page: number;
   settings: FamilyScalerSettings;
   /** Sibling page strike of the same face and size (the registry's cache). */
-  pageStrike(page: number): DeckerFont | null;
+  pageStrike(page: number): BitmapFace | null;
 }
 
-export function createOutlineStrike(req: OutlineStrikeRequest): DeckerFont {
+export function createOutlineStrike(req: OutlineStrikeRequest): BitmapFace {
   const { face, ppem, page, settings } = req;
   const metrics = face.metrics(ppem);
   const gids = new Int32Array(256);
@@ -72,10 +58,12 @@ export function createOutlineStrike(req: OutlineStrikeRequest): DeckerFont {
   const originX = new Uint8Array(256);
   let maxWidth = 1;
   for (let ord = 0; ord < 256; ord++) {
-    const cp = codePointForSlot(page, ord);
+    // `.notdef` (glyph 0) is the missing-character box.
+    const notdef = page === 0 && ord === MISSING_SLOT;
+    const cp = notdef ? 0 : codePointForSlot(page, ord);
     if (cp === undefined || cp === 10) continue;
-    const gid = face.font.glyphId(cp);
-    if (!gid && cp !== 32) continue;
+    const gid = notdef ? 0 : face.font.glyphId(cp);
+    if (!gid && cp !== 32 && !notdef) continue;
     const cell = face.cell(gid, metrics);
     const width = Math.min(255, cp === 32 ? Math.max(1, cell.width) : cell.width);
     if (width < 1) continue;
@@ -95,7 +83,7 @@ export function createOutlineStrike(req: OutlineStrikeRequest): DeckerFont {
   const filled = new Uint8Array(256);
   for (let ord = 0; ord < 256; ord++) if (glyphWidths[ord] === 0) filled[ord] = 1;
 
-  const font: DeckerFont = {
+  const font: BitmapFace = {
     name: pageFaceKey(req.family, page),
     size: ppem,
     maxWidth,
@@ -108,7 +96,6 @@ export function createOutlineStrike(req: OutlineStrikeRequest): DeckerFont {
     originX,
     ...(room.above ? { inkAbove: room.above } : {}),
     ...(room.below ? { inkBelow: room.below } : {}),
-    sourceFormat: "FNT1",
     fontInfo: { ascent: metrics.ascent, descent: metrics.descent, leading: metrics.leading },
   };
 
@@ -131,8 +118,8 @@ export function createOutlineStrike(req: OutlineStrikeRequest): DeckerFont {
       }
     },
     locate(codePoint) {
-      const ord = deckerOrdinal(codePoint);
-      if (ord !== 255) {
+      const ord = slotForCodePoint(codePoint);
+      if (ord >= 0) {
         if (page === 0) return getGlyphWidth(font, ord) > 0 ? { font, ordinal: ord } : undefined;
         const home = req.pageStrike(0);
         return home?.outline?.locate(codePoint);
