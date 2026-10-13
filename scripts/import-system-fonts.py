@@ -117,7 +117,8 @@ def code_point_for(code: int, high: str) -> int | None:
 
 def read_volume(image: Path) -> machfs.Volume:
     data = image.read_bytes()
-    for offset in range(0, len(data) - 1026, 512):
+    # Raw images start the volume on a 512-byte boundary; DiskCopy 4.2 images after an 84-byte header.
+    for offset in [84, *range(0, len(data) - 1026, 512)]:
         if data[offset + 1024 : offset + 1026] == b"BD":
             volume = machfs.Volume()
             volume.read(data[offset:])

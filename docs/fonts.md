@@ -26,6 +26,10 @@ Chicago 12 draws 2px between glyphs, as the Mac's NFNT does (`i` advances 4, `H`
 
 Chicago 12, Geneva (9–24), Monaco (9, 12) and New York (9–24) are Apple's own NFNT/FONT bitmaps from System 7.5.3, with every Mac OS Roman character Apple drew (™, accented letters, curly quotes, ligatures), plus Apple's hand-drawn Geneva 9 Italic, the one styled bitmap strike System 7.5.3 ships. `scripts/import-system-fonts.py` reads them out of a System 7.5.3 disk image (`python3 scripts/import-system-fonts.py --image path/to/System7_5_3.img`; needs `pip install machfs rsrcfork`) into `fonts/faces/system/`. It keeps the cell geometry the earlier strikes had (its `LAYOUT` table), puts rows of ink above the cell (accents on capitals) in `inkAbove`, and fills letters Apple lacks (Ł, Ő, Ș, € and the like) in Geneva 9, Chicago 12 and Monaco 9 from Decker's drawings (`scripts/decker-fonts.ts`), on page strikes. Bold Geneva 9 and 12 are smeared from these (`scripts/import-geneva-bold.ts`).
 
+### The city fonts
+
+Venice 14, London 18, Athens 18, San Francisco 18, Cairo 18 and Los Angeles 12 and 24 are Apple's FONTs from the Fonts suitcase on the System 6.0.8 System Additions disk, read the same way into `fonts/faces/city/` (`python3 scripts/import-city-fonts.py --image path/to/MacOS_6.0.8_System_Additions.img`), with every Mac OS Roman character each strike has and its missing-character box. Toronto (9–24) isn't on any System 6 disk; its strikes came from the LOSTFONTS suitcase and are kept as committed unless `--toronto` names a suitcase that has it.
+
 ### Missing characters
 
 A character no strike draws shows the font's missing-character glyph, a hollow box, as QuickDraw drew the glyph after `lastChar`. Bitmap strikes keep it at slot 0 (`MISSING_SLOT`); `ensureMissingGlyph` draws one for strikes that lack it. Outline strikes use the font's own `.notdef`. Curly quotes, dashes and odd spaces a font lacks still fall back to their ASCII look-alikes first.
