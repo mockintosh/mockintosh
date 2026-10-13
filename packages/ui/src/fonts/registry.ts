@@ -20,8 +20,6 @@ import {
 
 let strikes: Map<string, Map<number, BitmapFace>> | undefined;
 let pendingStrikes: Map<string, Map<number, string>> | undefined;
-let lazyStrikes: Map<string, Map<number, () => Promise<string>>> | undefined;
-let fetchingStrikes: Map<string, Promise<void>> | undefined;
 let pendingBaked: Map<string, { family: string; size: number; data: string }> | undefined;
 let aliases: Map<string, { family: string; size: number }> | undefined;
 let defaults: Map<string, number> | undefined;
@@ -33,9 +31,6 @@ function strikeMap(): Map<string, Map<number, BitmapFace>> {
 }
 function pendingStrikeMap(): Map<string, Map<number, string>> {
   return (pendingStrikes ??= new Map());
-}
-function lazyStrikeMap(): Map<string, Map<number, () => Promise<string>>> {
-  return (lazyStrikes ??= new Map());
 }
 function pendingBakedMap(): Map<string, { family: string; size: number; data: string }> {
   return (pendingBaked ??= new Map());
@@ -121,15 +116,9 @@ function rememberInfo(family: string, size: number, info: RegisteredFontInfo | u
   infoMap().set(fontInfoKey(family, size), info);
 }
 
-let overhangsByKey: Map<string, Readonly<Record<number, readonly [number, number]>>> | undefined;
-function overhangMap(): Map<string, Readonly<Record<number, readonly [number, number]>>> {
-  return (overhangsByKey ??= new Map());
-}
 
 function loadStrike(family: string, size: number, data: string): BitmapFace {
-  // Overhangs: the cell is the glyph's ink; these glyphs advance less than it (f, j, y).
-  const overhangs = overhangMap().get(fontInfoKey(family, size));
-  const font = decodeFont(data, family, { size, overhangs });
+  const font = decodeFont(data, family, { size });
   return finishFace(font, infoMap().get(fontInfoKey(family, size))?.descent);
 }
 
@@ -164,8 +153,8 @@ function nearestSize(sizes: Iterable<number>, requested: number): number {
   return best;
 }
 
-/** Sizes in memory (decoded or not), without lazy strikes still to fetch. */
-function readySizes(family: string): number[] {
+/** Sizes in memory (decoded or not). */
+function knownSizes(family: string): number[] {
   const decoded = strikeMap().get(family);
   const pending = pendingStrikeMap().get(family);
   const sizes = new Set<number>();
@@ -174,48 +163,11 @@ function readySizes(family: string): number[] {
   return [...sizes];
 }
 
-function knownSizes(family: string): number[] {
-  const lazy = lazyStrikeMap().get(family);
-  return lazy ? [...new Set([...readySizes(family), ...lazy.keys()])] : readySizes(family);
-}
-
-/** Fetch a lazy built-in strike; fonts change once it lands (or is dropped on failure). */
-function fetchStrike(family: string, size: number): Promise<void> {
-  const key = fontInfoKey(family, size);
-  const fetching = (fetchingStrikes ??= new Map());
-  const inFlight = fetching.get(key);
-  if (inFlight) return inFlight;
-  const load = lazyStrikeMap().get(family)?.get(size);
-  if (!load) return Promise.resolve();
-  const done = load()
-    .then(
-      (data) => {
-        if (lazyStrikeMap().get(family)?.has(size)) sizesOf(pendingStrikeMap(), family).set(size, data);
-      },
-      (error: unknown) => console.warn(`Fonts: couldn't load ${family} ${size}`, error),
-    )
-    .finally(() => {
-      lazyStrikeMap().get(family)?.delete(size);
-      fetching.delete(key);
-      fontsChanged();
-    });
-  fetching.set(key, done);
-  return done;
-}
-
 function ensureStrike(family: string, size: number): BitmapFace | null {
   const have = strikeMap().get(family)?.get(size);
   if (have) return have;
   const data = pendingStrikeMap().get(family)?.get(size);
-  if (!data) {
-    if (!lazyStrikeMap().get(family)?.has(size)) return null;
-    void fetchStrike(family, size);
-    // Until it lands a styled request is synthesized on the plain face;
-    // a plain one draws with the nearest size already in memory.
-    if (family.includes(STYLE_MARK)) return null;
-    const ready = readySizes(family);
-    return ready.length ? ensureStrike(family, nearestSize(ready, size)) : null;
-  }
+  if (!data) return null;
   const font = loadStrike(family, size, data);
   const mark = family.indexOf(STYLE_MARK);
   if (mark >= 0) {
@@ -278,8 +230,7 @@ function sizesOf<T>(map: Map<string, Map<number, T>>, family: string): Map<numbe
 
 function addBuiltinStrike({ family: base, size, style, data }: FontStrikeSpec): void {
   const family = strikeKey(base, style ?? 0);
-  if (typeof data === "string") sizesOf(pendingStrikeMap(), family).set(size, data);
-  else if (!readySizes(family).includes(size)) sizesOf(lazyStrikeMap(), family).set(size, data);
+  sizesOf(pendingStrikeMap(), family).set(size, data);
 }
 
 export function initBuiltinFonts(): void {
@@ -288,7 +239,6 @@ export function initBuiltinFonts(): void {
     addBuiltinStrike(strike);
     const key = strikeKey(strike.family, strike.style ?? 0);
     rememberInfo(key, strike.size, strike.info);
-    if (strike.overhangs) overhangMap().set(fontInfoKey(key, strike.size), strike.overhangs);
   }
   for (const [name, alias] of Object.entries(BAKED_STYLE_ALIASES)) {
     pendingBakedMap().set(name, alias);
@@ -303,12 +253,13 @@ export function initBuiltinFonts(): void {
  * Custom fonts can override built-in names. Extra symbol glyphs (see `extraGlyphs.ts`)
  * are applied when a drawing exists for `name`, so overriding `menu` keeps ⌘ / ✓ / • working.
  */
-export function registerFont(name: string, data: string, size?: number): BitmapFace {
+export function registerFont(name: string, data: string, size?: number, info?: RegisteredFontInfo): BitmapFace {
   initBuiltinFonts();
-  record({ op: "font", name, data, size });
+  record({ op: "font", name, data, size, info });
   const alias = aliasMap().get(name);
   const family = alias?.family ?? name;
   const point = size ?? alias?.size ?? defaultMap().get(family) ?? 12;
+  rememberInfo(family, point, info);
   const font = loadStrike(family, point, data);
   putStrike(family, point, font);
   defaultMap().set(family, point);
@@ -412,20 +363,6 @@ export function getFontForScaling(name: string = "body", size?: number): BitmapF
   return ensureStrike(family, pick);
 }
 
-/**
- * {@link getFont}, after fetching the strike if it's a lazy built-in
- * (large sizes load on first use; until then `getFont` returns the nearest
- * size in memory). With `bits` (1 bold, 2 italic), that styled face's
- * strike, or null when the family has none at that size.
- */
-export async function fetchFont(name: string = "body", size?: number, bits = 0): Promise<BitmapFace | null> {
-  initBuiltinFonts();
-  const ref = resolveFaceRef(name, size);
-  const key = strikeKey(ref.family, bits & (STYLE_BOLD | STYLE_ITALIC));
-  await fetchStrike(key, ref.size);
-  return key === ref.family ? getFont(name, size) : ensureStrike(key, ref.size);
-}
-
 export function requireFont(name: string = "body", size?: number): BitmapFace {
   const font = getFont(name, size);
   if (!font) throw new Error(`Unknown font: "${name}"${size != null ? ` ${size}` : ""}`);
@@ -463,7 +400,7 @@ export function listFontFamilies(): FontFamilyInfo[] {
         sizes,
         scalable: Boolean(outline),
         builtIn: !outline && BUILTIN_STRIKES.some((s) => s.family === name),
-        displayName: outline?.displayName ?? familyDisplayName(name),
+        displayName: outline?.displayName ?? familyNames.get(name) ?? familyDisplayName(name),
       };
     });
 }
@@ -618,11 +555,18 @@ export function registerOutlineFace(
 }
 
 /** Install a bitmap strike for a styled face (`bits`: 1 bold, 2 italic) of `family`. */
-export function registerStyledStrike(family: string, size: number, data: string, bits: number): BitmapFace {
-  if (!bits) return registerFont(family, data, size);
+export function registerStyledStrike(
+  family: string,
+  size: number,
+  data: string,
+  bits: number,
+  info?: RegisteredFontInfo,
+): BitmapFace {
+  if (!bits) return registerFont(family, data, size, info);
   initBuiltinFonts();
-  record({ op: "styled", family, size, data, bits });
+  record({ op: "styled", family, size, data, bits, info });
   const key = strikeKey(family, bits);
+  rememberInfo(key, size, info);
   const font = loadStrike(key, size, data);
   font.name = family;
   putStrike(key, size, font);
@@ -649,8 +593,19 @@ export function familySettings(family: string): FamilyScalerSettings | undefined
  * Built-in strikes are restored on the next {@link initBuiltinFonts}; this
  * only drops what was registered.
  */
+/** Names for menus that installed families gave themselves (a suitcase's "Geist Pixel" for `geistpixel`). */
+const familyNames = new Map<string, string>();
+
+/** Give an installed bitmap family the name its menus show. */
+export function nameFamily(family: string, displayName: string): void {
+  record({ op: "name", family, displayName });
+  familyNames.set(family, displayName);
+  fontsChanged();
+}
+
 export function unregisterFamily(family: string): void {
   forget(family);
+  familyNames.delete(family);
   outlineFamilyMap().delete(family);
   dropScaled(family);
   for (const key of [...strikeMap().keys()]) {
@@ -672,10 +627,11 @@ export function unregisterFamily(family: string): void {
 
 /** One registration, replayable with {@link replayFontRegistration}. */
 export type FontRegistration =
-  | { op: "font"; name: string; data: string; size?: number }
-  | { op: "styled"; family: string; size: number; data: string; bits: number }
+  | { op: "font"; name: string; data: string; size?: number; info?: RegisteredFontInfo }
+  | { op: "styled"; family: string; size: number; data: string; bits: number; info?: RegisteredFontInfo }
   | { op: "outline"; bytes: Uint8Array; options: OutlineFaceRegistration }
   | { op: "settings"; family: string; settings: Partial<FamilyScalerSettings> }
+  | { op: "name"; family: string; displayName: string }
   | { op: "unregister"; family: string };
 
 let journal: FontRegistration[] = [];
@@ -720,16 +676,19 @@ export function onFontRegistration(listener: (registration: FontRegistration) =>
 export function replayFontRegistration(registration: FontRegistration): void {
   switch (registration.op) {
     case "font":
-      registerFont(registration.name, registration.data, registration.size);
+      registerFont(registration.name, registration.data, registration.size, registration.info);
       return;
     case "styled":
-      registerStyledStrike(registration.family, registration.size, registration.data, registration.bits);
+      registerStyledStrike(registration.family, registration.size, registration.data, registration.bits, registration.info);
       return;
     case "outline":
       registerOutlineFace(registration.bytes, registration.options);
       return;
     case "settings":
       setFamilySettings(registration.family, registration.settings);
+      return;
+    case "name":
+      nameFamily(registration.family, registration.displayName);
       return;
     case "unregister":
       unregisterFamily(registration.family);

@@ -6,6 +6,7 @@ import { useOS } from "../src/os/context";
 import { bundledApps, bundledManifest, type BundledAppListing } from "../src/os/bundledApps";
 import { installedAppIds } from "../src/os/installedApps";
 import { loadRegistry, pendingPage, takePendingPage, type RegistryEntry } from "../src/os/appStoreLink";
+import { installLibraryFont, libraryFontKey, loadFontLibrary, type LibraryFont } from "../src/os/fontLibrary";
 
 /** One catalog row, whether it ships in this build or comes from the registry. */
 interface StoreApp {
@@ -114,6 +115,49 @@ function AppPage(props: {
   );
 }
 
+/** A byte count in whole kilobytes, rounded up, as the Finder states it. */
+function formatK(bytes: number): string {
+  return `${Math.ceil(bytes / 1024).toLocaleString("en-US")}K`;
+}
+
+const FONT_SAMPLE = "The quick brown fox jumps over the lazy dog";
+
+/** The size a sample line is set in: the strike nearest 18 points. */
+function sampleSize(sizes: readonly number[]): number | undefined {
+  return [...sizes].sort((a, b) => Math.abs(a - 18) - Math.abs(b - 18) || a - b)[0];
+}
+
+/** One library font: what it is, Install, and once installed a line in it. */
+function FontListing(props: { font: LibraryFont; installed: boolean; busy: boolean; onInstall: () => void }): JSX.Element {
+  const key = () => libraryFontKey(props.font);
+  return (
+    <box flexDirection="column" gap={3}>
+      <box flexDirection="row" gap={8} alignItems="center">
+        <text font="menu" spacing={1} flexGrow={1} flexShrink={1} minWidth={0}>{props.font.family}</text>
+        <Show
+          when={props.installed}
+          fallback={
+            <Button
+              name={`install-font-${key()}`}
+              label={props.busy ? "…" : "Install"}
+              disabled={props.busy}
+              onClick={() => props.onInstall()}
+            />
+          }
+        >
+          <text font="body">Installed</text>
+        </Show>
+      </box>
+      <text font="body">{props.font.description}</text>
+      <text font="body">{`${props.font.designer} · ${props.font.sizes.join(", ")} pt · ${formatK(props.font.bytes)}`}</text>
+      <text font="body">{props.font.license}</text>
+      <Show when={props.installed}>
+        <text font={key()} size={sampleSize(props.font.sizes)}>{FONT_SAMPLE}</text>
+      </Show>
+    </box>
+  );
+}
+
 function AppStore(_props: Record<string, unknown>): JSX.Element {
   const app = useApp();
   const win = app.window;
@@ -125,6 +169,23 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
   const installed = createMemo(() => new Set(installedAppIds(os.fs)));
   const [status, setStatus] = createSignal("");
   const [busyId, setBusyId] = createSignal<string | null>(null);
+  const fontLibrary = createMemo(async () => (fetch ? await loadFontLibrary(fetch) : ([] as LibraryFont[])));
+  const installedFonts = createMemo(() => new Set(os.fontFolder?.families() ?? []));
+  const [busyFont, setBusyFont] = createSignal<string | null>(null);
+
+  async function installFont(font: LibraryFont): Promise<void> {
+    const folder = os.fontFolder;
+    if (!folder || !fetch) return;
+    setBusyFont(font.family);
+    setStatus("");
+    try {
+      await installLibraryFont(fetch, font, folder);
+      setStatus(`Installed ${font.family}.`);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Install failed.");
+    }
+    setBusyFont(null);
+  }
   // A window opened to show one app (a Spotlight result) starts on its page.
   const firstListing = untrack(() => {
     const request = pendingPage();
@@ -260,6 +321,26 @@ function AppStore(_props: Record<string, unknown>): JSX.Element {
           <box flexDirection="column" gap={8}>
             <text font="menu" spacing={1}>Mockintosh Apps</text>
             <AppShelf apps={bundledApps().map(bundledListing)} columns={columns()} onOpen={openPage} />
+            <Show when={os.fontFolder && fetch}>
+              <text font="menu" spacing={1}>Fonts</text>
+              <text font="body">Installing a font puts it in System Folder › Fonts.</text>
+              <Loading fallback={<text font="body">Loading fonts…</text>}>
+                <Errored fallback={() => <text font="body">Failed to load the font library.</text>}>
+                  <box flexDirection="column" gap={10}>
+                    <For each={fontLibrary()}>
+                      {(font) => (
+                        <FontListing
+                          font={font}
+                          installed={installedFonts().has(libraryFontKey(font))}
+                          busy={busyFont() === font.family}
+                          onInstall={() => void installFont(font)}
+                        />
+                      )}
+                    </For>
+                  </box>
+                </Errored>
+              </Loading>
+            </Show>
             <Show when={fetch}>
               <text font="menu" spacing={1}>From the Registry</text>
               <text font="body">SDK v3 apps only</text>

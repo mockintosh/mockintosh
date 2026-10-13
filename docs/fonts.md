@@ -16,7 +16,8 @@ Chicago 12 draws 2px between glyphs, as the Mac's NFNT does (`i` advances 4, `H`
 
 ### Where families come from
 
-- **Built in:** compiled into `@mockintosh/ui` (`fonts/families.ts`, `fonts/faces/`): Chicago, Geneva, Monaco, New York, the city fonts, Lisa, Geist Pixel, Redaction (10, 14, 20, 29, 50, 100, each in Regular, Bold and Italic) and Jiskan (16). Redaction's pixel cuts 100, 70, 50, 35, 20 and 10 draw on an N-unit grid of a 1000-unit em, so each is imported at 1000 / N px, where one grid step is one pixel (`npm run fonts:import-redaction`, from the official OTFs). Only Regular 10–29 are bundled. The other strikes (Regular 50 and 100, all of Bold and Italic) are lazy: their bitmaps are separate chunks fetched the first time something asks for them. Until the fonts-changed notice, a plain request draws with the nearest size in memory and a styled one is synthesized on the plain face; `fetchFont(name, size, bits)` awaits it. A built-in strike is lazy when its `FontStrikeSpec.data` is a loader instead of a string, and a styled face when it sets `style` (1 bold, 2 italic). Jiskan comes from the AngelCode BMFont file in `public/fonts` via `npm run fonts:import-bmfont`, with kerning pairs dropped. Glyphs whose ink overhangs their advance keep it through an overhang table.
+- **Built in:** compiled into `@mockintosh/ui` (`fonts/families.ts`, `fonts/faces/`): Chicago, Geneva, Monaco, New York and the city fonts. A built-in strike is a styled face when its `FontStrikeSpec` sets `style` (1 bold, 2 italic).
+- **Font library:** Redaction, Geist Pixel, Lisa and Jiskan aren't built in. They're suitcases in `public/fonts/library/`, listed by its `index.json`, and the App Store's Fonts section installs one by downloading it into System Folder › Fonts (`src/os/fontLibrary.ts`). See [The font library](#the-font-library).
 - **System Folder › Fonts** (`src/os/fontFolder.ts`): every `.suit` suitcase, loose `.ttf` / `.otf` / `.ttc`, and `family-size.fnt` strike in it is installed at boot and again whenever the folder changes. Loose outlines join a family by their own family name and `OS/2` style bits. A folder named "Fonts" made before the role existed is adopted. Files that fail log `Fonts: couldn't install …`.
 - **Run time:** `app.fonts.register(name, data, size)` installs a strike for this boot only; `app.fonts.install(suitcase)` writes a suitcase into the Fonts folder.
 
@@ -29,6 +30,17 @@ Chicago 12, Geneva (9–24), Monaco (9, 12) and New York (9–24) are Apple's ow
 ### The city fonts
 
 Venice 14, London 18, Athens 18, San Francisco 18, Cairo 18 and Los Angeles 12 and 24 are Apple's FONTs from the Fonts suitcase on the System 6.0.8 System Additions disk, read the same way into `fonts/faces/city/` (`python3 scripts/import-city-fonts.py --image path/to/MacOS_6.0.8_System_Additions.img`), with every Mac OS Roman character each strike has and its missing-character box. Toronto (9–24) isn't on any System 6 disk; its strikes came from the LOSTFONTS suitcase and are kept as committed unless `--toronto` names a suitcase that has it.
+
+### The font library
+
+`npm run fonts:library` (`scripts/build-font-library.py`) builds one suitcase per family into `public/fonts/library/`, every strike an `%%MFN1` record with every character its source draws, plus `index.json` for the App Store:
+
+- **Redaction** (SIL OFL): every pixel cut, Regular, Bold and Italic, each at the size where its grid is one pixel (Redaction 100 → 10, 70 → 14, 50 → 20, 35 → 29, 20 → 50, 10 → 100), from the `@fontsource/redaction-<cut>` packages.
+- **Geist Pixel** (SIL OFL): Square at 24, from the `geist` package.
+- **Lisa** (Kreative Relay Free Use): LisaTerminal Paper Raw at 12, from Kreative's `lisa1.zip` (`--lisa`); without it the suitcase in the library is kept.
+- **Jiskan** 16, from the AngelCode BMFont in `public/fonts`.
+
+The outline sources draw every point on a pixel grid with straight edges, so each pixel is sampled at its centre, which is exact. Each strike keeps the line box it has always had; ink outside it is `inkAbove` / `inkBelow`. A suitcase strike carries its FontInfo (`info`), and a suitcase its `defaultSize`; a bitmap family is named in font menus by its suitcase's family name.
 
 ### Missing characters
 
@@ -92,7 +104,7 @@ The research behind this, from *Inside Macintosh: Text* ch. 4 ([font requests](h
 Today every built-in family is compiled in, and System Folder › Fonts holds only what the user adds. System 7.1, which introduced the Fonts folder, kept the fonts the interface depends on in the System file and shipped the rest as ordinary suitcases in the folder. We could do the same:
 
 - **Stay built in:** Chicago, Geneva, Monaco. Menus and the `body` / `mono` roles depend on them, so they must not be removable.
-- **Become suitcases:** New York, Venice, London, Athens, San Francisco, Toronto, Cairo, Los Angeles, Lisa, Geist Pixel. `bootstrapFileSystem` writes one `.suit` per family on first boot (as it does the desktop shortcuts), and the registry stops registering them from built-in data; `fontFolder.ts` then installs them like any other suitcase.
+- **Become suitcases:** New York, Venice, London, Athens, San Francisco, Toronto, Cairo, Los Angeles. `bootstrapFileSystem` writes one `.suit` per family on first boot (as it does the desktop shortcuts), and the registry stops registering them from built-in data; `fontFolder.ts` then installs them like any other suitcase.
 
 It buys a Fonts folder that shows what is installed, removing a font by dragging it out, and Foundry editing of built-in families. It costs:
 

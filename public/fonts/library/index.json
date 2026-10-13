@@ -1,0 +1,71 @@
+{
+ "version": 1,
+ "fonts": [
+  {
+   "family": "Redaction",
+   "file": "redaction.suit",
+   "designer": "MCKL",
+   "description": "Redaction's pixel cuts, from 10 to 100 points, in Regular, Bold and Italic.",
+   "license": "SIL Open Font License 1.1",
+   "licenseFile": "LICENSE-Redaction.txt",
+   "sizes": [
+    10,
+    14,
+    20,
+    29,
+    50,
+    100
+   ],
+   "styles": [
+    "Regular",
+    "Bold",
+    "Italic"
+   ],
+   "bytes": 2090233
+  },
+  {
+   "family": "Geist Pixel",
+   "file": "geist-pixel.suit",
+   "designer": "Vercel",
+   "description": "The Square cut of Geist Pixel.",
+   "license": "SIL Open Font License 1.1",
+   "licenseFile": "LICENSE-GeistPixel.txt",
+   "sizes": [
+    24
+   ],
+   "styles": [
+    "Regular"
+   ],
+   "bytes": 41619
+  },
+  {
+   "family": "Lisa",
+   "file": "lisa.suit",
+   "designer": "Kreative Software",
+   "description": "The Apple Lisa's terminal font.",
+   "license": "Kreative Relay Free Use License 1.2f",
+   "licenseFile": "LICENSE-LisaTerminal.txt",
+   "sizes": [
+    12
+   ],
+   "styles": [
+    "Regular"
+   ],
+   "bytes": 4272
+  },
+  {
+   "family": "Jiskan",
+   "file": "jiskan.suit",
+   "designer": "X11 Japanese bitmap fonts",
+   "description": "The Latin letters of Jiskan 16.",
+   "license": "Public domain",
+   "sizes": [
+    16
+   ],
+   "styles": [
+    "Regular"
+   ],
+   "bytes": 12682
+  }
+ ]
+}

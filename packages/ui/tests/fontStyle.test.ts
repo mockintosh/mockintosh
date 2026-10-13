@@ -97,15 +97,15 @@ describe("resolveFont italic extra", () => {
   });
 
   it("caches italic and bold+italic separately", () => {
-    expect(resolveFont("lisa", { italic: true })).toBe(resolveFont("lisa", { italic: true }));
-    expect(resolveFont("lisa", { italic: true })).not.toBe(resolveFont("lisa", { bold: true }));
+    expect(resolveFont("venice", { italic: true })).toBe(resolveFont("venice", { italic: true }));
+    expect(resolveFont("venice", { italic: true })).not.toBe(resolveFont("venice", { bold: true }));
   });
 
   it("asks DrawText for a slope that moves the top of short faces, and none for Apple's own italic", () => {
     const body = uiFontMetrics(requireFont("body"));
-    const pixel = uiFontMetrics(requireFont("pixel"));
+    const tall = uiFontMetrics(requireFont("athens"));
     expect(italicShearUnits(body.ascent, STRIKE_DESCENT)).toBeGreaterThan(body.ascent >> 3);
-    expect(italicShearUnits(pixel.ascent, STRIKE_DESCENT)).toBe(pixel.ascent >> 3);
+    expect(italicShearUnits(tall.ascent, STRIKE_DESCENT)).toBe(tall.ascent >> 3);
 
     const fm = hostSwapFont({
       family: 0,

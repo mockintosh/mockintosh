@@ -108,7 +108,6 @@ export {
   getFont,
   requireFont,
   spacedFontName,
-  fetchFont,
   defaultFontSize,
   registerOutlineFace,
   registerStyledStrike,
