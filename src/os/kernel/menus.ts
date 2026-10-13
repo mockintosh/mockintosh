@@ -6,6 +6,7 @@ import { getApp } from "../apps";
 import { openAboutBox } from "../../../apps/finder/AboutBox";
 import { openControlPanel } from "../../../apps/finder/ControlPanel";
 import { CHOOSER_TITLE, openChooser } from "../../../apps/finder/Chooser";
+import { CLUB_MENU_LABEL, JOIN_CLUB_LABEL, openComputerClub } from "../../../apps/finder/ComputerClub";
 import {
   CAPTURE_ENTIRE_SCREEN_LABEL,
   CAPTURE_SELECTED_PORTION_LABEL,
@@ -33,6 +34,13 @@ export function aboutMenuItem(os: OSServices): MenubarActionItem {
   };
 }
 
+/** "Join Mockintosh Computer Club…" until this computer is signed in, then "Computer Club…". */
+function clubMenuItems(os: OSServices): MenubarActionItem[] {
+  const club = os.club;
+  if (!club) return [];
+  return [{ label: club.member() ? CLUB_MENU_LABEL : JOIN_CLUB_LABEL, onClick: () => openComputerClub(os) }];
+}
+
 export function appleMenu(os: OSServices): MenubarDefinition {
   return {
     label: APPLE_MENU_LABEL,
@@ -44,7 +52,7 @@ export function appleMenu(os: OSServices): MenubarDefinition {
     }, {
       label: CHOOSER_TITLE,
       onClick: () => openChooser(os)
-    }, {
+    }, ...clubMenuItems(os), {
       type: "submenu",
       label: SCREENSHOT_MENU_LABEL,
       items: [{

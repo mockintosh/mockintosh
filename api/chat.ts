@@ -1,5 +1,5 @@
 import { MOCKINTOSH_CHAT_CONTEXT } from "./mockintosh-context.js";
-import { envLimit, guardRequest, type RouteLimits } from "./_guard.js";
+import { envLimit, guardRequest, type GuardResult, type RouteLimits } from "./_guard.js";
 import { GATEWAY_URL, gatewayModel, gatewayToken } from "./_gateway.js";
 import { TYPE_DIGEST, SOURCE_MAP } from "./mockintosh-context.generated.js";
 import {
@@ -13,7 +13,7 @@ import {
   thinkingFromText,
   type ChatMessage,
   type OpenAITool,
-} from "../src/shared/chatProtocol.js";
+} from "../packages/protocol/src/chatProtocol.js";
 
 const LLM_API_URL = `${GATEWAY_URL}/chat/completions`;
 const LLM_MODEL = gatewayModel(process.env.LLM_MODEL || "openai/gpt-5.6-sol");
@@ -95,7 +95,7 @@ export function toLLMMessages(messages: ChatMessage[], mode: "chat" | "build", t
 }
 
 /** A build session makes one request per tool round, so the hourly budget is generous. */
-const CHAT_LIMITS: RouteLimits = {
+export const CHAT_LIMITS: RouteLimits = {
   route: "chat",
   // Vercel refuses bodies over 4.5 MB before the function runs.
   maxBodyBytes: 4_000_000,
@@ -110,9 +110,29 @@ export function staticPromptPrefix(mode: "chat" | "build"): string {
   return buildSystemPrompt(mode);
 }
 
-export default async function handler(req: Request): Promise<Response> {
+/**
+ * Charges for a call that has been answered, given the gateway's response;
+ * the caller's credits after, or `undefined` when nothing was charged.
+ * The Computer Club passes one (`sites/club/api/chat.ts`); here nobody pays.
+ */
+export type ChargeCall = (model: string, gatewayResponse: unknown) => Promise<number | undefined>;
+
+async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, CHAT_LIMITS);
   if (!guard.ok) return guard.response;
+  try {
+    return await answerChat(req, guard);
+  } finally {
+    await guard.done();
+  }
+}
+
+/** Answers a request the guard has let through, with our gateway credential. */
+export async function answerChat(
+  req: Request,
+  guard: Extract<GuardResult, { ok: true }>,
+  charge?: ChargeCall,
+): Promise<Response> {
 
   const token = gatewayToken(req);
   if (!token) {
@@ -185,8 +205,9 @@ export default async function handler(req: Request): Promise<Response> {
       throw new Error(`LLM API error (${resp.status})`);
     }
     const data = await resp.json();
+    const credits = await charge?.(LLM_MODEL, data);
     const result = completeFromLLMChoice(data.choices?.[0]);
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(credits === undefined ? result : { ...result, credits }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -199,3 +220,6 @@ export default async function handler(req: Request): Promise<Response> {
 }
 
 export const maxDuration = 300;
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };

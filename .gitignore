@@ -52,3 +52,6 @@ yarn-error.log*
 
 # Scratch files that have to live inside the repo (e.g. scripts importing its packages)
 .tmp-*
+
+# The local Computer Club's database (sites/club/scripts/dev.ts)
+.dev-db

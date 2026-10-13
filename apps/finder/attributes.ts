@@ -59,7 +59,14 @@ export function iconForNode(fs: FileSystem, node: FSNode): string {
   const custom = finderAttributes(fs, node.id).icon;
   if (custom) return custom;
   if (node.kind === "directory") {
-    if (node.role === "trash") return fs.childCount(node.id) > 0 ? "icon/trash-full" : "icon/trash";
+    if (node.role === "trash") {
+      // The Trash shows every mounted disk's Trash.
+      const full = fs.volumes().some((v) => {
+        const trash = fs.locate("trash", v.id);
+        return !!trash && fs.childCount(trash.id) > 0;
+      });
+      return full ? "icon/trash-full" : "icon/trash";
+    }
     if (node.role === "volume") return "icon/hd";
     return "icon/folder";
   }

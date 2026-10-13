@@ -25,6 +25,7 @@ export const ROOT_ID: NodeId = "__root__";
  *   system         the System Folder
  *   preferences    per-app storage folders (`System Folder/Preferences/<appId>`)
  *   pictures       the volume's Pictures folder (user pictures, not settings)
+ *   documents      the volume's Documents folder (a member's home disk has one)
  *   fonts          `System Folder/Fonts`: suitcases, TrueType files and strikes loaded at boot
  */
 export type NodeRole =
@@ -36,6 +37,7 @@ export type NodeRole =
   | "system"
   | "preferences"
   | "pictures"
+  | "documents"
   | "extensions"
   | "printer-drivers"
   | "fonts";
@@ -71,6 +73,14 @@ export interface FSDirectory extends FSNodeBase {
   locked?: boolean;
   /** On a volume: the user can eject it (`FileSystem.unmount`). */
   ejectable?: boolean;
+  /**
+   * On a volume: the Computer Club member whose home disk this is. A home
+   * disk is searched before the startup disk for a role, so new files go to
+   * it while it is mounted (see `FileSystem.locate`).
+   */
+  home?: string;
+  /** On a volume: ejected. Its nodes stay in the catalog but read as absent. */
+  ejected?: boolean;
 }
 
 export type FSNode = FSFile | FSDirectory;

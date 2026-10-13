@@ -25,6 +25,8 @@ import type {
   GpuService,
   Capability,
   FetchFunction,
+  FetchRequest,
+  FetchResponse,
   DownloadService,
   FontRasterService,
   ImageService,
@@ -151,6 +153,78 @@ export interface SignInRelay {
   start(request: SignInStartRequest): Promise<SignInPairing>;
 }
 
+/** A Mockintosh Computer Club member, as this computer is signed in. */
+export interface ClubMember {
+  /** The Club's id for the member: stable across renames, and their home disk's owner. */
+  id: string;
+  name: string;
+  /** Chosen when joining ("Ada"), and their home disk's name; `null` for one who joined with GitHub or Google and hasn't chosen yet. */
+  username: string | null;
+  email: string;
+  /** When they joined, in milliseconds since the epoch. */
+  since: number;
+}
+
+/** A member's credits and their latest changes (`/api/club/credits`). */
+export interface ClubCredits {
+  balance: number;
+  /** Newest first. `at` is milliseconds since the epoch; `delta` is negative for use. */
+  recent: Array<{ at: number; kind: "grant" | "purchase" | "usage" | "refund" | "adjust"; delta: number; model: string | null }>;
+}
+
+/** How this computer signs in to its Club (`GET /api/config` on the Club). */
+export interface ClubConfig {
+  /**
+   * `form`: the Club window asks for an email and the code the Club sends
+   * (Mockintosh's own sites only). `connect`: the member approves this
+   * computer on the Club's own page.
+   */
+  signIn: "form" | "connect";
+  /** Sign-in providers the Club's page offers (GitHub, Google), through `connect`. */
+  providers: Array<"github" | "google">;
+}
+
+/** A connection waiting for the member to approve it on the Club's page. */
+export interface ClubConnection {
+  /** What the page shows too, so the member can check they match: `ABCD-EFGH`. */
+  code: string;
+  /** The Club's page for this code, to open in a browser or show as a QR code. */
+  url: string;
+  /** Milliseconds since the epoch. */
+  expiresAt: number;
+  /** How often to call `poll`. */
+  pollIntervalMs: number;
+  /** Asks once; on `connected` this computer holds its new session. */
+  poll(): Promise<"pending" | "connected" | "denied" | "expired">;
+}
+
+/**
+ * The Mockintosh Computer Club, a service of its own (`sites/club`) at the
+ * URL the host's config names. This side holds the session token and
+ * sends it with every call; apps reach the Club only through `fetch` here.
+ */
+export interface ClubAccounts {
+  /** Who this computer is signed in as, or `null`. */
+  session(): Promise<ClubMember | null>;
+  /** How this computer may sign in. */
+  config(): Promise<ClubConfig>;
+  /**
+   * Emails a six-digit sign-in code (`form` only). The Club makes a
+   * membership for a new address, which needs `username`: checked here,
+   * before a code is spent on it.
+   */
+  sendCode(email: string, username?: string): Promise<void>;
+  /** Signs in with an emailed code; a new member gives the `username` they chose. Throws when the code is wrong. */
+  signInWithCode(email: string, code: string, username?: string): Promise<ClubMember>;
+  /** Starts connecting this computer on the Club's page. */
+  connect(): Promise<ClubConnection>;
+  signOut(): Promise<void>;
+  /** The signed-in member's credits, or `null` when signed out. */
+  credits(): Promise<ClubCredits | null>;
+  /** A request to one of the Club's endpoints (`/api/chat`), with this computer's session. */
+  fetch(path: string, init?: FetchRequest): Promise<FetchResponse>;
+}
+
 /** Capabilities a platform declares outright; the rest follow from which services it provides. */
 export type HostCapability = "browser";
 
@@ -201,6 +275,8 @@ export interface Platform {
   musicKit?: MusicKitService;
   /** Phone sign-in for apps (`useApp().signIn`). Absent when no relay server is reachable. */
   signInRelay?: SignInRelay;
+  /** The Mockintosh Computer Club. Absent when the host has no accounts server. */
+  club?: ClubAccounts;
   /**
    * Load a JavaScript module by URL, for installing a remote app bundle.
    * Absent when the host cannot load modules at runtime. Bundled apps, whose

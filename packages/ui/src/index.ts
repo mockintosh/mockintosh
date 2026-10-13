@@ -199,7 +199,7 @@ export {
   renderAsciiGlyphAtlas,
 } from "./asciiDither";
 export type { AsciiMatchMode, AsciiDitherOptions, ResolvedAsciiOptions } from "./asciiDither";
-export { decodeBase64 } from "./base64";
+export { decodeBase64, encodeBase64 } from "./base64";
 
 // -------------------------------------------------------------------------
 // Primitives (headless behavior)

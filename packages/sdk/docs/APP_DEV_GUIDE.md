@@ -265,6 +265,7 @@ export default defineApp({
 - `crypto.randomBytes` / `crypto.sha256`
 - `browser` — `openExternal`, `authorize`, `loadScript`, when this Macintosh runs in a browser
 - `signIn` — sign in to an OAuth provider from the user's phone (see [Signing in](#signing-in))
+- `club` — the Mockintosh Computer Club: whether the user is a member, their AI credits, and the Club window (see [The Computer Club](#the-computer-club))
 
 `useApp()` reads a per-window context, so call it during component setup (not in a callback created elsewhere).
 
@@ -286,6 +287,7 @@ Mockintosh runs in more than one place — a browser today, small devices with a
 | `browser`   | `useApp().browser` is available (`openExternal`, `authorize`, `loadScript`) |
 | `sign-in`   | `useApp().signIn` is available (see [Signing in](#signing-in))        |
 | `music-kit` | `useApp().musicKit` is available (see [Apple Music](#apple-music))    |
+| `club`      | `useApp().club` is available (see [The Computer Club](#the-computer-club)) |
 | `gpu`       | `useApp().gpu` is available: WGSL pixel programs rendered to an `ImageFrame`, and a rasterizer for meshes kept on the GPU, drawn by a WGSL corner program with a depth test (see `GpuService`) |
 | `agent-runtime` | `useApp().agentRuntime` is available (see [Agents](#agents))      |
 
@@ -380,6 +382,33 @@ The provider must support the **authorization code flow with PKCE**. The relay o
 5. Link what you show to Apple Music: Apple asks apps that play previews to link each one to its music. The Apple Music API gives catalog items a `url`, and `state.item.url` is the playing song's; `openInAppleMusic(url)` opens it in a new tab (and only `music.apple.com` links).
 
 The music stops when your app quits. `apps/Music.tsx` is a complete example.
+## The Computer Club
+
+The Macintosh's AI is run by the Mockintosh Computer Club, a service of its own that people join from the Apple menu and pay in credits. `useApp().club` (capability `club`) is how an app reaches it:
+
+- `club.fetch(path, init)` sends a request to one of the Club's endpoints (`"/api/chat"`, `"/api/generate-image"`) with the member's session, which your app never sees. Each answer that cost credits says how many are left (`credits`).
+- `club.status()` tells you whether someone is a member and their credits.
+- `club.open()` opens the Club window, where people join, sign in and see their credits.
+
+A refusal says why:
+
+- `401` with `code: "not_a_member"` — nobody is signed in to the Club.
+- `402` with `code: "out_of_credits"` — the member has none left.
+- `402` with `code: "over_daily_cap"` — the member capped what this Macintosh may spend a day, and it has; `error` says so in a sentence you can show.
+
+```tsx
+const { club, os } = useApp();
+const resp = await club!.fetch("/api/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }),
+});
+if (resp.status === 402 && (await os.showDialog({ message: "You're out of credits.", buttons: ["Cancel", "Computer Club…"] })) === "Computer Club…") {
+  club!.open();
+}
+```
+
+`club` is absent on a Macintosh set up without a Club. `apps/Assistant.tsx` is a complete example.
 
 ## Sound
 
@@ -497,6 +526,8 @@ const take = decodeWav((await app.storage.readBytes("take.wav"))!);
 ## Files
 
 `useApp().fs` is the user's file system — the same one the Finder shows. Catalog reads are reactive (call them inside `createMemo` or the `compute` half of `createEffect` and they re-run when that folder changes); bodies are read with `readText`/`readBytes`/`readJSON`.
+
+While someone is signed in to the Computer Club, their own disk (named after them) is mounted next to Mockintosh HD, and `fs.locate("desktop")`, `"pictures"` and `"documents"` find its folders first. So saving to the role you located puts the file on their disk without your app knowing about disks. To read everything on the desktop, list each mounted disk's Desktop Folder: `fs.volumes().map((v) => fs.locate("desktop", v.id))`. A disk ejected when they sign out, and everything on it, reads as absent: an id you kept for something on it stops resolving until they sign in again.
 
 ```tsx
 import { useApp, MIME, createMemo, For } from "@mockintosh/sdk";

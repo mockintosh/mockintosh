@@ -23,6 +23,7 @@ const START: Omit<ProcessStart, "appId" | "source"> = {
   screen: { width: 512, height: 342 },
   env: { origin: "http://test", config: {} },
   capabilities: [],
+  club: false,
   audio: false,
   download: false,
   video: false,

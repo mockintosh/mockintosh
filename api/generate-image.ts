@@ -1,10 +1,12 @@
-import { envLimit, guardRequest, type RouteLimits } from "./_guard";
-import { GATEWAY_URL, gatewayToken } from "./_gateway";
+import { envLimit, guardRequest, type GuardResult, type RouteLimits } from "./_guard.js";
+import { GATEWAY_URL, gatewayToken } from "./_gateway.js";
+import type { ChargeCall } from "./chat.js";
 
 const IMAGE_API_URL = `${GATEWAY_URL}/images/generations`;
+const IMAGE_MODEL = "openai/gpt-image-1.5";
 
 /** Each image costs far more than a chat turn. */
-const IMAGE_LIMITS: RouteLimits = {
+export const IMAGE_LIMITS: RouteLimits = {
   route: "image",
   maxBodyBytes: 8_000,
   perClient: { max: envLimit("IMAGE_LIMIT_PER_HOUR", 20), windowSeconds: 3600 },
@@ -13,9 +15,22 @@ const IMAGE_LIMITS: RouteLimits = {
 
 const MAX_PROMPT_CHARS = 2000;
 
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   const guard = await guardRequest(req, IMAGE_LIMITS);
   if (!guard.ok) return guard.response;
+  try {
+    return await generateImage(req, guard);
+  } finally {
+    await guard.done();
+  }
+}
+
+/** Answers a request the guard has let through; `charge` as for chat (`ChargeCall`). */
+export async function generateImage(
+  req: Request,
+  guard: Extract<GuardResult, { ok: true }>,
+  charge?: ChargeCall,
+): Promise<Response> {
 
   const token = gatewayToken(req);
   if (!token) {
@@ -55,7 +70,7 @@ export default async function handler(req: Request): Promise<Response> {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        model: "openai/gpt-image-1.5",
+        model: IMAGE_MODEL,
         prompt: prompt.trim(),
         n: 1,
         size: "1024x1024",
@@ -75,6 +90,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const data = await imgResponse.json();
+    const credits = await charge?.(IMAGE_MODEL, data);
     const b64 = data.data?.[0]?.b64_json ?? null;
 
     if (!b64) {
@@ -84,7 +100,7 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    return new Response(JSON.stringify({ b64 }), {
+    return new Response(JSON.stringify(credits === undefined ? { b64 } : { b64, credits }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -96,4 +112,8 @@ export default async function handler(req: Request): Promise<Response> {
   }
 }
 
-export const config = { runtime: "edge" };
+/** Image generation can take a while; Node functions allow it. */
+export const maxDuration = 120;
+
+/** Vercel's Web-handler form: a default-exported function is called as Node's `(req, res)` instead. */
+export default { fetch: handler };
