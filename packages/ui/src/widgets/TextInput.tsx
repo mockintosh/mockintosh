@@ -5,6 +5,7 @@ import { getFocusManager } from "../focusContext";
 import { useRadius } from "../theme";
 import { useUIServices } from "../services";
 import { measureText } from "../fonts/bridge";
+import { clusters, isTypedKey } from "../fonts/emojiClusters";
 import type { CanvasNode, Modifiers } from "../nodes";
 import type { Sprite } from "../sprite";
 import { createTextClicks, wordRangeAt, type TextClickSelection } from "../textClicks";
@@ -155,9 +156,9 @@ export function TextInput(props: TextInputProps): JSX.Element {
   function pixelsToCharIndex(px: number): number {
     const text = displayValue();
     let accumulated = 0;
-    for (let i = 0; i < text.length; i++) {
-      const cw = measureText(text[i], fontName(), {}, fontSize());
-      if (px < accumulated + cw / 2) return i;
+    for (const [start, end] of clusters(text)) {
+      const cw = measureText(text.slice(start, end), fontName(), {}, fontSize());
+      if (px < accumulated + cw / 2) return start;
       accumulated += cw;
     }
     return text.length;
@@ -175,7 +176,7 @@ export function TextInput(props: TextInputProps): JSX.Element {
 
   /** Typed characters, and pasted text one character at a time; the host sends a keypress after each keydown. */
   function handleKeyPress(char: string): void {
-    if (props.disabled || char.length !== 1) return;
+    if (props.disabled || !isTypedKey(char)) return;
     editing.insert(char);
   }
 

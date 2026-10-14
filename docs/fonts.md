@@ -44,7 +44,17 @@ The outline sources draw every point on a pixel grid with straight edges, so eac
 
 ### Missing characters
 
-A character no strike draws shows the font's missing-character glyph, a hollow box, as QuickDraw drew the glyph after `lastChar`. Bitmap strikes keep it at slot 0 (`MISSING_SLOT`); `ensureMissingGlyph` draws one for strikes that lack it. Outline strikes use the font's own `.notdef`. Curly quotes, dashes and odd spaces a font lacks still fall back to their ASCII look-alikes first.
+A character no strike draws, and the Emoji family doesn't either, shows the font's missing-character glyph, a hollow box, as QuickDraw drew the glyph after `lastChar`. Bitmap strikes keep it at slot 0 (`MISSING_SLOT`); `ensureMissingGlyph` draws one for strikes that lack it. Outline strikes use the font's own `.notdef`. Curly quotes, dashes and odd spaces a font lacks still fall back to their ASCII look-alikes first.
+
+### Emoji
+
+Every face falls back to the **Emoji** family for characters it doesn't draw: black-and-white emoji baked from Google's [Noto Emoji](https://github.com/google/fonts/tree/main/ofl/notoemoji) (SIL OFL, `fonts/faces/emoji/LICENSE-NotoEmoji.txt`) by `npm run fonts:emoji -- --font path/to/NotoEmoji[wght].ttf` (`scripts/build-emoji-font.ts`; `--preview out.png` draws a sample sheet instead). It is built in but kept out of font menus.
+
+- **Strikes:** one per cell height (10, 12, 14, 16, 20, 24), each emoji a square cell advancing one column more. A face draws emoji from the largest strike that fits its cell (Geneva 9 → 10, Chicago 12 → 12, Monaco 12 → 14), bottom-aligned, plain whatever the style: `uiTextRuns` gives an emoji run its own `TextFont`, `TextSize` and an empty `TextFace`. Coverage is sampled 8× and thresholded; below 16 rows, dropout control keeps Noto's hairlines whole.
+- **Loading:** each strike is a chunk of its own (29 KB gzipped at 10px, 89 KB at 24), loaded the first time text needs an emoji at that size, together with the sequence table (12 KB) (`loadEmoji` in `fonts/emoji.ts`). Until then those emoji draw as missing boxes; loading fires `onFontsChanged`, and the text layout caches compare `fontsVersion()`, so text lays out again.
+- **Order:** a character draws from the face itself, then a lookalike, then Emoji, then the missing box. U+FE0F (emoji presentation) tries Emoji first, so `™️` is the emoji and `™` Chicago's.
+- **Sequences:** text is walked by character, not by code unit (`fonts/emojiClusters.ts`): a base with its variation selector, skin tone, keycap or tags, regional-indicator pairs, and anything joined by U+200D are one character for drawing, wrapping, clicks, ← → and ⌫. A sequence is looked up whole, without variation selectors, in `EMOJI_SEQUENCES` (Noto's `ccmp` ligatures): it names a code point, the base emoji's when Noto draws the sequence as its base (Noto has no skin tones, so 👍🏽 is 👍), or a private-use one from U+F0000 (flags, families, keycaps). A sequence it lacks draws its parts, without joiners, selectors and tones. Joiners, selectors, bidi marks and tags on their own draw nothing.
+- **Typing:** a key whose `key` is one emoji is a keypress, like a letter (`isTypedKey`), and pasted emoji go in whole. The macOS Character Viewer types only into editable page elements, so it doesn't reach the canvas yet; paste works.
 
 ### Suitcases
 

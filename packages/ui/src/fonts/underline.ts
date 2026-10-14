@@ -10,7 +10,7 @@
 
 import { EraseRect, PaintRect } from "@mockintosh/quickdraw";
 import { makeRect } from "@mockintosh/quickdraw/bits";
-import { charAdvance, getGlyphIndexForChar, getGlyphPixel, getGlyphWidth, glyphOriginX, textAdvance, type BitmapFace } from "./font";
+import { forEachGlyph, getGlyphPixel, getGlyphWidth, glyphAdvance, glyphOriginX, textAdvance, type BitmapFace } from "./font";
 import { faceMetrics } from "./metrics";
 
 /** Pixels `[left, right)` of an underline, measured from the pen. */
@@ -32,17 +32,16 @@ export function underlineSpans(font: BitmapFace, text: string): UnderlineSpan[] 
   const rows = faceMetrics(font).descent > 2 ? [row - 1, row, row + 1] : [row - 1, row];
   const ink = new Uint8Array(width + 2);
   let pen = 0;
-  for (const ch of text) {
-    const glyph = getGlyphIndexForChar(font, ch);
-    if (glyph >= 0) {
-      const glyphWidth = getGlyphWidth(font, glyph);
-      const left = pen - glyphOriginX(font, glyph);
-      for (let x = 0; x < glyphWidth && left + x < width; x++) {
-        if (left + x >= -1 && rows.some((y) => getGlyphPixel(font, glyph, x, y))) ink[left + x + 1] = 1;
-      }
+  forEachGlyph(font, text, ({ font: strike, ordinal }) => {
+    // A strike shorter than the cell (an emoji's) sits on the cell bottom.
+    const dy = font.glyphHeight - strike.glyphHeight;
+    const glyphWidth = getGlyphWidth(strike, ordinal);
+    const left = pen - glyphOriginX(strike, ordinal);
+    for (let x = 0; x < glyphWidth && left + x < width; x++) {
+      if (left + x >= -1 && rows.some((y) => getGlyphPixel(strike, ordinal, x, y - dy))) ink[left + x + 1] = 1;
     }
-    pen += charAdvance(font, ch);
-  }
+    pen += glyphAdvance(strike, ordinal) + font.spacing;
+  });
   const spans: UnderlineSpan[] = [];
   let start = -1;
   for (let x = 0; x <= width; x++) {

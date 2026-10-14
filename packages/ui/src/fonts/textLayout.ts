@@ -10,8 +10,10 @@
  */
 
 import type { CanvasNode } from "../nodes";
-import { textAdvance, type BitmapFace } from "./font";
+import { forEachGlyph, glyphAdvance, textAdvance, type BitmapFace } from "./font";
+import { clusters } from "./emojiClusters";
 import { faceMetrics } from "./metrics";
+import { fontsVersion } from "./registry";
 
 export interface TextLine {
   text: string;
@@ -75,6 +77,8 @@ export function layoutText(
 }
 
 interface TextLayoutCache {
+  /** `fontsVersion()` when laid out: a font installed since (the Emoji family) can change any width. */
+  version: number;
   font: BitmapFace;
   text: string;
   maxWidth: number | undefined;
@@ -94,11 +98,12 @@ export function layoutNodeText(
   maxWidth?: number,
 ): TextBlock {
   const hit = textLayoutCache.get(node);
-  if (hit && hit.font === font && hit.text === text && hit.maxWidth === maxWidth) {
+  const version = fontsVersion();
+  if (hit && hit.version === version && hit.font === font && hit.text === text && hit.maxWidth === maxWidth) {
     return hit.block;
   }
   const block = layoutText(font, text, maxWidth);
-  textLayoutCache.set(node, { font, text, maxWidth, block });
+  textLayoutCache.set(node, { version, font, text, maxWidth, block });
   return block;
 }
 
@@ -156,17 +161,16 @@ function wrapParagraph(
     if (textAdvance(font, word) > maxWidth) {
       let chunk = "";
       let chunkStart = start;
-      let charIndex = 0;
-      for (const ch of word) {
+      for (const [from, to] of clusters(word)) {
+        const ch = word.slice(from, to);
         const next = chunk + ch;
         if (chunk && textAdvance(font, next) > maxWidth) {
           out.push(makeLine(font, chunk, chunkStart));
           chunk = ch;
-          chunkStart = start + charIndex;
+          chunkStart = start + from;
         } else {
           chunk = next;
         }
-        charIndex += ch.length;
       }
       line = chunk;
       lineStart = chunkStart;
@@ -213,15 +217,27 @@ export function caretPoint(
   };
 }
 
-/** Caret index in `text` for a click at `x` along the line (half-glyph rule). */
+/** Caret index in `text` for a click at `x` along the line (half-glyph rule), never inside a character. */
 export function charIndexAtX(font: BitmapFace, text: string, x: number): number {
   let accumulated = 0;
-  for (let i = 0; i < text.length; i++) {
-    const cw = textAdvance(font, text[i]!);
-    if (x < accumulated + cw / 2) return i;
-    accumulated += cw;
-  }
-  return text.length;
+  let found = -1;
+  let clusterStart = -1;
+  let clusterWidth = 0;
+  const settle = () => {
+    if (found < 0 && clusterStart >= 0 && x < accumulated + clusterWidth / 2) found = clusterStart;
+    accumulated += clusterWidth;
+  };
+  forEachGlyph(font, text, (glyph, start) => {
+    if (found >= 0) return;
+    if (start !== clusterStart) {
+      settle();
+      clusterStart = start;
+      clusterWidth = 0;
+    }
+    clusterWidth += glyphAdvance(glyph.font, glyph.ordinal) + font.spacing;
+  });
+  settle();
+  return found >= 0 ? found : text.length;
 }
 
 /** Source index in the original string for a point in a laid-out block. */

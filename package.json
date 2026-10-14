@@ -47,6 +47,7 @@
     "fonts:import-system": "python3 scripts/import-system-fonts.py && tsx scripts/import-geneva-bold.ts",
     "fonts:import-city": "python3 scripts/import-city-fonts.py",
     "fonts:library": "python3 scripts/build-font-library.py",
+    "fonts:emoji": "tsx scripts/build-emoji-font.ts",
     "icons:extract-753": "python3 scripts/extract-system753-icons.py",
     "resources:extract-753": "python3 scripts/extract-system753-resources.py"
   },

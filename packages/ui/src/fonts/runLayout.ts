@@ -8,6 +8,8 @@
 
 import type { CanvasNode, TextAlign, TextRun } from "../nodes";
 import { textAdvance, type BitmapFace } from "./font";
+import { clusters } from "./emojiClusters";
+import { fontsVersion } from "./registry";
 import { faceMetrics } from "./metrics";
 import { resolveFont, type FontStyle } from "./style";
 
@@ -141,7 +143,8 @@ export function layoutRuns(face: RunFace, runs: readonly TextRun[], maxWidth?: n
       continue;
     }
     for (const piece of cluster) {
-      for (const ch of piece.text) {
+      for (const [from, to] of clusters(piece.text)) {
+        const ch = piece.text.slice(from, to);
         const width = measure(piece.run, ch);
         if (pieces.length > 0 && lineWidth + width > limit) pushLine();
         place(piece.run, ch, width);
@@ -174,6 +177,8 @@ function toLine(pieces: Piece[]): RunLine {
 }
 
 interface RunLayoutCache {
+  /** `fontsVersion()` when laid out (see `layoutNodeText`). */
+  version: number;
   runs: readonly TextRun[];
   fontName: string;
   size: number | undefined;
@@ -197,8 +202,10 @@ export function layoutNodeRuns(
 ): RunBlock {
   const key = styleKey(face.style);
   const hit = runLayoutCache.get(node);
+  const version = fontsVersion();
   if (
     hit &&
+    hit.version === version &&
     hit.runs === runs &&
     hit.fontName === face.fontName &&
     hit.size === face.size &&
@@ -208,7 +215,7 @@ export function layoutNodeRuns(
     return hit.block;
   }
   const block = layoutRuns(face, runs, maxWidth);
-  runLayoutCache.set(node, { runs, fontName: face.fontName, size: face.size, styleKey: key, maxWidth, block });
+  runLayoutCache.set(node, { version, runs, fontName: face.fontName, size: face.size, styleKey: key, maxWidth, block });
   return block;
 }
 

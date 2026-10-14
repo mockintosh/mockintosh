@@ -17,7 +17,7 @@ import { registerFileOperations } from "./kernel/files";
 
 import { InitGraf, InitCursor, SetCursor, cursorState, globals as qd, type Rect } from "@mockintosh/quickdraw";
 import { newBitMap } from "@mockintosh/quickdraw/bits";
-import { copyBitMapBytes, createDoubleClickTracker, DOUBLE_CLICK_DIST, createUI, isEditingChord, macKey, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
+import { copyBitMapBytes, createDoubleClickTracker, DOUBLE_CLICK_DIST, createUI, isEditingChord, isTypedKey, macKey, moveSoftwareCursor, type Modifiers, type UIImageService } from "@mockintosh/ui";
 import { FileSystem, type FSFile } from "@mockintosh/fs";
 import type { AppContext } from "@mockintosh/sdk";
 import type { Platform, PlatformDropEvent, PlatformKeyEvent, PlatformPointerEvent } from "../platform/types";
@@ -1009,7 +1009,7 @@ export async function bootOS(platform: Platform, options?: BootOptions): Promise
     }
     const focused = ui.focusManager.focused !== null;
     ui.dispatchKeyboard("keydown", e.key, mods);
-    if (e.key.length === 1 && !command && !mods.ctrl) {
+    if (isTypedKey(e.key) && !command && !mods.ctrl) {
       ui.dispatchKeyboard("keypress", e.key, mods);
     }
     scheduleRepaint();

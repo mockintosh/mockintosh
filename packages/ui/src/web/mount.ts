@@ -14,6 +14,7 @@ import type { UITheme } from "../theme";
 import { CanvasPresenter } from "./CanvasPresenter";
 import { createWebImageService } from "./decode";
 import { copyHostPalette, DEFAULT_HOST_PALETTE, type HostPalette } from "./palette";
+import { isTypedKey } from "../fonts/emojiClusters";
 import { hostKeyStrokes } from "./hostKeyboard";
 import { hostPresentsCursor, pointerKind } from "./hostPointer";
 import { wheelDeltaX, wheelDeltaY, wheelIsPinchZoom } from "./hostWheel";
@@ -348,7 +349,7 @@ export function mountCanvasUI(options: CanvasUIOptions): CanvasUIHost {
     for (const type of hostKeyStrokes(key, mods)) {
       ui!.dispatchKeyboard(type, key, mods);
     }
-    if (key === "Tab" || key === "Backspace" || key === " " || (key.length === 1 && !mods.ctrl && !mods.meta)) {
+    if (key === "Tab" || key === "Backspace" || key === " " || (isTypedKey(key) && !mods.ctrl && !mods.meta)) {
       e.preventDefault();
     }
     // A focused editor's ⌘A, ⌘Z, ⌘← are its own, not the page's (⌘← is Back);

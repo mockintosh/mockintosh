@@ -1,3 +1,4 @@
+import { isTypedKey } from "../fonts/emojiClusters";
 import type { Modifiers } from "../nodes";
 
 export type HostKeyStroke = "keydown" | "keypress";
@@ -8,6 +9,6 @@ export type HostKeyStroke = "keydown" | "keypress";
  */
 export function hostKeyStrokes(key: string, mods: Modifiers): readonly HostKeyStroke[] {
   const command = !!(mods.ctrl || mods.meta);
-  if (key.length === 1 && !command) return ["keydown", "keypress"];
+  if (isTypedKey(key) && !command) return ["keydown", "keypress"];
   return ["keydown"];
 }
