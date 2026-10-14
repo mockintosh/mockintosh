@@ -17,8 +17,9 @@ import {
 } from "@mockintosh/quickdraw";
 import { initBuiltinFonts } from "./registry";
 import { resolveFont, textFace, type FontStyle } from "./style";
-import { drawUiText, encodeUiText, fontAscent, fontFamilyId, hostSwapFont } from "./strike";
+import { drawUiText, encodeUiText, fontAscent, fontFamilyId, hostSwapFont, uiTextRuns } from "./strike";
 import { textAdvance } from "./font";
+import { clusters } from "./emojiClusters";
 import { faceMetricsByName } from "./metrics";
 import { drawUnderline } from "./underline";
 import { OUTLINE_PAD, SHADOW_PAD } from "./outlineSmear";
@@ -107,9 +108,15 @@ export function drawStyledLine(
   TextFont(fontFamilyId(fontName));
   TextSize(measured.size ?? 0);
   let cursor = x;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]!;
-    if (hollow) {
+  for (const [start, end] of clusters(text)) {
+    const ch = text.slice(start, end);
+    // Emoji keep their own look: no ring, no shadow.
+    const emoji = hollow && uiTextRuns(inner, ch).some((run) => run.emojiSize !== undefined);
+    if (emoji) {
+      TextFace(face);
+      applyInk(color);
+      drawUiText(inner, ch, cursor, y + inner.glyphHeight);
+    } else if (hollow) {
       const ringFace = textFace({ ...style, outline: true, shadow: false });
       const ringBytes = encodeUiText(ring, ch);
       if (drop) {

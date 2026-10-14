@@ -1,4 +1,6 @@
 import { MISSING_SLOT, charForSlot, pageOfCodePoint, slotForCodePoint } from "./charmap";
+import { emojiFace, emojiSequence } from "./emoji";
+import { VS15, VS16, clusterEnd, isDefaultIgnorable, isRegionalIndicator, isSimpleText, isSkinTone } from "./emojiClusters";
 
 export interface BitmapFace {
   name: string;
@@ -110,11 +112,6 @@ export function locateGlyph(font: BitmapFace, codePoint: number): { font: Bitmap
   return page && hasGlyph(page, ordinal) ? { font: page, ordinal } : undefined;
 }
 
-/** Whether a face draws characters beyond its own 256 slots. */
-export function isPaged(font: BitmapFace): boolean {
-  return Boolean(font.outline || font.pages);
-}
-
 export function getGlyphWidth(font: BitmapFace, glyphIndex: number): number {
   if (glyphIndex < 0 || glyphIndex > 255) return 0;
   return font.glyphWidths[glyphIndex] ?? 0;
@@ -177,15 +174,7 @@ export function getGlyphPixel(
 
 /** Advance of one character, including trailing `spacing` (matches the FM width table). */
 export function charAdvance(font: BitmapFace, ch: string): number {
-  if (isPaged(font) && ch) {
-    const cp = ch.codePointAt(0)!;
-    if (cp >= 0xdc00 && cp <= 0xdfff) return 0;
-    const hit = locateGlyph(font, cp) ?? lookalikeGlyph(font, cp);
-    if (hit) return glyphAdvance(hit.font, hit.ordinal) + font.spacing;
-  }
-  const glyphIndex = getGlyphIndexForChar(font, ch);
-  if (glyphIndex < 0) return 0;
-  return glyphAdvance(font, glyphIndex) + font.spacing;
+  return textAdvance(font, ch);
 }
 
 /** A lookalike's glyph for a character the face lacks (curly quote → straight). */
@@ -194,22 +183,109 @@ export function lookalikeGlyph(font: BitmapFace, codePoint: number): { font: Bit
   return lookalike === undefined ? undefined : locateGlyph(font, lookalike.charCodeAt(0));
 }
 
-/** Sum of {@link charAdvance} over `text` plus pair kerning (no newline handling). */
+/** One glyph a line draws: which strike and slot, and whether it is the Emoji family's. */
+export interface PlacedGlyph {
+  font: BitmapFace;
+  ordinal: number;
+  /** From the Emoji family (`emoji.ts`): drawn plain, bottom-aligned in the face's cell. */
+  emoji: boolean;
+}
+
+function emojiGlyph(font: BitmapFace, codePoint: number): PlacedGlyph | undefined {
+  const face = emojiFace(font.glyphHeight);
+  const hit = face && locateGlyph(face, codePoint);
+  return hit && { font: hit.font, ordinal: hit.ordinal, emoji: true };
+}
+
+/**
+ * The glyph a single character draws: the face's own, a lookalike, then the
+ * Emoji family's, then the face's missing-character box. `preferEmoji` (the
+ * character asked for emoji presentation, U+FE0F) tries the Emoji family first.
+ * Undefined for characters that draw nothing (joiners, selectors).
+ */
+export function glyphFor(font: BitmapFace, codePoint: number, preferEmoji = false): PlacedGlyph | undefined {
+  if (isDefaultIgnorable(codePoint)) return undefined;
+  if (preferEmoji) {
+    const emoji = emojiGlyph(font, codePoint);
+    if (emoji) return emoji;
+  }
+  const own = locateGlyph(font, codePoint) ?? lookalikeGlyph(font, codePoint);
+  if (own) return { font: own.font, ordinal: own.ordinal, emoji: false };
+  const emoji = emojiGlyph(font, codePoint);
+  if (emoji) return emoji;
+  const missing = missingGlyphIndex(font);
+  return missing < 0 ? undefined : { font, ordinal: missing, emoji: false };
+}
+
+/**
+ * Visit every glyph `text` draws in `font`, with the character (cluster)
+ * `[start, end)` it belongs to. A cluster the Emoji family draws whole is
+ * one glyph; one it doesn't draws its parts, without the joiners,
+ * selectors and skin tones. Characters that draw nothing are skipped.
+ */
+export function forEachGlyph(
+  font: BitmapFace,
+  text: string,
+  visit: (glyph: PlacedGlyph, start: number, end: number, codePoint: number) => void,
+): void {
+  if (isSimpleText(text)) {
+    for (let i = 0; i < text.length; i++) {
+      const cp = text.charCodeAt(i);
+      const glyph = glyphFor(font, cp);
+      if (glyph) visit(glyph, i, i + 1, cp);
+    }
+    return;
+  }
+  for (let i = 0; i < text.length; ) {
+    const end = clusterEnd(text, i);
+    const first = text.codePointAt(i)!;
+    if (end === i + (first > 0xffff ? 2 : 1)) {
+      const glyph = glyphFor(font, first);
+      if (glyph) visit(glyph, i, end, first);
+      i = end;
+      continue;
+    }
+    const parts: number[] = [];
+    let presentation = 0;
+    for (let at = i; at < end; ) {
+      const cp = text.codePointAt(at)!;
+      at += cp > 0xffff ? 2 : 1;
+      if (cp === VS15 || cp === VS16) presentation ||= cp;
+      else parts.push(cp);
+    }
+    const sequence = parts.length > 1 ? emojiSequence(String.fromCodePoint(...parts)) : undefined;
+    const whole = sequence !== undefined ? emojiGlyph(font, sequence) : undefined;
+    if (whole) {
+      visit(whole, i, end, sequence!);
+    } else if (parts.length === 1 || (parts.length === 2 && isRegionalIndicator(parts[0]!))) {
+      // A selector on one character, or a pair of regional indicators that names no flag.
+      for (const cp of parts) {
+        const glyph = glyphFor(font, cp, presentation === VS16);
+        if (glyph) visit(glyph, i, end, cp);
+      }
+    } else {
+      parts.forEach((cp, k) => {
+        if (k > 0 && (isSkinTone(cp) || cp === 0x20e3)) return;
+        const glyph = glyphFor(font, cp, true);
+        if (glyph) visit(glyph, i, end, cp);
+      });
+    }
+    i = end;
+  }
+}
+
+/** Sum of glyph advances (each plus `spacing`) over `text`, with pair kerning (no newline handling). */
 export function textAdvance(font: BitmapFace, text: string): number {
   let w = 0;
-  if (!isPaged(font)) {
-    for (let i = 0; i < text.length; i++) w += charAdvance(font, text[i]!);
-    return w;
-  }
   let prev = -1;
-  for (let i = 0; i < text.length; i++) {
-    const cp = text.codePointAt(i)!;
-    const ch = cp > 0xffff ? text.slice(i, i + 2) : text[i]!;
-    if (cp > 0xffff) i++;
-    if (prev >= 0 && font.outline) w += font.outline.kern(prev, cp);
-    w += charAdvance(font, ch);
-    prev = cp;
-  }
+  const kern = font.outline;
+  forEachGlyph(font, text, (glyph, _start, _end, cp) => {
+    if (kern) {
+      if (prev >= 0 && !glyph.emoji) w += kern.kern(prev, cp);
+      prev = glyph.emoji ? -1 : cp;
+    }
+    w += glyphAdvance(glyph.font, glyph.ordinal) + font.spacing;
+  });
   return w;
 }
 

@@ -3,13 +3,14 @@
  * editor. Pure: text and selection in, text and selection out; each widget
  * keeps its own drawing, and its own keys (Return, Escape) on top.
  *
- * The keys are the Mac's: ← → by character, ⌥ by word, ⌘ to the line's
+ * The keys are the Mac's: ← → by character (a whole emoji, flag or family at once), ⌥ by word, ⌘ to the line's
  * ends; ↑ ↓ by line, ⌘ to the text's ends; ⇧ extends; ⌫ ⌦ delete a
  * character, ⌥ a word, ⌘ to the line's end; ⌘A ⌘C ⌘X; ⌘Z and ⇧⌘Z undo and
  * redo. Control counts as Command, as everywhere in Mockintosh.
  */
 
 import { createEffect, createSignal, type Accessor } from "solid-js";
+import { clusterEndAfter, clusterStartBefore } from "./fonts/emojiClusters";
 import type { Modifiers } from "./nodes";
 import type { UIClipboard } from "./services";
 
@@ -115,11 +116,11 @@ export function editingKey(state: TextEditState, key: string, mods: Modifiers, l
     case "ArrowLeft":
       if (command) return go(lines.lineAt(caret).start);
       if (mods.alt) return go(wordStartBefore(value, caret));
-      return go(!collapsed && !mods.shift ? lo : caret - 1);
+      return go(!collapsed && !mods.shift ? lo : clusterStartBefore(value, caret));
     case "ArrowRight":
       if (command) return go(lines.lineAt(caret).end);
       if (mods.alt) return go(wordEndAfter(value, caret));
-      return go(!collapsed && !mods.shift ? hi : caret + 1);
+      return go(!collapsed && !mods.shift ? hi : clusterEndAfter(value, caret));
     case "ArrowUp":
       if (command) return go(0);
       return go(lines.vertical(!collapsed && !mods.shift ? lo : caret, -1));
@@ -133,11 +134,11 @@ export function editingKey(state: TextEditState, key: string, mods: Modifiers, l
     case "Backspace":
       if (command) return remove(lines.lineAt(caret).start);
       if (mods.alt) return remove(wordStartBefore(value, caret));
-      return remove(caret - 1);
+      return remove(clusterStartBefore(value, caret));
     case "Delete":
       if (command) return remove(lines.lineAt(caret).end);
       if (mods.alt) return remove(wordEndAfter(value, caret));
-      return remove(caret + 1);
+      return remove(clusterEndAfter(value, caret));
   }
   return {};
 }
@@ -280,7 +281,9 @@ export function createTextEditing(options: TextEditingOptions): TextEditing {
       const max = options.maxLength?.();
       if (max !== undefined) {
         const { lo, hi } = editing.selection();
-        clean = clean.slice(0, Math.max(0, max - (valueNow().length - (hi - lo))));
+        const room = Math.max(0, max - (valueNow().length - (hi - lo)));
+        // Never half an emoji: stop at the last whole character that fits.
+        if (room < clean.length) clean = clean.slice(0, clusterStartBefore(clean, room + 1));
         if (!clean) return;
       }
       apply(insertText(stateNow(), clean), kind);

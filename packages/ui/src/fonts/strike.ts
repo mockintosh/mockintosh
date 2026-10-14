@@ -11,7 +11,9 @@ import type { FMInput, FMOutput, FontStrike } from "@mockintosh/quickdraw";
 import {
   DrawText,
   MoveTo,
+  TextFace,
   TextFont,
+  TextSize,
   bold,
   italic,
   outline,
@@ -21,19 +23,18 @@ import {
 } from "@mockintosh/quickdraw";
 import { rowBytesFor, setBit } from "@mockintosh/quickdraw/bits";
 import {
+  forEachGlyph,
   getGlyphIndexForChar,
   getGlyphPixel,
   getGlyphWidth,
   glyphAdvance,
   glyphOriginX,
   hasGlyph,
-  isPaged,
-  locateGlyph,
-  lookalikeGlyph,
   missingGlyphIndex,
   type BitmapFace,
 } from "./font";
-import { MISSING_SLOT } from "./charmap";
+import { MISSING_SLOT, placeCodePoint } from "./charmap";
+import { EMOJI_FAMILY } from "./emoji";
 import { pageFaceKey } from "./outlineStrike";
 import { getFontForScaling, getRealFace, requireFont, spacedFontName } from "./registry";
 import { resolveFont } from "./style";
@@ -122,6 +123,8 @@ export interface UiTextRun {
   font: BitmapFace;
   bytes: number[];
   x: number;
+  /** An Emoji family run: drawn at this `TextSize`, plain. */
+  emojiSize?: number;
 }
 
 /** `TextFont` name for page `page` of a bitmap face. */
@@ -137,57 +140,64 @@ function bitmapPageKey(face: BitmapFace, page: BitmapFace): string | undefined {
 
 /**
  * Split a line into runs: a new run starts where a character lives on
- * another page strike or where pair kerning moves the pen. A face that
- * draws everything from page 0 comes back as one run.
+ * another page strike, falls back to the Emoji family, or where pair
+ * kerning moves the pen. A face that draws everything from page 0 comes
+ * back as one run.
  */
 export function uiTextRuns(font: BitmapFace, text: string): UiTextRun[] {
-  if (!isPaged(font)) return [{ font, bytes: encodeUiText(font, text), x: 0 }];
   const src = font.outline;
   const runs: UiTextRun[] = [];
   let run: UiTextRun | undefined;
   let pen = 0;
   let prev = -1;
-  for (let i = 0; i < text.length; i++) {
-    const cp = text.codePointAt(i)!;
-    const wide = cp > 0xffff;
-    const ch = wide ? text.slice(i, i + 2) : text[i]!;
-    if (wide) i++;
-    const kern = prev >= 0 && src ? src.kern(prev, cp) : 0;
-    prev = cp;
+  forEachGlyph(font, text, (glyph, _start, _end, cp) => {
+    const kern = prev >= 0 && src && !glyph.emoji ? src.kern(prev, cp) : 0;
+    prev = glyph.emoji ? -1 : cp;
     pen += kern;
-    const hit = locateGlyph(font, cp) ?? lookalikeGlyph(font, cp);
-    const target = hit?.font ?? font;
-    const ordinal = hit?.ordinal ?? Math.max(0, getGlyphIndexForChar(font, ch));
-    const key = src ? (target.outline?.faceKey ?? src.faceKey) : bitmapPageKey(font, target);
+    const target = glyph.font;
+    const key = glyph.emoji
+      ? spacedFontName(pageFaceKey(EMOJI_FAMILY, placeCodePoint(cp).page), font.spacing)
+      : src
+        ? (target.outline?.faceKey ?? src.faceKey)
+        : bitmapPageKey(font, target);
     if (!run || run.faceKey !== key || kern !== 0) {
-      run = { faceKey: key, font: target, bytes: [], x: pen };
+      run = { faceKey: key, font: target, bytes: [], x: pen, ...(glyph.emoji ? { emojiSize: target.size } : {}) };
       runs.push(run);
     }
-    run.bytes.push(ordinal);
-    pen += glyphAdvance(target, ordinal) + font.spacing;
-  }
+    run.bytes.push(glyph.ordinal);
+    pen += glyphAdvance(target, glyph.ordinal) + font.spacing;
+  });
   return runs;
 }
 
 /**
  * `MoveTo` + `DrawText` for one line at `baseline` (the cell bottom).
- * A run on another page strike switches `TextFont` for that run, then restores it.
+ * A run on another page strike switches `TextFont` for that run, then
+ * restores it; an Emoji run also switches `TextSize` and draws plain.
  */
 export function drawUiText(font: BitmapFace, text: string, x: number, baseline: number): void {
-  if (!isPaged(font)) {
-    const bytes = encodeUiText(font, text);
-    MoveTo(x, baseline);
-    DrawText(bytes, 0, bytes.length);
-    return;
-  }
-  const saved = globals.thePort?.txFont;
+  const port = globals.thePort;
+  const saved = port && { font: port.txFont, size: port.txSize, face: port.txFace };
+  let switched = false;
   for (const run of uiTextRuns(font, text)) {
     if (run.faceKey !== undefined) TextFont(fontFamilyId(run.faceKey));
-    else if (saved !== undefined) TextFont(saved);
+    else if (saved && switched) TextFont(saved.font);
+    if (run.emojiSize !== undefined) {
+      TextSize(run.emojiSize);
+      TextFace(0);
+    } else if (saved && switched) {
+      TextSize(saved.size);
+      TextFace(saved.face);
+    }
+    switched = run.faceKey !== undefined || run.emojiSize !== undefined;
     MoveTo(x + run.x, baseline);
     DrawText(run.bytes, 0, run.bytes.length);
   }
-  if (saved !== undefined) TextFont(saved);
+  if (saved && switched) {
+    TextFont(saved.font);
+    TextSize(saved.size);
+    TextFace(saved.face);
+  }
 }
 
 /** Map a JS string to page-0 slots for `DrawText`. */

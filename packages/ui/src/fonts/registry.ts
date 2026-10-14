@@ -248,6 +248,20 @@ export function initBuiltinFonts(): void {
   builtInsInitialized = true;
 }
 
+/** Families the system draws with but menus don't list (the Emoji fallback). */
+const hiddenFamilies = new Set<string>();
+
+/**
+ * Add a built-in family that loaded after boot (`emoji.ts`): its strikes,
+ * decoded on first use, kept out of font menus.
+ */
+export function registerHiddenStrikes(family: string, specs: readonly { size: number; data: string }[]): void {
+  initBuiltinFonts();
+  hiddenFamilies.add(family);
+  for (const { size, data } of specs) sizesOf(pendingStrikeMap(), family).set(size, data);
+  fontsChanged();
+}
+
 /**
  * Register a custom font from a font record (`%%MFN1`, or Decker's `%%FNT0` / `%%FNT1`).
  * Custom fonts can override built-in names. Extra symbol glyphs (see `extraGlyphs.ts`)
@@ -372,8 +386,8 @@ export function requireFont(name: string = "body", size?: number): BitmapFace {
 export function listFonts(): string[] {
   initBuiltinFonts();
   const extra = new Set<string>();
-  for (const name of strikeMap().keys()) if (!name.includes(STYLE_MARK)) extra.add(name);
-  for (const name of pendingStrikeMap().keys()) if (!name.includes(STYLE_MARK)) extra.add(name);
+  for (const name of strikeMap().keys()) if (!name.includes(STYLE_MARK) && !hiddenFamilies.has(name)) extra.add(name);
+  for (const name of pendingStrikeMap().keys()) if (!name.includes(STYLE_MARK) && !hiddenFamilies.has(name)) extra.add(name);
   for (const name of outlineFamilyMap().keys()) extra.add(name);
   const listed = LISTED_FONT_NAMES as readonly string[];
   const extras = [...extra].filter((name) => !listed.includes(name));

@@ -13,6 +13,7 @@
 // -------------------------------------------------------------------------
 export { createUI } from "./ui";
 export { isEditingChord } from "./textEditing";
+export { isTypedKey } from "./fonts/emojiClusters";
 export type { UIInstance, UIConfig } from "./ui";
 export { useUIServices } from "./services";
 export type { UIServices, UIClipboard, UIImageService, UIScheduler, ImageDecodeOptions } from "./services";
