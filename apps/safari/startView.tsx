@@ -80,7 +80,7 @@ function SiteIcon(props: { bookmark: Bookmark; icons?: FaviconLoader }): JSX.Ele
   if (src && props.icons && known === undefined) void props.icons.load(src).then((loaded) => setBits(loaded));
 
   const letter = () => (
-    <text font="newYork" size={24} nowrap>{props.bookmark.title.slice(0, 1).toUpperCase()}</text>
+    <text font="newark" size={24} nowrap>{props.bookmark.title.slice(0, 1).toUpperCase()}</text>
   );
   return (
     <TileFrame pressed={false}>

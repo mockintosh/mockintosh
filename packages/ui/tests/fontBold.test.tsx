@@ -101,14 +101,14 @@ describe("<text bold> / <text italic> / <text outline>", () => {
     const plainUi = createUI({ screen: plainScreen });
     const ringUi = createUI({ screen: ringScreen });
     const boldUi = createUI({ screen: boldScreen });
-    plainUi.render(() => <text font="geneva12">I</text>);
+    plainUi.render(() => <text font="genova12">I</text>);
     ringUi.render(() => (
-      <text font="geneva12" outline>
+      <text font="genova12" outline>
         I
       </text>
     ));
     boldUi.render(() => (
-      <text font="geneva12" bold>
+      <text font="genova12" bold>
         I
       </text>
     ));
@@ -137,7 +137,7 @@ describe("<text bold> / <text italic> / <text outline>", () => {
     const ui = createUI({ screen });
     ui.render(() => (
       <box background={1} padding={4}>
-        <text font="geneva12" outline color={0} semantic={{ name: "ghost" }}>
+        <text font="genova12" outline color={0} semantic={{ name: "ghost" }}>
           I
         </text>
       </box>
@@ -207,12 +207,12 @@ describe("<text bold> / <text italic> / <text outline>", () => {
     const ringUi = createUI({ screen: ringScreen });
     const dropUi = createUI({ screen: dropScreen });
     ringUi.render(() => (
-      <text font="geneva12" outline>
+      <text font="genova12" outline>
         I
       </text>
     ));
     dropUi.render(() => (
-      <text font="geneva12" shadow>
+      <text font="genova12" shadow>
         I
       </text>
     ));

@@ -31,7 +31,7 @@ function fontFor(style: FontStyle): BitmapFace {
   const key = `${style.font}:${style.size ?? ""}`;
   let font = fonts.get(key);
   if (!font) {
-    font = getFont(style.font, style.size) ?? getFont("chicago")!;
+    font = getFont(style.font, style.size) ?? getFont("chicane")!;
     fonts.set(key, font);
   }
   return font;

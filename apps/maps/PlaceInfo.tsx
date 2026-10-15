@@ -26,7 +26,7 @@ const BUTTON_ROW = BUTTON_H + 8;
 /** Chicago at the app content's 1px glyph spacing. */
 const TITLE_FONT = spacedFontName("menu", 1);
 const TEXT_FONT = "body";
-const VALUE_FONT = "geneva12";
+const VALUE_FONT = "genova12";
 
 /** "golf_course" → "Golf course". */
 export function kindLabel(kind: string): string {

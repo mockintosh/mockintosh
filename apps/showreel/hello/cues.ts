@@ -26,25 +26,25 @@ export const CARDS: readonly Card[] = [
   {
     at: 7.8,
     text: "512 x 342",
-    font: "chicago",
+    font: "chicane",
     size: 12,
     inverse: false,
     deco: "dimensions",
   },
-  { at: 8.15, text: "One Bit", font: "newYork", size: 24, inverse: true },
+  { at: 8.15, text: "One Bit", font: "newark", size: 24, inverse: true },
   {
     at: 8.5,
     text: "Every Pixel",
-    font: "sanFrancisco",
+    font: "sanfrisco",
     size: 18,
     inverse: false,
     deco: "grid",
   },
-  { at: 8.85, text: "On Purpose", font: "venice", size: 14, inverse: true },
+  { at: 8.85, text: "On Purpose", font: "vence", size: 14, inverse: true },
 ];
 
 /** "Mockintosh" strobes through the system fonts. */
-export const FLICKER = ["london", "sanFrancisco", "venice", "athens", "toronto", "newYork", "losAngeles", "geneva", "chicago"] as const;
+export const FLICKER = ["londinium", "sanfrisco", "vence", "athene", "taranto", "newark", "losalamos", "genova", "chicane"] as const;
 export const FLICKER_AT = 9.2;
 export const FLICKER_STEP = 1 / 15;
 

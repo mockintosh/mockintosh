@@ -44,7 +44,7 @@ export function ChordButton(props: {
       <text font="body" color={ink()} align="center" nowrap>
         {props.numeral}
       </text>
-      <text font="geneva" size={12} bold color={ink()} align="center" nowrap>
+      <text font="genova" size={12} bold color={ink()} align="center" nowrap>
         {props.chord}
       </text>
       <text font="body" color={ink()} align="center" nowrap>
@@ -157,7 +157,7 @@ export function Lcd(props: {
       semantic={{ name: "display", role: "status", value: `${props.chord} | ${props.detail} | ${props.status}` }}
     >
       <box flexDirection="row" alignItems="flex-start" justifyContent="space-between" height={24}>
-        <text font="geneva" size={18} bold color={0} nowrap>
+        <text font="genova" size={18} bold color={0} nowrap>
           {props.chord}
         </text>
         <box paddingTop={8}>

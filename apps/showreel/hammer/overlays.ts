@@ -11,7 +11,7 @@ import { toneOver, type Painter, type PixelRect, type Vec } from "../painter";
 import type { Screen } from "../screen";
 import { ALERTS, BANNERS, BANNERS_UNTIL, CARD_LINES, CRASH, IMPACT, LOGO_AT, LOGO_UNTIL } from "./edit";
 
-const SYSTEM = { font: "chicago" } as const;
+const SYSTEM = { font: "chicane" } as const;
 
 /** A System 7 alert centred on (cx, cy): icon, message, buttons with the last one default. */
 function alertBox(sc: Screen, cx: number, cy: number, lines: readonly string[], buttons: readonly string[], icon: Sprite | undefined): void {
@@ -61,7 +61,7 @@ export function banners(sc: Screen, t: number): void {
   const room = sc.clip.y1 - sc.clip.y0 - 12 * z;
   const top = sc.clip.y0 + 6 * z - Math.max(0, stack - room);
   shown.forEach((b, i) => {
-    const w = Math.max(150 * z, sc.measure(b.text, { font: "geneva", size: 9 }).width + 20 * z);
+    const w = Math.max(150 * z, sc.measure(b.text, { font: "genova", size: 9 }).width + 20 * z);
     const slide = 1 - easeOutCubic(seg(t, b.at, b.at + 0.18));
     const x1 = sc.clip.x1 - 6 * z + Math.round(slide * (w + 12 * z));
     const y = top + i * (h + gap);
@@ -70,7 +70,7 @@ export function banners(sc: Screen, t: number): void {
     sc.fillRect(r, 0);
     sc.box(r, z);
     sc.text("Big Brother", r.x0 + 8 * z, r.y0 + 4 * z, SYSTEM);
-    sc.text(b.text, r.x0 + 8 * z, r.y0 + 20 * z, { font: "geneva", size: 9 });
+    sc.text(b.text, r.x0 + 8 * z, r.y0 + 20 * z, { font: "genova", size: 9 });
   });
 }
 
@@ -86,7 +86,7 @@ export function marquee(sc: Screen, person: KeyBox, phase: number): void {
   if (box.x1 - box.x0 < 6 * z || box.y1 - box.y0 < 6 * z) return;
   sc.box(box, z, 0);
   sc.ants(box, phase);
-  const style = { font: "geneva", size: 9 } as const;
+  const style = { font: "genova", size: 9 } as const;
   const label = "Mockintosh";
   const { width, height } = sc.measure(label, style);
   const cx = Math.round((box.x0 + box.x1) / 2);
@@ -150,7 +150,7 @@ export function card(p: Painter, sc: Screen, t: number, happy: Sprite | undefine
   for (const [at, until, lines] of CARD_LINES) {
     if (t < at || t >= until + 0.3) continue;
     const amount = Math.min(seg(t, at, at + 0.6), 1 - seg(t, until, until + 0.3));
-    const style = { font: "newYork", size: 18, k: z, ink: 0 as const };
+    const style = { font: "newark", size: 18, k: z, ink: 0 as const };
     const lh = sc.measure("Ag", style).height;
     const top = sc.y(90) - Math.round((lh * 1.35 * lines.length) / 2);
     lines.forEach((line, i) => sc.centered(line, sc.x(160), top + Math.round(i * lh * 1.35), style));
@@ -166,8 +166,8 @@ export function card(p: Painter, sc: Screen, t: number, happy: Sprite | undefine
     sc.sprite(happy, cx - Math.round((happy.width * k) / 2), y, k, true);
     y += happy.height * k + sc.len(8);
   }
-  const markH = sc.measure("Mockintosh", { font: "chicago", k: 1 }).height;
-  sc.centered("Mockintosh", cx, y, { font: "chicago", k: Math.max(z, Math.round(sc.len(20) / markH)), ink: 0 });
+  const markH = sc.measure("Mockintosh", { font: "chicane", k: 1 }).height;
+  sc.centered("Mockintosh", cx, y, { font: "chicane", k: Math.max(z, Math.round(sc.len(20) / markH)), ink: 0 });
   dissolve(p, p.clip, easeInOutCubic(amount));
 }
 

@@ -21,11 +21,11 @@ import type { Bitmap } from "./bitmap";
 
 export interface LabelFace {
   /**
-   * A font name `<text font>` takes: `body`, `geneva12`, `menu`, … Not
-   * `bodyBold` or `geneva12Bold`: those are the Font Manager's smear.
+   * A font name `<text font>` takes: `body`, `genova12`, `menu`, … Not
+   * `bodyBold` or `genova12Bold`: those are the Font Manager's smear.
    */
   font: string;
-  /** Point size, for a family name such as `newYork`; a role name (`body`) has its own. */
+  /** Point size, for a family name such as `newark`; a role name (`body`) has its own. */
   size?: number;
   italic?: boolean;
   upper?: boolean;

@@ -10,7 +10,7 @@ The Font Manager (`packages/ui/src/fonts/registry.ts`) knows **families**, as a 
 - **Outlines**, by style: TrueType (`glyf`) or PostScript-flavoured OpenType (`CFF `), parsed into an `OutlineFace`.
 - **Settings**: kerning, hinting, dropout control, preserveGlyph, preferOutline.
 
-Family keys are lowercase letters and digits (`familyKey("Futura PT")` → `"futurapt"`); built-ins keep their historical keys (`newYork`). Every family has a `displayName` for menus. The roles `body`, `menu` and `mono` alias Geneva 9, Chicago 12 and Monaco 9.
+Family keys are lowercase letters and digits (`familyKey("Futura PT")` → `"futurapt"`); built-ins are renamed from Apple's trademarked names (`chicane`, `genova`, `monoco`, …; the old keys still resolve). Every family has a `displayName` for menus. The roles `body`, `menu` and `mono` alias Geneva 9, Chicago 12 and Monaco 9.
 
 Chicago 12 draws 2px between glyphs, as the Mac's NFNT does (`i` advances 4, `H` 8). A font name with a `~sN` suffix (`spacedFontName("menu", 1)` → `"menu~s1"`) is that face with `N` pixels between glyphs instead. `getFont`, `getRealFace`, `getFontForScaling` and `resolveFaceRef` strip the suffix, look up the face and return a cached copy with `spacing` replaced, so measuring, wrapping and the QuickDraw strike (its own family id, by name) all agree. `<text spacing={n}>` is that suffix on the node's font. System chrome uses Chicago's own 2px; app content sets 1.
 

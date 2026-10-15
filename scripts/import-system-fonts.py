@@ -51,39 +51,39 @@ DEFAULT_IMAGE = Path("/tmp/system753/System7_5_3.img")
 
 # FOND family → registry key, and the suitcase in System Folder:Fonts.
 FAMILIES = {
-    "Chicago": "chicago",
-    "Geneva": "geneva",
-    "Monaco": "monaco",
-    "New York": "newYork",
+    "Chicago": "chicane",
+    "Geneva": "genova",
+    "Monaco": "monoco",
+    "New York": "newark",
 }
 
 # (family, size) → (rows of Apple's rectangle above the cell, cell rows, spacing).
 # The cells are the ones these strikes have always had, so text lays out as before.
 LAYOUT = {
-    ("chicago", 12): (2, 13, 2),
-    ("geneva", 9): (2, 10, 1),
-    ("geneva", 10): (0, 12, 0),
-    ("geneva", 12): (2, 13, 0),
-    ("geneva", 14): (0, 18, 0),
-    ("geneva", 18): (0, 22, 0),
-    ("geneva", 20): (0, 24, 0),
-    ("geneva", 24): (0, 28, 0),
-    ("monaco", 9): (0, 11, 1),
-    ("monaco", 12): (0, 15, 0),
-    ("newYork", 9): (0, 12, 0),
-    ("newYork", 10): (0, 12, 0),
-    ("newYork", 12): (0, 15, 0),
-    ("newYork", 14): (0, 17, 0),
-    ("newYork", 18): (0, 21, 0),
-    ("newYork", 20): (0, 22, 0),
-    ("newYork", 24): (0, 26, 0),
+    ("chicane", 12): (2, 13, 2),
+    ("genova", 9): (2, 10, 1),
+    ("genova", 10): (0, 12, 0),
+    ("genova", 12): (2, 13, 0),
+    ("genova", 14): (0, 18, 0),
+    ("genova", 18): (0, 22, 0),
+    ("genova", 20): (0, 24, 0),
+    ("genova", 24): (0, 28, 0),
+    ("monoco", 9): (0, 11, 1),
+    ("monoco", 12): (0, 15, 0),
+    ("newark", 9): (0, 12, 0),
+    ("newark", 10): (0, 12, 0),
+    ("newark", 12): (0, 15, 0),
+    ("newark", 14): (0, 17, 0),
+    ("newark", 18): (0, 21, 0),
+    ("newark", 20): (0, 22, 0),
+    ("newark", 24): (0, 26, 0),
 }
 
 # Decker records whose extra letters supplement Apple's strike.
 DECKER_SUPPLEMENTS = {
-    ("geneva", 9): "BUILTIN_FONT_BODY",
-    ("chicago", 12): "BUILTIN_FONT_MENU",
-    ("monaco", 9): "BUILTIN_FONT_MONO",
+    ("genova", 9): "BUILTIN_FONT_BODY",
+    ("chicane", 12): "BUILTIN_FONT_MENU",
+    ("monoco", 9): "BUILTIN_FONT_MONO",
 }
 
 # Chicago's menu symbols. 0x14 (the Apple logo) is also Mac OS Roman 0xF0.

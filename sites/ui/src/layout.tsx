@@ -78,10 +78,10 @@ function Brand(): JSX.Element {
         if (key === "Enter" || key === " ") router.navigate("/");
       }}
     >
-      <text font="geneva" size={10} nowrap>
+      <text font="genova" size={10} nowrap>
         mockintosh/
       </text>
-      <text font="geneva" size={10} bold nowrap>
+      <text font="genova" size={10} bold nowrap>
         ui
       </text>
     </box>
@@ -99,7 +99,7 @@ function HeaderNav(): JSX.Element {
             label={link.title}
             active={headerActive(router.path(), link.href)}
             invert={false}
-            font="geneva"
+            font="genova"
             size={10}
           />
         )}
@@ -142,7 +142,7 @@ function CompactMenu(): JSX.Element {
             if (key === "Enter" || key === " ") setOpen((on) => !on);
           }}
         >
-          <text font="geneva" size={10} color={open() ? 0 : 1} nowrap>
+          <text font="genova" size={10} color={open() ? 0 : 1} nowrap>
             Menu
           </text>
         </box>
@@ -163,7 +163,7 @@ function CompactMenu(): JSX.Element {
         <For each={SIDEBAR}>
           {(section) => (
             <box flexDirection="column" gap={4}>
-              <text font="geneva" size={10} nowrap>
+              <text font="genova" size={10} nowrap>
                 {section.title}
               </text>
               <For each={section.items}>
@@ -220,9 +220,9 @@ function CompactHeader(): JSX.Element {
 function RegularHeader(): JSX.Element {
   const router = useRouter();
   const { measureText } = useMeasure();
-  const measure = (text: string) => measureText(text, "geneva", {}, 10);
+  const measure = (text: string) => measureText(text, "genova", {}, 10);
   const navLeft =
-    HEADER_PAD_X + measure("mockintosh/") + measureText("ui", "geneva", { bold: true }, 10) + HEADER_GAP;
+    HEADER_PAD_X + measure("mockintosh/") + measureText("ui", "genova", { bold: true }, 10) + HEADER_GAP;
   const [barX, setBarX] = createSignal(0);
   const [barW, setBarW] = createSignal(0);
   let frame = 0;
@@ -296,7 +296,7 @@ export function Sidebar(): JSX.Element {
       <For each={SIDEBAR}>
         {(section) => (
           <box flexDirection="column" gap={4}>
-            <text font="geneva" size={10} nowrap>
+            <text font="genova" size={10} nowrap>
               {section.title}
             </text>
             <For each={section.items}>

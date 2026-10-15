@@ -135,11 +135,11 @@ describe("outline families in the Font Manager", () => {
 describe("bitmap scaling order", () => {
   it("picks 2×, then ½, then the next larger size, then the largest", () => {
     // Geneva ships 9, 10, 12, 14, 18, 20, 24.
-    expect(getFontForScaling("geneva", 9)?.size).toBe(9);
-    expect(getFontForScaling("geneva", 7)?.size).toBe(14);
-    expect(getFontForScaling("geneva", 36)?.size).toBe(18);
-    expect(getFontForScaling("geneva", 11)?.size).toBe(12);
-    expect(getFontForScaling("geneva", 60)?.size).toBe(24);
+    expect(getFontForScaling("genova", 9)?.size).toBe(9);
+    expect(getFontForScaling("genova", 7)?.size).toBe(14);
+    expect(getFontForScaling("genova", 36)?.size).toBe(18);
+    expect(getFontForScaling("genova", 11)?.size).toBe(12);
+    expect(getFontForScaling("genova", 60)?.size).toBe(24);
   });
 });
 

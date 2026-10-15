@@ -1,6 +1,6 @@
 /**
  * Bake Font Manager bold of System 7.5.3 Geneva 9 (`body`) and Geneva 12
- * (`geneva12`) as their own faces, `bodyBold` and `geneva12Bold`.
+ * (`genova12`) as their own faces, `bodyBold` and `genova12Bold`.
  *
  * Apple's System FONDs only list plain Geneva 9/12. Bold on the original Mac
  * is this 1px smear — not a separate designed strike.
@@ -26,7 +26,7 @@ function smearFace(face: BitmapFace, name: string): BitmapFace {
 }
 
 function bake(source: string, size: number, name: string, constName: string, file: string, from: string): void {
-  const bold = smearFace(decodeFont(source, "geneva", { size }), name);
+  const bold = smearFace(decodeFont(source, "genova", { size }), name);
   const record = encodeFont(bold);
   const outPath = resolve(root, "packages/ui/src/fonts/faces", file);
   writeFileSync(
@@ -42,4 +42,4 @@ export const ${constName} = "${record}";
 }
 
 bake(SYSTEM_FONT_GENEVA_9, 9, "bodyBold", "BUILTIN_FONT_BODY_BOLD", "bodyBold.ts", "FONT 393 (Geneva 9)");
-bake(SYSTEM_FONT_GENEVA_12, 12, "geneva12Bold", "BUILTIN_FONT_GENEVA_12_BOLD", "genevaTwelveBold.ts", "FONT 396 (Geneva 12)");
+bake(SYSTEM_FONT_GENEVA_12, 12, "genova12Bold", "BUILTIN_FONT_GENEVA_12_BOLD", "genevaTwelveBold.ts", "FONT 396 (Geneva 12)");

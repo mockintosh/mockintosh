@@ -36,8 +36,8 @@ const SYSTEM_FONT_INFO: Readonly<Record<string, FontInfo>> = {
   menu: { ascent: 12, descent: 3, leading: 1 }, // Chicago 12
   body: { ascent: 10, descent: 2, leading: 0 }, // Geneva 9
   bodyBold: { ascent: 10, descent: 2, leading: 0 }, // Geneva 9 Bold (FM smear)
-  geneva12: { ascent: 12, descent: 3, leading: 1 }, // FONT 396
-  geneva12Bold: { ascent: 12, descent: 3, leading: 1 }, // FONT 396 Bold (FM smear)
+  genova12: { ascent: 12, descent: 3, leading: 1 }, // FONT 396
+  genova12Bold: { ascent: 12, descent: 3, leading: 1 }, // FONT 396 Bold (FM smear)
   mono: { ascent: 9, descent: 2, leading: 0 }, // Monaco 9
   lisa: { ascent: 10, descent: 2, leading: 0 }, // LisaTerminal Paper Raw
 };

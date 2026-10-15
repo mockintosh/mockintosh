@@ -187,7 +187,7 @@ function startSession(app: AppContext, screenWidth: number, screenHeight: number
     fontNames: () => listFontFamilies().map((f) => f.name),
     fontLabel: (name) => listFontFamilies().find((f) => f.name === name)?.displayName,
     fontNumber: (name) => fontFamilyId(name),
-    applicationFont: () => "geneva",
+    applicationFont: () => "genova",
   };
 
   const program = new PaintProgram(host, () => app.scheduler.now(), rect(0, 0, screenWidth, screenHeight), file);

@@ -26,58 +26,78 @@ export interface FontStrikeSpec {
   info?: { ascent: number; descent: number; leading: number };
 }
 
+export const FAMILY_DEFAULTS: Readonly<Record<string, number>> = {
+  chicane: 12,
+  genova: 9,
+  monoco: 9,
+  newark: 12,
+  vence: 14,
+  londinium: 18,
+  athene: 18,
+  sanfrisco: 18,
+  taranto: 12,
+  kairos: 18,
+  losalamos: 12,
+};
+
+/**
+ * Apple's names for the built-in families (trademarks, so the families go by
+ * other names) → registry key. Documents saved under the old keys still open.
+ */
+export const FORMER_FAMILY_NAMES: Readonly<Record<string, string>> = {
+  chicago: "chicane",
+  geneva: "genova",
+  monaco: "monoco",
+  newYork: "newark",
+  venice: "vence",
+  london: "londinium",
+  athens: "athene",
+  sanFrancisco: "sanfrisco",
+  toronto: "taranto",
+  cairo: "kairos",
+  losAngeles: "losalamos",
+};
+
 /** Role names keep existing `<text font="body">` call sites. */
 export const ROLE_ALIASES: Readonly<Record<string, { family: string; size: number }>> = {
-  body: { family: "geneva", size: 9 },
-  menu: { family: "chicago", size: 12 },
-  mono: { family: "monaco", size: 9 },
-  geneva12: { family: "geneva", size: 12 },
+  body: { family: "genova", size: 9 },
+  menu: { family: "chicane", size: 12 },
+  mono: { family: "monoco", size: 9 },
+  genova12: { family: "genova", size: 12 },
+  // The Apple names these families shipped under before they were renamed.
+  ...Object.fromEntries(
+    Object.entries(FORMER_FAMILY_NAMES).map(([old, family]) => [old, { family, size: FAMILY_DEFAULTS[family]! }]),
+  ),
 };
 
 /** Baked FM smears — resolvable by the old name, not listed as families. */
 export const BAKED_STYLE_ALIASES: Readonly<Record<string, { family: string; size: number; data: string }>> = {
-  bodyBold: { family: "geneva", size: 9, data: BUILTIN_FONT_BODY_BOLD },
-  geneva12Bold: { family: "geneva", size: 12, data: BUILTIN_FONT_GENEVA_12_BOLD },
-};
-
-export const FAMILY_DEFAULTS: Readonly<Record<string, number>> = {
-  chicago: 12,
-  geneva: 9,
-  monaco: 9,
-  newYork: 12,
-  venice: 14,
-  london: 18,
-  athens: 18,
-  sanFrancisco: 18,
-  toronto: 12,
-  cairo: 18,
-  losAngeles: 12,
+  bodyBold: { family: "genova", size: 9, data: BUILTIN_FONT_BODY_BOLD },
+  genova12Bold: { family: "genova", size: 12, data: BUILTIN_FONT_GENEVA_12_BOLD },
 };
 
 /** Menu names for built-in families whose key isn't just the name lowercased. */
 const BUILTIN_DISPLAY_NAMES: Readonly<Record<string, string>> = {
-  newYork: "New York",
-  sanFrancisco: "San Francisco",
-  losAngeles: "Los Angeles",
+  losalamos: "Los Alamos",
 };
 
-/** How a menu shows a family key: `newYork` → "New York", `futura` → "Futura". */
+/** How a menu shows a family key: `losalamos` → "Los Alamos", `futura` → "Futura". */
 export function familyDisplayName(key: string): string {
   return BUILTIN_DISPLAY_NAMES[key] ?? key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 }
 
 export const CITY_FAMILY_ORDER = [
-  "chicago",
-  "geneva",
-  "newYork",
-  "monaco",
-  "venice",
-  "london",
-  "athens",
-  "sanFrancisco",
-  "toronto",
-  "cairo",
-  "losAngeles",
+  "chicane",
+  "genova",
+  "newark",
+  "monoco",
+  "vence",
+  "londinium",
+  "athene",
+  "sanfrisco",
+  "taranto",
+  "kairos",
+  "losalamos",
 ] as const;
 
 /** Chicago, Geneva, Monaco and New York from System 7.5.3; the other city fonts from System 6.0.8. */

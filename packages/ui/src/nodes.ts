@@ -427,7 +427,7 @@ export type TextVerticalAlign = "top" | "middle" | "bottom";
 export interface TextProps extends LayoutStyle, EventHandlers, SemanticProps {
   font?: string;
   /**
-   * Native bitmap point size for a family (`font="geneva" size={12}`).
+   * Native bitmap point size for a family (`font="genova" size={12}`).
    * Omitted uses the family's default (Geneva 9, Chicago 12, …).
    * A size Apple did not ship snaps to the nearest native strike.
    */

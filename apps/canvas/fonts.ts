@@ -4,7 +4,7 @@ import { defaultFontSize, getFont, listFontSizes, type FontFamilyInfo } from "@m
 export const SCALABLE_SIZES = [9, 10, 12, 14, 18, 24, 36, 48, 72] as const;
 
 /** Older documents name the system faces by role; the Font menu names families. */
-const ROLE_FAMILY: Readonly<Record<string, string>> = { body: "geneva", menu: "chicago", mono: "monaco" };
+const ROLE_FAMILY: Readonly<Record<string, string>> = { body: "genova", menu: "chicane", mono: "monoco" };
 
 /** The Font menu entry a text element's font checks. */
 export function fontFamilyOf(font: string): string {

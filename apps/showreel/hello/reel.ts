@@ -163,7 +163,7 @@ function powerOn(sc: Screen, t: number, cast: Cast): void {
   if (t >= 1.97) return;
   // "Welcome to Mockintosh." and the extensions marching in along the bottom.
   const text = "Welcome to Mockintosh.";
-  const tw = sc.measure(text, { font: "chicago" }).width;
+  const tw = sc.measure(text, { font: "chicane" }).width;
   const box = {
     x0: cx - Math.round(tw / 2) - 28 * z,
     y0: sc.y(84) - 34 * z,
@@ -171,7 +171,7 @@ function powerOn(sc: Screen, t: number, cast: Cast): void {
     y1: sc.y(84) + 26 * z,
   };
   const inside = dialogFrame(sc, box);
-  sc.centered(text, cx, inside.y0 + 12 * z, { font: "chicago" });
+  sc.centered(text, cx, inside.y0 + 12 * z, { font: "chicane" });
   const f = seg(t, 1.15, 1.9);
   const stepped = Math.floor(f * 9 + hash(Math.floor(f * 9), 3) * 0.9) / 9;
   progressBar(
@@ -211,7 +211,7 @@ function helloWord(sc: Screen, u0: number, v0: number, u1: number, v1: number): 
   const key = `${sc.stage.scale}:${sc.stage.x}:${sc.stage.y}:${u0},${v0},${u1},${v1}`;
   const hit = wordCache.get(key);
   if (hit) return hit;
-  const base = { font: "losAngeles", size: 24, k: 1 };
+  const base = { font: "losalamos", size: 24, k: 1 };
   const one = sc.measure("hello", base);
   const k = Math.max(1, Math.min(Math.floor(sc.len(u1 - u0) / one.width), Math.floor(sc.len(v1 - v0) / one.height)));
   const style = { ...base, k };
@@ -433,7 +433,7 @@ function typeCards(sc: Screen, t: number, cast: Cast): void {
       sc.fill(box.x, y - 4 * z, box.x + z, y + 5 * z, 1);
       sc.fill(box.x + box.width - z, y - 4 * z, box.x + box.width, y + 5 * z, 1);
       sc.centered("512 pixels", box.x + box.width / 2, y - 12 * z, {
-        font: "geneva",
+        font: "genova",
         size: 9,
       });
       const x = box.x + box.width + 10 * z;
@@ -441,7 +441,7 @@ function typeCards(sc: Screen, t: number, cast: Cast): void {
       sc.fill(x - 4 * z, box.y, x + 5 * z, box.y + z, 1);
       sc.fill(x - 4 * z, box.y + box.height - z, x + 5 * z, box.y + box.height, 1);
       sc.centered("342", box.x + box.width / 2, box.y + box.height + 6 * z, {
-        font: "geneva",
+        font: "genova",
         size: 9,
       });
     }
@@ -545,9 +545,9 @@ function shutDown(sc: Screen, t: number, cast: Cast): void {
     const cx = sc.x(160);
     sc.sprite(cast.happy, cx - Math.round((cast.happy.width * k) / 2), sc.y(82) - cast.happy.height * k, k);
     // The wordmark drops in a letter at a time.
-    const markHeight = sc.measure(WORDMARK, { font: "chicago", k: 1 }).height;
+    const markHeight = sc.measure(WORDMARK, { font: "chicane", k: 1 }).height;
     const style = {
-      font: "chicago",
+      font: "chicane",
       k: Math.max(z, Math.round(sc.len(34) / markHeight)),
     };
     const width = sc.measure(WORDMARK, style).width;
@@ -566,7 +566,7 @@ function shutDown(sc: Screen, t: number, cast: Cast): void {
     const typed = Math.floor(seg(t, 13.12, 13.45) * TAGLINE.length);
     if (typed > 0)
       sc.centered(TAGLINE.slice(0, typed), cx, sc.y(132), {
-        font: "geneva",
+        font: "genova",
         size: 12,
       });
     if (t >= 13.4) {
@@ -594,7 +594,7 @@ function shutDown(sc: Screen, t: number, cast: Cast): void {
   }
   desk(sc);
   const lines = ["It is now safe to switch off", "your Mockintosh."];
-  const tw = Math.max(...lines.map((l) => sc.measure(l, { font: "chicago" }).width));
+  const tw = Math.max(...lines.map((l) => sc.measure(l, { font: "chicane" }).width));
   const cx = sc.x(160);
   const cy = sc.y(90);
   const box = {
@@ -607,7 +607,7 @@ function shutDown(sc: Screen, t: number, cast: Cast): void {
   sc.sprite(cast.happy, inside.x0 + 8 * z, inside.y0 + 8 * z, z);
   lines.forEach((l, i) =>
     sc.text(l, inside.x0 + 48 * z, inside.y0 + 10 * z + i * 16 * z, {
-      font: "chicago",
+      font: "chicane",
     }),
   );
   button(

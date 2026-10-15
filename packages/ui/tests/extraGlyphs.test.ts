@@ -24,7 +24,7 @@ import {
 import { requireFont } from "../src/fonts/registry";
 import { measureText } from "../src/fonts/bridge";
 
-const BUILTIN_FONTS = ["body", "menu", "mono", "bodyBold", "geneva12", "geneva12Bold"] as const;
+const BUILTIN_FONTS = ["body", "menu", "mono", "bodyBold", "genova12", "genova12Bold"] as const;
 const SYMBOLS = [COMMAND_KEY, CHECK_MARK, BULLET];
 
 function glyphHasInk(font: BitmapFace, ordinal: number): boolean {

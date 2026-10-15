@@ -17,7 +17,7 @@ export interface DialogProps {
 /** Title line. Geneva 10, like other chrome labels. */
 export function DialogTitle(props: { children: string }): JSX.Element {
   return (
-    <text font="geneva" size={10} nowrap>
+    <text font="genova" size={10} nowrap>
       {props.children}
     </text>
   );

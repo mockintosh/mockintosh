@@ -44,7 +44,7 @@ export type PrintableText = (text: string, face: LabelFace) => string | null;
 // Weight comes from the faces themselves (Chicago, Geneva at 12 and 9),
 // never from the Font Manager's bold smear.
 const BODY: LabelFace = { font: "body" };
-const LARGE: LabelFace = { font: "geneva12" };
+const LARGE: LabelFace = { font: "genova12" };
 const CHICAGO: LabelFace = { font: spacedFontName("menu", 1) };
 const CAPS: LabelFace = { font: "body", upper: true, tracking: 1 };
 /** Water and islands: Apple's own Geneva 9 Italic, set apart from the upright land names. */
@@ -86,7 +86,7 @@ function placeStyle(f: TileFeature, zoom: number): PlaceStyle | null {
     case "continent":
       return zoom <= 2 ? { face: CAPS, priority: 0, marker: "none" } : null;
     case "country":
-      return zoom <= 8 ? { face: zoom <= 4 ? CAPS : { ...CAPS, font: "geneva12" }, priority: 1 + r, marker: "none" } : null;
+      return zoom <= 8 ? { face: zoom <= 4 ? CAPS : { ...CAPS, font: "genova12" }, priority: 1 + r, marker: "none" } : null;
     case "state":
     case "province":
       return zoom >= 5 && zoom <= 9 ? { face: CAPS, priority: 40 + r, marker: "none" } : null;

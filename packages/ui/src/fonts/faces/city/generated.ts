@@ -22,16 +22,16 @@ export interface CityStrike {
 
 /** Venice, London, Athens, San Francisco, Toronto, Cairo and Los Angeles. */
 export const CITY_GENERATED: readonly CityStrike[] = [
-  { family: "athens", size: 18, data: CITY_FONT_ATHENS_18, info: { ascent: 18, descent: 4, leading: 1 } },
-  { family: "cairo", size: 18, data: CITY_FONT_CAIRO_18, info: { ascent: 20, descent: 4, leading: 2 } },
-  { family: "london", size: 18, data: CITY_FONT_LONDON_18, info: { ascent: 17, descent: 3, leading: 3 } },
-  { family: "losAngeles", size: 12, data: CITY_FONT_LOS_ANGELES_12, info: { ascent: 11, descent: 3, leading: 2 } },
-  { family: "losAngeles", size: 24, data: CITY_FONT_LOS_ANGELES_24, info: { ascent: 22, descent: 6, leading: 1 } },
-  { family: "sanFrancisco", size: 18, data: CITY_FONT_SAN_FRANCISCO_18, info: { ascent: 16, descent: 4, leading: 3 } },
-  { family: "toronto", size: 9, data: CITY_FONT_TORONTO_9, info: { ascent: 10, descent: 2, leading: 0 } },
-  { family: "toronto", size: 12, data: CITY_FONT_TORONTO_12, info: { ascent: 12, descent: 3, leading: 1 } },
-  { family: "toronto", size: 14, data: CITY_FONT_TORONTO_14, info: { ascent: 14, descent: 3, leading: 2 } },
-  { family: "toronto", size: 18, data: CITY_FONT_TORONTO_18, info: { ascent: 18, descent: 5, leading: 0 } },
-  { family: "toronto", size: 24, data: CITY_FONT_TORONTO_24, info: { ascent: 23, descent: 6, leading: 0 } },
-  { family: "venice", size: 14, data: CITY_FONT_VENICE_14, info: { ascent: 15, descent: 4, leading: 0 } },
+  { family: "athene", size: 18, data: CITY_FONT_ATHENS_18, info: { ascent: 18, descent: 4, leading: 1 } },
+  { family: "kairos", size: 18, data: CITY_FONT_CAIRO_18, info: { ascent: 20, descent: 4, leading: 2 } },
+  { family: "londinium", size: 18, data: CITY_FONT_LONDON_18, info: { ascent: 17, descent: 3, leading: 3 } },
+  { family: "losalamos", size: 12, data: CITY_FONT_LOS_ANGELES_12, info: { ascent: 11, descent: 3, leading: 2 } },
+  { family: "losalamos", size: 24, data: CITY_FONT_LOS_ANGELES_24, info: { ascent: 22, descent: 6, leading: 1 } },
+  { family: "sanfrisco", size: 18, data: CITY_FONT_SAN_FRANCISCO_18, info: { ascent: 16, descent: 4, leading: 3 } },
+  { family: "taranto", size: 9, data: CITY_FONT_TORONTO_9, info: { ascent: 10, descent: 2, leading: 0 } },
+  { family: "taranto", size: 12, data: CITY_FONT_TORONTO_12, info: { ascent: 12, descent: 3, leading: 1 } },
+  { family: "taranto", size: 14, data: CITY_FONT_TORONTO_14, info: { ascent: 14, descent: 3, leading: 2 } },
+  { family: "taranto", size: 18, data: CITY_FONT_TORONTO_18, info: { ascent: 18, descent: 5, leading: 0 } },
+  { family: "taranto", size: 24, data: CITY_FONT_TORONTO_24, info: { ascent: 23, descent: 6, leading: 0 } },
+  { family: "vence", size: 14, data: CITY_FONT_VENICE_14, info: { ascent: 15, descent: 4, leading: 0 } },
 ];

@@ -87,7 +87,7 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
         ],
       },
       // Geneva 12: 1px strokes, caps on rows 1–9.
-      geneva12: {
+      genova12: {
         top: 1,
         rows: [
           ".#.....#.",
@@ -101,7 +101,7 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
           ".#.....#.",
         ],
       },
-      geneva12Bold: {
+      genova12Bold: {
         top: 1,
         rows: [
           ".##....##.",
@@ -168,7 +168,7 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
           "..##....",
         ],
       },
-      geneva12: {
+      genova12: {
         top: 2,
         rows: [
           ".......#",
@@ -180,7 +180,7 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
           "..#.....",
         ],
       },
-      geneva12Bold: {
+      genova12Bold: {
         top: 2,
         rows: [
           ".......##",
@@ -238,7 +238,7 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
           ".###.",
         ],
       },
-      geneva12: {
+      genova12: {
         top: 5,
         rows: [
           ".##.",
@@ -247,7 +247,7 @@ export const EXTRA_GLYPHS: readonly ExtraGlyphDefinition[] = [
           ".##.",
         ],
       },
-      geneva12Bold: {
+      genova12Bold: {
         top: 5,
         rows: [
           ".###.",
@@ -371,10 +371,10 @@ export function writePixelGlyph(font: BitmapFace, ordinal: number, glyph: PixelG
  * `extraGlyphs.test.ts` asserts every built-in font draws every symbol.
  */
 const EXTRA_FACE_ALIASES: Readonly<Record<string, string>> = {
-  "geneva/9": "body",
-  "chicago/12": "menu",
-  "monaco/9": "mono",
-  "geneva/12": "geneva12",
+  "genova/9": "body",
+  "chicane/12": "menu",
+  "monoco/9": "mono",
+  "genova/12": "genova12",
 };
 
 function extraGlyphLookupKeys(font: BitmapFace): string[] {
